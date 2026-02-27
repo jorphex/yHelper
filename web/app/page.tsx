@@ -81,7 +81,22 @@ type OverviewResponse = {
     ydaemon: string;
     kong_gql: string;
   };
+  data_policy?: {
+    worker_interval_sec?: number;
+    pps_retention_days?: number;
+    ingestion_run_retention_days?: number;
+    db_cleanup_min_interval_sec?: number;
+    kong_pps_lookback_days?: number;
+  };
 };
+
+function formatIntervalSeconds(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "n/a";
+  if (value < 60) return `${value}s`;
+  if (value % 3600 === 0) return `${value / 3600}h`;
+  if (value % 60 === 0) return `${value / 60}m`;
+  return `${value}s`;
+}
 
 export default function HomePage() {
   const [data, setData] = useState<OverviewResponse | null>(null);
@@ -166,6 +181,26 @@ export default function HomePage() {
           <p>Loading live status…</p>
         ) : (
           <p>API unavailable. Start services with Docker Compose.</p>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Data Cadence and Retention</h2>
+        <p className="muted card-intro">
+          Ingestion frequency and retention windows decide how fast data updates and how far back history is kept.
+        </p>
+        {data?.data_policy ? (
+          <KpiGrid
+            items={[
+              { label: "Worker Tick", value: formatIntervalSeconds(data.data_policy.worker_interval_sec) },
+              { label: "Kong Lookback", value: `${data.data_policy.kong_pps_lookback_days ?? "n/a"}d` },
+              { label: "PPS Retention", value: `${data.data_policy.pps_retention_days ?? "n/a"}d` },
+              { label: "Run-Log Retention", value: `${data.data_policy.ingestion_run_retention_days ?? "n/a"}d` },
+              { label: "Cleanup Cadence", value: formatIntervalSeconds(data.data_policy.db_cleanup_min_interval_sec) },
+            ]}
+          />
+        ) : (
+          <p>Policy metadata unavailable.</p>
         )}
       </section>
 

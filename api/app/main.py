@@ -39,6 +39,11 @@ DEFI_LLAMA_CACHE_TTL_SEC = int(os.getenv("DEFI_LLAMA_CACHE_TTL_SEC", "600"))
 ASSETS_FEATURED_MIN_TVL_USD = float(os.getenv("API_ASSETS_FEATURED_MIN_TVL_USD", "5000000"))
 ASSETS_FEATURED_MIN_VENUES = int(os.getenv("API_ASSETS_FEATURED_MIN_VENUES", "2"))
 ASSETS_FEATURED_MIN_CHAINS = int(os.getenv("API_ASSETS_FEATURED_MIN_CHAINS", "1"))
+WORKER_INTERVAL_SEC = int(os.getenv("WORKER_INTERVAL_SEC", "300"))
+PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
+INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
+DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
+KONG_PPS_LOOKBACK_DAYS = int(os.getenv("KONG_PPS_LOOKBACK_DAYS", "119"))
 
 _defillama_cache: dict[str, object] = {"fetched_at_epoch": 0.0, "snapshot": None}
 
@@ -798,6 +803,13 @@ async def overview() -> dict[str, object]:
         "sources": {
             "ydaemon": os.getenv("YDAEMON_URL", "https://ydaemon.yearn.fi/vaults/detected?limit=2000"),
             "kong_gql": os.getenv("KONG_GQL_URL", "https://kong.yearn.farm/api/gql"),
+        },
+        "data_policy": {
+            "worker_interval_sec": WORKER_INTERVAL_SEC,
+            "pps_retention_days": PPS_RETENTION_DAYS,
+            "ingestion_run_retention_days": INGESTION_RUN_RETENTION_DAYS,
+            "db_cleanup_min_interval_sec": DB_CLEANUP_MIN_INTERVAL_SEC,
+            "kong_pps_lookback_days": KONG_PPS_LOOKBACK_DAYS,
         },
         "ingestion": {
             "active_vaults": active_vaults,
