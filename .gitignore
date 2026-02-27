@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 
+# Local planning/notes (kept out of git history)
+NOTES.md
+PLAN.md
+
 # Python
 __pycache__/
 *.py[cod]
