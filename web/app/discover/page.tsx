@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, regimeLabel, shortVaultLabel } from "../lib/format";
+import { chainLabel, formatPct, formatUsd, regimeLabel, shortVaultLabel, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryBool, queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, KpiGrid } from "../components/visuals";
@@ -480,7 +480,16 @@ function DiscoverPageContent() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.vault_address}>
-                  <td title={row.vault_address}>{shortVaultLabel(row.symbol, row.vault_address)}</td>
+                  <td title={row.vault_address}>
+                    <Link
+                      href={yearnVaultUrl(row.chain_id, row.vault_address)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="vault-link"
+                    >
+                      {shortVaultLabel(row.symbol, row.vault_address)}
+                    </Link>
+                  </td>
                   <td>
                     <Link
                       href={`/regimes?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}

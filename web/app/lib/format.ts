@@ -56,6 +56,10 @@ export function shortVaultLabel(symbol: string | null | undefined, address: stri
   return address.slice(0, 10);
 }
 
+export function yearnVaultUrl(chainId: number, address: string): string {
+  return `https://yearn.fi/vaults/${chainId}/${encodeURIComponent(address)}`;
+}
+
 export function regimeLabel(value: string | null | undefined): string {
   if (!value) return "Unknown";
   const key = value.toLowerCase();

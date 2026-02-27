@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, shortVaultLabel } from "../lib/format";
+import { chainLabel, formatPct, formatUsd, shortVaultLabel, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, KpiGrid } from "../components/visuals";
@@ -681,7 +681,16 @@ function CompositionPageContent() {
             <tbody>
               {crowdedRows.map((row) => (
                 <tr key={`crowded-${row.vault_address}`}>
-                  <td title={row.vault_address}>{shortVaultLabel(row.symbol, row.vault_address)}</td>
+                  <td title={row.vault_address}>
+                    <Link
+                      href={yearnVaultUrl(row.chain_id, row.vault_address)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="vault-link"
+                    >
+                      {shortVaultLabel(row.symbol, row.vault_address)}
+                    </Link>
+                  </td>
                   <td>
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
@@ -807,7 +816,16 @@ function CompositionPageContent() {
             <tbody>
               {uncrowdedRows.map((row) => (
                 <tr key={`uncrowded-${row.vault_address}`}>
-                  <td title={row.vault_address}>{shortVaultLabel(row.symbol, row.vault_address)}</td>
+                  <td title={row.vault_address}>
+                    <Link
+                      href={yearnVaultUrl(row.chain_id, row.vault_address)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="vault-link"
+                    >
+                      {shortVaultLabel(row.symbol, row.vault_address)}
+                    </Link>
+                  </td>
                   <td>
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}

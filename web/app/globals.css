@@ -279,6 +279,19 @@ a:hover {
   color: var(--accent-2);
 }
 
+.vault-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  white-space: nowrap;
+}
+
+.vault-link::after {
+  content: "↗";
+  font-size: 0.72em;
+  opacity: 0.75;
+}
+
 .table-wrap {
   width: 100%;
   max-width: 100%;
