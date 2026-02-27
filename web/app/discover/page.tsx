@@ -413,7 +413,7 @@ function DiscoverPageContent() {
       <section className="card">
         <h2>Vault Universe</h2>
         <p className="muted card-intro">
-          Filtered vaults with enough TVL and data history to reduce noisy outliers. Switch to Analyst mode for extra context columns. Rows:{" "}
+          Filtered vaults with enough TVL and data history to reduce noisy outliers. Switch to Dense mode for extra context columns. Rows:{" "}
           {data?.pagination.total ?? "loading..."}
         </p>
         <div className="table-wrap">

@@ -137,7 +137,7 @@ function MoverTable({
     <section className="card">
       <h2>{title}</h2>
       <p className="muted card-intro">
-        Click columns to sort by signal, size, or data staleness. Analyst mode adds token/category and previous-APY context columns.
+        Click columns to sort by signal, size, or data staleness. Dense mode adds token/category and previous-APY context columns.
       </p>
       <div className="table-wrap">
         <table>

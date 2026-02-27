@@ -1458,6 +1458,7 @@ async def chains_rollups(
 @app.get("/api/assets")
 async def assets(
     universe: Literal["core", "extended", "raw"] = "core",
+    token_scope: Literal["canonical", "all"] = "canonical",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     min_points: int | None = Query(default=None, ge=0),
     max_vaults: int | None = Query(default=None, ge=0),
@@ -1481,11 +1482,23 @@ async def assets(
     order_dir = "ASC" if direction == "asc" else "DESC"
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
+    token_type_sql = """
+        CASE
+            WHEN COALESCE(d.token_symbol, '') ~ '[-_/]' THEN 'structured'
+            WHEN LOWER(COALESCE(d.token_symbol, '')) LIKE '%%curve%%' THEN 'structured'
+            WHEN LOWER(COALESCE(d.token_symbol, '')) LIKE '%%pool%%' THEN 'structured'
+            WHEN LOWER(COALESCE(d.token_symbol, '')) LIKE 'lp%%' THEN 'structured'
+            WHEN LOWER(COALESCE(d.token_symbol, '')) LIKE '%%-lp%%' THEN 'structured'
+            WHEN LENGTH(COALESCE(d.token_symbol, '')) > 14 THEN 'structured'
+            ELSE 'canonical'
+        END
+    """
     tokens_cte = f"""
         WITH filtered AS (
             SELECT
                 LOWER(COALESCE(d.token_symbol, '')) AS token_symbol_key,
                 COALESCE(NULLIF(d.token_symbol, ''), 'unknown') AS token_symbol,
+                {token_type_sql} AS token_type,
                 d.chain_id,
                 COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
                 LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s) AS safe_apy_30d
@@ -1498,9 +1511,36 @@ async def assets(
                 AND COALESCE(m.points_count, 0) >= %(min_points)s
                 {rank_clause}
         ),
+        token_all AS (
+            SELECT
+                token_symbol_key,
+                token_symbol,
+                MAX(token_type) AS token_type
+            FROM filtered
+            GROUP BY token_symbol_key, token_symbol
+        ),
+        scoped_tokens AS (
+            SELECT token_symbol_key, token_symbol, token_type
+            FROM token_all
+            WHERE %(token_scope)s = 'all' OR token_type = 'canonical'
+        ),
+        scoped AS (
+            SELECT
+                f.token_symbol_key,
+                f.token_symbol,
+                t.token_type,
+                f.chain_id,
+                f.tvl_usd,
+                f.safe_apy_30d
+            FROM filtered f
+            JOIN scoped_tokens t
+              ON t.token_symbol_key = f.token_symbol_key
+             AND t.token_symbol = f.token_symbol
+        ),
         token_agg AS (
             SELECT
                 token_symbol,
+                token_type,
                 COUNT(*) AS venues,
                 COUNT(DISTINCT chain_id) AS chains,
                 SUM(tvl_usd) AS total_tvl_usd,
@@ -1512,11 +1552,12 @@ async def assets(
                     THEN SUM(tvl_usd * safe_apy_30d) / SUM(tvl_usd)
                     ELSE NULL
                 END AS weighted_safe_apy_30d
-            FROM filtered
-            GROUP BY token_symbol_key, token_symbol
+            FROM scoped
+            GROUP BY token_symbol_key, token_symbol, token_type
         )
     """
     sql_params = {
+        "token_scope": token_scope,
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "limit": limit,
@@ -1533,6 +1574,7 @@ async def assets(
                 + """
                 SELECT
                     token_symbol,
+                    token_type,
                     venues,
                     chains,
                     total_tvl_usd,
@@ -1569,7 +1611,10 @@ async def assets(
                     (
                         SELECT MAX(total_tvl_usd) / NULLIF(SUM(total_tvl_usd), 0)
                         FROM token_agg
-                    ) AS top_token_tvl_share
+                    ) AS top_token_tvl_share,
+                    (SELECT COUNT(*) FROM token_all) AS tokens_available_all,
+                    (SELECT COUNT(*) FROM token_all WHERE token_type = 'canonical') AS tokens_available_canonical,
+                    (SELECT COUNT(*) FROM token_all WHERE token_type = 'structured') AS tokens_available_structured
                 FROM token_agg
                 """,
                 sql_params,
@@ -1584,6 +1629,7 @@ async def assets(
     return {
         "filters": {
             "universe": universe,
+            "token_scope": token_scope,
             "min_tvl_usd": min_tvl_usd,
             "min_points": min_points,
             "max_vaults": max_vaults,

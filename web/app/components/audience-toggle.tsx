@@ -46,7 +46,7 @@ export function AudienceToggle() {
         aria-pressed={mode === "guide"}
         onClick={() => setMode("guide")}
       >
-        Simple
+        Guided
       </button>
       <button
         type="button"
@@ -54,7 +54,7 @@ export function AudienceToggle() {
         aria-pressed={mode === "analyst"}
         onClick={() => setMode("analyst")}
       >
-        Detailed
+        Dense
       </button>
     </div>
   );

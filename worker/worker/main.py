@@ -22,6 +22,10 @@ KONG_PPS_LOOKBACK_DAYS = int(os.getenv("KONG_PPS_LOOKBACK_DAYS", str(max(KONG_PP
 KONG_PPS_ANCHOR_SLACK_DAYS = int(os.getenv("KONG_PPS_ANCHOR_SLACK_DAYS", "3"))
 KONG_TIMEOUT_SEC = int(os.getenv("KONG_TIMEOUT_SEC", "12"))
 KONG_SLEEP_BETWEEN_REQ_MS = int(os.getenv("KONG_SLEEP_BETWEEN_REQ_MS", "10"))
+PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
+INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
+DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
+DB_CLEANUP_ENABLED = os.getenv("DB_CLEANUP_ENABLED", "1") == "1"
 JOB_YDAEMON = "ydaemon_snapshot"
 JOB_KONG = "kong_pps_metrics"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
@@ -31,6 +35,7 @@ ALERT_TELEGRAM_BOT_TOKEN = os.getenv("ALERT_TELEGRAM_BOT_TOKEN", "").strip()
 ALERT_TELEGRAM_CHAT_ID = os.getenv("ALERT_TELEGRAM_CHAT_ID", "").strip()
 ALERT_DISCORD_WEBHOOK_URL = os.getenv("ALERT_DISCORD_WEBHOOK_URL", "").strip()
 RUNNING_STALE_SECONDS = int(os.getenv("RUNNING_STALE_SECONDS", "1800"))
+LAST_CLEANUP_AT: datetime | None = None
 
 KONG_PPS_QUERY = """
 query Query($label: String!, $chainId: Int, $address: String, $component: String, $limit: Int, $timestamp: BigInt) {
@@ -819,6 +824,45 @@ def _upsert_metrics(conn: psycopg.Connection, rows: list[dict]) -> int:
     return len(rows)
 
 
+def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
+    deleted_pps = 0
+    deleted_runs = 0
+    with conn.cursor() as cur:
+        if PPS_RETENTION_DAYS > 0:
+            cutoff_ts = int((datetime.now(UTC) - timedelta(days=PPS_RETENTION_DAYS)).timestamp())
+            cur.execute("DELETE FROM pps_timeseries WHERE ts < %s", (cutoff_ts,))
+            deleted_pps = cur.rowcount
+        if INGESTION_RUN_RETENTION_DAYS > 0:
+            cur.execute(
+                "DELETE FROM ingestion_runs WHERE started_at < NOW() - (%s * INTERVAL '1 day')",
+                (INGESTION_RUN_RETENTION_DAYS,),
+            )
+            deleted_runs = cur.rowcount
+    conn.commit()
+    return {"pps_timeseries": deleted_pps, "ingestion_runs": deleted_runs}
+
+
+def _maybe_cleanup_old_data(conn: psycopg.Connection) -> None:
+    global LAST_CLEANUP_AT
+    if not DB_CLEANUP_ENABLED:
+        return
+    now = datetime.now(UTC)
+    if LAST_CLEANUP_AT is not None:
+        elapsed = max(0, int((now - LAST_CLEANUP_AT).total_seconds()))
+        if elapsed < DB_CLEANUP_MIN_INTERVAL_SEC:
+            return
+    result = _cleanup_old_data(conn)
+    LAST_CLEANUP_AT = now
+    if result["pps_timeseries"] > 0 or result["ingestion_runs"] > 0:
+        logging.info(
+            "DB cleanup removed rows: pps_timeseries=%s ingestion_runs=%s",
+            result["pps_timeseries"],
+            result["ingestion_runs"],
+        )
+    else:
+        logging.info("DB cleanup check completed; no rows removed")
+
+
 def _run_ydaemon_ingestion(conn: psycopg.Connection) -> tuple[int, int]:
     started_at = datetime.now(UTC)
     run_id = _insert_run(conn, JOB_YDAEMON, started_at)
@@ -891,6 +935,7 @@ def run_once() -> None:
         else:
             logging.warning("Skipping Kong ingestion because yDaemon snapshot stored 0 records")
         _evaluate_alerts(conn)
+        _maybe_cleanup_old_data(conn)
 
 
 def main() -> None:

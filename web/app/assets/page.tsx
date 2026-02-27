@@ -12,6 +12,7 @@ import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "
 
 type AssetRow = {
   token_symbol: string;
+  token_type?: "canonical" | "structured";
   venues: number;
   chains: number;
   total_tvl_usd: number | null;
@@ -21,8 +22,14 @@ type AssetRow = {
 };
 
 type AssetsResponse = {
+  filters?: {
+    token_scope?: "canonical" | "all";
+  };
   summary?: {
     tokens?: number;
+    tokens_available_all?: number;
+    tokens_available_canonical?: number;
+    tokens_available_structured?: number;
     total_tvl_usd?: number;
     total_venues?: number;
     avg_venues_per_token?: number | null;
@@ -72,6 +79,7 @@ type AssetVenuesResponse = {
 type TokenSortKey = "token" | "venues" | "chains" | "tvl" | "best" | "weighted" | "spread";
 type VenueSortKey = "vault" | "chain" | "category" | "version" | "tvl" | "apy" | "momentum" | "consistency" | "regime";
 type AssetApiSort = "tvl" | "spread" | "best_apy" | "venues";
+type TokenScope = "canonical" | "all";
 
 function AssetsPageContent() {
   const router = useRouter();
@@ -92,6 +100,7 @@ function AssetsPageContent() {
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
       minPoints: queryInt(searchParams, "min_points", defaults.minPoints, { min: 0, max: 365 }),
       limit: queryInt(searchParams, "limit", 120, { min: 10, max: 300 }),
+      tokenScope: queryChoice<TokenScope>(searchParams, "token_scope", ["canonical", "all"] as const, "canonical"),
       apiSort: queryChoice<AssetApiSort>(searchParams, "api_sort", ["tvl", "spread", "best_apy", "venues"] as const, "tvl"),
       apiDir: queryChoice(searchParams, "api_dir", ["asc", "desc"] as const, "desc"),
       token: queryString(searchParams, "token", ""),
@@ -129,6 +138,7 @@ function AssetsPageContent() {
           min_tvl_usd: String(query.minTvl),
           min_points: String(query.minPoints),
           limit: String(query.limit),
+          token_scope: query.tokenScope,
           sort_by: query.apiSort,
           direction: query.apiDir,
         });
@@ -149,13 +159,20 @@ function AssetsPageContent() {
     return () => {
       active = false;
     };
-  }, [query.universe, query.minTvl, query.minPoints, query.limit, query.apiSort, query.apiDir]);
+  }, [query.universe, query.minTvl, query.minPoints, query.limit, query.tokenScope, query.apiSort, query.apiDir]);
 
   const selectedSymbol = query.token || assetData?.rows[0]?.token_symbol || "";
 
   useEffect(() => {
     if (!query.token && assetData?.rows[0]?.token_symbol) {
       replaceQuery(router, pathname, searchParams, { token: assetData.rows[0].token_symbol });
+      return;
+    }
+    if (query.token && assetData?.rows.length) {
+      const exists = assetData.rows.some((row) => row.token_symbol === query.token);
+      if (!exists) {
+        replaceQuery(router, pathname, searchParams, { token: assetData.rows[0].token_symbol });
+      }
     }
   }, [assetData, pathname, query.token, router, searchParams]);
 
@@ -246,7 +263,10 @@ function AssetsPageContent() {
 
       <section className="card">
         <h2>Token Universe</h2>
-        <p className="muted card-intro">Pick a token, then sort by spread, TVL, or weighted APY.</p>
+        <p className="muted card-intro">
+          Pick a token, then sort by spread, TVL, or weighted APY. Canonical mode keeps the list focused on plain symbols;
+          All mode includes LP/structured symbols.
+        </p>
         <div className="inline-controls">
           <label>
             Token:&nbsp;
@@ -256,6 +276,13 @@ function AssetsPageContent() {
                   {row.token_symbol}
                 </option>
               ))}
+            </select>
+          </label>
+          <label>
+            Token List:&nbsp;
+            <select value={query.tokenScope} onChange={(event) => updateQuery({ token_scope: event.target.value as TokenScope, token: null })}>
+              <option value="canonical">Canonical only</option>
+              <option value="all">All symbols (incl. LP/structured)</option>
             </select>
           </label>
           <label>
@@ -337,6 +364,14 @@ function AssetsPageContent() {
                 value: String(assetData?.summary?.high_spread_tokens ?? "n/a"),
                 hint: "Spread >= 2%",
               },
+              {
+                label: "Canonical Available",
+                value: String(assetData?.summary?.tokens_available_canonical ?? "n/a"),
+              },
+              {
+                label: "Structured Available",
+                value: String(assetData?.summary?.tokens_available_structured ?? "n/a"),
+              },
             ]}
           />
           <BarList
@@ -366,6 +401,7 @@ function AssetsPageContent() {
                     Token <span className="th-indicator">{sortIndicator(tokenSort, "token")}</span>
                   </button>
                 </th>
+                {query.tokenScope === "all" ? <th>Type</th> : null}
                 <th className="is-numeric">
                   <button
                     className={`th-button ${tokenSort.key === "venues" ? "is-active" : ""}`}
@@ -448,6 +484,7 @@ function AssetsPageContent() {
                   onClick={() => updateQuery({ token: row.token_symbol })}
                 >
                   <td>{row.token_symbol}</td>
+                  {query.tokenScope === "all" ? <td>{row.token_type === "structured" ? "Structured" : "Canonical"}</td> : null}
                   <td className="is-numeric">{row.venues}</td>
                   <td className="is-numeric tablet-hide analyst-only">{row.chains}</td>
                   <td className="is-numeric">{formatUsd(row.total_tvl_usd)}</td>
@@ -464,7 +501,7 @@ function AssetsPageContent() {
       <section className="card">
         <h2>{detail?.token_symbol || selectedSymbol || "Token"} Venues</h2>
         <p className="muted card-intro">
-          Venue-level detail for the selected token. Sort to compare alternatives quickly. Analyst mode adds extra context columns.
+          Venue-level detail for the selected token. Sort to compare alternatives quickly. Dense mode adds extra context columns.
         </p>
         <div className="split-grid">
           <KpiGrid
