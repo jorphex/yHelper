@@ -1,0 +1,16 @@
+# yHelper-only virtual host.
+# Keep this in a separate include file and do not edit existing Nextcloud site blocks.
+
+yhelper.seul.one {
+    encode zstd gzip
+
+    @api path /api/*
+    handle @api {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:3010
+    }
+}
+

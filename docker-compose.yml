@@ -1,0 +1,111 @@
+services:
+  yhelper-postgres:
+    image: postgres:16
+    container_name: yhelper-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-yhelper}
+      POSTGRES_USER: ${POSTGRES_USER:-yhelper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    volumes:
+      - yhelper_postgres_data:/var/lib/postgresql/data
+    networks:
+      - yhelper-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-yhelper} -d ${POSTGRES_DB:-yhelper}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  yhelper-api:
+    build:
+      context: ./api
+    container_name: yhelper-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://yhelper:change_me@yhelper-postgres:5432/yhelper}
+      API_HOST: ${API_HOST:-0.0.0.0}
+      API_PORT: ${API_PORT:-8000}
+      API_LOG_LEVEL: ${API_LOG_LEVEL:-info}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3010}
+      API_APY_MIN: ${API_APY_MIN:--0.95}
+      API_APY_MAX: ${API_APY_MAX:-3.0}
+      API_MOMENTUM_ABS_MAX: ${API_MOMENTUM_ABS_MAX:-1.0}
+      API_MIN_TVL_USD: ${API_MIN_TVL_USD:-100000}
+      API_MIN_POINTS: ${API_MIN_POINTS:-30}
+      API_UNIVERSE_CORE_MIN_TVL_USD: ${API_UNIVERSE_CORE_MIN_TVL_USD:-1000000}
+      API_UNIVERSE_CORE_MIN_POINTS: ${API_UNIVERSE_CORE_MIN_POINTS:-45}
+      API_UNIVERSE_CORE_MAX_VAULTS: ${API_UNIVERSE_CORE_MAX_VAULTS:-250}
+      API_UNIVERSE_EXTENDED_MIN_TVL_USD: ${API_UNIVERSE_EXTENDED_MIN_TVL_USD:-250000}
+      API_UNIVERSE_EXTENDED_MIN_POINTS: ${API_UNIVERSE_EXTENDED_MIN_POINTS:-20}
+      API_UNIVERSE_EXTENDED_MAX_VAULTS: ${API_UNIVERSE_EXTENDED_MAX_VAULTS:-700}
+      API_UNIVERSE_RAW_MIN_TVL_USD: ${API_UNIVERSE_RAW_MIN_TVL_USD:-0}
+      API_UNIVERSE_RAW_MIN_POINTS: ${API_UNIVERSE_RAW_MIN_POINTS:-0}
+      API_UNIVERSE_RAW_MAX_VAULTS: ${API_UNIVERSE_RAW_MAX_VAULTS:-0}
+      DEFI_LLAMA_PROTOCOL_URL: ${DEFI_LLAMA_PROTOCOL_URL:-https://api.llama.fi/protocol/yearn-finance}
+      DEFI_LLAMA_TIMEOUT_SEC: ${DEFI_LLAMA_TIMEOUT_SEC:-8}
+      DEFI_LLAMA_CACHE_TTL_SEC: ${DEFI_LLAMA_CACHE_TTL_SEC:-600}
+    depends_on:
+      yhelper-postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    networks:
+      - yhelper-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  yhelper-worker:
+    build:
+      context: ./worker
+    container_name: yhelper-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://yhelper:change_me@yhelper-postgres:5432/yhelper}
+      WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-300}
+      YDAEMON_URL: ${YDAEMON_URL:-https://ydaemon.yearn.fi/vaults/detected?limit=2000}
+      KONG_GQL_URL: ${KONG_GQL_URL:-https://kong.yearn.farm/api/gql}
+      KONG_MAX_VAULTS: ${KONG_MAX_VAULTS:-120}
+      KONG_MIN_TVL_USD: ${KONG_MIN_TVL_USD:-100000}
+      KONG_PPS_LIMIT: ${KONG_PPS_LIMIT:-120}
+      KONG_TIMEOUT_SEC: ${KONG_TIMEOUT_SEC:-12}
+      KONG_SLEEP_BETWEEN_REQ_MS: ${KONG_SLEEP_BETWEEN_REQ_MS:-10}
+      ALERT_STALE_SECONDS: ${ALERT_STALE_SECONDS:-86400}
+      ALERT_COOLDOWN_SECONDS: ${ALERT_COOLDOWN_SECONDS:-21600}
+      ALERT_NOTIFY_ON_RECOVERY: ${ALERT_NOTIFY_ON_RECOVERY:-1}
+      ALERT_TELEGRAM_BOT_TOKEN: ${ALERT_TELEGRAM_BOT_TOKEN:-}
+      ALERT_TELEGRAM_CHAT_ID: ${ALERT_TELEGRAM_CHAT_ID:-}
+      ALERT_DISCORD_WEBHOOK_URL: ${ALERT_DISCORD_WEBHOOK_URL:-}
+      RUNNING_STALE_SECONDS: ${RUNNING_STALE_SECONDS:-1800}
+    depends_on:
+      yhelper-postgres:
+        condition: service_healthy
+    networks:
+      - yhelper-net
+
+  yhelper-web:
+    build:
+      context: ./web
+    container_name: yhelper-web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+      API_INTERNAL_BASE_URL: ${API_INTERNAL_BASE_URL:-/api}
+    depends_on:
+      yhelper-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3010}:3000"
+    networks:
+      - yhelper-net
+
+volumes:
+  yhelper_postgres_data:
+    name: yhelper_postgres_data
+
+networks:
+  yhelper-net:
+    name: yhelper-net
