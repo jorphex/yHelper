@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatHours, formatPct, formatUsd } from "./lib/format";
+import { formatHours, formatPct, formatUsd, formatUtcDateTime } from "./lib/format";
 import { BarList, KpiGrid } from "./components/visuals";
 
 type OverviewResponse = {
@@ -86,6 +86,7 @@ type OverviewResponse = {
 export default function HomePage() {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [serverTimeLive, setServerTimeLive] = useState("n/a");
 
   useEffect(() => {
     let active = true;
@@ -117,6 +118,26 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!data?.server_time_utc) {
+      setServerTimeLive("n/a");
+      return;
+    }
+    const baseMs = Date.parse(data.server_time_utc);
+    if (!Number.isFinite(baseMs)) {
+      setServerTimeLive("n/a");
+      return;
+    }
+    const startMs = Date.now();
+    const tick = () => {
+      const liveMs = baseMs + (Date.now() - startMs);
+      setServerTimeLive(formatUtcDateTime(liveMs));
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [data?.server_time_utc]);
+
   return (
     <main className="container">
       <section className="hero">
@@ -133,7 +154,7 @@ export default function HomePage() {
               items={[
                 { label: "Project", value: data.project },
                 { label: "Status", value: data.status },
-                { label: "Server Time (UTC)", value: data.server_time_utc },
+                { label: "Server Time (UTC, Live)", value: serverTimeLive },
                 { label: "Active Vaults", value: String(data.ingestion?.active_vaults ?? "n/a") },
                 { label: "PPS Data Points", value: String(data.ingestion?.pps_points ?? "n/a") },
                 { label: "Metric Rows", value: String(data.ingestion?.metrics_count ?? "n/a") },

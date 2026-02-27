@@ -19,6 +19,8 @@ type BadgeState = {
 };
 
 const REFRESH_MS = 60_000;
+const DELAY_AGE_SECONDS = 24 * 3600;
+const DELAY_STALE_RATIO = 0.2;
 
 function deriveBadgeState(data: FreshnessResponse | null): BadgeState {
   if (!data) {
@@ -51,11 +53,11 @@ function deriveBadgeState(data: FreshnessResponse | null): BadgeState {
       staleRatio,
     };
   }
-  if (age > 6 * 3600 || (staleRatio !== null && staleRatio >= 0.2)) {
+  if (age > DELAY_AGE_SECONDS || (staleRatio !== null && staleRatio >= DELAY_STALE_RATIO)) {
     return {
       tone: "warn",
       label: "Delayed",
-      detail: "Freshness is degraded; verify trust metrics before acting.",
+      detail: "Freshness is degraded (latest PPS older than 24h or 24h stale ratio is 20%+).",
       ageSeconds: age,
       staleRatio,
     };
@@ -63,7 +65,7 @@ function deriveBadgeState(data: FreshnessResponse | null): BadgeState {
   return {
     tone: "ok",
     label: "Fresh",
-    detail: "Data freshness is within normal bounds.",
+    detail: "Data freshness is within 24h age and below 20% 24h stale ratio.",
     ageSeconds: age,
     staleRatio,
   };

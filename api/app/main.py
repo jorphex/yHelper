@@ -790,7 +790,7 @@ async def overview() -> dict[str, object]:
 
     return {
         "project": "yHelper",
-        "status": "Phase 6 Hardening (In Progress)",
+        "status": "Phase 6 Hardening (Freshness Calibration In Progress)",
         "server_time_utc": datetime.now(UTC).isoformat(),
         "sources": {
             "ydaemon": os.getenv("YDAEMON_URL", "https://ydaemon.yearn.fi/vaults/detected?limit=2000"),
@@ -807,7 +807,7 @@ async def overview() -> dict[str, object]:
         "coverage": coverage,
         "protocol_context": protocol_context,
         "lifecycle": lifecycle,
-        "message": "Phase 6 hardening is in progress: trust diagnostics, UX consistency, and data-quality safeguards are actively being refined.",
+        "message": "Phase 6 hardening is in progress: freshness calibration, trust diagnostics, UX consistency, and data-quality safeguards are actively being refined.",
     }
 
 

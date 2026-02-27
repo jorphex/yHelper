@@ -97,6 +97,12 @@ function staleThresholdLabel(value: StaleThresholdKey): string {
   return value;
 }
 
+function runningLabel(value: boolean | undefined): string {
+  if (value === true) return "active";
+  if (value === false) return "idle";
+  return "n/a";
+}
+
 function MoverTable({
   title,
   rows,
@@ -458,6 +464,11 @@ function ChangesPageContent() {
           These indicate whether the data stream is current enough for decision support. Current stale cutoff:{" "}
           {staleThresholdLabel(data?.filters?.stale_threshold ?? query.staleThreshold)}.
         </p>
+        <p className="muted">
+          Stale vault means its latest PPS data point is older than the selected cutoff. Stale ratio means stale vaults divided by
+          tracked vaults. Job status <strong>idle</strong> is normal between scheduled runs; check Last Success age for actual
+          health.
+        </p>
         <KpiGrid
           items={[
             { label: "Latest PPS Age", value: formatHours(data?.freshness?.latest_pps_age_seconds) },
@@ -472,8 +483,8 @@ function ChangesPageContent() {
               label: "yDaemon Last Success",
               value: formatHours(data?.freshness?.ingestion_jobs?.ydaemon_snapshot?.last_success_age_seconds),
             },
-            { label: "Kong Running", value: data?.freshness?.ingestion_jobs?.kong_pps_metrics?.running ? "yes" : "no" },
-            { label: "yDaemon Running", value: data?.freshness?.ingestion_jobs?.ydaemon_snapshot?.running ? "yes" : "no" },
+            { label: "Kong Job Status", value: runningLabel(data?.freshness?.ingestion_jobs?.kong_pps_metrics?.running) },
+            { label: "yDaemon Job Status", value: runningLabel(data?.freshness?.ingestion_jobs?.ydaemon_snapshot?.running) },
           ]}
         />
       </section>

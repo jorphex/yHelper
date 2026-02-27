@@ -6,7 +6,7 @@ import math
 import os
 import statistics
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import psycopg
 import requests
@@ -18,6 +18,8 @@ KONG_GQL_URL = os.getenv("KONG_GQL_URL", "https://kong.yearn.farm/api/gql")
 KONG_MAX_VAULTS = int(os.getenv("KONG_MAX_VAULTS", "120"))
 KONG_MIN_TVL_USD = float(os.getenv("KONG_MIN_TVL_USD", "100000"))
 KONG_PPS_LIMIT = int(os.getenv("KONG_PPS_LIMIT", "120"))
+KONG_PPS_LOOKBACK_DAYS = int(os.getenv("KONG_PPS_LOOKBACK_DAYS", str(max(KONG_PPS_LIMIT - 1, 1))))
+KONG_PPS_ANCHOR_SLACK_DAYS = int(os.getenv("KONG_PPS_ANCHOR_SLACK_DAYS", "3"))
 KONG_TIMEOUT_SEC = int(os.getenv("KONG_TIMEOUT_SEC", "12"))
 KONG_SLEEP_BETWEEN_REQ_MS = int(os.getenv("KONG_SLEEP_BETWEEN_REQ_MS", "10"))
 JOB_YDAEMON = "ydaemon_snapshot"
@@ -31,8 +33,8 @@ ALERT_DISCORD_WEBHOOK_URL = os.getenv("ALERT_DISCORD_WEBHOOK_URL", "").strip()
 RUNNING_STALE_SECONDS = int(os.getenv("RUNNING_STALE_SECONDS", "1800"))
 
 KONG_PPS_QUERY = """
-query Query($label: String!, $chainId: Int, $address: String, $component: String, $limit: Int) {
-  timeseries(label: $label, chainId: $chainId, address: $address, component: $component, limit: $limit) {
+query Query($label: String!, $chainId: Int, $address: String, $component: String, $limit: Int, $timestamp: BigInt) {
+  timeseries(label: $label, chainId: $chainId, address: $address, component: $component, limit: $limit, timestamp: $timestamp) {
     time
     value
   }
@@ -589,13 +591,26 @@ def _select_kong_vaults(conn: psycopg.Connection) -> list[tuple[int, str]]:
         return [(int(row[0]), str(row[1])) for row in cur.fetchall()]
 
 
-def _fetch_kong_pps(chain_id: int, vault_address: str) -> list[tuple[int, float]]:
+def _utc_midnight_epoch_days_ago(days_ago: int) -> int:
+    safe_days = max(0, days_ago)
+    midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    return int((midnight - timedelta(days=safe_days)).timestamp())
+
+
+def _fetch_kong_series(
+    *,
+    chain_id: int,
+    vault_address: str,
+    limit: int | None,
+    timestamp: int | None,
+) -> list[tuple[int, float]]:
     variables = {
         "label": "pps",
         "chainId": chain_id,
         "address": vault_address,
         "component": "raw",
-        "limit": KONG_PPS_LIMIT,
+        "limit": limit,
+        "timestamp": timestamp,
     }
     response = requests.post(
         KONG_GQL_URL,
@@ -617,6 +632,39 @@ def _fetch_kong_pps(chain_id: int, vault_address: str) -> list[tuple[int, float]
         out.append((t, v))
     out.sort(key=lambda x: x[0])
     return out
+
+
+def _fetch_kong_pps(chain_id: int, vault_address: str) -> list[tuple[int, float]]:
+    target_lookback_days = max(0, KONG_PPS_LOOKBACK_DAYS)
+    candidate_days: list[int] = [target_lookback_days]
+    for delta in range(1, KONG_PPS_ANCHOR_SLACK_DAYS + 1):
+        candidate_days.append(target_lookback_days + delta)
+        candidate_days.append(max(0, target_lookback_days - delta))
+    unique_days: list[int] = []
+    for value in candidate_days:
+        if value not in unique_days:
+            unique_days.append(value)
+
+    best_partial: list[tuple[int, float]] = []
+    for days_ago in unique_days:
+        points = _fetch_kong_series(
+            chain_id=chain_id,
+            vault_address=vault_address,
+            limit=KONG_PPS_LIMIT,
+            timestamp=_utc_midnight_epoch_days_ago(days_ago),
+        )
+        if len(points) >= 2:
+            return points
+        if len(points) > len(best_partial):
+            best_partial = points
+
+    # Fallback path: pull full history if anchored snapshots did not return enough points.
+    points = _fetch_kong_series(chain_id=chain_id, vault_address=vault_address, limit=None, timestamp=None)
+    if points:
+        trimmed = points[-KONG_PPS_LIMIT:] if KONG_PPS_LIMIT > 0 else points
+        if len(trimmed) >= len(best_partial):
+            return trimmed
+    return best_partial
 
 
 def _upsert_pps_points(conn: psycopg.Connection, chain_id: int, vault_address: str, points: list[tuple[int, float]]) -> int:

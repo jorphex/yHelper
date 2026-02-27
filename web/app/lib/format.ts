@@ -49,6 +49,28 @@ export function formatHours(seconds: number | null | undefined, digits = 1): str
   return `${(seconds / 3600).toFixed(digits)}h`;
 }
 
+const UTC_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "UTC",
+});
+
+export function formatUtcDateTime(value: Date | number | string | null | undefined): string {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "n/a";
+  }
+  return `${UTC_DATE_TIME_FORMATTER.format(date)} UTC`;
+}
+
 export function shortVaultLabel(symbol: string | null | undefined, address: string): string {
   if (symbol && symbol.trim().length > 0) {
     return symbol.trim();

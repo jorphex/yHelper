@@ -38,7 +38,7 @@ export function AudienceToggle() {
   }, [mode]);
 
   return (
-    <div className="audience-toggle" role="group" aria-label="Audience mode">
+    <div className="audience-toggle" role="group" aria-label="View mode">
       <span className="audience-label">Mode</span>
       <button
         type="button"
@@ -46,7 +46,7 @@ export function AudienceToggle() {
         aria-pressed={mode === "guide"}
         onClick={() => setMode("guide")}
       >
-        Guide
+        Simple
       </button>
       <button
         type="button"
@@ -54,7 +54,7 @@ export function AudienceToggle() {
         aria-pressed={mode === "analyst"}
         onClick={() => setMode("analyst")}
       >
-        Analyst
+        Detailed
       </button>
     </div>
   );
