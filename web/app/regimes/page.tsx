@@ -3,10 +3,11 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, regimeLabel, shortVaultLabel, yearnVaultUrl } from "../lib/format";
+import { chainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, KpiGrid } from "../components/visuals";
+import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
 type RegimeSummary = {
@@ -392,16 +393,7 @@ function RegimesPageContent() {
             <tbody>
               {moverRows.map((row) => (
                 <tr key={row.vault_address}>
-                  <td title={row.vault_address}>
-                    <Link
-                      href={yearnVaultUrl(row.chain_id, row.vault_address)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="vault-link"
-                    >
-                      {shortVaultLabel(row.symbol, row.vault_address)}
-                    </Link>
-                  </td>
+                  <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
                   <td>
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
