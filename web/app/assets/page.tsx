@@ -402,117 +402,121 @@ function AssetsPageContent() {
             valueFormatter={(value) => formatUsd(value)}
           />
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <button
-                    className={`th-button ${tokenSort.key === "token" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(tokenSort, "token");
-                      setTokenSort(next);
-                      updateQuery({ token_sort: next.key, token_dir: next.direction });
-                    }}
-                  >
-                    Token <span className="th-indicator">{sortIndicator(tokenSort, "token")}</span>
-                  </button>
-                </th>
-                {query.tokenScope === "all" ? <th>Type</th> : null}
-                <th className="is-numeric">
-                  <button
-                    className={`th-button ${tokenSort.key === "venues" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(tokenSort, "venues");
-                      setTokenSort(next);
-                      updateQuery({ token_sort: next.key, token_dir: next.direction });
-                    }}
-                  >
-                    Venues <span className="th-indicator">{sortIndicator(tokenSort, "venues")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric tablet-hide analyst-only">
-                  <button
-                    className={`th-button ${tokenSort.key === "chains" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(tokenSort, "chains");
-                      setTokenSort(next);
-                      updateQuery({ token_sort: next.key, token_dir: next.direction });
-                    }}
-                  >
-                    Chains <span className="th-indicator">{sortIndicator(tokenSort, "chains")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric">
-                  <button
-                    className={`th-button ${tokenSort.key === "tvl" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(tokenSort, "tvl");
-                      setTokenSort(next);
-                      updateQuery({ token_sort: next.key, token_dir: next.direction });
-                    }}
-                  >
-                    Total TVL <span className="th-indicator">{sortIndicator(tokenSort, "tvl")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric">
-                  <button
-                    className={`th-button ${tokenSort.key === "best" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(tokenSort, "best");
-                      setTokenSort(next);
-                      updateQuery({ token_sort: next.key, token_dir: next.direction });
-                    }}
-                  >
-                    Best APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "best")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric tablet-hide analyst-only">
-                  <button
-                    className={`th-button ${tokenSort.key === "weighted" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(tokenSort, "weighted");
-                      setTokenSort(next);
-                      updateQuery({ token_sort: next.key, token_dir: next.direction });
-                    }}
-                  >
-                    Weighted APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "weighted")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric">
-                  <button
-                    className={`th-button ${tokenSort.key === "spread" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(tokenSort, "spread");
-                      setTokenSort(next);
-                      updateQuery({ token_sort: next.key, token_dir: next.direction });
-                    }}
-                  >
-                    APY Spread <span className="th-indicator">{sortIndicator(tokenSort, "spread")}</span>
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {tokenRows.map((row) => (
-                <tr
-                  key={row.token_symbol}
-                  className={row.token_symbol === selectedSymbol ? "row-selected" : "row-clickable"}
-                  onClick={() => updateQuery({ token: row.token_symbol })}
-                >
-                  <td>{row.token_symbol}</td>
-                  {query.tokenScope === "all" ? <td>{row.token_type === "structured" ? "Structured" : "Canonical"}</td> : null}
-                  <td className="is-numeric">{row.venues}</td>
-                  <td className="is-numeric tablet-hide analyst-only">{row.chains}</td>
-                  <td className="is-numeric">{formatUsd(row.total_tvl_usd)}</td>
-                  <td className="is-numeric">{formatPct(row.best_safe_apy_30d)}</td>
-                  <td className="is-numeric tablet-hide analyst-only">{formatPct(row.weighted_safe_apy_30d)}</td>
-                  <td className="is-numeric">{formatPct(row.spread_safe_apy_30d)}</td>
+        {tokenRows.length === 0 ? (
+          <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch Token List mode.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>
+                    <button
+                      className={`th-button ${tokenSort.key === "token" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "token");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Token <span className="th-indicator">{sortIndicator(tokenSort, "token")}</span>
+                    </button>
+                  </th>
+                  {query.tokenScope === "all" ? <th>Type</th> : null}
+                  <th className="is-numeric">
+                    <button
+                      className={`th-button ${tokenSort.key === "venues" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "venues");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Venues <span className="th-indicator">{sortIndicator(tokenSort, "venues")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric tablet-hide analyst-only">
+                    <button
+                      className={`th-button ${tokenSort.key === "chains" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "chains");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Chains <span className="th-indicator">{sortIndicator(tokenSort, "chains")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric">
+                    <button
+                      className={`th-button ${tokenSort.key === "tvl" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "tvl");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Total TVL <span className="th-indicator">{sortIndicator(tokenSort, "tvl")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric">
+                    <button
+                      className={`th-button ${tokenSort.key === "best" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "best");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Best APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "best")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric tablet-hide analyst-only">
+                    <button
+                      className={`th-button ${tokenSort.key === "weighted" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "weighted");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Weighted APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "weighted")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric">
+                    <button
+                      className={`th-button ${tokenSort.key === "spread" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "spread");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      APY Spread <span className="th-indicator">{sortIndicator(tokenSort, "spread")}</span>
+                    </button>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {tokenRows.map((row) => (
+                  <tr
+                    key={row.token_symbol}
+                    className={row.token_symbol === selectedSymbol ? "row-selected" : "row-clickable"}
+                    onClick={() => updateQuery({ token: row.token_symbol })}
+                  >
+                    <td>{row.token_symbol}</td>
+                    {query.tokenScope === "all" ? <td>{row.token_type === "structured" ? "Structured" : "Canonical"}</td> : null}
+                    <td className="is-numeric">{row.venues}</td>
+                    <td className="is-numeric tablet-hide analyst-only">{row.chains}</td>
+                    <td className="is-numeric">{formatUsd(row.total_tvl_usd)}</td>
+                    <td className="is-numeric">{formatPct(row.best_safe_apy_30d)}</td>
+                    <td className="is-numeric tablet-hide analyst-only">{formatPct(row.weighted_safe_apy_30d)}</td>
+                    <td className="is-numeric">{formatPct(row.spread_safe_apy_30d)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="card">
@@ -520,6 +524,7 @@ function AssetsPageContent() {
         <p className="muted card-intro">
           Venue-level detail for the selected token. Sort to compare alternatives quickly. Dense mode adds extra context columns.
         </p>
+        {!selectedSymbol ? <p className="muted">Select a token above to load venue-level details.</p> : null}
         <div className="split-grid">
           <KpiGrid
             items={[
