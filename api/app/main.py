@@ -36,6 +36,9 @@ UNIVERSE_RAW_MAX_VAULTS = int(os.getenv("API_UNIVERSE_RAW_MAX_VAULTS", "0"))
 DEFI_LLAMA_PROTOCOL_URL = os.getenv("DEFI_LLAMA_PROTOCOL_URL", "https://api.llama.fi/protocol/yearn-finance")
 DEFI_LLAMA_TIMEOUT_SEC = float(os.getenv("DEFI_LLAMA_TIMEOUT_SEC", "8"))
 DEFI_LLAMA_CACHE_TTL_SEC = int(os.getenv("DEFI_LLAMA_CACHE_TTL_SEC", "600"))
+ASSETS_FEATURED_MIN_TVL_USD = float(os.getenv("API_ASSETS_FEATURED_MIN_TVL_USD", "5000000"))
+ASSETS_FEATURED_MIN_VENUES = int(os.getenv("API_ASSETS_FEATURED_MIN_VENUES", "2"))
+ASSETS_FEATURED_MIN_CHAINS = int(os.getenv("API_ASSETS_FEATURED_MIN_CHAINS", "1"))
 
 _defillama_cache: dict[str, object] = {"fetched_at_epoch": 0.0, "snapshot": None}
 
@@ -1458,7 +1461,7 @@ async def chains_rollups(
 @app.get("/api/assets")
 async def assets(
     universe: Literal["core", "extended", "raw"] = "core",
-    token_scope: Literal["canonical", "all"] = "canonical",
+    token_scope: Literal["featured", "canonical", "all"] = "featured",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     min_points: int | None = Query(default=None, ge=0),
     max_vaults: int | None = Query(default=None, ge=0),
@@ -1554,6 +1557,18 @@ async def assets(
                 END AS weighted_safe_apy_30d
             FROM scoped
             GROUP BY token_symbol_key, token_symbol, token_type
+        ),
+        final_tokens AS (
+            SELECT *
+            FROM token_agg
+            WHERE
+                %(token_scope)s <> 'featured'
+                OR (
+                    token_type = 'canonical'
+                    AND total_tvl_usd >= %(featured_min_tvl_usd)s
+                    AND venues >= %(featured_min_venues)s
+                    AND chains >= %(featured_min_chains)s
+                )
         )
     """
     sql_params = {
@@ -1563,6 +1578,9 @@ async def assets(
         "limit": limit,
         "apy_min": APY_MIN,
         "apy_max": APY_MAX,
+        "featured_min_tvl_usd": ASSETS_FEATURED_MIN_TVL_USD,
+        "featured_min_venues": ASSETS_FEATURED_MIN_VENUES,
+        "featured_min_chains": ASSETS_FEATURED_MIN_CHAINS,
     }
     if max_vaults is not None:
         sql_params["max_vaults"] = max_vaults
@@ -1582,7 +1600,7 @@ async def assets(
                     worst_safe_apy_30d,
                     spread_safe_apy_30d,
                     weighted_safe_apy_30d
-                FROM token_agg
+                FROM final_tokens
                 ORDER BY {order_expr} {order_dir}, total_tvl_usd DESC
                 LIMIT %(limit)s
                 """.format(order_expr=order_expr, order_dir=order_dir),
@@ -1607,15 +1625,23 @@ async def assets(
                         THEN SUM(total_tvl_usd * weighted_safe_apy_30d) / SUM(total_tvl_usd)
                         ELSE NULL
                     END AS tvl_weighted_safe_apy_30d,
-                    (SELECT token_symbol FROM token_agg ORDER BY total_tvl_usd DESC NULLS LAST LIMIT 1) AS top_token_symbol,
+                    (SELECT token_symbol FROM final_tokens ORDER BY total_tvl_usd DESC NULLS LAST LIMIT 1) AS top_token_symbol,
                     (
                         SELECT MAX(total_tvl_usd) / NULLIF(SUM(total_tvl_usd), 0)
-                        FROM token_agg
+                        FROM final_tokens
                     ) AS top_token_tvl_share,
                     (SELECT COUNT(*) FROM token_all) AS tokens_available_all,
                     (SELECT COUNT(*) FROM token_all WHERE token_type = 'canonical') AS tokens_available_canonical,
-                    (SELECT COUNT(*) FROM token_all WHERE token_type = 'structured') AS tokens_available_structured
-                FROM token_agg
+                    (SELECT COUNT(*) FROM token_all WHERE token_type = 'structured') AS tokens_available_structured,
+                    (
+                        SELECT COUNT(*)
+                        FROM token_agg
+                        WHERE token_type = 'canonical'
+                          AND total_tvl_usd >= %(featured_min_tvl_usd)s
+                          AND venues >= %(featured_min_venues)s
+                          AND chains >= %(featured_min_chains)s
+                    ) AS tokens_available_featured
+                FROM final_tokens
                 """,
                 sql_params,
             )
@@ -1636,6 +1662,9 @@ async def assets(
             "limit": limit,
             "sort_by": sort_by,
             "direction": direction,
+            "featured_min_tvl_usd": ASSETS_FEATURED_MIN_TVL_USD,
+            "featured_min_venues": ASSETS_FEATURED_MIN_VENUES,
+            "featured_min_chains": ASSETS_FEATURED_MIN_CHAINS,
             "apy_bounds": {"min": APY_MIN, "max": APY_MAX},
         },
         "universe_gate": universe_gate,

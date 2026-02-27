@@ -23,10 +23,14 @@ type AssetRow = {
 
 type AssetsResponse = {
   filters?: {
-    token_scope?: "canonical" | "all";
+    token_scope?: "featured" | "canonical" | "all";
+    featured_min_tvl_usd?: number;
+    featured_min_venues?: number;
+    featured_min_chains?: number;
   };
   summary?: {
     tokens?: number;
+    tokens_available_featured?: number;
     tokens_available_all?: number;
     tokens_available_canonical?: number;
     tokens_available_structured?: number;
@@ -79,7 +83,7 @@ type AssetVenuesResponse = {
 type TokenSortKey = "token" | "venues" | "chains" | "tvl" | "best" | "weighted" | "spread";
 type VenueSortKey = "vault" | "chain" | "category" | "version" | "tvl" | "apy" | "momentum" | "consistency" | "regime";
 type AssetApiSort = "tvl" | "spread" | "best_apy" | "venues";
-type TokenScope = "canonical" | "all";
+type TokenScope = "featured" | "canonical" | "all";
 
 function AssetsPageContent() {
   const router = useRouter();
@@ -100,7 +104,7 @@ function AssetsPageContent() {
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
       minPoints: queryInt(searchParams, "min_points", defaults.minPoints, { min: 0, max: 365 }),
       limit: queryInt(searchParams, "limit", 120, { min: 10, max: 300 }),
-      tokenScope: queryChoice<TokenScope>(searchParams, "token_scope", ["canonical", "all"] as const, "canonical"),
+      tokenScope: queryChoice<TokenScope>(searchParams, "token_scope", ["featured", "canonical", "all"] as const, "featured"),
       apiSort: queryChoice<AssetApiSort>(searchParams, "api_sort", ["tvl", "spread", "best_apy", "venues"] as const, "tvl"),
       apiDir: queryChoice(searchParams, "api_dir", ["asc", "desc"] as const, "desc"),
       token: queryString(searchParams, "token", ""),
@@ -264,8 +268,8 @@ function AssetsPageContent() {
       <section className="card">
         <h2>Token Universe</h2>
         <p className="muted card-intro">
-          Pick a token, then sort by spread, TVL, or weighted APY. Canonical mode keeps the list focused on plain symbols;
-          All mode includes LP/structured symbols.
+          Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
+          Canonical shows all plain symbols. All includes LP and structured symbols.
         </p>
         <div className="inline-controls">
           <label>
@@ -281,6 +285,7 @@ function AssetsPageContent() {
           <label>
             Token List:&nbsp;
             <select value={query.tokenScope} onChange={(event) => updateQuery({ token_scope: event.target.value as TokenScope, token: null })}>
+              <option value="featured">Featured (clean list)</option>
               <option value="canonical">Canonical only</option>
               <option value="all">All symbols (incl. LP/structured)</option>
             </select>
@@ -342,11 +347,23 @@ function AssetsPageContent() {
             </select>
           </label>
         </div>
+        {query.tokenScope === "featured" ? (
+          <p className="muted card-intro">
+            Featured criteria: token TVL at least {formatUsd(assetData?.filters?.featured_min_tvl_usd)}, at least{" "}
+            {assetData?.filters?.featured_min_venues ?? "n/a"} venues, and at least{" "}
+            {assetData?.filters?.featured_min_chains ?? "n/a"} chains.
+          </p>
+        ) : null}
         <div className="split-grid">
           <KpiGrid
             items={[
               { label: "Tokens", value: String(assetData?.summary?.tokens ?? tokenRows.length) },
               { label: "Total TVL", value: formatUsd(assetData?.summary?.total_tvl_usd) },
+              {
+                label: "Featured Available",
+                value: String(assetData?.summary?.tokens_available_featured ?? "n/a"),
+                hint: "Large + multi-venue",
+              },
               {
                 label: "TVL-Weighted APY",
                 value: formatPct(assetData?.summary?.tvl_weighted_safe_apy_30d),
