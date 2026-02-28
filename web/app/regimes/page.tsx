@@ -70,6 +70,12 @@ type TransitionDailyRow = {
 
 type TransitionDailyResponse = {
   rows?: TransitionDailyRow[];
+  grouped?: {
+    group_by?: "none" | "chain" | "category";
+    rows?: Array<TransitionDailyRow & { group_key: string; tvl_total_usd?: number | null }>;
+    latest?: Array<TransitionDailyRow & { group_key: string; tvl_total_usd?: number | null }>;
+    series?: Record<string, Array<TransitionDailyRow & { group_key: string; tvl_total_usd?: number | null }>>;
+  };
 };
 
 type RegimeSummarySortKey = "regime" | "vaults" | "tvl";
@@ -93,6 +99,7 @@ function RegimesPageContent() {
   const [data, setData] = useState<RegimeResponse | null>(null);
   const [transitionData, setTransitionData] = useState<TransitionResponse | null>(null);
   const [transitionDaily, setTransitionDaily] = useState<TransitionDailyRow[]>([]);
+  const [transitionDailyGrouped, setTransitionDailyGrouped] = useState<TransitionDailyResponse["grouped"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [summarySort, setSummarySort] = useState<SortState<RegimeSummarySortKey>>({ key: "vaults", direction: "desc" });
   const [moverSort, setMoverSort] = useState<SortState<RegimeMoverSortKey>>({ key: "momentum", direction: "desc" });
@@ -105,6 +112,7 @@ function RegimesPageContent() {
       chain: queryInt(searchParams, "chain", 0, { min: 0 }),
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
       minPoints: queryInt(searchParams, "min_points", defaults.minPoints, { min: 0, max: 365 }),
+      transitionSplit: queryChoice(searchParams, "transition_split", ["none", "chain", "category"] as const, "none"),
       limit: queryInt(searchParams, "limit", 30, { min: 5, max: 300 }),
       summarySort: queryChoice<RegimeSummarySortKey>(
         searchParams,
@@ -142,10 +150,14 @@ function RegimesPageContent() {
           min_points: String(query.minPoints),
         });
         if (query.chain > 0) params.set("chain_id", String(query.chain));
+        const dailyParams = new URLSearchParams(params);
+        dailyParams.set("days", "120");
+        dailyParams.set("group_by", query.transitionSplit);
+        dailyParams.set("group_limit", "8");
         const [regimesRes, transitionsRes, transitionsDailyRes] = await Promise.all([
           fetch(`/api/regimes?${params.toString()}`, { cache: "no-store" }),
           fetch(`/api/regimes/transitions?${params.toString()}`, { cache: "no-store" }),
-          fetch(`/api/regimes/transitions/daily?${params.toString()}&days=120`, { cache: "no-store" }),
+          fetch(`/api/regimes/transitions/daily?${dailyParams.toString()}`, { cache: "no-store" }),
         ]);
         if (!regimesRes.ok || !transitionsRes.ok || !transitionsDailyRes.ok) {
           const status = !regimesRes.ok ? regimesRes.status : !transitionsRes.ok ? transitionsRes.status : transitionsDailyRes.status;
@@ -161,6 +173,7 @@ function RegimesPageContent() {
           setData(payload);
           setTransitionData(transitionsPayload);
           setTransitionDaily(Array.isArray(transitionsDailyPayload.rows) ? transitionsDailyPayload.rows : []);
+          setTransitionDailyGrouped(transitionsDailyPayload.grouped ?? null);
           setError(null);
         }
       } catch (err) {
@@ -171,7 +184,7 @@ function RegimesPageContent() {
     return () => {
       active = false;
     };
-  }, [query.universe, query.chain, query.minTvl, query.minPoints, query.limit]);
+  }, [query.universe, query.chain, query.minTvl, query.minPoints, query.limit, query.transitionSplit]);
 
   const summaryRows = sortRows(data?.summary ?? [], summarySort, {
     regime: (row) => row.regime,
@@ -229,6 +242,81 @@ function RegimesPageContent() {
     ],
     [transitionDaily],
   );
+  const groupedTransitionTrendItems = useMemo(() => {
+    const series = transitionDailyGrouped?.series ?? {};
+    const latest = transitionDailyGrouped?.latest ?? [];
+    const ranked = [...latest]
+      .sort((left, right) => (right.tvl_total_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_total_usd ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 6);
+    return ranked.map((row) => {
+      const key = row.group_key;
+      const label =
+        transitionDailyGrouped?.group_by === "chain"
+          ? chainLabel(Number(key))
+          : key;
+      return {
+        id: `transition-group-${key}`,
+        label,
+        points: (series[key] ?? []).map((point) => point.changed_ratio),
+        note: `Latest churn ${formatPct(row.changed_ratio)} • TVL ${formatUsd(row.tvl_total_usd)}`,
+      };
+    });
+  }, [transitionDailyGrouped]);
+  const groupedDriftItems = useMemo(() => {
+    const series = transitionDailyGrouped?.series ?? {};
+    const groupType = transitionDailyGrouped?.group_by;
+    const rows = Object.entries(series)
+      .map(([key, points]) => {
+        const latest = points[points.length - 1]?.changed_ratio;
+        const previous = points.length > 1 ? points[points.length - 2]?.changed_ratio : null;
+        if (latest === null || latest === undefined) return null;
+        const delta = previous === null || previous === undefined ? 0 : latest - previous;
+        const label = groupType === "chain" ? chainLabel(Number(key)) : key;
+        const tvl = points[points.length - 1]?.tvl_total_usd;
+        return {
+          id: `drift-${key}`,
+          label,
+          value: delta,
+          note: `Latest churn ${formatPct(latest)} • TVL ${formatUsd(tvl)}`,
+        };
+      })
+      .filter((item): item is { id: string; label: string; value: number; note: string } => item !== null)
+      .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))
+      .slice(0, 8);
+    return rows;
+  }, [transitionDailyGrouped]);
+  const groupedLatestChurnHeat = useMemo(() => {
+    const latest = transitionDailyGrouped?.latest ?? [];
+    const groupType = transitionDailyGrouped?.group_by;
+    return [...latest]
+      .sort((left, right) => (right.tvl_total_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_total_usd ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 12)
+      .map((row) => {
+        const key = row.group_key;
+        return {
+          id: `latest-churn-${key}`,
+          label: groupType === "chain" ? chainLabel(Number(key)) : key,
+          value: row.changed_tvl_ratio,
+          note: `Churn ${formatPct(row.changed_ratio)} • TVL ${formatUsd(row.tvl_total_usd)}`,
+        };
+      });
+  }, [transitionDailyGrouped]);
+  const groupedLatestChurnBars = useMemo(() => {
+    const latest = transitionDailyGrouped?.latest ?? [];
+    const groupType = transitionDailyGrouped?.group_by;
+    return [...latest]
+      .sort((left, right) => (right.changed_ratio ?? Number.NEGATIVE_INFINITY) - (left.changed_ratio ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 10)
+      .map((row) => {
+        const key = row.group_key;
+        return {
+          id: `latest-churn-bar-${key}`,
+          label: groupType === "chain" ? chainLabel(Number(key)) : key,
+          value: row.changed_ratio,
+          note: `TVL ${formatUsd(row.tvl_total_usd)} • Churn TVL ${formatPct(row.changed_tvl_ratio)}`,
+        };
+      });
+  }, [transitionDailyGrouped]);
   const summaryConfidence = clampScore(
     Math.min(1, (summaryRows.reduce((acc, row) => acc + row.vaults, 0) || 0) / 120) * 65 + Math.min(1, moverRows.length / 40) * 35,
   );
@@ -316,6 +404,14 @@ function RegimesPageContent() {
               <option value={30}>30</option>
               <option value={50}>50</option>
               <option value={80}>80</option>
+            </select>
+          </label>
+          <label>
+            Transition Split:&nbsp;
+            <select value={query.transitionSplit} onChange={(event) => updateQuery({ transition_split: event.target.value })}>
+              <option value="none">Global</option>
+              <option value="chain">By Chain</option>
+              <option value="category">By Category</option>
             </select>
           </label>
         </div>
@@ -432,22 +528,40 @@ function RegimesPageContent() {
           ]}
         />
         <div className="changes-stale-grid">
-          <HeatGrid
-            title="Transition Weight by TVL"
-            items={transitionHeat}
-            valueFormatter={(value) => formatUsd(value)}
-            legend="Higher intensity means more TVL moved between regime states."
-          />
-          <BarList
-            title="Chains with Highest Regime Churn"
-            items={(transitionData?.chain_breakdown ?? []).map((row) => ({
-              id: String(row.chain_id),
-              label: chainLabel(row.chain_id),
-              value: row.changed_ratio,
-              note: `${row.changed_vaults}/${row.vaults} vaults • ${formatUsd(row.changed_tvl_usd)}`,
-            }))}
-            valueFormatter={(value) => formatPct(value, 1)}
-          />
+          {query.transitionSplit === "none" ? (
+            <>
+              <HeatGrid
+                title="Transition Weight by TVL"
+                items={transitionHeat}
+                valueFormatter={(value) => formatUsd(value)}
+                legend="Higher intensity means more TVL moved between regime states."
+              />
+              <BarList
+                title="Chains with Highest Regime Churn"
+                items={(transitionData?.chain_breakdown ?? []).map((row) => ({
+                  id: String(row.chain_id),
+                  label: chainLabel(row.chain_id),
+                  value: row.changed_ratio,
+                  note: `${row.changed_vaults}/${row.vaults} vaults • ${formatUsd(row.changed_tvl_usd)}`,
+                }))}
+                valueFormatter={(value) => formatPct(value, 1)}
+              />
+            </>
+          ) : (
+            <>
+              <HeatGrid
+                title={`Latest Churn TVL Share by ${query.transitionSplit === "chain" ? "Chain" : "Category"}`}
+                items={groupedLatestChurnHeat}
+                valueFormatter={(value) => formatPct(value, 2)}
+                legend="Each cell is latest-day churn TVL ratio (TVL in changed-regime vaults divided by total cohort TVL)."
+              />
+              <BarList
+                title={`${query.transitionSplit === "chain" ? "Chains" : "Categories"} with Highest Latest Churn`}
+                items={groupedLatestChurnBars}
+                valueFormatter={(value) => formatPct(value, 2)}
+              />
+            </>
+          )}
         </div>
       </section>
 
@@ -463,6 +577,23 @@ function RegimesPageContent() {
           deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
           emptyText="Transition trend is unavailable for this filter."
         />
+        {query.transitionSplit !== "none" ? (
+          <>
+            <TrendStrips
+              title={`Transition Churn by ${query.transitionSplit === "chain" ? "Chain" : "Category"} (Top 6 by latest TVL)`}
+              items={groupedTransitionTrendItems}
+              valueFormatter={(value) => formatPct(value, 2)}
+              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+              emptyText="Grouped transition churn trend is unavailable for this filter."
+            />
+            <BarList
+              title={`Churn Drift Leaderboard (${query.transitionSplit === "chain" ? "Chains" : "Categories"})`}
+              items={groupedDriftItems}
+              valueFormatter={(value) => formatPct(value, 2)}
+              emptyText="Not enough grouped history yet for drift ranking."
+            />
+          </>
+        ) : null}
       </section>
 
       <section className="card">

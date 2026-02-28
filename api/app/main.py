@@ -1629,6 +1629,8 @@ async def regime_transitions_daily(
     min_points: int | None = Query(default=None, ge=0),
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     max_vaults: int | None = Query(default=None, ge=0),
+    group_by: Literal["none", "chain", "category"] = Query(default="none"),
+    group_limit: int = Query(default=8, ge=2, le=30),
     days: int = Query(default=120, ge=30, le=365),
 ) -> dict[str, object]:
     universe_gate = _resolve_universe_gate(
@@ -1647,6 +1649,7 @@ async def regime_transitions_daily(
         "min_points": min_points,
         "apy_min": APY_MIN,
         "apy_max": APY_MAX,
+        "group_limit": group_limit,
     }
     if chain_id is not None:
         params["chain_id"] = chain_id
@@ -1664,6 +1667,7 @@ async def regime_transitions_daily(
                     SELECT
                         d.vault_address,
                         d.chain_id,
+                        COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
                         COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
                         COALESCE(m.vol_30d, 0.0) AS vol_30d
                     FROM vault_dim d
@@ -1678,6 +1682,8 @@ async def regime_transitions_daily(
                 daily_ranked AS (
                     SELECT
                         e.vault_address,
+                        e.chain_id,
+                        e.category,
                         e.tvl_usd,
                         e.vol_30d,
                         (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date AS day,
@@ -1696,6 +1702,8 @@ async def regime_transitions_daily(
                 daily_latest AS (
                     SELECT
                         vault_address,
+                        chain_id,
+                        category,
                         tvl_usd,
                         vol_30d,
                         day,
@@ -1706,6 +1714,8 @@ async def regime_transitions_daily(
                 calc AS (
                     SELECT
                         vault_address,
+                        chain_id,
+                        category,
                         tvl_usd,
                         vol_30d,
                         day,
@@ -1718,6 +1728,8 @@ async def regime_transitions_daily(
                 apy AS (
                     SELECT
                         vault_address,
+                        chain_id,
+                        category,
                         tvl_usd,
                         vol_30d,
                         day,
@@ -1741,6 +1753,8 @@ async def regime_transitions_daily(
                 momentum AS (
                     SELECT
                         vault_address,
+                        chain_id,
+                        category,
                         tvl_usd,
                         vol_30d,
                         day,
@@ -1754,6 +1768,8 @@ async def regime_transitions_daily(
                 regimes AS (
                     SELECT
                         vault_address,
+                        chain_id,
+                        category,
                         tvl_usd,
                         day,
                         current_momentum,
@@ -1777,6 +1793,156 @@ async def regime_transitions_daily(
                 params,
             )
             rows = cur.fetchall()
+            grouped_rows: list[dict] = []
+            if group_by != "none":
+                group_expr = "chain_id::text" if group_by == "chain" else "category"
+                cur.execute(
+                    f"""
+                    WITH eligible AS (
+                        SELECT
+                            d.vault_address,
+                            d.chain_id,
+                            COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
+                            COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
+                            COALESCE(m.vol_30d, 0.0) AS vol_30d
+                        FROM vault_dim d
+                        JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                        WHERE
+                            d.active = TRUE
+                            AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
+                            AND COALESCE(m.points_count, 0) >= %(min_points)s
+                            {chain_clause}
+                            {rank_clause}
+                    ),
+                    daily_ranked AS (
+                        SELECT
+                            e.vault_address,
+                            e.chain_id,
+                            e.category,
+                            e.tvl_usd,
+                            e.vol_30d,
+                            (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date AS day,
+                            p.ts,
+                            p.pps_raw,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY e.vault_address, (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date
+                                ORDER BY p.ts DESC
+                            ) AS rn
+                        FROM pps_timeseries p
+                        JOIN eligible e ON e.vault_address = p.vault_address
+                        WHERE p.ts >= EXTRACT(
+                            EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - ((%(days)s + 110) * INTERVAL '1 day'))
+                        )
+                    ),
+                    daily_latest AS (
+                        SELECT
+                            vault_address,
+                            chain_id,
+                            category,
+                            tvl_usd,
+                            vol_30d,
+                            day,
+                            pps_raw
+                        FROM daily_ranked
+                        WHERE rn = 1
+                    ),
+                    calc AS (
+                        SELECT
+                            vault_address,
+                            chain_id,
+                            category,
+                            tvl_usd,
+                            vol_30d,
+                            day,
+                            pps_raw,
+                            LAG(pps_raw, 7) OVER (PARTITION BY vault_address ORDER BY day) AS pps_7d,
+                            LAG(pps_raw, 30) OVER (PARTITION BY vault_address ORDER BY day) AS pps_30d,
+                            LAG(pps_raw, 90) OVER (PARTITION BY vault_address ORDER BY day) AS pps_90d
+                        FROM daily_latest
+                    ),
+                    apy AS (
+                        SELECT
+                            vault_address,
+                            chain_id,
+                            category,
+                            tvl_usd,
+                            vol_30d,
+                            day,
+                            CASE
+                                WHEN pps_raw > 0 AND pps_7d > 0
+                                THEN LEAST(GREATEST(POWER(pps_raw / pps_7d, 365.0 / 7.0) - 1, %(apy_min)s), %(apy_max)s)
+                                ELSE NULL
+                            END AS apy_7d,
+                            CASE
+                                WHEN pps_raw > 0 AND pps_30d > 0
+                                THEN LEAST(GREATEST(POWER(pps_raw / pps_30d, 365.0 / 30.0) - 1, %(apy_min)s), %(apy_max)s)
+                                ELSE NULL
+                            END AS apy_30d,
+                            CASE
+                                WHEN pps_raw > 0 AND pps_90d > 0
+                                THEN LEAST(GREATEST(POWER(pps_raw / pps_90d, 365.0 / 90.0) - 1, %(apy_min)s), %(apy_max)s)
+                                ELSE NULL
+                            END AS apy_90d
+                        FROM calc
+                    ),
+                    momentum AS (
+                        SELECT
+                            vault_address,
+                            chain_id,
+                            category,
+                            tvl_usd,
+                            vol_30d,
+                            day,
+                            (apy_7d - apy_30d) AS current_momentum,
+                            (apy_30d - apy_90d) AS previous_momentum
+                        FROM apy
+                        WHERE day >= ((NOW() AT TIME ZONE 'UTC')::date - ((%(days)s::text || ' days')::interval))
+                          AND apy_30d IS NOT NULL
+                          AND apy_90d IS NOT NULL
+                    ),
+                    regimes AS (
+                        SELECT
+                            vault_address,
+                            chain_id,
+                            category,
+                            tvl_usd,
+                            day,
+                            current_momentum,
+                            previous_momentum,
+                            {current_regime_sql} AS current_regime,
+                            {previous_regime_sql} AS previous_regime
+                        FROM momentum
+                    ),
+                    grouped AS (
+                        SELECT
+                            day::text AS day,
+                            {group_expr} AS group_key,
+                            COUNT(*) AS vaults_total,
+                            COUNT(*) FILTER (WHERE previous_regime <> current_regime) AS changed_vaults,
+                            SUM(tvl_usd) AS tvl_total_usd,
+                            SUM(tvl_usd) FILTER (WHERE previous_regime <> current_regime) AS changed_tvl_usd,
+                            AVG(current_momentum) AS avg_current_momentum,
+                            AVG(previous_momentum) AS avg_previous_momentum
+                        FROM regimes
+                        GROUP BY day, group_key
+                    ),
+                    ranked_groups AS (
+                        SELECT
+                            group_key,
+                            SUM(tvl_total_usd) FILTER (WHERE day = (SELECT MAX(day) FROM grouped)) AS latest_tvl_usd
+                        FROM grouped
+                        GROUP BY group_key
+                        ORDER BY latest_tvl_usd DESC NULLS LAST
+                        LIMIT %(group_limit)s
+                    )
+                    SELECT g.*
+                    FROM grouped g
+                    JOIN ranked_groups r ON r.group_key = g.group_key
+                    ORDER BY g.day, g.group_key
+                    """,
+                    params,
+                )
+                grouped_rows = cur.fetchall()
 
     for row in rows:
         vaults_total = int(row.get("vaults_total") or 0)
@@ -1788,6 +1954,25 @@ async def regime_transitions_daily(
         current_m = _to_float_or_none(row.get("avg_current_momentum"))
         previous_m = _to_float_or_none(row.get("avg_previous_momentum"))
         row["momentum_spread"] = (current_m - previous_m) if current_m is not None and previous_m is not None else None
+    grouped_series: dict[str, list[dict]] = {}
+    grouped_latest: list[dict] = []
+    if group_by != "none":
+        for row in grouped_rows:
+            vaults_total = int(row.get("vaults_total") or 0)
+            changed_vaults = int(row.get("changed_vaults") or 0)
+            tvl_total = float(row.get("tvl_total_usd") or 0.0)
+            changed_tvl = float(row.get("changed_tvl_usd") or 0.0)
+            row["changed_ratio"] = (changed_vaults / vaults_total) if vaults_total > 0 else None
+            row["changed_tvl_ratio"] = (changed_tvl / tvl_total) if tvl_total > 0 else None
+            current_m = _to_float_or_none(row.get("avg_current_momentum"))
+            previous_m = _to_float_or_none(row.get("avg_previous_momentum"))
+            row["momentum_spread"] = (current_m - previous_m) if current_m is not None and previous_m is not None else None
+            group_key = str(row.get("group_key") or "unknown")
+            grouped_series.setdefault(group_key, []).append(row)
+        latest_group_day = grouped_rows[-1]["day"] if grouped_rows else None
+        if latest_group_day is not None:
+            grouped_latest = [row for row in grouped_rows if row.get("day") == latest_group_day]
+            grouped_latest.sort(key=lambda item: float(item.get("tvl_total_usd") or 0.0), reverse=True)
 
     latest = rows[-1] if rows else None
     first = rows[0] if rows else None
@@ -1812,12 +1997,20 @@ async def regime_transitions_daily(
             "min_points": min_points,
             "min_tvl_usd": min_tvl_usd,
             "max_vaults": max_vaults,
+            "group_by": group_by,
+            "group_limit": group_limit,
             "days": days,
             "apy_bounds": {"min": APY_MIN, "max": APY_MAX},
         },
         "universe_gate": universe_gate,
         "summary": summary,
         "rows": rows,
+        "grouped": {
+            "group_by": group_by,
+            "rows": grouped_rows,
+            "latest": grouped_latest,
+            "series": grouped_series,
+        },
     }
 
 
