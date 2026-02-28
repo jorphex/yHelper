@@ -50,8 +50,8 @@
   --surface-3: #0b1220;
   --line: #1f3d71;
   --line-2: #18305a;
-  --accent: #0675f9;
-  --accent-2: #63a5ff;
+  --accent: #0657f9;
+  --accent-2: #7aaaff;
   --accent-soft: #0c2354;
   --positive: #63c532;
   --negative: #df536a;
@@ -79,6 +79,28 @@ body {
     radial-gradient(circle at 92% 0%, #0b2248 0%, transparent 32%),
     linear-gradient(180deg, #0c0c0c 0%, #090d16 100%);
   overflow-x: hidden;
+}
+
+#main-content:focus {
+  outline: none;
+}
+
+.skip-link {
+  position: absolute;
+  left: 0.8rem;
+  top: -3rem;
+  z-index: 50;
+  border: 1px solid var(--accent-2);
+  border-radius: 10px;
+  background: #0e2144;
+  color: #f6fbff;
+  padding: 0.42rem 0.64rem;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0.8rem;
 }
 
 .site-header {
@@ -129,6 +151,13 @@ body {
   border-color: var(--accent-2);
   background: linear-gradient(180deg, #1a2f5d 0%, #132344 100%);
   transform: translateY(-1px);
+}
+
+.site-nav-links a.is-active {
+  border-color: var(--accent-2);
+  background: linear-gradient(180deg, #1d3972 0%, #162b54 100%);
+  color: #f7fbff;
+  box-shadow: 0 0 0 1px rgba(122, 170, 255, 0.25) inset;
 }
 
 .audience-toggle {
@@ -278,7 +307,8 @@ body {
 .hero p {
   margin-top: 0.5rem;
   color: var(--muted);
-  max-width: 75ch;
+  max-width: 68ch;
+  line-height: 1.56;
 }
 
 .card {
@@ -358,6 +388,18 @@ a:hover {
   background: var(--surface-3);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+}
+
+.table-wrap tbody tr:nth-child(even) {
+  background: rgba(8, 18, 34, 0.38);
+}
+
+.table-wrap tbody tr:hover {
+  background: rgba(20, 42, 76, 0.36);
+}
+
+.table-wrap tbody tr.row-selected {
+  background: #173158;
 }
 
 .split-grid + .table-wrap,
@@ -540,6 +582,8 @@ input[type="text"] {
 
 .card-intro {
   margin: 0 0 0.7rem;
+  max-width: 80ch;
+  line-height: 1.52;
 }
 
 .confidence-line {
@@ -1509,6 +1553,17 @@ select:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--accent-2);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 #freshness-panels {

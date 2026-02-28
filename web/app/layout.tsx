@@ -1,10 +1,10 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
-import Link from "next/link";
 import { AudienceToggle } from "./components/audience-toggle";
 import { ChunkRecovery } from "./components/chunk-recovery";
 import { FreshnessBadge } from "./components/freshness-badge";
+import { NavLinks } from "./components/nav-links";
 
 export const metadata: Metadata = {
   title: "yHelper Dashboard",
@@ -22,24 +22,21 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <ChunkRecovery />
+        <a className="skip-link" href="#main-content">
+          Skip to main content
+        </a>
         <header className="site-header">
           <nav className="site-nav">
-            <div className="site-nav-links">
-              <Link href="/">Overview</Link>
-              <Link href="/discover">Discover</Link>
-              <Link href="/assets">Assets</Link>
-              <Link href="/composition">Composition</Link>
-              <Link href="/changes">Changes</Link>
-              <Link href="/regimes">Regimes</Link>
-              <Link href="/chains">Chains</Link>
-            </div>
+            <NavLinks />
             <div className="site-controls">
               <FreshnessBadge />
               <AudienceToggle />
             </div>
           </nav>
         </header>
-        {children}
+        <div id="main-content" tabIndex={-1}>
+          {children}
+        </div>
       </body>
     </html>
   );
