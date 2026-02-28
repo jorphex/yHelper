@@ -187,7 +187,7 @@ export default function HomePage() {
     <main className="container">
       <section className="hero">
         <h1>yHelper</h1>
-        <p>Public Yearn dashboard. No wallet needed. Built for quick checks by newcomers and deeper diagnostics by power users.</p>
+        <p>Public Yearn dashboard. Built for quick checks by newcomers and deeper diagnostics by power users.</p>
       </section>
 
       <section className="card overview-lifecycle-card">
@@ -393,7 +393,7 @@ export default function HomePage() {
       <section className="card">
         <h2>Dashboards</h2>
         <p className="muted card-intro">
-          No wallet input required. All pages apply quality filters so tiny/noisy vaults do not dominate rankings.
+          All pages apply quality filters so tiny/noisy vaults do not dominate rankings.
         </p>
         <ol>
           <li>

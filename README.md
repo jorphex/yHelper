@@ -3,7 +3,6 @@
 Public Yearn analytics scaffold (Phase 0).
 
 ## Scope
-- No wallet connect / no EOA input.
 - Public protocol-level dashboards.
 - Isolated deployment model (do not modify Nextcloud stack/routes).
 
