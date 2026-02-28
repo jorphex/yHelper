@@ -1398,24 +1398,29 @@ input:focus-visible {
 
   .site-nav-links {
     width: 100%;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.35rem;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.32rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 0.12rem;
   }
 
   .site-controls {
     width: 100%;
     max-width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     gap: 0.4rem;
   }
 
   .site-nav-links a {
-    width: 100%;
+    flex: 0 0 auto;
     text-align: center;
     padding: 0.28rem 0.5rem;
     font-size: 0.78rem;
+    white-space: nowrap;
   }
 
   .audience-toggle {
@@ -1427,7 +1432,7 @@ input:focus-visible {
   }
 
   .freshness-badge {
-    max-width: 56%;
+    max-width: 52%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
