@@ -80,6 +80,7 @@ type TransitionDailyResponse = {
 
 type RegimeSummarySortKey = "regime" | "vaults" | "tvl";
 type RegimeMoverSortKey = "vault" | "chain" | "token" | "tvl" | "apy" | "momentum" | "regime";
+type SplitSnapshotSortKey = "cohort" | "churn" | "churn_tvl" | "momentum" | "tvl";
 
 function confidenceBand(score: number): string {
   if (score >= 80) return "High";
@@ -103,6 +104,7 @@ function RegimesPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [summarySort, setSummarySort] = useState<SortState<RegimeSummarySortKey>>({ key: "vaults", direction: "desc" });
   const [moverSort, setMoverSort] = useState<SortState<RegimeMoverSortKey>>({ key: "momentum", direction: "desc" });
+  const [splitSnapshotSort, setSplitSnapshotSort] = useState<SortState<SplitSnapshotSortKey>>({ key: "churn", direction: "desc" });
 
   const query = useMemo(() => {
     const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
@@ -317,6 +319,29 @@ function RegimesPageContent() {
         };
       });
   }, [transitionDailyGrouped]);
+  const splitSnapshotRows = useMemo(() => {
+    const latest = transitionDailyGrouped?.latest ?? [];
+    const groupType = transitionDailyGrouped?.group_by;
+    const normalized = latest.map((row) => {
+      const key = row.group_key;
+      const label = groupType === "chain" ? chainLabel(Number(key)) : key;
+      return {
+        group_key: key,
+        cohort_label: label,
+        changed_ratio: row.changed_ratio ?? null,
+        changed_tvl_ratio: row.changed_tvl_ratio ?? null,
+        momentum_spread: row.momentum_spread ?? null,
+        tvl_total_usd: row.tvl_total_usd ?? null,
+      };
+    });
+    return sortRows(normalized, splitSnapshotSort, {
+      cohort: (row) => row.cohort_label,
+      churn: (row) => row.changed_ratio ?? Number.NEGATIVE_INFINITY,
+      churn_tvl: (row) => row.changed_tvl_ratio ?? Number.NEGATIVE_INFINITY,
+      momentum: (row) => row.momentum_spread ?? Number.NEGATIVE_INFINITY,
+      tvl: (row) => row.tvl_total_usd ?? Number.NEGATIVE_INFINITY,
+    });
+  }, [transitionDailyGrouped, splitSnapshotSort]);
   const summaryConfidence = clampScore(
     Math.min(1, (summaryRows.reduce((acc, row) => acc + row.vaults, 0) || 0) / 120) * 65 + Math.min(1, moverRows.length / 40) * 35,
   );
@@ -592,6 +617,69 @@ function RegimesPageContent() {
               valueFormatter={(value) => formatPct(value, 2)}
               emptyText="Not enough grouped history yet for drift ranking."
             />
+            <section>
+              <h3>{`Latest ${query.transitionSplit === "chain" ? "Chain" : "Category"} Snapshot`}</h3>
+              <p className="muted card-intro">Sortable latest-day cohort metrics for quick comparison and sanity checks.</p>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "cohort" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "cohort"))}
+                        >
+                          Cohort <span className="th-indicator">{sortIndicator(splitSnapshotSort, "cohort")}</span>
+                        </button>
+                      </th>
+                      <th className="is-numeric">
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "churn" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "churn"))}
+                        >
+                          Churn % <span className="th-indicator">{sortIndicator(splitSnapshotSort, "churn")}</span>
+                        </button>
+                      </th>
+                      <th className="is-numeric">
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "churn_tvl" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "churn_tvl"))}
+                        >
+                          Churn TVL % <span className="th-indicator">{sortIndicator(splitSnapshotSort, "churn_tvl")}</span>
+                        </button>
+                      </th>
+                      <th className="is-numeric">
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "momentum" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "momentum"))}
+                        >
+                          Momentum Spread <span className="th-indicator">{sortIndicator(splitSnapshotSort, "momentum")}</span>
+                        </button>
+                      </th>
+                      <th className="is-numeric">
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "tvl" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "tvl"))}
+                        >
+                          TVL <span className="th-indicator">{sortIndicator(splitSnapshotSort, "tvl")}</span>
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {splitSnapshotRows.map((row) => (
+                      <tr key={`split-latest-${row.group_key}`}>
+                        <td>{row.cohort_label}</td>
+                        <td className="is-numeric">{formatPct(row.changed_ratio, 2)}</td>
+                        <td className="is-numeric">{formatPct(row.changed_tvl_ratio, 2)}</td>
+                        <td className="is-numeric">{formatPct(row.momentum_spread, 2)}</td>
+                        <td className="is-numeric">{formatUsd(row.tvl_total_usd)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </>
         ) : null}
       </section>
