@@ -348,9 +348,16 @@ td.is-numeric {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.3rem;
+  width: 100%;
+  white-space: nowrap;
   font: inherit;
   color: inherit;
+}
+
+th.is-numeric .th-button {
+  justify-content: flex-end;
 }
 
 .th-button:hover {
