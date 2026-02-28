@@ -12,6 +12,7 @@ import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "
 
 type WindowKey = "24h" | "7d" | "30d";
 type StaleThresholdKey = "auto" | "24h" | "7d" | "30d";
+type TrendGroupKey = "none" | "chain" | "category";
 
 type Summary = {
   vaults_eligible: number;
@@ -303,6 +304,8 @@ function ChangesPageContent() {
   const [trends, setTrends] = useState<DailyTrendRow[]>([]);
   const [chainTrendLatest, setChainTrendLatest] = useState<GroupedTrendRow[]>([]);
   const [categoryTrendLatest, setCategoryTrendLatest] = useState<GroupedTrendRow[]>([]);
+  const [chainTrendSeries, setChainTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
+  const [categoryTrendSeries, setCategoryTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [trendError, setTrendError] = useState<string | null>(null);
   const [staleChainSort, setStaleChainSort] = useState<SortState<StaleChainSortKey>>({
@@ -328,6 +331,7 @@ function ChangesPageContent() {
         ["auto", "24h", "7d", "30d"] as const,
         "auto",
       ),
+      trendGroup: queryChoice<TrendGroupKey>(searchParams, "trend_group", ["none", "chain", "category"] as const, "none"),
       tvlView: queryChoice<TvlView>(searchParams, "tvl_view", ["both", "filtered", "yearn"] as const, "both"),
       limit: queryInt(searchParams, "limit", 20, { min: 5, max: 80 }),
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
@@ -444,8 +448,13 @@ function ChangesPageContent() {
         setTrends(Array.isArray(globalPayload.rows) ? globalPayload.rows : []);
         const chainLatest = Array.isArray(chainPayload.grouped?.latest) ? chainPayload.grouped.latest : [];
         const categoryLatest = Array.isArray(categoryPayload.grouped?.latest) ? categoryPayload.grouped.latest : [];
+        const chainSeries = chainPayload.grouped?.series && typeof chainPayload.grouped.series === "object" ? chainPayload.grouped.series : {};
+        const categorySeries =
+          categoryPayload.grouped?.series && typeof categoryPayload.grouped.series === "object" ? categoryPayload.grouped.series : {};
         setChainTrendLatest(chainLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
         setCategoryTrendLatest(categoryLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
+        setChainTrendSeries(chainSeries);
+        setCategoryTrendSeries(categorySeries);
         setTrendError(null);
       } catch (err) {
         if (active) setTrendError(`Trends load failed: ${String(err)}`);
@@ -640,6 +649,24 @@ function ChangesPageContent() {
     ],
     [trendSlice],
   );
+  const groupedApyTrendItems = useMemo(() => {
+    if (query.trendGroup === "none") return [];
+    const latest = query.trendGroup === "chain" ? chainTrendLatest : categoryTrendLatest;
+    const series = query.trendGroup === "chain" ? chainTrendSeries : categoryTrendSeries;
+    const ranked = [...latest]
+      .sort((left, right) => (right.total_tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.total_tvl_usd ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 6);
+    return ranked.map((row) => {
+      const key = row.group_key;
+      const label = query.trendGroup === "chain" ? chainLabel(Number(key)) : key;
+      return {
+        id: `group-apy-${query.trendGroup}-${key}`,
+        label,
+        points: (series[key] ?? []).map((point) => point.weighted_apy_30d),
+        note: `Latest APY 30d ${formatPct(row.weighted_apy_30d)} • TVL ${formatUsd(row.total_tvl_usd)}`,
+      };
+    });
+  }, [query.trendGroup, chainTrendLatest, categoryTrendLatest, chainTrendSeries, categoryTrendSeries]);
   const chainMomentumHeat = useMemo(
     () =>
       chainTrendLatest
@@ -728,7 +755,7 @@ function ChangesPageContent() {
             <option value="30d">30d</option>
           </select>
         </label>
-        <div className="inline-controls">
+        <div className="inline-controls controls-tight">
           <label>
             Stale Cutoff:&nbsp;
             <select
@@ -763,6 +790,14 @@ function ChangesPageContent() {
             </select>
           </label>
           <label>
+            Trend Series:&nbsp;
+            <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value as TrendGroupKey })}>
+              <option value="none">Global</option>
+              <option value="chain">By Chain</option>
+              <option value="category">By Category</option>
+            </select>
+          </label>
+          <label>
             Movers Limit:&nbsp;
             <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
               <option value={10}>10</option>
@@ -771,7 +806,7 @@ function ChangesPageContent() {
               <option value={50}>50</option>
             </select>
           </label>
-          <label>
+          <label className="field-compact">
             Min TVL (USD):&nbsp;
             <input
               type="number"
@@ -780,7 +815,7 @@ function ChangesPageContent() {
               onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
             />
           </label>
-          <label>
+          <label className="field-compact">
             Min Points:&nbsp;
             <input
               type="number"
@@ -848,11 +883,19 @@ function ChangesPageContent() {
             emptyText="Riser/faller drift unavailable for this filter."
           />
           <TrendStrips
-            title="Weighted APY Trend (7d / 30d / 90d)"
-            items={weightedApyTrendItems}
+            title={
+              query.trendGroup === "none"
+                ? "Weighted APY Trend (7d / 30d / 90d)"
+                : `Weighted APY 30d Trend (${query.trendGroup === "chain" ? "By Chain" : "By Category"})`
+            }
+            items={query.trendGroup === "none" ? weightedApyTrendItems : groupedApyTrendItems}
             valueFormatter={(value) => formatPct(value, 2)}
             deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
-            emptyText="Weighted APY trend unavailable for this filter."
+            emptyText={
+              query.trendGroup === "none"
+                ? "Weighted APY trend unavailable for this filter."
+                : "Grouped APY trend unavailable for this filter."
+            }
           />
         </div>
         <p className="muted">

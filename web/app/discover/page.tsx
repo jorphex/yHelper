@@ -76,6 +76,24 @@ type DailyTrendRow = {
 
 type DailyTrendResponse = {
   rows?: DailyTrendRow[];
+  grouped?: {
+    group_by?: "none" | "chain" | "category";
+    latest?: Array<
+      DailyTrendRow & {
+        group_key: string;
+        total_tvl_usd?: number | null;
+      }
+    >;
+    series?: Record<
+      string,
+      Array<
+        DailyTrendRow & {
+          group_key: string;
+          total_tvl_usd?: number | null;
+        }
+      >
+    >;
+  };
 };
 
 function asFiniteNumber(value: unknown): number | null {
@@ -199,6 +217,7 @@ function DiscoverPageContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<DiscoverResponse | null>(null);
   const [trends, setTrends] = useState<DailyTrendRow[]>([]);
+  const [trendGrouped, setTrendGrouped] = useState<DailyTrendResponse["grouped"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [trendError, setTrendError] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState<DiscoverSortKey>>({ key: "tvl", direction: "desc" });
@@ -233,6 +252,7 @@ function DiscoverPageContent() {
       includeRetired: queryBool(searchParams, "include_retired", false),
       migrationOnly: queryBool(searchParams, "migration_only", false),
       highlightedOnly: queryBool(searchParams, "highlighted_only", false),
+      trendGroup: queryChoice(searchParams, "trend_group", ["none", "chain", "category"] as const, "none"),
       serverSort,
       serverDir,
       uiSort,
@@ -327,6 +347,8 @@ function DiscoverPageContent() {
           days: "90",
         });
         if (query.chain) params.set("chain_id", String(query.chain));
+        params.set("group_by", query.trendGroup);
+        if (query.trendGroup !== "none") params.set("group_limit", "8");
         const res = await fetch(`/api/trends/daily?${params.toString()}`, { cache: "no-store" });
         if (!res.ok) {
           if (active) setTrendError(`Trends API error: ${res.status}`);
@@ -335,6 +357,7 @@ function DiscoverPageContent() {
         const payload = (await res.json()) as DailyTrendResponse;
         if (!active) return;
         setTrends(Array.isArray(payload.rows) ? payload.rows : []);
+        setTrendGrouped(payload.grouped ?? null);
         setTrendError(null);
       } catch (err) {
         if (active) setTrendError(`Trends load failed: ${String(err)}`);
@@ -344,7 +367,7 @@ function DiscoverPageContent() {
     return () => {
       active = false;
     };
-  }, [query.universe, query.minTvl, query.minPoints, query.chain]);
+  }, [query.universe, query.minTvl, query.minPoints, query.chain, query.trendGroup]);
 
   const rows = sortRows(data?.rows ?? [], sort, {
     vault: (row) => row.symbol ?? row.vault_address,
@@ -535,6 +558,25 @@ function DiscoverPageContent() {
     ],
     [trendSlice],
   );
+  const groupedWeightedApyTrendItems = useMemo(() => {
+    const latest = trendGrouped?.latest ?? [];
+    const series = trendGrouped?.series ?? {};
+    const groupBy = trendGrouped?.group_by ?? "none";
+    const ranked = [...latest]
+      .filter((row) => row.group_key && row.group_key !== "unknown")
+      .sort((left, right) => (right.total_tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.total_tvl_usd ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 6);
+    return ranked.map((row) => {
+      const key = row.group_key;
+      const label = groupBy === "chain" ? chainLabel(Number(key)) : key;
+      return {
+        id: `group-apy-${key}`,
+        label,
+        points: (series[key] ?? []).map((entry) => entry.weighted_apy_30d),
+        note: `Latest APY 30d ${formatPct(row.weighted_apy_30d)} • TVL ${formatUsd(row.total_tvl_usd)}`,
+      };
+    });
+  }, [trendGrouped]);
 
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
@@ -695,6 +737,14 @@ function DiscoverPageContent() {
               <option value="asc">Asc</option>
             </select>
           </label>
+          <label>
+            Trend Series:&nbsp;
+            <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value })}>
+              <option value="none">Global</option>
+              <option value="chain">By Chain</option>
+              <option value="category">By Category</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -811,11 +861,19 @@ function DiscoverPageContent() {
             emptyText="Trend rows unavailable for this filter."
           />
           <TrendStrips
-            title="Weighted APY Trend (7d / 30d / 90d)"
-            items={weightedApyTrendItems}
+            title={
+              query.trendGroup === "none"
+                ? "Weighted APY Trend (7d / 30d / 90d)"
+                : `Weighted APY 30d Trend (${query.trendGroup === "chain" ? "By Chain" : "By Category"})`
+            }
+            items={query.trendGroup === "none" ? weightedApyTrendItems : groupedWeightedApyTrendItems}
             valueFormatter={(value) => formatPct(value, 2)}
             deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
-            emptyText="Weighted APY trend unavailable for this filter."
+            emptyText={
+              query.trendGroup === "none"
+                ? "Weighted APY trend unavailable for this filter."
+                : "Grouped APY trend unavailable for this filter."
+            }
           />
         </div>
         <p className="muted">
