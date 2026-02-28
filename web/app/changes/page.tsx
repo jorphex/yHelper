@@ -419,11 +419,13 @@ function ChangesPageContent() {
           universe: query.universe,
           min_tvl_usd: String(query.minTvl),
           min_points: String(query.minPoints),
-          days: "90",
         });
         const globalParams = new URLSearchParams(baseParams);
+        globalParams.set("days", "90");
         const chainParams = new URLSearchParams(baseParams);
         const categoryParams = new URLSearchParams(baseParams);
+        chainParams.set("days", query.trendGroup === "chain" ? "90" : "14");
+        categoryParams.set("days", query.trendGroup === "category" ? "90" : "14");
         chainParams.set("group_by", "chain");
         chainParams.set("group_limit", "10");
         categoryParams.set("group_by", "category");
@@ -448,9 +450,14 @@ function ChangesPageContent() {
         setTrends(Array.isArray(globalPayload.rows) ? globalPayload.rows : []);
         const chainLatest = Array.isArray(chainPayload.grouped?.latest) ? chainPayload.grouped.latest : [];
         const categoryLatest = Array.isArray(categoryPayload.grouped?.latest) ? categoryPayload.grouped.latest : [];
-        const chainSeries = chainPayload.grouped?.series && typeof chainPayload.grouped.series === "object" ? chainPayload.grouped.series : {};
+        const chainSeries =
+          query.trendGroup === "chain" && chainPayload.grouped?.series && typeof chainPayload.grouped.series === "object"
+            ? chainPayload.grouped.series
+            : {};
         const categorySeries =
-          categoryPayload.grouped?.series && typeof categoryPayload.grouped.series === "object" ? categoryPayload.grouped.series : {};
+          query.trendGroup === "category" && categoryPayload.grouped?.series && typeof categoryPayload.grouped.series === "object"
+            ? categoryPayload.grouped.series
+            : {};
         setChainTrendLatest(chainLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
         setCategoryTrendLatest(categoryLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
         setChainTrendSeries(chainSeries);
@@ -464,7 +471,7 @@ function ChangesPageContent() {
     return () => {
       active = false;
     };
-  }, [query.universe, query.minTvl, query.minPoints]);
+  }, [query.universe, query.minTvl, query.minPoints, query.trendGroup]);
 
   const staleByChain = sortRows(data?.freshness?.stale_by_chain ?? [], staleChainSort, {
     chain: (row) => chainLabel(row.chain_id),
