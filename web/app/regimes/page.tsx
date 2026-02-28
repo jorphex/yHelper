@@ -93,6 +93,14 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function csvCell(value: string | number | null | undefined): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  if (text.includes(",") || text.includes("\"") || text.includes("\n")) {
+    return `"${text.replace(/"/g, "\"\"")}"`;
+  }
+  return text;
+}
+
 function RegimesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -347,6 +355,20 @@ function RegimesPageContent() {
       tvl: (row) => row.tvl_total_usd ?? Number.NEGATIVE_INFINITY,
     });
   }, [transitionDailyGrouped, splitSnapshotSort]);
+  const splitSnapshotCsv = useMemo(() => {
+    if (splitSnapshotRows.length === 0) return "";
+    const header = ["cohort", "churn_ratio", "churn_tvl_ratio", "momentum_spread", "tvl_usd"];
+    const lines = splitSnapshotRows.map((row) =>
+      [
+        csvCell(row.cohort_label),
+        csvCell(row.changed_ratio),
+        csvCell(row.changed_tvl_ratio),
+        csvCell(row.momentum_spread),
+        csvCell(row.tvl_total_usd),
+      ].join(","),
+    );
+    return [header.join(","), ...lines].join("\n");
+  }, [splitSnapshotRows]);
   const summaryConfidence = clampScore(
     Math.min(1, (summaryRows.reduce((acc, row) => acc + row.vaults, 0) || 0) / 120) * 65 + Math.min(1, moverRows.length / 40) * 35,
   );
@@ -640,6 +662,24 @@ function RegimesPageContent() {
             <section>
               <h3>{`Latest ${query.transitionSplit === "chain" ? "Chain" : "Category"} Snapshot`}</h3>
               <p className="muted card-intro">Sortable latest-day cohort metrics for quick comparison and sanity checks.</p>
+              <button
+                className="action-button"
+                onClick={() => {
+                  if (!splitSnapshotCsv) return;
+                  const blob = new Blob([splitSnapshotCsv], { type: "text/csv;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const anchor = document.createElement("a");
+                  const scope = query.transitionSplit === "chain" ? "chain" : "category";
+                  anchor.href = url;
+                  anchor.download = `yhelper-regimes-${scope}-snapshot.csv`;
+                  document.body.appendChild(anchor);
+                  anchor.click();
+                  anchor.remove();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download CSV
+              </button>
               <div className="table-wrap">
                 <table>
                   <thead>
