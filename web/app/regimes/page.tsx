@@ -288,6 +288,10 @@ function RegimesPageContent() {
       .slice(0, 8);
     return rows;
   }, [transitionDailyGrouped]);
+  const requestedTransitionDays = Number(query.transitionDays);
+  const availableTransitionDays = transitionDaily.length;
+  const transitionCoverageRatio = requestedTransitionDays > 0 ? availableTransitionDays / requestedTransitionDays : 1;
+  const showTransitionCoverageWarning = availableTransitionDays > 0 && transitionCoverageRatio < 0.8;
   const groupedLatestChurnHeat = useMemo(() => {
     const latest = transitionDailyGrouped?.latest ?? [];
     const groupType = transitionDailyGrouped?.group_by;
@@ -605,6 +609,12 @@ function RegimesPageContent() {
         <p className="muted card-intro">
           Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.
         </p>
+        {showTransitionCoverageWarning ? (
+          <p className="muted">
+            Coverage warning: requested {requestedTransitionDays} days, but only {availableTransitionDays} daily points are currently available.
+            Long-window views are truncated by retained PPS history.
+          </p>
+        ) : null}
         <TrendStrips
           title="Transition Churn Signals"
           items={transitionTrendItems}
