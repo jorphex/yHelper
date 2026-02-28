@@ -156,12 +156,14 @@ export function TrendStrips({
   items,
   valueFormatter,
   deltaFormatter,
+  columns = 1,
   emptyText = "No trend data available.",
 }: {
   title: string;
   items: TrendStripDatum[];
   valueFormatter: (value: number) => string;
   deltaFormatter: (value: number) => string;
+  columns?: number;
   emptyText?: string;
 }) {
   const validItems = items.filter((item) => finiteValues(item.points).length > 0);
@@ -177,7 +179,7 @@ export function TrendStrips({
   return (
     <section className="viz-panel">
       <h3>{title}</h3>
-      <div className="trend-strip-list">
+      <div className={`trend-strip-list trend-strip-cols-${Math.min(4, Math.max(1, columns))}`}>
         {validItems.map((item) => {
           const finite = finiteValues(item.points);
           const latest = finite[finite.length - 1];
@@ -185,7 +187,7 @@ export function TrendStrips({
           const delta = latest - previous;
           const min = Math.min(...finite);
           const max = Math.max(...finite);
-          const width = 320;
+          const width = 480;
           const height = 34;
           const innerW = width - 8;
           const innerH = height - 8;
@@ -205,7 +207,12 @@ export function TrendStrips({
                   {valueFormatter(latest)} <span className={toneClass}>{deltaFormatter(delta)}</span>
                 </p>
               </div>
-              <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.label} trend`}>
+              <svg
+                viewBox={`0 0 ${width} ${height}`}
+                preserveAspectRatio="none"
+                role="img"
+                aria-label={`${item.label} trend`}
+              >
                 <path d={path} className="trend-strip-line" />
               </svg>
               {item.note ? <p className="trend-strip-note muted">{item.note}</p> : null}
@@ -225,6 +232,7 @@ export function ScatterPlot({
   xFormatter,
   yFormatter,
   emptyText = "No points available for this filter.",
+  className,
 }: {
   title: string;
   xLabel: string;
@@ -233,6 +241,7 @@ export function ScatterPlot({
   xFormatter: (value: number) => string;
   yFormatter: (value: number) => string;
   emptyText?: string;
+  className?: string;
 }) {
   const valid = points.filter((point) => {
     const x = point.x;
@@ -241,7 +250,7 @@ export function ScatterPlot({
   });
   if (valid.length === 0) {
     return (
-      <section className="viz-panel">
+      <section className={`viz-panel ${className ?? ""}`.trim()}>
         <h3>{title}</h3>
         <p className="muted">{emptyText}</p>
       </section>
@@ -250,9 +259,9 @@ export function ScatterPlot({
 
   const width = 700;
   const height = 320;
-  const paddingLeft = 84;
-  const paddingRight = 18;
-  const paddingTop = 24;
+  const paddingLeft = 64;
+  const paddingRight = 20;
+  const paddingTop = 22;
   const paddingBottom = 62;
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
@@ -270,7 +279,7 @@ export function ScatterPlot({
   const yMid = (yMin + yMax) / 2;
 
   return (
-    <section className="viz-panel">
+    <section className={`viz-panel ${className ?? ""}`.trim()}>
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>

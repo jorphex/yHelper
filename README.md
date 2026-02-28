@@ -1,66 +1,46 @@
 # yHelper
 
-Public Yearn analytics scaffold (Phase 0).
+yHelper is a public Yearn dashboard focused on protocol-level insight, not wallet tracking.
+
+It helps users compare:
+- where yield is rising or falling
+- where TVL is concentrated
+- how stable or volatile vault behavior has been
+- how chains, tokens, and categories differ over time
+
+## What It Includes
+- `Overview`: protocol snapshot and guardrails
+- `Discover`: vault scanner by APY, momentum, consistency, and regime
+- `Assets`: venue comparison for the same underlying token
+- `Composition`: concentration and crowding across chains/categories/tokens
+- `Changes`: top risers, fallers, and freshness-aware deltas
+- `Regimes`: behavior classes and transition trends
+- `Chains`: chain-level weighted rollups
+
+## Data Sources
+- Yearn yDaemon metadata/snapshots
+- Kong PPS history and derived yield metrics
+- Optional DefiLlama context for protocol-level confluence
+
+## Run Locally
+1. Copy `.env.example` to `.env`
+2. Start services:
+```bash
+docker compose up --build
+```
+3. Open:
+- `http://localhost:3010`
+
+## Verification
+Run after deploy/restart:
+```bash
+npm --prefix web run lint
+docker compose up -d --build yhelper-web
+python3 scripts/post_deploy_smoke.py --base-url http://127.0.0.1:3010
+```
 
 ## Scope
-- Public protocol-level dashboards.
-- Isolated deployment model (do not modify Nextcloud stack/routes).
-
-## Current status
-- `web/`: Next.js shell with API status card.
-- `api/`: FastAPI service with health and ingestion overview endpoint.
-- `worker/`: yDaemon snapshot ingestion + Kong PPS ingestion + initial metrics + stale-ingestion alert checks.
-- `docker-compose.yml`: isolated `yhelper-*` services and network.
-- `infra/`: yHelper-only Caddy and Cloudflare Tunnel config examples.
-- Optional external context: DefiLlama protocol TVL snapshot for high-level confluence checks.
-- API guardrails: APY and momentum are bounded with fixed internal limits to reduce outlier distortion.
-
-## API endpoints (current)
-- `GET /health`
-- `GET /api/meta/freshness`
-- `GET /api/meta/coverage`
-- `GET /api/meta/protocol-context`
-- `GET /api/meta/movers`
-- `GET /api/overview`
-- `GET /api/discover`
-- `GET /api/assets`
-- `GET /api/assets/{token_symbol}/venues`
-- `GET /api/composition`
-- `GET /api/changes`
-- `GET /api/regimes`
-- `GET /api/chains/rollups`
-
-## Quick start
-1. Copy `.env.example` to `.env` and set values.
-2. Run:
-   - `docker compose up --build`
-3. Open:
-   - `http://localhost:3010`
-4. Verify API:
-   - `http://localhost:3010/api/overview`
-
-## Environment policy
-- Keep `.env` focused on operational values (URLs, ports, credentials, retention cadence).
-- Analytics guardrails and default universe gates are fixed in code to avoid configuration overload.
-- `API_ASSETS_FEATURED_MIN_TVL_USD` remains configurable as the main user-facing discovery strictness knob.
-
-## Alerting (optional)
-- Worker evaluates stale ingestion for `ydaemon_snapshot` and `kong_pps_metrics`.
-- Alert state is persisted in Postgres (`alert_state`) and returned in `GET /api/meta/freshness` and `GET /api/overview`.
-- Configure channels via env:
-  - `ALERT_TELEGRAM_BOT_TOKEN` + `ALERT_TELEGRAM_CHAT_ID`
-  - `ALERT_DISCORD_WEBHOOK_URL`
-  - `ALERT_STALE_SECONDS` and `ALERT_COOLDOWN_SECONDS`
-- Worker uses a fixed internal stale-running timeout to auto-mark abandoned `running` rows after restarts.
-
-## Daily health summary (ops)
-- Run `python3 scripts/daily_health_summary.py` to emit a PASS/FAIL JSON summary from `/api/overview` and `/api/meta/freshness`.
-- Exit code is `0` on PASS and `1` on FAIL for easy cron/systemd integration.
-- Run `python3 scripts/post_deploy_smoke.py` after deploy/restart to verify all public pages and key API routes return `200`.
-- Optional: `python3 scripts/post_deploy_smoke.py --base-url https://yhelper.seul.one` for external edge verification.
-- Optional retries/allow-list: `python3 scripts/post_deploy_smoke.py --retries 4 --retry-delay 1.5 --allow-status 200,301`.
-
-## Isolation safety
-- Service names, network, and volume use `yhelper-*` naming.
-- Keep `infra/Caddyfile.yhelper` as a separate include block.
-- Do not edit existing Nextcloud compose files, volumes, or routes.
+- Public dashboards only
+- No wallet connect / EOA input flow
+- No support/docs workflows
+- No export features unless explicitly requested

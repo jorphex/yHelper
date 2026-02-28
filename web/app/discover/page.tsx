@@ -844,6 +844,7 @@ function DiscoverPageContent() {
         </p>
         <div className="discover-visual-grid">
           <ScatterPlot
+            className="discover-main-scatter"
             title="APY vs Momentum Map (Top TVL Vaults)"
             xLabel="Momentum (percentage points: 7-day APY minus 30-day APY)"
             yLabel="APY over last 30 days (percent)"
@@ -866,11 +867,13 @@ function DiscoverPageContent() {
             xFormatter={(value) => formatPct(value, 1)}
             yFormatter={(value) => formatPct(value, 1)}
           />
-          <HeatGrid
-            title="Yield-Momentum Quadrants"
-            items={momentumQuadrantHeat}
-            valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
-          />
+          <div className="discover-quadrants-grid">
+            <HeatGrid
+              title="Yield-Momentum Quadrants"
+              items={momentumQuadrantHeat}
+              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+            />
+          </div>
           <HeatGrid
             title="Chain Momentum Heatmap"
             items={chainMomentumHeat}
@@ -906,7 +909,7 @@ function DiscoverPageContent() {
             }
           />
         </div>
-        <p className="muted">Delta compares the latest point against the previous day.</p>
+        <p className="muted discover-analytics-note">Delta compares the latest point against the previous day.</p>
       </section>
 
       <section className="card">

@@ -111,7 +111,6 @@ type OverviewResponse = {
 export default function HomePage() {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [serverTimeLive, setServerTimeLive] = useState("n/a");
 
   useEffect(() => {
     let active = true;
@@ -143,26 +142,6 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!data?.server_time_utc) {
-      setServerTimeLive("n/a");
-      return;
-    }
-    const baseMs = Date.parse(data.server_time_utc);
-    if (!Number.isFinite(baseMs)) {
-      setServerTimeLive("n/a");
-      return;
-    }
-    const startMs = Date.now();
-    const tick = () => {
-      const liveMs = baseMs + (Date.now() - startMs);
-      setServerTimeLive(formatUtcDateTime(liveMs));
-    };
-    tick();
-    const timer = window.setInterval(tick, 1000);
-    return () => window.clearInterval(timer);
-  }, [data?.server_time_utc]);
-
   return (
     <main className="container">
       <section className="hero">
@@ -170,14 +149,14 @@ export default function HomePage() {
         <p>Public Yearn dashboard. Built for quick checks by newcomers and deeper diagnostics by power users.</p>
       </section>
 
-      <section className="card">
+      <section className="card overview-snapshot-card">
         <h2>Data Snapshot</h2>
         <p className="muted card-intro">Quick health view so users can trust what they read on the other pages.</p>
         {data ? (
           <>
             <KpiGrid
               items={[
-                { label: "Updated (UTC)", value: serverTimeLive },
+                { label: "Server Time (UTC)", value: formatUtcDateTime(data.server_time_utc) },
                 { label: "Latest PPS Age", value: formatHours(data.freshness?.latest_pps_age_seconds) },
                 { label: "Newest Metrics Age", value: formatHours(data.freshness?.metrics_newest_age_seconds) },
                 { label: "PPS Stale Ratio", value: formatPct(data.freshness?.pps_stale_ratio, 1) },
@@ -185,7 +164,6 @@ export default function HomePage() {
                 { label: "Metric Rows", value: String(data.ingestion?.metrics_count ?? "n/a") },
               ]}
             />
-            <p className="muted">{data.message}</p>
           </>
         ) : loading ? (
           <p>Loading snapshot…</p>
@@ -194,20 +172,30 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="card">
-        <h2>Universe Snapshot</h2>
-        <p className="muted card-intro">Current scope stats for the Yearn-aligned vault universe used by this dashboard.</p>
+      <section className="card overview-guardrails-card">
+        <h2>Universe and Guardrails</h2>
+        <p className="muted card-intro">
+          Current scope stats plus inclusion guardrails (minimum TVL and minimum data points) used across dashboard pages.
+        </p>
         {data?.lifecycle || data?.coverage?.global ? (
-          <KpiGrid
-            items={[
-              { label: "Active Vaults", value: String(data?.lifecycle?.active_vaults ?? data?.coverage?.global?.active_vaults ?? "n/a") },
-              { label: "Eligible Vaults", value: String(data?.coverage?.global?.eligible_vaults ?? "n/a") },
-              { label: "Highlighted Vaults", value: String(data?.lifecycle?.highlighted_vaults ?? "n/a") },
-              { label: "Migration Ready", value: String(data?.lifecycle?.migration_ready_vaults ?? "n/a") },
-              { label: "Excluded Vaults", value: String(data?.coverage?.global?.excluded_vaults ?? "n/a") },
-              { label: "Low Data Points", value: String(data?.coverage?.global?.low_points ?? "n/a") },
-            ]}
-          />
+          <>
+            <KpiGrid
+              items={[
+                { label: "Active Vaults", value: String(data?.lifecycle?.active_vaults ?? data?.coverage?.global?.active_vaults ?? "n/a") },
+                { label: "Eligible Vaults", value: String(data?.coverage?.global?.eligible_vaults ?? "n/a") },
+                { label: "Highlighted Vaults", value: String(data?.lifecycle?.highlighted_vaults ?? "n/a") },
+                { label: "Migration Ready", value: String(data?.lifecycle?.migration_ready_vaults ?? "n/a") },
+                { label: "Excluded Vaults", value: String(data?.coverage?.global?.excluded_vaults ?? "n/a") },
+                { label: "Missing Metrics", value: String(data?.coverage?.global?.missing_metrics ?? "n/a") },
+                { label: "Below TVL Filter", value: String(data?.coverage?.global?.below_tvl ?? "n/a") },
+                { label: "Low Data Points", value: String(data?.coverage?.global?.low_points ?? "n/a") },
+              ]}
+            />
+            <p className="muted">
+              Inclusion filter: TVL (Total Value Locked) ≥ {data?.coverage?.filters?.min_tvl_usd?.toLocaleString("en-US") ?? "n/a"} and
+              data points ≥ {data?.coverage?.filters?.min_points ?? "n/a"}.
+            </p>
+          </>
         ) : (
           <p>Universe stats are unavailable for this cycle.</p>
         )}
@@ -238,28 +226,6 @@ export default function HomePage() {
             <a href="/chains">Chains</a>: chain-level weighted yield and consistency.
           </li>
         </ol>
-      </section>
-
-      <section className="card">
-        <h2>Coverage Guardrails</h2>
-        <p className="muted card-intro">
-          Inclusion filter: TVL (Total Value Locked) ≥ {data?.coverage?.filters?.min_tvl_usd?.toLocaleString("en-US") ?? "n/a"} and
-          data points ≥ {data?.coverage?.filters?.min_points ?? "n/a"}.
-        </p>
-        {data?.coverage?.global ? (
-          <KpiGrid
-            items={[
-              { label: "Active Vaults", value: String(data.coverage.global.active_vaults ?? "n/a") },
-              { label: "Eligible Vaults", value: String(data.coverage.global.eligible_vaults ?? "n/a") },
-              { label: "Excluded Vaults", value: String(data.coverage.global.excluded_vaults ?? "n/a") },
-              { label: "Missing Metrics", value: String(data.coverage.global.missing_metrics ?? "n/a") },
-              { label: "Below TVL Filter", value: String(data.coverage.global.below_tvl ?? "n/a") },
-              { label: "Low Data Points", value: String(data.coverage.global.low_points ?? "n/a") },
-            ]}
-          />
-        ) : (
-          <p>Coverage metrics are unavailable for this cycle.</p>
-        )}
       </section>
 
       <section className="card">

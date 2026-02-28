@@ -378,6 +378,7 @@ function CompositionPageContent() {
         </p>
         <div className="split-grid composition-crowding-grid">
           <ScatterPlot
+            className="composition-main-scatter"
             title="APY vs TVL Map (Crowding Context)"
             xLabel="APY over last 30 days (percent)"
             yLabel="TVL in USD"
@@ -416,7 +417,7 @@ function CompositionPageContent() {
         <h2>Chain Concentration</h2>
         <p className="muted card-intro">Click headers to sort by share, TVL, or weighted APY.</p>
         <div className="table-wrap">
-          <table>
+          <table className="composition-summary-table">
             <thead>
               <tr>
                 <th>
@@ -505,7 +506,7 @@ function CompositionPageContent() {
       <section className="card">
         <h2>Category Concentration</h2>
         <div className="table-wrap">
-          <table>
+          <table className="composition-summary-table">
             <thead>
               <tr>
                 <th>
@@ -598,7 +599,7 @@ function CompositionPageContent() {
       <section className="card">
         <h2>Top Tokens by TVL</h2>
         <div className="table-wrap">
-          <table>
+          <table className="composition-summary-table">
             <thead>
               <tr>
                 <th>

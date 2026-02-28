@@ -408,7 +408,7 @@ function RegimesPageContent() {
 
       {error ? <section className="card">{error}</section> : null}
 
-      <section className="card">
+      <section className="card regime-transition-matrix">
         <h2>Filters</h2>
         <p className="muted card-intro">Filters and sort are stored in URL query params for shareable views.</p>
         <div className="inline-controls controls-tight">
@@ -657,6 +657,7 @@ function RegimesPageContent() {
           items={transitionTrendItems}
           valueFormatter={(value) => formatPct(value, 2)}
           deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+          columns={3}
           emptyText="Transition trend is unavailable for this filter."
         />
         {query.transitionSplit !== "none" ? (
@@ -820,7 +821,7 @@ function RegimesPageContent() {
                     Momentum <span className="th-indicator">{sortIndicator(moverSort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide col-regime">
+                <th className="tablet-hide is-numeric col-regime">
                   <button
                     className={`th-button ${moverSort.key === "regime" ? "is-active" : ""}`}
                     onClick={() => {
@@ -859,7 +860,7 @@ function RegimesPageContent() {
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="tablet-hide col-regime">{compactRegimeLabel(row.regime)}</td>
+                  <td className="tablet-hide is-numeric col-regime">{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>

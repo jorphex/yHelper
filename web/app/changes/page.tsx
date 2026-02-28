@@ -274,7 +274,9 @@ function MoverTable({
                       "unknown"
                     )}
                   </td>
-                <td className="mobile-hide analyst-only col-category">{row.category || "unknown"}</td>
+                <td className="mobile-hide analyst-only col-category">
+                  <span className="cell-truncate">{row.category || "unknown"}</span>
+                </td>
                 <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                 <td className="is-numeric col-current">{formatPct(row.safe_apy_window)}</td>
                 <td className="is-numeric mobile-hide analyst-only col-previous">{formatPct(row.safe_apy_prev_window)}</td>
@@ -766,6 +768,15 @@ function ChangesPageContent() {
               <option value="yearn">Yearn-Aligned Proxy Only</option>
             </select>
           </label>
+          <label className="field-compact">
+            Min TVL (USD):&nbsp;
+            <input
+              type="number"
+              min={0}
+              value={query.minTvl}
+              onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
+            />
+          </label>
           <label>
             Trend View:&nbsp;
             <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value as TrendGroupKey })}>
@@ -782,15 +793,6 @@ function ChangesPageContent() {
               <option value={30}>30</option>
               <option value={50}>50</option>
             </select>
-          </label>
-          <label className="field-compact">
-            Min TVL (USD):&nbsp;
-            <input
-              type="number"
-              min={0}
-              value={query.minTvl}
-              onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
-            />
           </label>
           <label className="field-compact">
             Min Points:&nbsp;
@@ -813,7 +815,9 @@ function ChangesPageContent() {
         <p className="muted confidence-line">
           Confidence: <strong>{windowConfidence}/100 ({confidenceBand(windowConfidence)})</strong> based on vault coverage and freshness.
         </p>
-        <KpiGrid items={summaryKpiItems} />
+        <div className="changes-summary-kpis">
+          <KpiGrid items={summaryKpiItems} />
+        </div>
         <p className="muted">
           TVL View controls the scope shown above: dashboard-filtered totals from yDaemon, Yearn-aligned proxy scope, or both.
         </p>
@@ -872,6 +876,7 @@ function ChangesPageContent() {
         </div>
         <div className="changes-delta-panels">
           <ScatterPlot
+            className="changes-main-scatter"
             title="Delta vs Current APY (Top Movers)"
             xLabel="Delta (percentage points)"
             yLabel="Current APY (percent)"

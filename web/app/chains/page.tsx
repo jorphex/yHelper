@@ -161,29 +161,31 @@ function ChainsPageContent() {
         </div>
       </section>
 
-      <section className="card split-grid">
+      <section className="card split-grid chains-snapshot-layout">
         <div>
           <h2>Chain Universe Snapshot</h2>
           <p className="muted card-intro">At-a-glance totals for the current filter set.</p>
-          <KpiGrid
-            items={[
-              { label: "Chains", value: String(data?.summary?.chains ?? "n/a") },
-              { label: "Total TVL", value: formatUsd(data?.summary?.total_tvl_usd) },
-              { label: "Active Vaults", value: String(data?.summary?.active_vaults ?? "n/a") },
-              { label: "With Metrics", value: String(data?.summary?.with_metrics ?? "n/a") },
-              { label: "Coverage Ratio", value: formatPct(data?.summary?.metrics_coverage_ratio) },
-              { label: "TVL-Weighted APY", value: formatPct(data?.summary?.tvl_weighted_apy_30d) },
-              { label: "Median Chain APY", value: formatPct(data?.summary?.median_chain_apy_30d) },
-              {
-                label: "Top Chain Share",
-                value: formatPct(data?.summary?.top_chain_tvl_share),
-                hint:
-                  data?.summary?.top_chain_id !== null && data?.summary?.top_chain_id !== undefined
-                    ? chainLabel(data.summary.top_chain_id)
-                    : undefined,
-              },
-            ]}
-          />
+          <div className="chains-snapshot-kpis">
+            <KpiGrid
+              items={[
+                { label: "Chains", value: String(data?.summary?.chains ?? "n/a") },
+                { label: "Total TVL", value: formatUsd(data?.summary?.total_tvl_usd) },
+                { label: "Active Vaults", value: String(data?.summary?.active_vaults ?? "n/a") },
+                { label: "With Metrics", value: String(data?.summary?.with_metrics ?? "n/a") },
+                { label: "Coverage Ratio", value: formatPct(data?.summary?.metrics_coverage_ratio) },
+                { label: "TVL-Weighted APY", value: formatPct(data?.summary?.tvl_weighted_apy_30d) },
+                { label: "Median Chain APY", value: formatPct(data?.summary?.median_chain_apy_30d) },
+                {
+                  label: "Top Chain Share",
+                  value: formatPct(data?.summary?.top_chain_tvl_share),
+                  hint:
+                    data?.summary?.top_chain_id !== null && data?.summary?.top_chain_id !== undefined
+                      ? chainLabel(data.summary.top_chain_id)
+                      : undefined,
+                },
+              ]}
+            />
+          </div>
         </div>
         <BarList
           title="TVL by Chain"
