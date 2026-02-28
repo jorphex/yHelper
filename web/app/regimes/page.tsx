@@ -735,10 +735,10 @@ function RegimesPageContent() {
         <h2>Regime Movers</h2>
         <p className="muted card-intro">Sort by momentum to spot short-term shifts, or by TVL to focus on size.</p>
         <div className="table-wrap">
-          <table>
+          <table className="regimes-mover-table">
             <thead>
               <tr>
-                <th>
+                <th className="col-vault">
                   <button
                     className={`th-button ${moverSort.key === "vault" ? "is-active" : ""}`}
                     onClick={() => {
@@ -750,7 +750,7 @@ function RegimesPageContent() {
                     Vault <span className="th-indicator">{sortIndicator(moverSort, "vault")}</span>
                   </button>
                 </th>
-                <th>
+                <th className="col-chain">
                   <button
                     className={`th-button ${moverSort.key === "chain" ? "is-active" : ""}`}
                     onClick={() => {
@@ -762,7 +762,7 @@ function RegimesPageContent() {
                     Chain <span className="th-indicator">{sortIndicator(moverSort, "chain")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide">
+                <th className="tablet-hide col-token">
                   <button
                     className={`th-button ${moverSort.key === "token" ? "is-active" : ""}`}
                     onClick={() => {
@@ -774,7 +774,7 @@ function RegimesPageContent() {
                     Token <span className="th-indicator">{sortIndicator(moverSort, "token")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-tvl">
                   <button
                     className={`th-button ${moverSort.key === "tvl" ? "is-active" : ""}`}
                     onClick={() => {
@@ -786,7 +786,7 @@ function RegimesPageContent() {
                     TVL <span className="th-indicator">{sortIndicator(moverSort, "tvl")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-apy">
                   <button
                     className={`th-button ${moverSort.key === "apy" ? "is-active" : ""}`}
                     onClick={() => {
@@ -798,7 +798,7 @@ function RegimesPageContent() {
                     APY 30d <span className="th-indicator">{sortIndicator(moverSort, "apy")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-momentum">
                   <button
                     className={`th-button ${moverSort.key === "momentum" ? "is-active" : ""}`}
                     onClick={() => {
@@ -810,7 +810,7 @@ function RegimesPageContent() {
                     Momentum <span className="th-indicator">{sortIndicator(moverSort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide">
+                <th className="tablet-hide col-regime">
                   <button
                     className={`th-button ${moverSort.key === "regime" ? "is-active" : ""}`}
                     onClick={() => {
@@ -827,15 +827,15 @@ function RegimesPageContent() {
             <tbody>
               {moverRows.map((row) => (
                 <tr key={row.vault_address}>
-                  <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td>
+                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
+                  <td className="col-chain">
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
-                  <td className="tablet-hide">
+                  <td className="tablet-hide col-token">
                     {row.token_symbol ? (
                       <Link
                         href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
@@ -846,10 +846,10 @@ function RegimesPageContent() {
                       "n/a"
                     )}
                   </td>
-                  <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
-                  <td className="is-numeric">{formatPct(row.safe_apy_30d)}</td>
-                  <td className="is-numeric">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="tablet-hide">{regimeLabel(row.regime)}</td>
+                  <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
+                  <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
+                  <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
+                  <td className="tablet-hide col-regime">{regimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>

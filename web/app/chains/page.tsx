@@ -203,10 +203,10 @@ function ChainsPageContent() {
           Weighted metrics are TVL-weighted across filtered vaults. Click any header to sort.
         </p>
         <div className="table-wrap">
-          <table>
+          <table className="chains-rollup-table">
             <thead>
               <tr>
-                <th>
+                <th className="col-chain">
                   <button
                     className={`th-button ${sort.key === "chain" ? "is-active" : ""}`}
                     onClick={() => {
@@ -218,7 +218,7 @@ function ChainsPageContent() {
                     Chain <span className="th-indicator">{sortIndicator(sort, "chain")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-active">
                   <button
                     className={`th-button ${sort.key === "active" ? "is-active" : ""}`}
                     onClick={() => {
@@ -230,7 +230,7 @@ function ChainsPageContent() {
                     Active Vaults <span className="th-indicator">{sortIndicator(sort, "active")}</span>
                   </button>
                 </th>
-                <th className="is-numeric tablet-hide">
+                <th className="is-numeric tablet-hide col-metrics">
                   <button
                     className={`th-button ${sort.key === "metrics" ? "is-active" : ""}`}
                     onClick={() => {
@@ -242,7 +242,7 @@ function ChainsPageContent() {
                     With Metrics <span className="th-indicator">{sortIndicator(sort, "metrics")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-tvl">
                   <button
                     className={`th-button ${sort.key === "tvl" ? "is-active" : ""}`}
                     onClick={() => {
@@ -254,7 +254,7 @@ function ChainsPageContent() {
                     Total TVL <span className="th-indicator">{sortIndicator(sort, "tvl")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-apy">
                   <button
                     className={`th-button ${sort.key === "apy" ? "is-active" : ""}`}
                     onClick={() => {
@@ -266,7 +266,7 @@ function ChainsPageContent() {
                     Weighted APY 30d <span className="th-indicator">{sortIndicator(sort, "apy")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-momentum">
                   <button
                     className={`th-button ${sort.key === "momentum" ? "is-active" : ""}`}
                     onClick={() => {
@@ -278,7 +278,7 @@ function ChainsPageContent() {
                     Avg Momentum <span className="th-indicator">{sortIndicator(sort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="is-numeric tablet-hide">
+                <th className="is-numeric tablet-hide col-consistency">
                   <button
                     className={`th-button ${sort.key === "consistency" ? "is-active" : ""}`}
                     onClick={() => {
@@ -295,17 +295,17 @@ function ChainsPageContent() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.chain_id}>
-                  <td>
+                  <td className="col-chain">
                     <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
-                  <td className="is-numeric">{row.active_vaults}</td>
-                  <td className="is-numeric tablet-hide">{row.with_metrics}</td>
-                  <td className="is-numeric">{formatUsd(row.total_tvl_usd)}</td>
-                  <td className="is-numeric">{formatPct(row.weighted_apy_30d)}</td>
-                  <td className="is-numeric">{formatPct(row.avg_momentum_7d_30d)}</td>
-                  <td className="is-numeric tablet-hide">{formatPct(row.avg_consistency)}</td>
+                  <td className="is-numeric col-active">{row.active_vaults}</td>
+                  <td className="is-numeric tablet-hide col-metrics">{row.with_metrics}</td>
+                  <td className="is-numeric col-tvl">{formatUsd(row.total_tvl_usd)}</td>
+                  <td className="is-numeric col-apy">{formatPct(row.weighted_apy_30d)}</td>
+                  <td className="is-numeric col-momentum">{formatPct(row.avg_momentum_7d_30d)}</td>
+                  <td className="is-numeric tablet-hide col-consistency">{formatPct(row.avg_consistency)}</td>
                 </tr>
               ))}
             </tbody>

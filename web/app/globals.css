@@ -794,6 +794,81 @@ input[type="text"] {
   text-overflow: ellipsis;
 }
 
+.chains-rollup-table {
+  min-width: 820px;
+  table-layout: fixed;
+}
+
+.chains-rollup-table th.col-chain,
+.chains-rollup-table td.col-chain {
+  width: 8.8rem;
+  white-space: nowrap;
+}
+
+.chains-rollup-table th.col-active,
+.chains-rollup-table td.col-active,
+.chains-rollup-table th.col-metrics,
+.chains-rollup-table td.col-metrics,
+.chains-rollup-table th.col-tvl,
+.chains-rollup-table td.col-tvl,
+.chains-rollup-table th.col-apy,
+.chains-rollup-table td.col-apy,
+.chains-rollup-table th.col-momentum,
+.chains-rollup-table td.col-momentum,
+.chains-rollup-table th.col-consistency,
+.chains-rollup-table td.col-consistency {
+  width: 7.35rem;
+}
+
+.regimes-mover-table {
+  min-width: 900px;
+  table-layout: fixed;
+}
+
+.regimes-mover-table th.col-vault,
+.regimes-mover-table td.col-vault {
+  width: 13rem;
+}
+
+.regimes-mover-table th.col-chain,
+.regimes-mover-table td.col-chain {
+  width: 8rem;
+  white-space: nowrap;
+}
+
+.regimes-mover-table th.col-token,
+.regimes-mover-table td.col-token {
+  width: 8rem;
+  white-space: nowrap;
+}
+
+.regimes-mover-table th.col-regime,
+.regimes-mover-table td.col-regime {
+  width: 8rem;
+  white-space: nowrap;
+}
+
+.regimes-mover-table th.col-tvl,
+.regimes-mover-table td.col-tvl,
+.regimes-mover-table th.col-apy,
+.regimes-mover-table td.col-apy,
+.regimes-mover-table th.col-momentum,
+.regimes-mover-table td.col-momentum {
+  width: 7.5rem;
+}
+
+.regimes-mover-table td.col-vault {
+  white-space: normal;
+}
+
+.regimes-mover-table td.col-vault .vault-link {
+  max-width: 12.7rem;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-wrap: wrap;
+}
+
 .assets-universe-card .kpi-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
