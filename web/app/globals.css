@@ -1393,19 +1393,44 @@ input:focus-visible {
   .site-nav {
     align-items: flex-start;
     flex-direction: column;
+    width: 100%;
   }
 
   .site-nav-links {
     width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.35rem;
   }
 
   .site-controls {
-    align-self: flex-end;
+    width: 100%;
     max-width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .site-nav-links a {
+    width: 100%;
+    text-align: center;
+    padding: 0.28rem 0.5rem;
+    font-size: 0.78rem;
   }
 
   .audience-toggle {
     flex-shrink: 0;
+  }
+
+  .audience-toggle .audience-label {
+    display: none;
+  }
+
+  .freshness-badge {
+    max-width: 56%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .freshness-age {
