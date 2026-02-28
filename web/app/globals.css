@@ -341,6 +341,7 @@ th.is-numeric,
 td.is-numeric {
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .th-button {
