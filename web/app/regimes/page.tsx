@@ -115,6 +115,7 @@ function RegimesPageContent() {
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
       minPoints: queryInt(searchParams, "min_points", defaults.minPoints, { min: 0, max: 365 }),
       transitionSplit: queryChoice(searchParams, "transition_split", ["none", "chain", "category"] as const, "none"),
+      transitionDays: queryChoice(searchParams, "transition_days", ["60", "120", "180", "365"] as const, "120"),
       limit: queryInt(searchParams, "limit", 30, { min: 5, max: 300 }),
       summarySort: queryChoice<RegimeSummarySortKey>(
         searchParams,
@@ -153,7 +154,7 @@ function RegimesPageContent() {
         });
         if (query.chain > 0) params.set("chain_id", String(query.chain));
         const dailyParams = new URLSearchParams(params);
-        dailyParams.set("days", "120");
+        dailyParams.set("days", query.transitionDays);
         dailyParams.set("group_by", query.transitionSplit);
         dailyParams.set("group_limit", "8");
         const [regimesRes, transitionsRes, transitionsDailyRes] = await Promise.all([
@@ -186,7 +187,7 @@ function RegimesPageContent() {
     return () => {
       active = false;
     };
-  }, [query.universe, query.chain, query.minTvl, query.minPoints, query.limit, query.transitionSplit]);
+  }, [query.universe, query.chain, query.minTvl, query.minPoints, query.limit, query.transitionSplit, query.transitionDays]);
 
   const summaryRows = sortRows(data?.summary ?? [], summarySort, {
     regime: (row) => row.regime,
@@ -439,6 +440,15 @@ function RegimesPageContent() {
               <option value="category">By Category</option>
             </select>
           </label>
+          <label>
+            Transition Window:&nbsp;
+            <select value={query.transitionDays} onChange={(event) => updateQuery({ transition_days: event.target.value })}>
+              <option value="60">60d</option>
+              <option value="120">120d</option>
+              <option value="180">180d</option>
+              <option value="365">365d</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -591,7 +601,7 @@ function RegimesPageContent() {
       </section>
 
       <section className="card">
-        <h2>Regime Transition Trend (Last 120 Days)</h2>
+        <h2>{`Regime Transition Trend (Last ${query.transitionDays} Days)`}</h2>
         <p className="muted card-intro">
           Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.
         </p>
