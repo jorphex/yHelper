@@ -277,11 +277,15 @@ function AssetsPageContent() {
           <label>
             Token:&nbsp;
             <select value={selectedSymbol} onChange={(event) => updateQuery({ token: event.target.value })}>
-              {tokenRows.map((row) => (
-                <option key={row.token_symbol} value={row.token_symbol}>
-                  {row.token_symbol}
-                </option>
-              ))}
+              {tokenRows.length === 0 ? (
+                <option value="">No tokens available</option>
+              ) : (
+                tokenRows.map((row) => (
+                  <option key={row.token_symbol} value={row.token_symbol}>
+                    {row.token_symbol}
+                  </option>
+                ))
+              )}
             </select>
           </label>
           <label>
@@ -354,6 +358,11 @@ function AssetsPageContent() {
             Featured criteria: token TVL at least {formatUsd(assetData?.filters?.featured_min_tvl_usd)}, at least{" "}
             {featuredMinVenues ?? "n/a"} {featuredMinVenues === 1 ? "venue" : "venues"}, and at least {featuredMinChains ?? "n/a"}{" "}
             {featuredMinChains === 1 ? "chain" : "chains"}.
+          </p>
+        ) : null}
+        {tokenRows.length === 0 ? (
+          <p className="muted card-intro">
+            No tokens matched this filter set. Lower <strong>Min TVL</strong>, lower <strong>Min Points</strong>, or switch list mode.
           </p>
         ) : null}
         <div className="split-grid assets-universe-top">

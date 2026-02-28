@@ -222,7 +222,7 @@ export default function HomePage() {
         ) : loading ? (
           <p>Loading live status…</p>
         ) : (
-          <p>API unavailable. Start services with Docker Compose.</p>
+          <p>Live status is temporarily unavailable. Refresh shortly; if this persists, ingestion or API services are down.</p>
         )}
       </section>
 
@@ -242,7 +242,7 @@ export default function HomePage() {
             ]}
           />
         ) : (
-          <p>Policy metadata unavailable.</p>
+          <p>Policy metadata is unavailable for this cycle.</p>
         )}
       </section>
 
@@ -275,7 +275,7 @@ export default function HomePage() {
             />
           </div>
         ) : (
-          <p>Lifecycle metadata unavailable.</p>
+          <p>Lifecycle metadata is unavailable for this cycle.</p>
         )}
       </section>
 
@@ -309,7 +309,7 @@ export default function HomePage() {
             />
           </div>
         ) : (
-          <p>Freshness metrics unavailable.</p>
+          <p>Freshness metrics are unavailable for this cycle.</p>
         )}
         {Object.entries(data?.freshness?.alerts ?? {}).length > 0 ? (
           <div className="inline-controls">
@@ -368,7 +368,7 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          <p>Protocol context unavailable.</p>
+          <p>Protocol context is unavailable for this cycle.</p>
         )}
         <p className="muted">
           DefiLlama currently reports protocol TVL from its own adapter scope. The Yearn-aligned proxy is derived from yDaemon
@@ -435,7 +435,7 @@ export default function HomePage() {
             ]}
           />
         ) : (
-          <p>Coverage metrics unavailable.</p>
+          <p>Coverage metrics are unavailable for this cycle.</p>
         )}
       </section>
 

@@ -733,12 +733,12 @@ function DiscoverPageContent() {
           <label>
             Direction:&nbsp;
             <select value={query.serverDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
+              <option value="desc">Highest first</option>
+              <option value="asc">Lowest first</option>
             </select>
           </label>
           <label>
-            Trend Series:&nbsp;
+            Trend View:&nbsp;
             <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value })}>
               <option value="none">Global</option>
               <option value="chain">By Chain</option>
@@ -747,6 +747,19 @@ function DiscoverPageContent() {
           </label>
         </div>
       </section>
+
+      {!error && !data?.rows?.length ? (
+        <section className="card">
+          <h2>No Vaults Match This Filter Yet</h2>
+          <p className="muted card-intro">
+            This usually means current filters are too strict for the latest ingestion cycle, not that the protocol has no vaults.
+          </p>
+          <p className="muted">
+            Try lowering <strong>Min TVL</strong>, lowering <strong>Min Points</strong>, or changing <strong>Universe</strong>.
+            If most cards still show n/a after that, wait for the next ingestion cycle.
+          </p>
+        </section>
+      ) : null}
 
       <section className="card discover-universe-card">
         <h2>Universe Snapshot</h2>
@@ -783,6 +796,7 @@ function DiscoverPageContent() {
                 note: `${row.vaults} vaults`,
               }))}
               valueFormatter={(value) => formatUsd(value)}
+              emptyText="No regime mix for this filter yet."
             />
             <BarList
               title="APY Bucket Count"
@@ -793,6 +807,7 @@ function DiscoverPageContent() {
                 { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
               ]}
               valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+              emptyText="No APY bucket counts for this filter yet."
             />
             <BarList
               title="Risk Level Mix (TVL)"
@@ -803,6 +818,7 @@ function DiscoverPageContent() {
                 note: `${row.vaults} vaults`,
               }))}
               valueFormatter={(value) => formatUsd(value)}
+              emptyText="No risk mix for this filter yet."
             />
           </div>
         </div>
@@ -846,6 +862,7 @@ function DiscoverPageContent() {
             title="Chain Momentum Heatmap"
             items={chainMomentumHeat}
             valueFormatter={(value) => formatPct(value)}
+            emptyText="No chain momentum values for this filter yet."
           />
           <HeatGrid
             title="Token APY Dispersion Heatmap"
