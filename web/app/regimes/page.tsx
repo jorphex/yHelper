@@ -500,7 +500,7 @@ function RegimesPageContent() {
           Confidence: <strong>{summaryConfidence}/100 ({confidenceBand(summaryConfidence)})</strong> from sample breadth and ranked mover coverage.
         </p>
         <div className="regime-summary-layout">
-          <div className="regime-summary-side">
+          <div className="regime-summary-main">
             <KpiGrid
               items={[
                 { label: "Regimes Tracked", value: String(summaryRows.length) },
@@ -514,63 +514,63 @@ function RegimesPageContent() {
                 },
               ]}
             />
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>
-                    <button
-                      className={`th-button ${summarySort.key === "regime" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(summarySort, "regime");
-                        setSummarySort(next);
-                        updateQuery({ summary_sort: next.key, summary_dir: next.direction });
-                      }}
-                    >
-                      Regime <span className="th-indicator">{sortIndicator(summarySort, "regime")}</span>
-                    </button>
-                  </th>
-                  <th className="is-numeric">
-                    <button
-                      className={`th-button ${summarySort.key === "vaults" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(summarySort, "vaults");
-                        setSummarySort(next);
-                        updateQuery({ summary_sort: next.key, summary_dir: next.direction });
-                      }}
-                    >
-                      Vaults <span className="th-indicator">{sortIndicator(summarySort, "vaults")}</span>
-                    </button>
-                  </th>
-                  <th className="is-numeric">
-                    <button
-                      className={`th-button ${summarySort.key === "tvl" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(summarySort, "tvl");
-                        setSummarySort(next);
-                        updateQuery({ summary_sort: next.key, summary_dir: next.direction });
-                      }}
-                    >
-                      Total TVL <span className="th-indicator">{sortIndicator(summarySort, "tvl")}</span>
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {summaryRows.map((row) => (
-                  <tr key={row.regime}>
-                    <td>
-                      <Link href={`/changes?window=7d&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
-                        {compactRegimeLabel(row.regime)}
-                      </Link>
-                    </td>
-                    <td className="is-numeric">{row.vaults}</td>
-                    <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>
+                      <button
+                        className={`th-button ${summarySort.key === "regime" ? "is-active" : ""}`}
+                        onClick={() => {
+                          const next = toggleSort(summarySort, "regime");
+                          setSummarySort(next);
+                          updateQuery({ summary_sort: next.key, summary_dir: next.direction });
+                        }}
+                      >
+                        Regime <span className="th-indicator">{sortIndicator(summarySort, "regime")}</span>
+                      </button>
+                    </th>
+                    <th className="is-numeric">
+                      <button
+                        className={`th-button ${summarySort.key === "vaults" ? "is-active" : ""}`}
+                        onClick={() => {
+                          const next = toggleSort(summarySort, "vaults");
+                          setSummarySort(next);
+                          updateQuery({ summary_sort: next.key, summary_dir: next.direction });
+                        }}
+                      >
+                        Vaults <span className="th-indicator">{sortIndicator(summarySort, "vaults")}</span>
+                      </button>
+                    </th>
+                    <th className="is-numeric">
+                      <button
+                        className={`th-button ${summarySort.key === "tvl" ? "is-active" : ""}`}
+                        onClick={() => {
+                          const next = toggleSort(summarySort, "tvl");
+                          setSummarySort(next);
+                          updateQuery({ summary_sort: next.key, summary_dir: next.direction });
+                        }}
+                      >
+                        Total TVL <span className="th-indicator">{sortIndicator(summarySort, "tvl")}</span>
+                      </button>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {summaryRows.map((row) => (
+                    <tr key={row.regime}>
+                      <td>
+                        <Link href={`/changes?window=7d&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
+                          {compactRegimeLabel(row.regime)}
+                        </Link>
+                      </td>
+                      <td className="is-numeric">{row.vaults}</td>
+                      <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
           <BarList
             title="Regime TVL Mix"
@@ -604,12 +604,14 @@ function RegimesPageContent() {
         <div className="stack">
           {query.transitionSplit === "none" ? (
             <>
-              <HeatGrid
-                title="Transition Weight by TVL"
-                items={transitionHeat}
-                valueFormatter={(value) => formatUsd(value)}
-                legend="Higher intensity means more TVL moved between regime states."
-              />
+              <div className="regime-transition-heat">
+                <HeatGrid
+                  title="Transition Weight by TVL"
+                  items={transitionHeat}
+                  valueFormatter={(value) => formatUsd(value)}
+                  legend="Higher intensity means more TVL moved between regime states."
+                />
+              </div>
               <BarList
                 title="Chains with Highest Regime Churn"
                 items={(transitionData?.chain_breakdown ?? []).map((row) => ({

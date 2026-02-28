@@ -26,6 +26,7 @@ APY_MAX = 3.0
 MOMENTUM_ABS_MAX = 1.0
 USER_VISIBLE_KIND = "Multi Strategy"
 USER_VISIBLE_VERSION_PREFIX = "3."
+EXCLUDED_CHAIN_IDS = (250,)  # Fantom deprecated
 DEFAULT_MIN_TVL_USD = 100000.0
 DEFAULT_MIN_POINTS = 30
 UNIVERSE_CORE_MIN_TVL_USD = 1000000.0
@@ -126,18 +127,20 @@ def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None) -> str:
     {alias}.vault_address IN (
         SELECT r.vault_address
         FROM vault_dim r
-        WHERE r.active = TRUE
+        WHERE {scope_sql}
         ORDER BY r.feature_score DESC NULLS LAST, r.tvl_usd DESC NULLS LAST, r.vault_address
         LIMIT %(max_vaults)s
     )
-    """.format(alias=alias)
+    """.format(alias=alias, scope_sql=_user_visible_filter_sql("r", include_retired=False))
 
 
 def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> str:
+    excluded_ids_sql = ", ".join(str(chain_id) for chain_id in EXCLUDED_CHAIN_IDS)
     clauses = [
         f"{alias}.active = TRUE",
         f"COALESCE({alias}.kind, '') = '{USER_VISIBLE_KIND}'",
         f"COALESCE({alias}.version, '') LIKE '{USER_VISIBLE_VERSION_PREFIX}%%'",
+        f"COALESCE({alias}.chain_id, -1) NOT IN ({excluded_ids_sql})",
     ]
     if not include_retired:
         clauses.append(f"COALESCE(({alias}.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE")
@@ -219,7 +222,7 @@ def _freshness_snapshot(
         result["metrics_newest_age_seconds"] = _seconds_since(metrics_newest, now)
 
         cur.execute(
-            """
+            f"""
             WITH latest AS (
                 SELECT vault_address, MAX(ts) AS latest_ts
                 FROM pps_timeseries
@@ -234,7 +237,9 @@ def _freshness_snapshot(
                     COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
                     (%(now_epoch)s - l.latest_ts) AS age_seconds
                 FROM latest l
-                LEFT JOIN vault_dim d ON d.vault_address = l.vault_address AND d.active = TRUE
+                JOIN vault_dim d
+                  ON d.vault_address = l.vault_address
+                 AND {_user_visible_filter_sql("d", include_retired=False)}
             )
             SELECT
                 chain_id,
@@ -261,7 +266,7 @@ def _freshness_snapshot(
         result["stale_by_chain"] = cur.fetchall()
 
         cur.execute(
-            """
+            f"""
             WITH latest AS (
                 SELECT vault_address, MAX(ts) AS latest_ts
                 FROM pps_timeseries
@@ -275,7 +280,9 @@ def _freshness_snapshot(
                     COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
                     (%(now_epoch)s - l.latest_ts) AS age_seconds
                 FROM latest l
-                LEFT JOIN vault_dim d ON d.vault_address = l.vault_address AND d.active = TRUE
+                JOIN vault_dim d
+                  ON d.vault_address = l.vault_address
+                 AND {_user_visible_filter_sql("d", include_retired=False)}
             )
             SELECT
                 category,
@@ -401,7 +408,7 @@ def _coverage_snapshot(
 
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            """
+            f"""
             WITH base AS (
                 SELECT
                     d.vault_address,
@@ -413,7 +420,7 @@ def _coverage_snapshot(
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
                 LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
-                WHERE d.active = TRUE
+                WHERE {_user_visible_filter_sql("d", include_retired=False)}
             )
             SELECT
                 COUNT(*) AS active_vaults,
@@ -446,7 +453,7 @@ def _coverage_snapshot(
         }
 
         cur.execute(
-            """
+            f"""
             WITH base AS (
                 SELECT
                     COALESCE(d.chain_id, -1) AS chain_id,
@@ -456,7 +463,7 @@ def _coverage_snapshot(
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
                 LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
-                WHERE d.active = TRUE
+                WHERE {_user_visible_filter_sql("d", include_retired=False)}
             )
             SELECT
                 chain_id,
@@ -477,7 +484,7 @@ def _coverage_snapshot(
         out["by_chain"] = cur.fetchall()
 
         cur.execute(
-            """
+            f"""
             WITH base AS (
                 SELECT
                     COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
@@ -487,7 +494,7 @@ def _coverage_snapshot(
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
                 LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
-                WHERE d.active = TRUE
+                WHERE {_user_visible_filter_sql("d", include_retired=False)}
             )
             SELECT
                 category,
@@ -578,13 +585,14 @@ def _coingecko_market_cap_usd(gecko_id: str | None) -> float | None:
 
 def _yearn_aligned_proxy_scope(cur: psycopg.Cursor) -> dict[str, object]:
     cur.execute(
-        """
+            """
         SELECT
             COUNT(*) AS vaults,
             SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
         FROM vault_dim d
         WHERE
             d.active = TRUE
+            AND COALESCE(d.chain_id, -1) NOT IN (250)
             AND COALESCE(d.kind, '') IN ('Multi Strategy', 'Single Strategy')
             AND COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
             AND COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
@@ -659,6 +667,8 @@ def _defillama_snapshot() -> dict[str, object]:
 
         top_chains: list[dict[str, object]] = []
         for chain_name, raw_value in current_chain_tvls.items():
+            if str(chain_name).strip().lower() == "fantom":
+                continue
             numeric = _to_float_or_none(raw_value)
             if numeric is None:
                 continue
@@ -981,7 +991,7 @@ def _composition_filtered_cte(*, max_vaults: int | None) -> str:
         FROM vault_dim d
         JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
         WHERE
-            d.active = TRUE
+            {_user_visible_filter_sql("d", include_retired=False)}
             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             AND COALESCE(m.points_count, 0) >= %(min_points)s
             {rank_clause}
@@ -1011,7 +1021,7 @@ def _changes_base_cte(*, max_vaults: int | None) -> str:
         FROM vault_dim d
         JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
         WHERE
-            d.active = TRUE
+            {_user_visible_filter_sql("d", include_retired=False)}
             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             AND COALESCE(m.points_count, 0) >= %(min_points)s
             {rank_clause}
@@ -1400,7 +1410,11 @@ async def regimes(
     min_tvl_usd = float(universe_gate["min_tvl_usd"])
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
-    filters = ["d.active = TRUE", "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s", "COALESCE(m.points_count, 0) >= %(min_points)s"]
+    filters = [
+        _user_visible_filter_sql("d", include_retired=False),
+        "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s",
+        "COALESCE(m.points_count, 0) >= %(min_points)s",
+    ]
     params: dict[str, object] = {"min_tvl_usd": min_tvl_usd, "min_points": min_points, "limit": limit}
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     if rank_filter_sql:
@@ -1487,7 +1501,11 @@ async def regime_transitions(
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
 
-    filters = ["d.active = TRUE", "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s", "COALESCE(m.points_count, 0) >= %(min_points)s"]
+    filters = [
+        _user_visible_filter_sql("d", include_retired=False),
+        "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s",
+        "COALESCE(m.points_count, 0) >= %(min_points)s",
+    ]
     params: dict[str, object] = {
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
@@ -1690,7 +1708,7 @@ async def regime_transitions_daily(
                     FROM vault_dim d
                     JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
                     WHERE
-                        d.active = TRUE
+                        {_user_visible_filter_sql("d", include_retired=False)}
                         AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                         AND COALESCE(m.points_count, 0) >= %(min_points)s
                         {chain_clause}
@@ -1825,7 +1843,7 @@ async def regime_transitions_daily(
                         FROM vault_dim d
                         JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
                         WHERE
-                            d.active = TRUE
+                            {_user_visible_filter_sql("d", include_retired=False)}
                             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                             AND COALESCE(m.points_count, 0) >= %(min_points)s
                             {chain_clause}
@@ -2059,11 +2077,11 @@ async def chains_rollups(
                 f"""
                 SELECT
                     d.chain_id,
-                    COUNT(*) FILTER (WHERE d.active) AS active_vaults,
-                    COUNT(*) FILTER (WHERE d.active AND m.vault_address IS NOT NULL) AS with_metrics,
-                    SUM(COALESCE(d.tvl_usd, 0)) FILTER (WHERE d.active) AS total_tvl_usd,
+                    COUNT(*) AS active_vaults,
+                    COUNT(*) FILTER (WHERE m.vault_address IS NOT NULL) AS with_metrics,
+                    SUM(COALESCE(d.tvl_usd, 0)) AS total_tvl_usd,
                     CASE
-                        WHEN SUM(COALESCE(d.tvl_usd, 0)) FILTER (WHERE d.active AND m.apy_30d IS NOT NULL) > 0
+                        WHEN SUM(COALESCE(d.tvl_usd, 0)) FILTER (WHERE m.apy_30d IS NOT NULL) > 0
                         THEN
                             SUM(
                                 (
@@ -2071,18 +2089,19 @@ async def chains_rollups(
                                     *
                                     LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s)
                                 )
-                            ) FILTER (WHERE d.active AND m.apy_30d IS NOT NULL)
+                            ) FILTER (WHERE m.apy_30d IS NOT NULL)
                             /
-                            SUM(COALESCE(d.tvl_usd, 0)) FILTER (WHERE d.active AND m.apy_30d IS NOT NULL)
+                            SUM(COALESCE(d.tvl_usd, 0)) FILTER (WHERE m.apy_30d IS NOT NULL)
                         ELSE NULL
                     END AS weighted_apy_30d,
                     AVG(
                         LEAST(GREATEST(COALESCE(m.momentum_7d_30d, 0.0), %(momentum_min)s), %(momentum_max)s)
-                    ) FILTER (WHERE d.active AND m.momentum_7d_30d IS NOT NULL) AS avg_momentum_7d_30d,
-                    AVG(m.consistency_score) FILTER (WHERE d.active AND m.consistency_score IS NOT NULL) AS avg_consistency
+                    ) FILTER (WHERE m.momentum_7d_30d IS NOT NULL) AS avg_momentum_7d_30d,
+                    AVG(m.consistency_score) FILTER (WHERE m.consistency_score IS NOT NULL) AS avg_consistency
                 FROM vault_dim d
                 LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
-                WHERE COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s
+                WHERE {_user_visible_filter_sql("d", include_retired=False)}
+                  AND COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s
                   {rank_clause}
                 GROUP BY d.chain_id
                 ORDER BY total_tvl_usd DESC NULLS LAST
@@ -2186,7 +2205,7 @@ async def daily_trends(
             FROM vault_dim d
             JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
             WHERE
-                d.active = TRUE
+                {_user_visible_filter_sql("d", include_retired=False)}
                 AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                 AND COALESCE(m.points_count, 0) >= %(min_points)s
                 {chain_clause}
@@ -2326,7 +2345,7 @@ async def daily_trends(
                         FROM vault_dim d
                         JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
                         WHERE
-                            d.active = TRUE
+                            {_user_visible_filter_sql("d", include_retired=False)}
                             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                             AND COALESCE(m.points_count, 0) >= %(min_points)s
                             {chain_clause}
@@ -3169,6 +3188,7 @@ async def changes(
                 FROM vault_dim d
                 WHERE
                     d.active = TRUE
+                    AND COALESCE(d.chain_id, -1) NOT IN (250)
                     AND COALESCE(d.kind, '') IN ('Multi Strategy', 'Single Strategy')
                     AND COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
                     AND COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE

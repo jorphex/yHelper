@@ -185,7 +185,7 @@ export function TrendStrips({
           const delta = latest - previous;
           const min = Math.min(...finite);
           const max = Math.max(...finite);
-          const width = 180;
+          const width = 320;
           const height = 34;
           const innerW = width - 8;
           const innerH = height - 8;
