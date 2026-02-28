@@ -57,6 +57,8 @@ Public Yearn analytics scaffold (Phase 0).
 ## Daily health summary (ops)
 - Run `python3 scripts/daily_health_summary.py` to emit a PASS/FAIL JSON summary from `/api/overview` and `/api/meta/freshness`.
 - Exit code is `0` on PASS and `1` on FAIL for easy cron/systemd integration.
+- Run `python3 scripts/post_deploy_smoke.py` after deploy/restart to verify all public pages and key API routes return `200`.
+- Optional: `python3 scripts/post_deploy_smoke.py --base-url https://yhelper.seul.one` for external edge verification.
 
 ## Isolation safety
 - Service names, network, and volume use `yhelper-*` naming.
