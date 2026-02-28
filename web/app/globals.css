@@ -850,6 +850,40 @@ input[type="text"] {
   text-overflow: ellipsis;
 }
 
+.assets-token-table {
+  min-width: 900px;
+  table-layout: fixed;
+}
+
+.assets-token-table th.col-token,
+.assets-token-table td.col-token {
+  width: 8.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assets-token-table th.col-type,
+.assets-token-table td.col-type {
+  width: 7.8rem;
+  white-space: nowrap;
+}
+
+.assets-token-table th.col-venues,
+.assets-token-table td.col-venues,
+.assets-token-table th.col-chains,
+.assets-token-table td.col-chains,
+.assets-token-table th.col-tvl,
+.assets-token-table td.col-tvl,
+.assets-token-table th.col-best,
+.assets-token-table td.col-best,
+.assets-token-table th.col-weighted,
+.assets-token-table td.col-weighted,
+.assets-token-table th.col-spread,
+.assets-token-table td.col-spread {
+  width: 7.5rem;
+}
+
 .chains-rollup-table {
   min-width: 820px;
   table-layout: fixed;

@@ -276,27 +276,10 @@ function AssetsPageContent() {
       {assetsError ? <section className="card">{assetsError}</section> : null}
       {detailError ? <section className="card">{detailError}</section> : null}
 
-      <section className="card assets-universe-card">
-        <h2>Token Universe</h2>
-        <p className="muted card-intro">
-          Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
-          Canonical shows all plain symbols. All includes LP and structured symbols.
-        </p>
+      <section className="card">
+        <h2>Filters</h2>
+        <p className="muted card-intro">All controls are URL-backed so this comparison view is shareable.</p>
         <div className="inline-controls controls-tight">
-          <label>
-            Token:&nbsp;
-            <select value={selectedSymbol} onChange={(event) => updateQuery({ token: event.target.value })}>
-              {tokenRows.length === 0 ? (
-                <option value="">No tokens available</option>
-              ) : (
-                tokenRows.map((row) => (
-                  <option key={row.token_symbol} value={row.token_symbol}>
-                    {row.token_symbol}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
           <label>
             List:&nbsp;
             <select value={query.tokenScope} onChange={(event) => updateQuery({ token_scope: event.target.value as TokenScope, token: null })}>
@@ -318,7 +301,7 @@ function AssetsPageContent() {
               ))}
             </select>
           </label>
-          <label>
+          <label className="field-compact">
             Min TVL (USD):&nbsp;
             <input
               type="number"
@@ -327,7 +310,7 @@ function AssetsPageContent() {
               onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
             />
           </label>
-          <label>
+          <label className="field-compact">
             Min Points:&nbsp;
             <input
               type="number"
@@ -359,6 +342,30 @@ function AssetsPageContent() {
             <select value={query.apiDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
               <option value="desc">Highest first</option>
               <option value="asc">Lowest first</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section className="card assets-universe-card">
+        <h2>Token Universe</h2>
+        <p className="muted card-intro">
+          Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
+          Canonical shows all plain symbols. All includes LP and structured symbols.
+        </p>
+        <div className="inline-controls controls-tight">
+          <label>
+            Token:&nbsp;
+            <select value={selectedSymbol} onChange={(event) => updateQuery({ token: event.target.value })}>
+              {tokenRows.length === 0 ? (
+                <option value="">No tokens available</option>
+              ) : (
+                tokenRows.map((row) => (
+                  <option key={row.token_symbol} value={row.token_symbol}>
+                    {row.token_symbol}
+                  </option>
+                ))
+              )}
             </select>
           </label>
         </div>
@@ -431,10 +438,10 @@ function AssetsPageContent() {
           <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch List mode.</p>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="assets-token-table">
               <thead>
                 <tr>
-                  <th>
+                  <th className="col-token">
                     <button
                       className={`th-button ${tokenSort.key === "token" ? "is-active" : ""}`}
                       onClick={() => {
@@ -446,8 +453,8 @@ function AssetsPageContent() {
                       Token <span className="th-indicator">{sortIndicator(tokenSort, "token")}</span>
                     </button>
                   </th>
-                  {query.tokenScope === "all" ? <th>Type</th> : null}
-                  <th className="is-numeric">
+                  {query.tokenScope === "all" ? <th className="col-type">Type</th> : null}
+                  <th className="is-numeric col-venues">
                     <button
                       className={`th-button ${tokenSort.key === "venues" ? "is-active" : ""}`}
                       onClick={() => {
@@ -459,7 +466,7 @@ function AssetsPageContent() {
                       Venues <span className="th-indicator">{sortIndicator(tokenSort, "venues")}</span>
                     </button>
                   </th>
-                  <th className="is-numeric tablet-hide analyst-only">
+                  <th className="is-numeric tablet-hide analyst-only col-chains">
                     <button
                       className={`th-button ${tokenSort.key === "chains" ? "is-active" : ""}`}
                       onClick={() => {
@@ -471,7 +478,7 @@ function AssetsPageContent() {
                       Chains <span className="th-indicator">{sortIndicator(tokenSort, "chains")}</span>
                     </button>
                   </th>
-                  <th className="is-numeric">
+                  <th className="is-numeric col-tvl">
                     <button
                       className={`th-button ${tokenSort.key === "tvl" ? "is-active" : ""}`}
                       onClick={() => {
@@ -483,7 +490,7 @@ function AssetsPageContent() {
                       Total TVL <span className="th-indicator">{sortIndicator(tokenSort, "tvl")}</span>
                     </button>
                   </th>
-                  <th className="is-numeric">
+                  <th className="is-numeric col-best">
                     <button
                       className={`th-button ${tokenSort.key === "best" ? "is-active" : ""}`}
                       onClick={() => {
@@ -495,7 +502,7 @@ function AssetsPageContent() {
                       Best APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "best")}</span>
                     </button>
                   </th>
-                  <th className="is-numeric tablet-hide analyst-only">
+                  <th className="is-numeric tablet-hide analyst-only col-weighted">
                     <button
                       className={`th-button ${tokenSort.key === "weighted" ? "is-active" : ""}`}
                       onClick={() => {
@@ -507,7 +514,7 @@ function AssetsPageContent() {
                       Weighted APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "weighted")}</span>
                     </button>
                   </th>
-                  <th className="is-numeric">
+                  <th className="is-numeric col-spread">
                     <button
                       className={`th-button ${tokenSort.key === "spread" ? "is-active" : ""}`}
                       onClick={() => {
@@ -528,14 +535,14 @@ function AssetsPageContent() {
                     className={row.token_symbol === selectedSymbol ? "row-selected" : "row-clickable"}
                     onClick={() => updateQuery({ token: row.token_symbol })}
                   >
-                    <td>{row.token_symbol}</td>
-                    {query.tokenScope === "all" ? <td>{row.token_type === "structured" ? "Structured" : "Canonical"}</td> : null}
-                    <td className="is-numeric">{row.venues}</td>
-                    <td className="is-numeric tablet-hide analyst-only">{row.chains}</td>
-                    <td className="is-numeric">{formatUsd(row.total_tvl_usd)}</td>
-                    <td className="is-numeric">{formatPct(row.best_safe_apy_30d)}</td>
-                    <td className="is-numeric tablet-hide analyst-only">{formatPct(row.weighted_safe_apy_30d)}</td>
-                    <td className="is-numeric">{formatPct(row.spread_safe_apy_30d)}</td>
+                    <td className="col-token">{row.token_symbol}</td>
+                    {query.tokenScope === "all" ? <td className="col-type">{row.token_type === "structured" ? "Structured" : "Canonical"}</td> : null}
+                    <td className="is-numeric col-venues">{row.venues}</td>
+                    <td className="is-numeric tablet-hide analyst-only col-chains">{row.chains}</td>
+                    <td className="is-numeric col-tvl">{formatUsd(row.total_tvl_usd)}</td>
+                    <td className="is-numeric col-best">{formatPct(row.best_safe_apy_30d)}</td>
+                    <td className="is-numeric tablet-hide analyst-only col-weighted">{formatPct(row.weighted_safe_apy_30d)}</td>
+                    <td className="is-numeric col-spread">{formatPct(row.spread_safe_apy_30d)}</td>
                   </tr>
                 ))}
               </tbody>
