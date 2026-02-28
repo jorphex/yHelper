@@ -422,40 +422,47 @@ function ChangesPageContent() {
         });
         const globalParams = new URLSearchParams(baseParams);
         globalParams.set("days", "90");
-        const chainParams = new URLSearchParams(baseParams);
-        const categoryParams = new URLSearchParams(baseParams);
-        chainParams.set("days", query.trendGroup === "chain" ? "90" : "14");
-        categoryParams.set("days", query.trendGroup === "category" ? "90" : "14");
-        chainParams.set("group_by", "chain");
-        chainParams.set("group_limit", "10");
-        categoryParams.set("group_by", "category");
-        categoryParams.set("group_limit", "10");
+        const requests: Array<Promise<Response>> = [fetch(`/api/trends/daily?${globalParams.toString()}`, { cache: "no-store" })];
+        const fetchChainGrouped = query.trendGroup === "chain";
+        const fetchCategoryGrouped = query.trendGroup === "category";
 
-        const [globalRes, chainRes, categoryRes] = await Promise.all([
-          fetch(`/api/trends/daily?${globalParams.toString()}`, { cache: "no-store" }),
-          fetch(`/api/trends/daily?${chainParams.toString()}`, { cache: "no-store" }),
-          fetch(`/api/trends/daily?${categoryParams.toString()}`, { cache: "no-store" }),
-        ]);
-        if (!globalRes.ok || !chainRes.ok || !categoryRes.ok) {
-          const status = !globalRes.ok ? globalRes.status : !chainRes.ok ? chainRes.status : categoryRes.status;
+        if (fetchChainGrouped) {
+          const chainParams = new URLSearchParams(baseParams);
+          chainParams.set("days", "90");
+          chainParams.set("group_by", "chain");
+          chainParams.set("group_limit", "10");
+          requests.push(fetch(`/api/trends/daily?${chainParams.toString()}`, { cache: "no-store" }));
+        }
+        if (fetchCategoryGrouped) {
+          const categoryParams = new URLSearchParams(baseParams);
+          categoryParams.set("days", "90");
+          categoryParams.set("group_by", "category");
+          categoryParams.set("group_limit", "10");
+          requests.push(fetch(`/api/trends/daily?${categoryParams.toString()}`, { cache: "no-store" }));
+        }
+
+        const responses = await Promise.all(requests);
+        const firstFailure = responses.find((response) => !response.ok);
+        if (firstFailure) {
+          const status = firstFailure.status;
           if (active) setTrendError(`Trends API error: ${status}`);
           return;
         }
-        const [globalPayload, chainPayload, categoryPayload] = (await Promise.all([
-          globalRes.json(),
-          chainRes.json(),
-          categoryRes.json(),
-        ])) as [DailyTrendResponse, DailyTrendResponse, DailyTrendResponse];
+
+        const payloads = (await Promise.all(responses.map((response) => response.json()))) as DailyTrendResponse[];
+        const globalPayload = payloads[0];
+        const chainPayload = fetchChainGrouped ? payloads[1] : null;
+        const categoryPayload = fetchCategoryGrouped ? payloads[fetchChainGrouped ? 2 : 1] : null;
         if (!active) return;
         setTrends(Array.isArray(globalPayload.rows) ? globalPayload.rows : []);
-        const chainLatest = Array.isArray(chainPayload.grouped?.latest) ? chainPayload.grouped.latest : [];
-        const categoryLatest = Array.isArray(categoryPayload.grouped?.latest) ? categoryPayload.grouped.latest : [];
+        const chainLatest = Array.isArray(chainPayload?.grouped?.latest) ? chainPayload.grouped.latest : [];
+        const categoryLatest = Array.isArray(categoryPayload?.grouped?.latest) ? categoryPayload.grouped.latest : [];
         const chainSeries =
-          query.trendGroup === "chain" && chainPayload.grouped?.series && typeof chainPayload.grouped.series === "object"
+          query.trendGroup === "chain" && chainPayload?.grouped?.series && typeof chainPayload.grouped.series === "object"
             ? chainPayload.grouped.series
             : {};
         const categorySeries =
-          query.trendGroup === "category" && categoryPayload.grouped?.series && typeof categoryPayload.grouped.series === "object"
+          query.trendGroup === "category" && categoryPayload?.grouped?.series && typeof categoryPayload.grouped.series === "object"
             ? categoryPayload.grouped.series
             : {};
         setChainTrendLatest(chainLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
@@ -797,7 +804,7 @@ function ChangesPageContent() {
             </select>
           </label>
           <label>
-            Trend Series:&nbsp;
+            Trend View:&nbsp;
             <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value as TrendGroupKey })}>
               <option value="none">Global</option>
               <option value="chain">By Chain</option>

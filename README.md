@@ -58,6 +58,7 @@ Public Yearn analytics scaffold (Phase 0).
 - Exit code is `0` on PASS and `1` on FAIL for easy cron/systemd integration.
 - Run `python3 scripts/post_deploy_smoke.py` after deploy/restart to verify all public pages and key API routes return `200`.
 - Optional: `python3 scripts/post_deploy_smoke.py --base-url https://yhelper.seul.one` for external edge verification.
+- Optional retries/allow-list: `python3 scripts/post_deploy_smoke.py --retries 4 --retry-delay 1.5 --allow-status 200,301`.
 
 ## Isolation safety
 - Service names, network, and volume use `yhelper-*` naming.

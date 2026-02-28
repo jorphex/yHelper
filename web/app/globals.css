@@ -1531,7 +1531,8 @@ input:focus-visible {
     position: sticky;
     left: 0;
     z-index: 2;
-    background: #091429;
+    background: var(--surface-3);
+    box-shadow: 1px 0 0 var(--line);
   }
 
   .vault-link {
@@ -1551,7 +1552,8 @@ input:focus-visible {
 
   .inline-controls > label {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
+    flex-wrap: wrap;
     gap: 0.55rem;
     padding: 0.35rem 0.45rem;
   }
@@ -1563,18 +1565,18 @@ input:focus-visible {
   .inline-controls > label > input[type="number"],
   .inline-controls > label > input[type="text"],
   .inline-controls > label > select {
-    width: min(62%, 240px);
+    width: 100%;
     min-width: 0;
   }
 
   .inline-controls.controls-tight > label > input[type="number"],
   .inline-controls.controls-tight > label > input[type="text"] {
-    width: min(46%, 118px);
+    width: 100%;
     min-width: 0;
   }
 
   .inline-controls.controls-tight > label.field-compact > input[type="number"] {
-    width: min(42%, 94px);
+    width: 100%;
   }
 
   .kpi-grid {
