@@ -692,10 +692,10 @@ function CompositionPageContent() {
         <h2>Most Crowded</h2>
         <p className="muted">High TVL relative to APY versus peers in the same filtered universe.</p>
         <div className="table-wrap">
-          <table>
+          <table className="composition-crowding-table">
             <thead>
               <tr>
-                <th>
+                <th className="col-vault">
                   <button
                     className={`th-button ${crowdedSort.key === "vault" ? "is-active" : ""}`}
                     onClick={() => {
@@ -707,7 +707,7 @@ function CompositionPageContent() {
                     Vault <span className="th-indicator">{sortIndicator(crowdedSort, "vault")}</span>
                   </button>
                 </th>
-                <th>
+                <th className="col-chain">
                   <button
                     className={`th-button ${crowdedSort.key === "chain" ? "is-active" : ""}`}
                     onClick={() => {
@@ -719,7 +719,7 @@ function CompositionPageContent() {
                     Chain <span className="th-indicator">{sortIndicator(crowdedSort, "chain")}</span>
                   </button>
                 </th>
-                <th>
+                <th className="col-token">
                   <button
                     className={`th-button ${crowdedSort.key === "token" ? "is-active" : ""}`}
                     onClick={() => {
@@ -731,7 +731,7 @@ function CompositionPageContent() {
                     Token <span className="th-indicator">{sortIndicator(crowdedSort, "token")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide">
+                <th className="tablet-hide col-category">
                   <button
                     className={`th-button ${crowdedSort.key === "category" ? "is-active" : ""}`}
                     onClick={() => {
@@ -743,7 +743,7 @@ function CompositionPageContent() {
                     Category <span className="th-indicator">{sortIndicator(crowdedSort, "category")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-tvl">
                   <button
                     className={`th-button ${crowdedSort.key === "tvl" ? "is-active" : ""}`}
                     onClick={() => {
@@ -755,7 +755,7 @@ function CompositionPageContent() {
                     TVL <span className="th-indicator">{sortIndicator(crowdedSort, "tvl")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-apy">
                   <button
                     className={`th-button ${crowdedSort.key === "apy" ? "is-active" : ""}`}
                     onClick={() => {
@@ -767,7 +767,7 @@ function CompositionPageContent() {
                     APY 30d <span className="th-indicator">{sortIndicator(crowdedSort, "apy")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-crowding">
                   <button
                     className={`th-button ${crowdedSort.key === "crowding" ? "is-active" : ""}`}
                     onClick={() => {
@@ -784,15 +784,15 @@ function CompositionPageContent() {
             <tbody>
               {crowdedRows.map((row) => (
                 <tr key={`crowded-${row.vault_address}`}>
-                  <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td>
+                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
+                  <td className="col-chain">
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
-                  <td>
+                  <td className="col-token">
                     {row.token_symbol ? (
                       <Link
                         href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
@@ -803,10 +803,10 @@ function CompositionPageContent() {
                       "unknown"
                     )}
                   </td>
-                  <td className="tablet-hide">{row.category || "unknown"}</td>
-                  <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
-                  <td className="is-numeric">{formatPct(row.safe_apy_30d)}</td>
-                  <td className="is-numeric">{row.crowding_index?.toFixed(2) ?? "n/a"}</td>
+                  <td className="tablet-hide col-category">{row.category || "unknown"}</td>
+                  <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
+                  <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
+                  <td className="is-numeric col-crowding">{row.crowding_index?.toFixed(2) ?? "n/a"}</td>
                 </tr>
               ))}
             </tbody>
@@ -818,10 +818,10 @@ function CompositionPageContent() {
         <h2>Least Crowded</h2>
         <p className="muted">Lower TVL relative to APY versus peers in the same filtered universe.</p>
         <div className="table-wrap">
-          <table>
+          <table className="composition-crowding-table">
             <thead>
               <tr>
-                <th>
+                <th className="col-vault">
                   <button
                     className={`th-button ${uncrowdedSort.key === "vault" ? "is-active" : ""}`}
                     onClick={() => {
@@ -833,7 +833,7 @@ function CompositionPageContent() {
                     Vault <span className="th-indicator">{sortIndicator(uncrowdedSort, "vault")}</span>
                   </button>
                 </th>
-                <th>
+                <th className="col-chain">
                   <button
                     className={`th-button ${uncrowdedSort.key === "chain" ? "is-active" : ""}`}
                     onClick={() => {
@@ -845,7 +845,7 @@ function CompositionPageContent() {
                     Chain <span className="th-indicator">{sortIndicator(uncrowdedSort, "chain")}</span>
                   </button>
                 </th>
-                <th>
+                <th className="col-token">
                   <button
                     className={`th-button ${uncrowdedSort.key === "token" ? "is-active" : ""}`}
                     onClick={() => {
@@ -857,7 +857,7 @@ function CompositionPageContent() {
                     Token <span className="th-indicator">{sortIndicator(uncrowdedSort, "token")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide">
+                <th className="tablet-hide col-category">
                   <button
                     className={`th-button ${uncrowdedSort.key === "category" ? "is-active" : ""}`}
                     onClick={() => {
@@ -869,7 +869,7 @@ function CompositionPageContent() {
                     Category <span className="th-indicator">{sortIndicator(uncrowdedSort, "category")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-tvl">
                   <button
                     className={`th-button ${uncrowdedSort.key === "tvl" ? "is-active" : ""}`}
                     onClick={() => {
@@ -881,7 +881,7 @@ function CompositionPageContent() {
                     TVL <span className="th-indicator">{sortIndicator(uncrowdedSort, "tvl")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-apy">
                   <button
                     className={`th-button ${uncrowdedSort.key === "apy" ? "is-active" : ""}`}
                     onClick={() => {
@@ -893,7 +893,7 @@ function CompositionPageContent() {
                     APY 30d <span className="th-indicator">{sortIndicator(uncrowdedSort, "apy")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-crowding">
                   <button
                     className={`th-button ${uncrowdedSort.key === "crowding" ? "is-active" : ""}`}
                     onClick={() => {
@@ -910,15 +910,15 @@ function CompositionPageContent() {
             <tbody>
               {uncrowdedRows.map((row) => (
                 <tr key={`uncrowded-${row.vault_address}`}>
-                  <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td>
+                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
+                  <td className="col-chain">
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
-                  <td>
+                  <td className="col-token">
                     {row.token_symbol ? (
                       <Link
                         href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
@@ -929,10 +929,10 @@ function CompositionPageContent() {
                       "unknown"
                     )}
                   </td>
-                  <td className="tablet-hide">{row.category || "unknown"}</td>
-                  <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
-                  <td className="is-numeric">{formatPct(row.safe_apy_30d)}</td>
-                  <td className="is-numeric">{row.crowding_index?.toFixed(2) ?? "n/a"}</td>
+                  <td className="tablet-hide col-category">{row.category || "unknown"}</td>
+                  <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
+                  <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
+                  <td className="is-numeric col-crowding">{row.crowding_index?.toFixed(2) ?? "n/a"}</td>
                 </tr>
               ))}
             </tbody>

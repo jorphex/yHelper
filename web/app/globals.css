@@ -622,6 +622,178 @@ input[type="text"] {
   flex-wrap: wrap;
 }
 
+.changes-mover-table {
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.changes-mover-table th,
+.changes-mover-table td {
+  overflow-wrap: normal;
+  word-break: normal;
+  vertical-align: middle;
+}
+
+.changes-mover-table th.col-vault,
+.changes-mover-table td.col-vault {
+  width: 13.2rem;
+}
+
+.changes-mover-table th.col-chain,
+.changes-mover-table td.col-chain {
+  width: 8rem;
+  white-space: nowrap;
+}
+
+.changes-mover-table th.col-token,
+.changes-mover-table td.col-token {
+  width: 7.8rem;
+  white-space: nowrap;
+}
+
+.changes-mover-table th.col-category,
+.changes-mover-table td.col-category {
+  width: 9rem;
+  white-space: nowrap;
+}
+
+.changes-mover-table th.col-tvl,
+.changes-mover-table td.col-tvl,
+.changes-mover-table th.col-current,
+.changes-mover-table td.col-current,
+.changes-mover-table th.col-previous,
+.changes-mover-table td.col-previous,
+.changes-mover-table th.col-delta,
+.changes-mover-table td.col-delta,
+.changes-mover-table th.col-age,
+.changes-mover-table td.col-age {
+  width: 7.4rem;
+}
+
+.changes-mover-table td.col-vault {
+  white-space: normal;
+}
+
+.changes-mover-table td.col-vault .vault-link {
+  max-width: 12.9rem;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-wrap: wrap;
+}
+
+.changes-mover-table td.col-token a,
+.changes-mover-table td.col-category {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composition-crowding-table {
+  min-width: 900px;
+  table-layout: fixed;
+}
+
+.composition-crowding-table th.col-vault,
+.composition-crowding-table td.col-vault {
+  width: 13rem;
+}
+
+.composition-crowding-table th.col-chain,
+.composition-crowding-table td.col-chain {
+  width: 8rem;
+  white-space: nowrap;
+}
+
+.composition-crowding-table th.col-token,
+.composition-crowding-table td.col-token {
+  width: 8rem;
+  white-space: nowrap;
+}
+
+.composition-crowding-table th.col-category,
+.composition-crowding-table td.col-category {
+  width: 8.5rem;
+  white-space: nowrap;
+}
+
+.composition-crowding-table th.col-tvl,
+.composition-crowding-table td.col-tvl,
+.composition-crowding-table th.col-apy,
+.composition-crowding-table td.col-apy,
+.composition-crowding-table th.col-crowding,
+.composition-crowding-table td.col-crowding {
+  width: 7.5rem;
+}
+
+.composition-crowding-table td.col-vault {
+  white-space: normal;
+}
+
+.composition-crowding-table td.col-vault .vault-link {
+  max-width: 12.8rem;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-wrap: wrap;
+}
+
+.assets-venues-table {
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.assets-venues-table th.col-vault,
+.assets-venues-table td.col-vault {
+  width: 13rem;
+}
+
+.assets-venues-table th.col-chain,
+.assets-venues-table td.col-chain {
+  width: 7.8rem;
+  white-space: nowrap;
+}
+
+.assets-venues-table th.col-category,
+.assets-venues-table td.col-category,
+.assets-venues-table th.col-version,
+.assets-venues-table td.col-version,
+.assets-venues-table th.col-regime,
+.assets-venues-table td.col-regime {
+  width: 8rem;
+  white-space: nowrap;
+}
+
+.assets-venues-table th.col-tvl,
+.assets-venues-table td.col-tvl,
+.assets-venues-table th.col-apy,
+.assets-venues-table td.col-apy,
+.assets-venues-table th.col-momentum,
+.assets-venues-table td.col-momentum,
+.assets-venues-table th.col-consistency,
+.assets-venues-table td.col-consistency {
+  width: 7.4rem;
+}
+
+.assets-venues-table td.col-vault {
+  white-space: normal;
+}
+
+.assets-venues-table td.col-vault .vault-link {
+  max-width: 12.8rem;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-wrap: wrap;
+}
+
+.assets-venues-table td.col-category,
+.assets-venues-table td.col-version,
+.assets-venues-table td.col-regime {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .assets-universe-card .kpi-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

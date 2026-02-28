@@ -202,25 +202,25 @@ function MoverTable({
         Click columns to sort by signal, size, or data staleness. Dense mode adds token/category and previous-APY context columns.
       </p>
       <div className="table-wrap">
-        <table>
+        <table className="changes-mover-table">
           <thead>
             <tr>
-              <th>
+              <th className="col-vault">
                 <button className={`th-button ${sort.key === "vault" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "vault"))}>
                   Vault <span className="th-indicator">{sortIndicator(sort, "vault")}</span>
                 </button>
               </th>
-              <th>
+              <th className="col-chain">
                 <button className={`th-button ${sort.key === "chain" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "chain"))}>
                   Chain <span className="th-indicator">{sortIndicator(sort, "chain")}</span>
                 </button>
               </th>
-              <th className="tablet-hide analyst-only">
+              <th className="tablet-hide analyst-only col-token">
                 <button className={`th-button ${sort.key === "token" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "token"))}>
                   Token <span className="th-indicator">{sortIndicator(sort, "token")}</span>
                 </button>
               </th>
-              <th className="mobile-hide analyst-only">
+              <th className="mobile-hide analyst-only col-category">
                 <button
                   className={`th-button ${sort.key === "category" ? "is-active" : ""}`}
                   onClick={() => setSort((current) => toggleSort(current, "category"))}
@@ -228,12 +228,12 @@ function MoverTable({
                   Category <span className="th-indicator">{sortIndicator(sort, "category")}</span>
                 </button>
               </th>
-              <th className="is-numeric">
+              <th className="is-numeric col-tvl">
                 <button className={`th-button ${sort.key === "tvl" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "tvl"))}>
                   TVL <span className="th-indicator">{sortIndicator(sort, "tvl")}</span>
                 </button>
               </th>
-              <th className="is-numeric">
+              <th className="is-numeric col-current">
                 <button
                   className={`th-button ${sort.key === "current" ? "is-active" : ""}`}
                   onClick={() => setSort((current) => toggleSort(current, "current"))}
@@ -241,7 +241,7 @@ function MoverTable({
                   Current APY <span className="th-indicator">{sortIndicator(sort, "current")}</span>
                 </button>
               </th>
-              <th className="is-numeric mobile-hide analyst-only">
+              <th className="is-numeric mobile-hide analyst-only col-previous">
                 <button
                   className={`th-button ${sort.key === "previous" ? "is-active" : ""}`}
                   onClick={() => setSort((current) => toggleSort(current, "previous"))}
@@ -249,12 +249,12 @@ function MoverTable({
                   Previous APY <span className="th-indicator">{sortIndicator(sort, "previous")}</span>
                 </button>
               </th>
-              <th className="is-numeric">
+              <th className="is-numeric col-delta">
                 <button className={`th-button ${sort.key === "delta" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "delta"))}>
                   Delta <span className="th-indicator">{sortIndicator(sort, "delta")}</span>
                 </button>
               </th>
-              <th className="is-numeric">
+              <th className="is-numeric col-age">
                 <button className={`th-button ${sort.key === "age" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "age"))}>
                   Data Age <span className="th-indicator">{sortIndicator(sort, "age")}</span>
                 </button>
@@ -264,13 +264,13 @@ function MoverTable({
           <tbody>
               {sortedRows.map((row) => (
                 <tr key={`${title}-${row.vault_address}`}>
-                  <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td>
+                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
+                  <td className="col-chain">
                     <Link href={`/discover?chain=${row.chain_id}&universe=${universe}&min_tvl=${minTvl}&min_points=${minPoints}`}>
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
-                  <td className="tablet-hide analyst-only">
+                  <td className="tablet-hide analyst-only col-token">
                     {row.token_symbol ? (
                       <Link
                         href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${universe}&min_tvl=${minTvl}&min_points=${minPoints}`}
@@ -281,12 +281,12 @@ function MoverTable({
                       "unknown"
                     )}
                   </td>
-                <td className="mobile-hide analyst-only">{row.category || "unknown"}</td>
-                <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
-                <td className="is-numeric">{formatPct(row.safe_apy_window)}</td>
-                <td className="is-numeric mobile-hide analyst-only">{formatPct(row.safe_apy_prev_window)}</td>
-                <td className="is-numeric">{formatPct(row.delta_apy)}</td>
-                <td className="is-numeric">{formatHours(row.age_seconds)}</td>
+                <td className="mobile-hide analyst-only col-category">{row.category || "unknown"}</td>
+                <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
+                <td className="is-numeric col-current">{formatPct(row.safe_apy_window)}</td>
+                <td className="is-numeric mobile-hide analyst-only col-previous">{formatPct(row.safe_apy_prev_window)}</td>
+                <td className="is-numeric col-delta">{formatPct(row.delta_apy)}</td>
+                <td className="is-numeric col-age">{formatHours(row.age_seconds)}</td>
               </tr>
             ))}
           </tbody>

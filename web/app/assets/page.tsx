@@ -557,10 +557,10 @@ function AssetsPageContent() {
         </div>
 
         <div className="table-wrap">
-          <table>
+          <table className="assets-venues-table">
             <thead>
               <tr>
-                <th>
+                <th className="col-vault">
                   <button
                     className={`th-button ${venueSort.key === "vault" ? "is-active" : ""}`}
                     onClick={() => {
@@ -572,7 +572,7 @@ function AssetsPageContent() {
                     Vault <span className="th-indicator">{sortIndicator(venueSort, "vault")}</span>
                   </button>
                 </th>
-                <th>
+                <th className="col-chain">
                   <button
                     className={`th-button ${venueSort.key === "chain" ? "is-active" : ""}`}
                     onClick={() => {
@@ -584,7 +584,7 @@ function AssetsPageContent() {
                     Chain <span className="th-indicator">{sortIndicator(venueSort, "chain")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only">
+                <th className="tablet-hide analyst-only col-category">
                   <button
                     className={`th-button ${venueSort.key === "category" ? "is-active" : ""}`}
                     onClick={() => {
@@ -596,7 +596,7 @@ function AssetsPageContent() {
                     Category <span className="th-indicator">{sortIndicator(venueSort, "category")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only">
+                <th className="tablet-hide analyst-only col-version">
                   <button
                     className={`th-button ${venueSort.key === "version" ? "is-active" : ""}`}
                     onClick={() => {
@@ -608,7 +608,7 @@ function AssetsPageContent() {
                     Version <span className="th-indicator">{sortIndicator(venueSort, "version")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-tvl">
                   <button
                     className={`th-button ${venueSort.key === "tvl" ? "is-active" : ""}`}
                     onClick={() => {
@@ -620,7 +620,7 @@ function AssetsPageContent() {
                     TVL <span className="th-indicator">{sortIndicator(venueSort, "tvl")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-apy">
                   <button
                     className={`th-button ${venueSort.key === "apy" ? "is-active" : ""}`}
                     onClick={() => {
@@ -632,7 +632,7 @@ function AssetsPageContent() {
                     APY 30d <span className="th-indicator">{sortIndicator(venueSort, "apy")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-momentum">
                   <button
                     className={`th-button ${venueSort.key === "momentum" ? "is-active" : ""}`}
                     onClick={() => {
@@ -644,7 +644,7 @@ function AssetsPageContent() {
                     Momentum <span className="th-indicator">{sortIndicator(venueSort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="is-numeric tablet-hide analyst-only">
+                <th className="is-numeric tablet-hide analyst-only col-consistency">
                   <button
                     className={`th-button ${venueSort.key === "consistency" ? "is-active" : ""}`}
                     onClick={() => {
@@ -656,7 +656,7 @@ function AssetsPageContent() {
                     Consistency <span className="th-indicator">{sortIndicator(venueSort, "consistency")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only">
+                <th className="tablet-hide analyst-only col-regime">
                   <button
                     className={`th-button ${venueSort.key === "regime" ? "is-active" : ""}`}
                     onClick={() => {
@@ -673,8 +673,8 @@ function AssetsPageContent() {
             <tbody>
               {venueRows.map((row) => (
                 <tr key={row.vault_address}>
-                  <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td>
+                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
+                  <td className="col-chain">
                     <Link
                       href={`/discover?chain=${row.chain_id}&token=${encodeURIComponent(
                         detail?.token_symbol ?? selectedSymbol,
@@ -683,13 +683,13 @@ function AssetsPageContent() {
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
-                  <td className="tablet-hide analyst-only">{row.category || "n/a"}</td>
-                  <td className="tablet-hide analyst-only">{row.version || "n/a"}</td>
-                  <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
-                  <td className="is-numeric">{formatPct(row.safe_apy_30d)}</td>
-                  <td className="is-numeric">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="is-numeric tablet-hide analyst-only">{formatPct(row.consistency_score)}</td>
-                  <td className="tablet-hide analyst-only">{regimeLabel(row.regime)}</td>
+                  <td className="tablet-hide analyst-only col-category">{row.category || "n/a"}</td>
+                  <td className="tablet-hide analyst-only col-version">{row.version || "n/a"}</td>
+                  <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
+                  <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
+                  <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
+                  <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
+                  <td className="tablet-hide analyst-only col-regime">{regimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>
