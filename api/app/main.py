@@ -5,6 +5,7 @@ import time
 from datetime import UTC, datetime
 from json import loads
 from typing import Literal
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, Query
@@ -19,31 +20,44 @@ def _parse_origins(raw: str) -> list[str]:
 
 app = FastAPI(title="yHelper API", version="0.1.0")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://yhelper:change_me@yhelper-postgres:5432/yhelper")
-APY_MIN = float(os.getenv("API_APY_MIN", "-0.95"))
-APY_MAX = float(os.getenv("API_APY_MAX", "3.0"))
-MOMENTUM_ABS_MAX = float(os.getenv("API_MOMENTUM_ABS_MAX", "1.0"))
-DEFAULT_MIN_TVL_USD = float(os.getenv("API_MIN_TVL_USD", "100000"))
-DEFAULT_MIN_POINTS = int(os.getenv("API_MIN_POINTS", "30"))
-UNIVERSE_CORE_MIN_TVL_USD = float(os.getenv("API_UNIVERSE_CORE_MIN_TVL_USD", "1000000"))
-UNIVERSE_EXTENDED_MIN_TVL_USD = float(os.getenv("API_UNIVERSE_EXTENDED_MIN_TVL_USD", "250000"))
-UNIVERSE_RAW_MIN_TVL_USD = float(os.getenv("API_UNIVERSE_RAW_MIN_TVL_USD", "0"))
-UNIVERSE_CORE_MIN_POINTS = int(os.getenv("API_UNIVERSE_CORE_MIN_POINTS", "45"))
-UNIVERSE_EXTENDED_MIN_POINTS = int(os.getenv("API_UNIVERSE_EXTENDED_MIN_POINTS", "20"))
-UNIVERSE_RAW_MIN_POINTS = int(os.getenv("API_UNIVERSE_RAW_MIN_POINTS", "0"))
-UNIVERSE_CORE_MAX_VAULTS = int(os.getenv("API_UNIVERSE_CORE_MAX_VAULTS", "250"))
-UNIVERSE_EXTENDED_MAX_VAULTS = int(os.getenv("API_UNIVERSE_EXTENDED_MAX_VAULTS", "700"))
-UNIVERSE_RAW_MAX_VAULTS = int(os.getenv("API_UNIVERSE_RAW_MAX_VAULTS", "0"))
+# Permanent bounds to keep analytics behavior stable across deploys.
+APY_MIN = -0.95
+APY_MAX = 3.0
+MOMENTUM_ABS_MAX = 1.0
+DEFAULT_MIN_TVL_USD = 100000.0
+DEFAULT_MIN_POINTS = 30
+UNIVERSE_CORE_MIN_TVL_USD = 1000000.0
+UNIVERSE_EXTENDED_MIN_TVL_USD = 250000.0
+UNIVERSE_RAW_MIN_TVL_USD = 0.0
+UNIVERSE_CORE_MIN_POINTS = 45
+UNIVERSE_EXTENDED_MIN_POINTS = 20
+UNIVERSE_RAW_MIN_POINTS = 0
+UNIVERSE_CORE_MAX_VAULTS = 250
+UNIVERSE_EXTENDED_MAX_VAULTS = 700
+UNIVERSE_RAW_MAX_VAULTS = 0
 DEFI_LLAMA_PROTOCOL_URL = os.getenv("DEFI_LLAMA_PROTOCOL_URL", "https://api.llama.fi/protocol/yearn-finance")
-DEFI_LLAMA_TIMEOUT_SEC = float(os.getenv("DEFI_LLAMA_TIMEOUT_SEC", "8"))
-DEFI_LLAMA_CACHE_TTL_SEC = int(os.getenv("DEFI_LLAMA_CACHE_TTL_SEC", "600"))
-ASSETS_FEATURED_MIN_TVL_USD = float(os.getenv("API_ASSETS_FEATURED_MIN_TVL_USD", "5000000"))
-ASSETS_FEATURED_MIN_VENUES = int(os.getenv("API_ASSETS_FEATURED_MIN_VENUES", "2"))
-ASSETS_FEATURED_MIN_CHAINS = int(os.getenv("API_ASSETS_FEATURED_MIN_CHAINS", "1"))
+COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price"
+DEFI_LLAMA_TIMEOUT_SEC = 8.0
+DEFI_LLAMA_CACHE_TTL_SEC = 600
+ASSETS_FEATURED_MIN_TVL_USD = float(os.getenv("API_ASSETS_FEATURED_MIN_TVL_USD", "1000000"))
+ASSETS_FEATURED_MIN_VENUES = 2
+ASSETS_FEATURED_MIN_CHAINS = 1
 WORKER_INTERVAL_SEC = int(os.getenv("WORKER_INTERVAL_SEC", "300"))
 PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
 INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
 DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
 KONG_PPS_LOOKBACK_DAYS = int(os.getenv("KONG_PPS_LOOKBACK_DAYS", "119"))
+
+
+def _validate_data_policy_config() -> None:
+    if PPS_RETENTION_DAYS > 0 and KONG_PPS_LOOKBACK_DAYS > 0 and PPS_RETENTION_DAYS < KONG_PPS_LOOKBACK_DAYS:
+        raise ValueError(
+            "Invalid retention policy: PPS_RETENTION_DAYS must be >= KONG_PPS_LOOKBACK_DAYS "
+            f"(got retention={PPS_RETENTION_DAYS}, lookback={KONG_PPS_LOOKBACK_DAYS})"
+        )
+
+
+_validate_data_policy_config()
 
 _defillama_cache: dict[str, object] = {"fetched_at_epoch": 0.0, "snapshot": None}
 
@@ -522,6 +536,60 @@ def _extract_defillama_tvl_series(raw_tvl: object) -> list[tuple[int, float]]:
     return series
 
 
+def _coingecko_market_cap_usd(gecko_id: str | None) -> float | None:
+    if gecko_id is None:
+        return None
+    cleaned = gecko_id.strip()
+    if not cleaned:
+        return None
+    query = urlencode(
+        {
+            "ids": cleaned,
+            "vs_currencies": "usd",
+            "include_market_cap": "true",
+        }
+    )
+    request = Request(
+        f"{COINGECKO_SIMPLE_PRICE_URL}?{query}",
+        headers={"User-Agent": "yhelper/0.1"},
+    )
+    with urlopen(request, timeout=DEFI_LLAMA_TIMEOUT_SEC) as response:
+        payload = loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        return None
+    token_entry = payload.get(cleaned)
+    if not isinstance(token_entry, dict):
+        return None
+    return _to_float_or_none(token_entry.get("usd_market_cap"))
+
+
+def _yearn_aligned_proxy_scope(cur: psycopg.Cursor) -> dict[str, object]:
+    cur.execute(
+        """
+        SELECT
+            COUNT(*) AS vaults,
+            SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
+        FROM vault_dim d
+        WHERE
+            d.active = TRUE
+            AND COALESCE(d.kind, '') IN ('Multi Strategy', 'Single Strategy')
+            AND COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
+            AND COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
+        """
+    )
+    row = cur.fetchone() or {}
+    return {
+        "vaults": int(row.get("vaults") or 0),
+        "tvl_usd": _to_float_or_none(row.get("tvl_usd")),
+        "criteria": {
+            "active": True,
+            "exclude_hidden": True,
+            "exclude_retired": True,
+            "kinds": ["Multi Strategy", "Single Strategy"],
+        },
+    }
+
+
 def _series_change_pct(series: list[tuple[int, float]], *, lookback_days: int) -> float | None:
     if not series:
         return None
@@ -558,6 +626,19 @@ def _defillama_snapshot() -> dict[str, object]:
         series = _extract_defillama_tvl_series(raw_tvl)
         tvl_usd = series[-1][1] if series else _to_float_or_none(raw_tvl)
         mcap_usd = _to_float_or_none(payload.get("mcap"))
+        mcap_source = "defillama" if mcap_usd is not None else None
+        gecko_id_raw = payload.get("gecko_id")
+        gecko_id = gecko_id_raw.strip() if isinstance(gecko_id_raw, str) else ""
+        if not gecko_id:
+            gecko_id = "yearn-finance"
+        if mcap_usd is None:
+            try:
+                fallback_mcap = _coingecko_market_cap_usd(gecko_id)
+            except Exception:
+                fallback_mcap = None
+            if fallback_mcap is not None:
+                mcap_usd = fallback_mcap
+                mcap_source = "coingecko"
         mcap_tvl_ratio = (mcap_usd / tvl_usd) if mcap_usd is not None and tvl_usd and tvl_usd > 0 else None
         current_chain_tvls = payload.get("currentChainTvls") or {}
         if not isinstance(current_chain_tvls, dict):
@@ -579,8 +660,10 @@ def _defillama_snapshot() -> dict[str, object]:
             "cache_ttl_seconds": DEFI_LLAMA_CACHE_TTL_SEC,
             "protocol_name": payload.get("name") or "Yearn Finance",
             "protocol_slug": payload.get("slug") or "yearn-finance",
+            "gecko_id": gecko_id,
             "tvl_usd": tvl_usd,
             "mcap_usd": mcap_usd,
+            "mcap_source": mcap_source,
             "mcap_tvl_ratio": mcap_tvl_ratio,
             "tvl_change_7d_pct": _series_change_pct(series, lookback_days=7),
             "tvl_change_30d_pct": _series_change_pct(series, lookback_days=30),
@@ -722,6 +805,7 @@ async def overview() -> dict[str, object]:
     freshness: dict[str, object] | None = None
     coverage: dict[str, object] | None = None
     protocol_context: dict[str, object] | None = None
+    yearn_proxy: dict[str, object] | None = None
     lifecycle: dict[str, object] | None = None
     last_runs: dict[str, dict[str, object] | None] = {"ydaemon_snapshot": None, "kong_pps_metrics": None}
     try:
@@ -778,6 +862,7 @@ async def overview() -> dict[str, object]:
                             "records": row["records"],
                             "error_summary": row["error_summary"],
                         }
+                yearn_proxy = _yearn_aligned_proxy_scope(cur)
             freshness = _freshness_snapshot(conn, stale_threshold_seconds=24 * 3600, split_limit=8)
             coverage = _coverage_snapshot(
                 conn,
@@ -792,6 +877,12 @@ async def overview() -> dict[str, object]:
                 if tvl_usd and tvl_usd > 0 and eligible_tvl_usd is not None:
                     protocol_context["eligible_vs_protocol_tvl_ratio"] = max(0.0, eligible_tvl_usd / tvl_usd)
                     protocol_context["eligible_vs_protocol_tvl_gap_usd"] = tvl_usd - eligible_tvl_usd
+                if isinstance(yearn_proxy, dict):
+                    proxy_tvl_usd = _to_float_or_none(yearn_proxy.get("tvl_usd"))
+                    protocol_context["yearn_aligned_proxy"] = yearn_proxy
+                    if proxy_tvl_usd is not None and tvl_usd is not None:
+                        protocol_context["defillama_vs_yearn_proxy_gap_usd"] = tvl_usd - proxy_tvl_usd
+                        protocol_context["defillama_vs_yearn_proxy_ratio"] = (tvl_usd / proxy_tvl_usd) if proxy_tvl_usd > 0 else None
     except Exception:
         # DB may be empty/not yet initialized during bootstrap.
         pass
@@ -1152,7 +1243,7 @@ async def discover(
                     COUNT(*) FILTER (WHERE {retired_sql} = TRUE) AS retired_vaults,
                     COUNT(*) FILTER (WHERE {highlighted_sql} = TRUE) AS highlighted_vaults,
                     COUNT(*) FILTER (WHERE {migration_sql} = TRUE) AS migration_ready_vaults,
-                    AVG({strategies_count_sql}) AS avg_strategies_per_vault,
+                    AVG({strategies_count_sql})::DOUBLE PRECISION AS avg_strategies_per_vault,
                     CASE
                         WHEN SUM(COALESCE(d.tvl_usd, 0.0)) > 0
                         THEN SUM(COALESCE(d.tvl_usd, 0.0) * {safe_apy_sql}) / SUM(COALESCE(d.tvl_usd, 0.0))
@@ -1462,6 +1553,213 @@ async def chains_rollups(
             "universe": universe,
             "min_tvl_usd": min_tvl_usd,
             "max_vaults": max_vaults,
+            "apy_bounds": {"min": APY_MIN, "max": APY_MAX},
+        },
+        "universe_gate": universe_gate,
+        "summary": summary,
+        "rows": rows,
+    }
+
+
+@app.get("/api/trends/daily")
+async def daily_trends(
+    universe: Literal["core", "extended", "raw"] = "core",
+    min_tvl_usd: float | None = Query(default=None, ge=0.0),
+    min_points: int | None = Query(default=None, ge=0),
+    max_vaults: int | None = Query(default=None, ge=0),
+    chain_id: int | None = Query(default=None),
+    days: int = Query(default=120, ge=14, le=365),
+) -> dict[str, object]:
+    universe_gate = _resolve_universe_gate(
+        universe, min_tvl_usd=min_tvl_usd, min_points=min_points, max_vaults=max_vaults
+    )
+    min_tvl_usd = float(universe_gate["min_tvl_usd"])
+    min_points = int(universe_gate["min_points"])
+    max_vaults = universe_gate["max_vaults"]
+    rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
+    rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
+    chain_clause = "AND d.chain_id = %(chain_id)s" if chain_id is not None else ""
+
+    params: dict[str, object] = {
+        "days": days,
+        "min_tvl_usd": min_tvl_usd,
+        "min_points": min_points,
+        "apy_min": APY_MIN,
+        "apy_max": APY_MAX,
+    }
+    if chain_id is not None:
+        params["chain_id"] = chain_id
+    if max_vaults is not None:
+        params["max_vaults"] = max_vaults
+
+    sql = f"""
+        WITH eligible AS (
+            SELECT
+                d.vault_address,
+                d.chain_id,
+                COALESCE(d.tvl_usd, 0.0) AS tvl_usd
+            FROM vault_dim d
+            JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+            WHERE
+                d.active = TRUE
+                AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
+                AND COALESCE(m.points_count, 0) >= %(min_points)s
+                {chain_clause}
+                {rank_clause}
+        ),
+        daily_ranked AS (
+            SELECT
+                e.vault_address,
+                e.chain_id,
+                e.tvl_usd,
+                (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date AS day,
+                p.ts,
+                p.pps_raw,
+                ROW_NUMBER() OVER (
+                    PARTITION BY e.vault_address, (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date
+                    ORDER BY p.ts DESC
+                ) AS rn
+            FROM pps_timeseries p
+            JOIN eligible e ON e.vault_address = p.vault_address
+            WHERE p.ts >= EXTRACT(
+                EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - ((%(days)s + 110) * INTERVAL '1 day'))
+            )
+        ),
+        daily_latest AS (
+            SELECT
+                vault_address,
+                chain_id,
+                tvl_usd,
+                day,
+                pps_raw
+            FROM daily_ranked
+            WHERE rn = 1
+        ),
+        calc AS (
+            SELECT
+                vault_address,
+                chain_id,
+                tvl_usd,
+                day,
+                pps_raw,
+                LAG(pps_raw, 7) OVER (PARTITION BY vault_address ORDER BY day) AS pps_7d,
+                LAG(pps_raw, 30) OVER (PARTITION BY vault_address ORDER BY day) AS pps_30d,
+                LAG(pps_raw, 90) OVER (PARTITION BY vault_address ORDER BY day) AS pps_90d
+            FROM daily_latest
+        ),
+        vault_daily AS (
+            SELECT
+                chain_id,
+                tvl_usd,
+                day,
+                CASE
+                    WHEN pps_raw > 0 AND pps_7d > 0
+                    THEN POWER(pps_raw / pps_7d, 365.0 / 7.0) - 1
+                    ELSE NULL
+                END AS apy_7d_raw,
+                CASE
+                    WHEN pps_raw > 0 AND pps_30d > 0
+                    THEN POWER(pps_raw / pps_30d, 365.0 / 30.0) - 1
+                    ELSE NULL
+                END AS apy_30d_raw,
+                CASE
+                    WHEN pps_raw > 0 AND pps_90d > 0
+                    THEN POWER(pps_raw / pps_90d, 365.0 / 90.0) - 1
+                    ELSE NULL
+                END AS apy_90d_raw
+            FROM calc
+        ),
+        trimmed AS (
+            SELECT
+                chain_id,
+                tvl_usd,
+                day,
+                LEAST(GREATEST(apy_7d_raw, %(apy_min)s), %(apy_max)s) AS apy_7d,
+                LEAST(GREATEST(apy_30d_raw, %(apy_min)s), %(apy_max)s) AS apy_30d,
+                LEAST(GREATEST(apy_90d_raw, %(apy_min)s), %(apy_max)s) AS apy_90d
+            FROM vault_daily
+            WHERE day >= ((NOW() AT TIME ZONE 'UTC')::date - ((%(days)s::text || ' days')::interval))
+        )
+        SELECT
+            day::text AS day,
+            COUNT(*) AS vaults,
+            SUM(tvl_usd) AS total_tvl_usd,
+            CASE
+                WHEN SUM(tvl_usd) FILTER (WHERE apy_7d IS NOT NULL) > 0
+                THEN SUM(tvl_usd * apy_7d) FILTER (WHERE apy_7d IS NOT NULL)
+                     / SUM(tvl_usd) FILTER (WHERE apy_7d IS NOT NULL)
+                ELSE NULL
+            END AS weighted_apy_7d,
+            CASE
+                WHEN SUM(tvl_usd) FILTER (WHERE apy_30d IS NOT NULL) > 0
+                THEN SUM(tvl_usd * apy_30d) FILTER (WHERE apy_30d IS NOT NULL)
+                     / SUM(tvl_usd) FILTER (WHERE apy_30d IS NOT NULL)
+                ELSE NULL
+            END AS weighted_apy_30d,
+            CASE
+                WHEN SUM(tvl_usd) FILTER (WHERE apy_90d IS NOT NULL) > 0
+                THEN SUM(tvl_usd * apy_90d) FILTER (WHERE apy_90d IS NOT NULL)
+                     / SUM(tvl_usd) FILTER (WHERE apy_90d IS NOT NULL)
+                ELSE NULL
+            END AS weighted_apy_90d,
+            CASE
+                WHEN SUM(tvl_usd) FILTER (WHERE apy_7d IS NOT NULL AND apy_30d IS NOT NULL) > 0
+                THEN SUM(tvl_usd * (apy_7d - apy_30d)) FILTER (WHERE apy_7d IS NOT NULL AND apy_30d IS NOT NULL)
+                     / SUM(tvl_usd) FILTER (WHERE apy_7d IS NOT NULL AND apy_30d IS NOT NULL)
+                ELSE NULL
+            END AS weighted_momentum_7d_30d,
+            COUNT(*) FILTER (WHERE apy_30d < 0.0) AS bucket_neg_count,
+            COUNT(*) FILTER (WHERE apy_30d >= 0.0 AND apy_30d < 0.05) AS bucket_low_count,
+            COUNT(*) FILTER (WHERE apy_30d >= 0.05 AND apy_30d < 0.15) AS bucket_mid_count,
+            COUNT(*) FILTER (WHERE apy_30d >= 0.15) AS bucket_high_count,
+            COUNT(*) FILTER (WHERE apy_7d IS NOT NULL AND apy_30d IS NOT NULL AND apy_7d > apy_30d) AS risers_count,
+            COUNT(*) FILTER (WHERE apy_7d IS NOT NULL AND apy_30d IS NOT NULL AND apy_7d < apy_30d) AS fallers_count
+        FROM trimmed
+        GROUP BY day
+        ORDER BY day
+    """
+
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+
+    for row in rows:
+        vaults = int(row.get("vaults") or 0)
+        risers = int(row.get("risers_count") or 0)
+        fallers = int(row.get("fallers_count") or 0)
+        row["riser_ratio"] = (risers / vaults) if vaults > 0 else None
+        row["faller_ratio"] = (fallers / vaults) if vaults > 0 else None
+        row["bucket_neg_ratio"] = (int(row.get("bucket_neg_count") or 0) / vaults) if vaults > 0 else None
+        row["bucket_low_ratio"] = (int(row.get("bucket_low_count") or 0) / vaults) if vaults > 0 else None
+        row["bucket_mid_ratio"] = (int(row.get("bucket_mid_count") or 0) / vaults) if vaults > 0 else None
+        row["bucket_high_ratio"] = (int(row.get("bucket_high_count") or 0) / vaults) if vaults > 0 else None
+
+    latest = rows[-1] if rows else None
+    first = rows[0] if rows else None
+    summary = {
+        "rows": len(rows),
+        "latest_day": latest.get("day") if latest else None,
+        "latest_weighted_apy_7d": latest.get("weighted_apy_7d") if latest else None,
+        "latest_weighted_apy_30d": latest.get("weighted_apy_30d") if latest else None,
+        "latest_weighted_apy_90d": latest.get("weighted_apy_90d") if latest else None,
+        "latest_weighted_momentum_7d_30d": latest.get("weighted_momentum_7d_30d") if latest else None,
+        "delta_weighted_apy_30d": (
+            (_to_float_or_none(latest.get("weighted_apy_30d")) or 0.0)
+            - (_to_float_or_none(first.get("weighted_apy_30d")) or 0.0)
+            if latest and first
+            else None
+        ),
+    }
+
+    return {
+        "filters": {
+            "universe": universe,
+            "min_tvl_usd": min_tvl_usd,
+            "min_points": min_points,
+            "max_vaults": max_vaults,
+            "chain_id": chain_id,
+            "days": days,
             "apy_bounds": {"min": APY_MIN, "max": APY_MAX},
         },
         "universe_gate": universe_gate,
@@ -2037,6 +2335,7 @@ async def changes(
     base_cte = _changes_base_cte(max_vaults=max_vaults)
     regime_sql = _regime_case_sql("n")
     freshness: dict[str, object] | None = None
+    reference_tvl: dict[str, object] = {}
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
@@ -2107,7 +2406,46 @@ async def changes(
                 params,
             )
             stale = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT
+                    COUNT(*) AS vaults,
+                    SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
+                FROM vault_dim d
+                WHERE
+                    d.active = TRUE
+                    AND COALESCE(d.kind, '') IN ('Multi Strategy', 'Single Strategy')
+                    AND COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
+                    AND COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
+                """
+            )
+            yearn_scope = cur.fetchone() or {}
         freshness = _freshness_snapshot(conn, stale_threshold_seconds=stale_threshold_seconds, split_limit=8)
+
+    filtered_total_tvl = float(summary.get("total_tvl_usd") or 0.0)
+    yearn_proxy_tvl = float(yearn_scope.get("tvl_usd") or 0.0)
+    reference_tvl = {
+        "yearn_aligned_proxy": {
+            "vaults": int(yearn_scope.get("vaults") or 0),
+            "tvl_usd": yearn_proxy_tvl if yearn_scope.get("tvl_usd") is not None else None,
+            "criteria": {
+                "active": True,
+                "exclude_hidden": True,
+                "exclude_retired": True,
+                "kinds": ["Multi Strategy", "Single Strategy"],
+            },
+            "comparison_to_filtered_universe": {
+                "filtered_total_tvl_usd": filtered_total_tvl if summary.get("total_tvl_usd") is not None else None,
+                "gap_usd": (filtered_total_tvl - yearn_proxy_tvl)
+                if summary.get("total_tvl_usd") is not None and yearn_scope.get("tvl_usd") is not None
+                else None,
+                "ratio": (filtered_total_tvl / yearn_proxy_tvl)
+                if summary.get("total_tvl_usd") is not None and yearn_proxy_tvl > 0
+                else None,
+            },
+        }
+    }
 
     if freshness is not None:
         tracked = int(summary.get("vaults_with_change") or 0)
@@ -2131,6 +2469,7 @@ async def changes(
         },
         "universe_gate": universe_gate,
         "summary": summary,
+        "reference_tvl": reference_tvl,
         "freshness": freshness,
         "regime_counts": regime_counts,
         "movers": movers,

@@ -17,11 +17,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://yhelper:change_me@yhelper
 KONG_GQL_URL = os.getenv("KONG_GQL_URL", "https://kong.yearn.farm/api/gql")
 KONG_MAX_VAULTS = int(os.getenv("KONG_MAX_VAULTS", "120"))
 KONG_MIN_TVL_USD = float(os.getenv("KONG_MIN_TVL_USD", "100000"))
-KONG_PPS_LIMIT = int(os.getenv("KONG_PPS_LIMIT", "120"))
+# Keep PPS series length fixed to reduce operator-side tuning overhead.
+KONG_PPS_LIMIT = 120
 KONG_PPS_LOOKBACK_DAYS = int(os.getenv("KONG_PPS_LOOKBACK_DAYS", str(max(KONG_PPS_LIMIT - 1, 1))))
-KONG_PPS_ANCHOR_SLACK_DAYS = int(os.getenv("KONG_PPS_ANCHOR_SLACK_DAYS", "3"))
-KONG_TIMEOUT_SEC = int(os.getenv("KONG_TIMEOUT_SEC", "12"))
-KONG_SLEEP_BETWEEN_REQ_MS = int(os.getenv("KONG_SLEEP_BETWEEN_REQ_MS", "10"))
+# Keep request cadence stable to avoid needless operator tuning.
+KONG_PPS_ANCHOR_SLACK_DAYS = 3
+KONG_TIMEOUT_SEC = 12
+KONG_SLEEP_BETWEEN_REQ_MS = 10
 PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
 INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
 DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
@@ -34,7 +36,8 @@ ALERT_NOTIFY_ON_RECOVERY = os.getenv("ALERT_NOTIFY_ON_RECOVERY", "1") == "1"
 ALERT_TELEGRAM_BOT_TOKEN = os.getenv("ALERT_TELEGRAM_BOT_TOKEN", "").strip()
 ALERT_TELEGRAM_CHAT_ID = os.getenv("ALERT_TELEGRAM_CHAT_ID", "").strip()
 ALERT_DISCORD_WEBHOOK_URL = os.getenv("ALERT_DISCORD_WEBHOOK_URL", "").strip()
-RUNNING_STALE_SECONDS = int(os.getenv("RUNNING_STALE_SECONDS", "1800"))
+# Running jobs older than this are automatically marked stale failed.
+RUNNING_STALE_SECONDS = 1800
 LAST_CLEANUP_AT: datetime | None = None
 
 KONG_PPS_QUERY = """
@@ -124,6 +127,14 @@ CREATE TABLE IF NOT EXISTS alert_state (
     last_notify_result JSONB
 );
 """
+
+
+def _validate_data_policy_config() -> None:
+    if PPS_RETENTION_DAYS > 0 and KONG_PPS_LOOKBACK_DAYS > 0 and PPS_RETENTION_DAYS < KONG_PPS_LOOKBACK_DAYS:
+        raise ValueError(
+            "Invalid retention policy: PPS_RETENTION_DAYS must be >= KONG_PPS_LOOKBACK_DAYS "
+            f"(got retention={PPS_RETENTION_DAYS}, lookback={KONG_PPS_LOOKBACK_DAYS})"
+        )
 
 UPSERT_SQL = """
 INSERT INTO vault_dim (
@@ -940,6 +951,7 @@ def run_once() -> None:
 
 def main() -> None:
     configure_logging()
+    _validate_data_policy_config()
     interval = int(os.getenv("WORKER_INTERVAL_SEC", "300"))
     logging.info("Worker booted with interval=%ss", interval)
     with _connect() as conn:

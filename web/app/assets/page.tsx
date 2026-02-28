@@ -243,6 +243,8 @@ function AssetsPageContent() {
         .slice(0, 8),
     [assetData?.rows],
   );
+  const featuredMinVenues = assetData?.filters?.featured_min_venues;
+  const featuredMinChains = assetData?.filters?.featured_min_chains;
 
   return (
     <main className="container">
@@ -265,13 +267,13 @@ function AssetsPageContent() {
       {assetsError ? <section className="card">{assetsError}</section> : null}
       {detailError ? <section className="card">{detailError}</section> : null}
 
-      <section className="card">
+      <section className="card assets-universe-card">
         <h2>Token Universe</h2>
         <p className="muted card-intro">
           Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
           Canonical shows all plain symbols. All includes LP and structured symbols.
         </p>
-        <div className="inline-controls">
+        <div className="inline-controls controls-tight">
           <label>
             Token:&nbsp;
             <select value={selectedSymbol} onChange={(event) => updateQuery({ token: event.target.value })}>
@@ -283,7 +285,7 @@ function AssetsPageContent() {
             </select>
           </label>
           <label>
-            Token List:&nbsp;
+            List:&nbsp;
             <select value={query.tokenScope} onChange={(event) => updateQuery({ token_scope: event.target.value as TokenScope, token: null })}>
               <option value="featured">Featured (clean list)</option>
               <option value="canonical">Canonical only</option>
@@ -331,7 +333,7 @@ function AssetsPageContent() {
             </select>
           </label>
           <label>
-            API Sort:&nbsp;
+            Sort:&nbsp;
             <select value={query.apiSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
               <option value="tvl">TVL</option>
               <option value="spread">APY Spread</option>
@@ -340,21 +342,21 @@ function AssetsPageContent() {
             </select>
           </label>
           <label>
-            API Dir:&nbsp;
+            Direction:&nbsp;
             <select value={query.apiDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
+              <option value="desc">Highest first</option>
+              <option value="asc">Lowest first</option>
             </select>
           </label>
         </div>
         {query.tokenScope === "featured" ? (
           <p className="muted card-intro">
             Featured criteria: token TVL at least {formatUsd(assetData?.filters?.featured_min_tvl_usd)}, at least{" "}
-            {assetData?.filters?.featured_min_venues ?? "n/a"} venues, and at least{" "}
-            {assetData?.filters?.featured_min_chains ?? "n/a"} chains.
+            {featuredMinVenues ?? "n/a"} {featuredMinVenues === 1 ? "venue" : "venues"}, and at least {featuredMinChains ?? "n/a"}{" "}
+            {featuredMinChains === 1 ? "chain" : "chains"}.
           </p>
         ) : null}
-        <div className="split-grid">
+        <div className="split-grid assets-universe-top">
           <KpiGrid
             items={[
               { label: "Tokens", value: String(assetData?.summary?.tokens ?? tokenRows.length) },
@@ -367,27 +369,32 @@ function AssetsPageContent() {
               {
                 label: "TVL-Weighted APY",
                 value: formatPct(assetData?.summary?.tvl_weighted_safe_apy_30d),
+                hint: "Average APY weighted by where most token TVL sits",
               },
               {
                 label: "Median Spread",
                 value: formatPct(assetData?.summary?.median_spread_safe_apy_30d),
+                hint: "Middle APY spread (best minus worst venue) across tokens",
               },
               {
                 label: "Multi-Chain Tokens",
                 value: String(assetData?.summary?.multi_chain_tokens ?? "n/a"),
+                hint: "Tokens available on more than one chain",
               },
               {
                 label: "High Spread Tokens",
                 value: String(assetData?.summary?.high_spread_tokens ?? "n/a"),
-                hint: "Spread >= 2%",
+                hint: "Tokens with APY spread >= 2 percentage points",
               },
               {
                 label: "Canonical Available",
                 value: String(assetData?.summary?.tokens_available_canonical ?? "n/a"),
+                hint: "Plain token symbols (no LP/structured syntax)",
               },
               {
                 label: "Structured Available",
                 value: String(assetData?.summary?.tokens_available_structured ?? "n/a"),
+                hint: "LP/pooled/structured symbols detected by token format",
               },
             ]}
           />
@@ -403,7 +410,7 @@ function AssetsPageContent() {
           />
         </div>
         {tokenRows.length === 0 ? (
-          <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch Token List mode.</p>
+          <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch List mode.</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -519,7 +526,7 @@ function AssetsPageContent() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card assets-venues-card">
         <h2>{detail?.token_symbol || selectedSymbol || "Token"} Venues</h2>
         <p className="muted card-intro">
           Venue-level detail for the selected token. Sort to compare alternatives quickly. Dense mode adds extra context columns.

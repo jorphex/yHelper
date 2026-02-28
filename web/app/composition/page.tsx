@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd } from "../lib/format";
+import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
-import { BarList, KpiGrid } from "../components/visuals";
+import { BarList, HeatGrid, KpiGrid, ScatterPlot } from "../components/visuals";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -58,6 +58,15 @@ type CategorySortKey = "category" | "vaults" | "tvl" | "share" | "apy";
 type TokenSortKey = "token" | "vaults" | "tvl" | "share" | "apy";
 type CrowdingSortKey = "vault" | "chain" | "token" | "category" | "tvl" | "apy" | "crowding";
 
+function formatUsdCompact(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 function CompositionPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -69,6 +78,7 @@ function CompositionPageContent() {
   const [tokenSort, setTokenSort] = useState<SortState<TokenSortKey>>({ key: "tvl", direction: "desc" });
   const [crowdedSort, setCrowdedSort] = useState<SortState<CrowdingSortKey>>({ key: "crowding", direction: "desc" });
   const [uncrowdedSort, setUncrowdedSort] = useState<SortState<CrowdingSortKey>>({ key: "crowding", direction: "asc" });
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
 
   const query = useMemo(() => {
     const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
@@ -125,6 +135,14 @@ function CompositionPageContent() {
     query.uncrowdedSort,
     query.uncrowdedDir,
   ]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const onChange = () => setIsCompactViewport(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
@@ -203,6 +221,49 @@ function CompositionPageContent() {
     apy: (row) => row.safe_apy_30d ?? Number.NEGATIVE_INFINITY,
     crowding: (row) => row.crowding_index ?? Number.NEGATIVE_INFINITY,
   });
+  const concentrationHeatItems = useMemo(() => {
+    const topChains = [...(data?.chains ?? [])]
+      .sort((left, right) => (right.share_tvl ?? Number.NEGATIVE_INFINITY) - (left.share_tvl ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 4)
+      .map((row) => ({
+        id: `chain-${row.chain_id}`,
+        label: `${chainLabel(row.chain_id)} (chain)`,
+        value: row.share_tvl,
+        note: `${formatUsd(row.tvl_usd)} TVL`,
+      }));
+    const topCategories = [...(data?.categories ?? [])]
+      .sort((left, right) => (right.share_tvl ?? Number.NEGATIVE_INFINITY) - (left.share_tvl ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 4)
+      .map((row) => ({
+        id: `category-${row.category || "unknown"}`,
+        label: `${row.category || "unknown"} (category)`,
+        value: row.share_tvl,
+        note: `${formatUsd(row.tvl_usd)} TVL`,
+      }));
+    const topTokens = [...(data?.tokens ?? [])]
+      .sort((left, right) => (right.share_tvl ?? Number.NEGATIVE_INFINITY) - (left.share_tvl ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 4)
+      .map((row) => ({
+        id: `token-${row.token_symbol || "unknown"}`,
+        label: `${row.token_symbol || "unknown"} (token)`,
+        value: row.share_tvl,
+        note: `${formatUsd(row.tvl_usd)} TVL`,
+      }));
+    return [...topChains, ...topCategories, ...topTokens];
+  }, [data?.categories, data?.chains, data?.tokens]);
+  const crowdingScatterRows = useMemo(() => {
+    const index = new Map<string, CrowdingRow>();
+    for (const row of [...(data?.crowding.most_crowded ?? []), ...(data?.crowding.least_crowded ?? [])]) {
+      const key = `${row.chain_id}:${row.vault_address}`;
+      const existing = index.get(key);
+      if (!existing || (row.tvl_usd ?? 0) > (existing.tvl_usd ?? 0)) {
+        index.set(key, row);
+      }
+    }
+    return [...index.values()]
+      .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
+      .slice(0, isCompactViewport ? 60 : 100);
+  }, [data?.crowding.least_crowded, data?.crowding.most_crowded, isCompactViewport]);
 
   return (
     <main className="container">
@@ -226,7 +287,7 @@ function CompositionPageContent() {
       <section className="card">
         <h2>Filters</h2>
         <p className="muted card-intro">Composition controls are URL-backed for reproducible views.</p>
-        <div className="inline-controls">
+        <div className="inline-controls controls-tight">
           <label>
             Universe:&nbsp;
             <select
@@ -260,7 +321,7 @@ function CompositionPageContent() {
             />
           </label>
           <label>
-            Top N:&nbsp;
+            Top Groups:&nbsp;
             <select value={query.topN} onChange={(event) => updateQuery({ top_n: Number(event.target.value) })}>
               <option value={10}>10</option>
               <option value={12}>12</option>
@@ -283,18 +344,18 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card composition-visuals-card">
         <h2>Summary</h2>
         <p className="muted card-intro">HHI concentration runs from near 0 (diversified) toward 1 (highly concentrated).</p>
-        <div className="split-grid">
+        <div className="split-grid composition-visual-grid">
           <KpiGrid
             items={[
               { label: "Eligible Vaults", value: String(data?.summary.vaults ?? "n/a") },
               { label: "Total TVL", value: formatUsd(data?.summary.total_tvl_usd) },
               { label: "Average APY 30d", value: formatPct(data?.summary.avg_safe_apy_30d) },
-              { label: "Chain HHI", value: data?.concentration.chain_hhi?.toFixed(3) ?? "n/a" },
-              { label: "Category HHI", value: data?.concentration.category_hhi?.toFixed(3) ?? "n/a" },
-              { label: "Token HHI", value: data?.concentration.token_hhi?.toFixed(3) ?? "n/a" },
+              { label: "Universe Chain HHI", value: data?.concentration.chain_hhi?.toFixed(3) ?? "n/a" },
+              { label: "Universe Category HHI", value: data?.concentration.category_hhi?.toFixed(3) ?? "n/a" },
+              { label: "Universe Token HHI", value: data?.concentration.token_hhi?.toFixed(3) ?? "n/a" },
             ]}
           />
           <BarList
@@ -307,6 +368,47 @@ function CompositionPageContent() {
             }))}
             valueFormatter={(value) => formatPct(value)}
           />
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Crowding Visuals</h2>
+        <p className="muted card-intro">
+          Scatter highlights APY versus size, while the heatmap shows where TVL share is concentrated in this filtered universe.
+        </p>
+        <div className="split-grid composition-crowding-grid">
+          <ScatterPlot
+            title="APY vs TVL Map (Crowding Context)"
+            xLabel="APY over last 30 days (percent)"
+            yLabel="TVL in USD"
+            points={crowdingScatterRows.map((row) => ({
+              id: `${row.chain_id}:${row.vault_address}`,
+              x: row.safe_apy_30d,
+              y: row.tvl_usd,
+              size: row.crowding_index,
+              href: yearnVaultUrl(row.chain_id, row.vault_address),
+              tooltip:
+                `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
+                `APY 30d: ${formatPct(row.safe_apy_30d)}\nTVL: ${formatUsd(row.tvl_usd)}\nCrowding: ${row.crowding_index?.toFixed(2) ?? "n/a"}`,
+              tone:
+                row.crowding_index !== null && row.crowding_index !== undefined
+                  ? row.crowding_index >= 0
+                    ? "negative"
+                    : "positive"
+                  : "neutral",
+            }))}
+            xFormatter={(value) => formatPct(value, 1)}
+            yFormatter={(value) => formatUsdCompact(value)}
+            emptyText="No crowding points for this filter."
+          />
+          <div className="stack">
+            <HeatGrid
+              title="Concentration Heatmap (Top Shares)"
+              items={concentrationHeatItems}
+              valueFormatter={(value) => formatPct(value)}
+              legend="Heat value is TVL share. Higher-intensity cells indicate stronger concentration by chain, category, or token segment."
+            />
+          </div>
         </div>
       </section>
 

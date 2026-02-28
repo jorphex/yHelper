@@ -138,7 +138,7 @@ function ChainsPageContent() {
       <section className="card">
         <h2>Filters</h2>
         <p className="muted card-intro">URL-backed controls keep chain views shareable.</p>
-        <div className="inline-controls">
+        <div className="inline-controls controls-tight">
           <label>
             Universe:&nbsp;
             <select value={query.universe} onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null })}>

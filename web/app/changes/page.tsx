@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatHours, formatPct, formatUsd, regimeLabel } from "../lib/format";
+import { chainLabel, formatHours, formatPct, formatUsd, regimeLabel, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
-import { BarList, KpiGrid } from "../components/visuals";
+import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips } from "../components/visuals";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -49,6 +49,23 @@ type ChangesResponse = {
     stale_threshold_seconds?: number;
   };
   summary: Summary;
+  reference_tvl?: {
+    yearn_aligned_proxy?: {
+      vaults?: number;
+      tvl_usd?: number | null;
+      criteria?: {
+        active?: boolean;
+        exclude_hidden?: boolean;
+        exclude_retired?: boolean;
+        kinds?: string[];
+      };
+      comparison_to_filtered_universe?: {
+        filtered_total_tvl_usd?: number | null;
+        gap_usd?: number | null;
+        ratio?: number | null;
+      };
+    };
+  };
   freshness?: {
     latest_pps_age_seconds?: number | null;
     pps_stale_ratio?: number | null;
@@ -91,6 +108,22 @@ type MoverSortKey = "vault" | "chain" | "token" | "category" | "tvl" | "current"
 type StaleChainSortKey = "chain" | "vaults" | "stale_vaults" | "stale_ratio" | "tvl" | "stale_tvl";
 type StaleCategorySortKey = "category" | "vaults" | "stale_vaults" | "stale_ratio" | "tvl" | "stale_tvl";
 type RegimeSortKey = "regime" | "vaults" | "tvl";
+type TvlView = "both" | "filtered" | "yearn";
+
+type DailyTrendRow = {
+  day: string;
+  weighted_apy_7d?: number | null;
+  weighted_apy_30d?: number | null;
+  weighted_apy_90d?: number | null;
+  weighted_momentum_7d_30d?: number | null;
+  riser_ratio?: number | null;
+  faller_ratio?: number | null;
+  bucket_high_ratio?: number | null;
+};
+
+type DailyTrendResponse = {
+  rows?: DailyTrendRow[];
+};
 
 function staleThresholdLabel(value: StaleThresholdKey): string {
   if (value === "auto") return "Auto (2× selected APY range)";
@@ -239,7 +272,9 @@ function ChangesPageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [data, setData] = useState<ChangesResponse | null>(null);
+  const [trends, setTrends] = useState<DailyTrendRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [trendError, setTrendError] = useState<string | null>(null);
   const [staleChainSort, setStaleChainSort] = useState<SortState<StaleChainSortKey>>({
     key: "stale_ratio",
     direction: "desc",
@@ -249,6 +284,7 @@ function ChangesPageContent() {
     direction: "desc",
   });
   const [regimeSort, setRegimeSort] = useState<SortState<RegimeSortKey>>({ key: "tvl", direction: "desc" });
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
 
   const query = useMemo(() => {
     const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
@@ -262,6 +298,7 @@ function ChangesPageContent() {
         ["auto", "24h", "7d", "30d"] as const,
         "auto",
       ),
+      tvlView: queryChoice<TvlView>(searchParams, "tvl_view", ["both", "filtered", "yearn"] as const, "both"),
       limit: queryInt(searchParams, "limit", 20, { min: 5, max: 80 }),
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
       minPoints: queryInt(searchParams, "min_points", defaults.minPoints, { min: 0, max: 365 }),
@@ -296,6 +333,14 @@ function ChangesPageContent() {
     query.regimeSort,
     query.regimeDir,
   ]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const onChange = () => setIsCompactViewport(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
@@ -332,6 +377,35 @@ function ChangesPageContent() {
     };
   }, [query.window, query.staleThreshold, query.limit, query.universe, query.minTvl, query.minPoints]);
 
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const params = new URLSearchParams({
+          universe: query.universe,
+          min_tvl_usd: String(query.minTvl),
+          min_points: String(query.minPoints),
+          days: "90",
+        });
+        const res = await fetch(`/api/trends/daily?${params.toString()}`, { cache: "no-store" });
+        if (!res.ok) {
+          if (active) setTrendError(`Trends API error: ${res.status}`);
+          return;
+        }
+        const payload = (await res.json()) as DailyTrendResponse;
+        if (!active) return;
+        setTrends(Array.isArray(payload.rows) ? payload.rows : []);
+        setTrendError(null);
+      } catch (err) {
+        if (active) setTrendError(`Trends load failed: ${String(err)}`);
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [query.universe, query.minTvl, query.minPoints]);
+
   const staleByChain = sortRows(data?.freshness?.stale_by_chain ?? [], staleChainSort, {
     chain: (row) => chainLabel(row.chain_id),
     vaults: (row) => row.vaults,
@@ -355,6 +429,166 @@ function ChangesPageContent() {
     vaults: (row) => row.vaults,
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
   });
+  const moverScatterRows = useMemo(() => {
+    const index = new Map<string, ChangeRow>();
+    const allRows = [
+      ...(data?.movers?.risers ?? []),
+      ...(data?.movers?.fallers ?? []),
+      ...(data?.movers?.largest_abs_delta ?? []),
+    ];
+    for (const row of allRows) {
+      const key = `${row.chain_id}:${row.vault_address}`;
+      const existing = index.get(key);
+      if (!existing || (row.tvl_usd ?? 0) > (existing.tvl_usd ?? 0)) {
+        index.set(key, row);
+      }
+    }
+    return [...index.values()]
+      .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
+      .slice(0, isCompactViewport ? 56 : 80);
+  }, [data?.movers, isCompactViewport]);
+  const staleChainHeat = useMemo(
+    () =>
+      [...(data?.freshness?.stale_by_chain ?? [])]
+        .sort((left, right) => (right.stale_ratio ?? Number.NEGATIVE_INFINITY) - (left.stale_ratio ?? Number.NEGATIVE_INFINITY))
+        .slice(0, isCompactViewport ? 8 : 12)
+        .map((row) => ({
+          id: String(row.chain_id),
+          label: chainLabel(row.chain_id),
+          value: row.stale_ratio,
+          note: `${row.stale_vaults}/${row.vaults} stale • ${formatUsd(row.stale_tvl_usd ?? 0)}`,
+        })),
+    [data?.freshness?.stale_by_chain, isCompactViewport],
+  );
+  const staleCategoryHeat = useMemo(
+    () =>
+      [...(data?.freshness?.stale_by_category ?? [])]
+        .sort((left, right) => (right.stale_ratio ?? Number.NEGATIVE_INFINITY) - (left.stale_ratio ?? Number.NEGATIVE_INFINITY))
+        .slice(0, isCompactViewport ? 8 : 12)
+        .map((row) => ({
+          id: row.category || "unknown",
+          label: row.category || "unknown",
+          value: row.stale_ratio,
+          note: `${row.stale_vaults}/${row.vaults} stale • ${formatUsd(row.stale_tvl_usd ?? 0)}`,
+        })),
+    [data?.freshness?.stale_by_category, isCompactViewport],
+  );
+  const deltaBandItems = useMemo(() => {
+    const bands = [
+      { id: "lt5", label: "≤ -5.0 percentage points", min: Number.NEGATIVE_INFINITY, max: -0.05 },
+      { id: "lt1", label: "-5.0 to -1.0 percentage points", min: -0.05, max: -0.01 },
+      { id: "mid", label: "-1.0 to +1.0 percentage points", min: -0.01, max: 0.01 },
+      { id: "gt1", label: "+1.0 to +5.0 percentage points", min: 0.01, max: 0.05 },
+      { id: "gt5", label: "≥ +5.0 percentage points", min: 0.05, max: Number.POSITIVE_INFINITY },
+    ].map((band) => ({ ...band, count: 0, tvl: 0 }));
+    for (const row of moverScatterRows) {
+      if (row.delta_apy === null || row.delta_apy === undefined) continue;
+      const band = bands.find((candidate) => row.delta_apy! >= candidate.min && row.delta_apy! < candidate.max);
+      if (!band) continue;
+      band.count += 1;
+      band.tvl += row.tvl_usd ?? 0;
+    }
+    return bands.map((band) => ({
+      id: band.id,
+      label: band.label,
+      value: band.count,
+      note: `${formatUsd(band.tvl)} TVL`,
+    }));
+  }, [moverScatterRows]);
+  const summaryKpiItems = [
+    { label: "Eligible Vaults", value: String(data?.summary.vaults_eligible ?? "n/a") },
+    { label: "With Change Data", value: String(data?.summary.vaults_with_change ?? "n/a") },
+    { label: "Stale Vaults", value: String(data?.summary.stale_vaults ?? "n/a") },
+    ...(query.tvlView !== "yearn"
+      ? [
+          {
+            label: "Total TVL (Filtered Universe)",
+            value: formatUsd(data?.summary.total_tvl_usd),
+            hint: "Sum of yDaemon vault TVL in current filters",
+          },
+          {
+            label: "Tracked TVL (With Delta)",
+            value: formatUsd(data?.summary.tracked_tvl_usd),
+            hint: "Subset with both current and previous APY windows",
+          },
+        ]
+      : []),
+    ...(query.tvlView !== "filtered"
+      ? [
+          {
+            label: "Yearn-Aligned TVL (Proxy)",
+            value: formatUsd(data?.reference_tvl?.yearn_aligned_proxy?.tvl_usd),
+            hint: "Active + non-hidden + non-retired + multi/single strategy kinds",
+          },
+          {
+            label: "Yearn-Aligned Vaults",
+            value: String(data?.reference_tvl?.yearn_aligned_proxy?.vaults ?? "n/a"),
+          },
+          {
+            label: "Filtered vs Yearn Gap",
+            value: formatUsd(data?.reference_tvl?.yearn_aligned_proxy?.comparison_to_filtered_universe?.gap_usd),
+          },
+          {
+            label: "Filtered / Yearn Ratio",
+            value: formatPct(data?.reference_tvl?.yearn_aligned_proxy?.comparison_to_filtered_universe?.ratio, 2),
+          },
+        ]
+      : []),
+    { label: "Average Delta", value: formatPct(data?.summary.avg_delta) },
+  ];
+  const trendSlice = useMemo(() => trends.slice(Math.max(0, trends.length - 60)), [trends]);
+  const moverDriftTrendItems = useMemo(
+    () => [
+      {
+        id: "riser-ratio",
+        label: "Riser share (APY 7d > APY 30d)",
+        points: trendSlice.map((row) => row.riser_ratio),
+        note: "Share of eligible vaults with improving short-term APY",
+      },
+      {
+        id: "faller-ratio",
+        label: "Faller share (APY 7d < APY 30d)",
+        points: trendSlice.map((row) => row.faller_ratio),
+        note: "Share of eligible vaults with weakening short-term APY",
+      },
+      {
+        id: "momentum",
+        label: "Weighted momentum (7d minus 30d APY)",
+        points: trendSlice.map((row) => row.weighted_momentum_7d_30d),
+        note: "TVL-weighted momentum baseline used by the Changes page",
+      },
+      {
+        id: "high-apy-share",
+        label: "High APY share (15%+)",
+        points: trendSlice.map((row) => row.bucket_high_ratio),
+        note: "Share of vaults in the highest APY bucket",
+      },
+    ],
+    [trendSlice],
+  );
+  const weightedApyTrendItems = useMemo(
+    () => [
+      {
+        id: "apy7",
+        label: "Weighted APY 7d",
+        points: trendSlice.map((row) => row.weighted_apy_7d),
+        note: "Latest-week annualized yield trend",
+      },
+      {
+        id: "apy30",
+        label: "Weighted APY 30d",
+        points: trendSlice.map((row) => row.weighted_apy_30d),
+        note: "Primary comparison baseline for delta changes",
+      },
+      {
+        id: "apy90",
+        label: "Weighted APY 90d",
+        points: trendSlice.map((row) => row.weighted_apy_90d),
+        note: "Longer-run annualized yield trend",
+      },
+    ],
+    [trendSlice],
+  );
 
   return (
     <main className="container">
@@ -377,6 +611,7 @@ function ChangesPageContent() {
       </section>
 
       {error ? <section className="card">{error}</section> : null}
+      {trendError ? <section className="card">{trendError}</section> : null}
 
       <section className="card">
         <h2>Window Summary</h2>
@@ -418,6 +653,14 @@ function ChangesPageContent() {
             </select>
           </label>
           <label>
+            TVL View:&nbsp;
+            <select value={query.tvlView} onChange={(event) => updateQuery({ tvl_view: event.target.value as TvlView })}>
+              <option value="both">Both (Filtered + Yearn Proxy)</option>
+              <option value="filtered">Filtered Universe Only</option>
+              <option value="yearn">Yearn-Aligned Proxy Only</option>
+            </select>
+          </label>
+          <label>
             Movers Limit:&nbsp;
             <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
               <option value={10}>10</option>
@@ -446,16 +689,10 @@ function ChangesPageContent() {
             />
           </label>
         </div>
-        <KpiGrid
-          items={[
-            { label: "Eligible Vaults", value: String(data?.summary.vaults_eligible ?? "n/a") },
-            { label: "With Change Data", value: String(data?.summary.vaults_with_change ?? "n/a") },
-            { label: "Stale Vaults", value: String(data?.summary.stale_vaults ?? "n/a") },
-            { label: "Total TVL", value: formatUsd(data?.summary.total_tvl_usd) },
-            { label: "Tracked TVL", value: formatUsd(data?.summary.tracked_tvl_usd) },
-            { label: "Average Delta", value: formatPct(data?.summary.avg_delta) },
-          ]}
-        />
+        <KpiGrid items={summaryKpiItems} />
+        <p className="muted">
+          TVL View controls the scope shown above: dashboard-filtered totals from yDaemon, Yearn-aligned proxy scope, or both.
+        </p>
       </section>
 
       <section className="card" id="freshness-panels">
@@ -487,6 +724,65 @@ function ChangesPageContent() {
             { label: "yDaemon Job Status", value: runningLabel(data?.freshness?.ingestion_jobs?.ydaemon_snapshot?.running) },
           ]}
         />
+      </section>
+
+      <section className="card changes-visuals-card">
+        <h2>Delta Visuals and Freshness Heatmaps</h2>
+        <p className="muted card-intro">
+          Delta bands use percentage points (for example, +2.0 means APY rose by two points versus the previous window).
+        </p>
+        <div className="changes-trend-grid">
+          <TrendStrips
+            title="Riser/Faller Drift (Last 60 Days)"
+            items={moverDriftTrendItems}
+            valueFormatter={(value) => formatPct(value, 1)}
+            deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 1)}`}
+            emptyText="Riser/faller drift unavailable for this filter."
+          />
+          <TrendStrips
+            title="Weighted APY Trend (7d / 30d / 90d)"
+            items={weightedApyTrendItems}
+            valueFormatter={(value) => formatPct(value, 2)}
+            deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+            emptyText="Weighted APY trend unavailable for this filter."
+          />
+        </div>
+        <p className="muted">
+          Each strip is daily. Right-most value is latest, and the signed delta is day-over-day change for that metric.
+        </p>
+        <div className="changes-delta-layout">
+          <div className="changes-delta-left">
+            <ScatterPlot
+              title="Delta vs Current APY (Top Movers)"
+              xLabel="Delta (percentage points)"
+              yLabel="Current APY (percent)"
+              points={moverScatterRows.map((row) => ({
+                id: `${row.chain_id}:${row.vault_address}`,
+                x: row.delta_apy,
+                y: row.safe_apy_window,
+                size: row.tvl_usd,
+                href: yearnVaultUrl(row.chain_id, row.vault_address),
+                tooltip:
+                  `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
+                  `Current APY: ${formatPct(row.safe_apy_window)}\nPrevious APY: ${formatPct(row.safe_apy_prev_window)}\n` +
+                  `Delta: ${formatPct(row.delta_apy)}\nTVL: ${formatUsd(row.tvl_usd)}`,
+                tone: row.delta_apy !== null && row.delta_apy !== undefined ? (row.delta_apy >= 0 ? "positive" : "negative") : "neutral",
+              }))}
+              xFormatter={(value) => formatPct(value, 1)}
+              yFormatter={(value) => formatPct(value, 1)}
+              emptyText="No mover rows yet for this filter."
+            />
+            <HeatGrid title="Stale Ratio Heatmap by Chain" items={staleChainHeat} valueFormatter={(value) => formatPct(value)} />
+          </div>
+          <div className="stack changes-delta-side">
+            <BarList
+              title="Delta Distribution (Top Movers)"
+              items={deltaBandItems}
+              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+            />
+            <HeatGrid title="Stale Ratio Heatmap by Category" items={staleCategoryHeat} valueFormatter={(value) => formatPct(value)} />
+          </div>
+        </div>
       </section>
 
       <section className="card">

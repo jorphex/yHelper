@@ -14,6 +14,15 @@ type OverviewResponse = {
     total_vaults?: number | null;
     pps_points?: number | null;
     metrics_count?: number | null;
+    last_runs?: Record<
+      string,
+      {
+        status?: string;
+        started_at?: string | null;
+        ended_at?: string | null;
+        records?: number | null;
+      } | null
+    >;
   };
   freshness?: {
     latest_pps_age_seconds?: number | null;
@@ -25,6 +34,7 @@ type OverviewResponse = {
       string,
       {
         running?: boolean;
+        last_success_at?: string | null;
         last_success_age_seconds?: number | null;
       }
     >;
@@ -57,11 +67,19 @@ type OverviewResponse = {
     protocol_name?: string;
     tvl_usd?: number | null;
     mcap_usd?: number | null;
+    mcap_source?: string | null;
+    gecko_id?: string | null;
     mcap_tvl_ratio?: number | null;
     tvl_change_7d_pct?: number | null;
     tvl_change_30d_pct?: number | null;
     eligible_vs_protocol_tvl_ratio?: number | null;
     eligible_vs_protocol_tvl_gap_usd?: number | null;
+    yearn_aligned_proxy?: {
+      vaults?: number;
+      tvl_usd?: number | null;
+    } | null;
+    defillama_vs_yearn_proxy_gap_usd?: number | null;
+    defillama_vs_yearn_proxy_ratio?: number | null;
     top_chains?: Array<{ chain: string; tvl_usd: number }>;
     error?: string;
   } | null;
@@ -96,6 +114,13 @@ function formatIntervalSeconds(value: number | null | undefined): string {
   if (value % 3600 === 0) return `${value / 3600}h`;
   if (value % 60 === 0) return `${value / 60}m`;
   return `${value}s`;
+}
+
+function addSecondsIso(iso: string | null | undefined, seconds: number | null | undefined): string | null {
+  if (!iso || seconds === null || seconds === undefined) return null;
+  const baseMs = Date.parse(iso);
+  if (!Number.isFinite(baseMs)) return null;
+  return new Date(baseMs + seconds * 1000).toISOString();
 }
 
 export default function HomePage() {
@@ -153,6 +178,11 @@ export default function HomePage() {
     return () => window.clearInterval(timer);
   }, [data?.server_time_utc]);
 
+  const ydaemonLastRunStart = data?.ingestion?.last_runs?.ydaemon_snapshot?.started_at ?? null;
+  const ydaemonLastRunEnd = data?.ingestion?.last_runs?.ydaemon_snapshot?.ended_at ?? null;
+  const ydaemonLastSuccessAt = data?.freshness?.ingestion_jobs?.ydaemon_snapshot?.last_success_at ?? null;
+  const nextExpectedTick = addSecondsIso(ydaemonLastRunStart, data?.data_policy?.worker_interval_sec);
+
   return (
     <main className="container">
       <section className="hero">
@@ -160,7 +190,7 @@ export default function HomePage() {
         <p>Public Yearn dashboard. No wallet needed. Built for quick checks by newcomers and deeper diagnostics by power users.</p>
       </section>
 
-      <section className="card">
+      <section className="card overview-lifecycle-card">
         <h2>System Snapshot</h2>
         <p className="muted card-intro">Live ingestion state. If these values stall, treat all dashboard signals as stale.</p>
         {data ? (
@@ -170,11 +200,23 @@ export default function HomePage() {
                 { label: "Project", value: data.project },
                 { label: "Status", value: data.status },
                 { label: "Server Time (UTC, Live)", value: serverTimeLive },
+                { label: "Latest Cycle Start (UTC)", value: formatUtcDateTime(ydaemonLastRunStart) },
+                { label: "Latest Cycle End (UTC)", value: formatUtcDateTime(ydaemonLastRunEnd) },
+                { label: "Last Successful Cycle (UTC)", value: formatUtcDateTime(ydaemonLastSuccessAt) },
+                { label: "Next Expected Tick (UTC)", value: formatUtcDateTime(nextExpectedTick) },
+                {
+                  label: "Last Successful Run Age",
+                  value: formatHours(data.freshness?.ingestion_jobs?.ydaemon_snapshot?.last_success_age_seconds),
+                },
                 { label: "Active Vaults", value: String(data.ingestion?.active_vaults ?? "n/a") },
                 { label: "PPS Data Points", value: String(data.ingestion?.pps_points ?? "n/a") },
                 { label: "Metric Rows", value: String(data.ingestion?.metrics_count ?? "n/a") },
               ]}
             />
+            <p className="muted">
+              Latest Cycle Start/End are from the most recent yDaemon ingestion run record. Last Successful Cycle is the most recent
+              run that completed with status <strong>success</strong>.
+            </p>
             <p className="muted">{data.message}</p>
           </>
         ) : loading ? (
@@ -210,7 +252,7 @@ export default function HomePage() {
           Lifecycle flags help users avoid stale vault choices and find migration paths faster.
         </p>
         {data?.lifecycle ? (
-          <div className="split-grid">
+          <div className="split-grid overview-lifecycle-layout">
             <KpiGrid
               items={[
                 { label: "Active Vaults", value: String(data.lifecycle.active_vaults ?? "n/a") },
@@ -237,33 +279,35 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card overview-freshness-card">
         <h2>Data Freshness</h2>
         <p className="muted card-intro">
           PPS means Price Per Share (vault share value over time). Most yield estimates here come from PPS history.
         </p>
         {data?.freshness ? (
-          <KpiGrid
-            items={[
-              { label: "Latest PPS Age", value: formatHours(data.freshness.latest_pps_age_seconds) },
-              { label: "Newest Metrics Age", value: formatHours(data.freshness.metrics_newest_age_seconds) },
-              { label: "PPS Stale Ratio", value: formatPct(data.freshness.pps_stale_ratio, 1) },
-              { label: "PPS Vaults Tracked", value: String(data.freshness.pps_vaults_total ?? "n/a") },
-              { label: "PPS Vaults Stale", value: String(data.freshness.pps_vaults_stale ?? "n/a") },
-              {
-                label: "Kong Last Success",
-                value: formatHours(data.freshness.ingestion_jobs?.kong_pps_metrics?.last_success_age_seconds),
-              },
-              {
-                label: "yDaemon Last Success",
-                value: formatHours(data.freshness.ingestion_jobs?.ydaemon_snapshot?.last_success_age_seconds),
-              },
-              {
-                label: "Alerts Firing",
-                value: String(Object.values(data.freshness.alerts ?? {}).filter((alert) => alert.is_firing).length),
-              },
-            ]}
-          />
+          <div className="overview-freshness-kpis">
+            <KpiGrid
+              items={[
+                { label: "Latest PPS Age", value: formatHours(data.freshness.latest_pps_age_seconds) },
+                { label: "Newest Metrics Age", value: formatHours(data.freshness.metrics_newest_age_seconds) },
+                { label: "PPS Stale Ratio", value: formatPct(data.freshness.pps_stale_ratio, 1) },
+                { label: "PPS Vaults Tracked", value: String(data.freshness.pps_vaults_total ?? "n/a") },
+                { label: "PPS Vaults Stale", value: String(data.freshness.pps_vaults_stale ?? "n/a") },
+                {
+                  label: "Kong Last Success",
+                  value: formatHours(data.freshness.ingestion_jobs?.kong_pps_metrics?.last_success_age_seconds),
+                },
+                {
+                  label: "yDaemon Last Success",
+                  value: formatHours(data.freshness.ingestion_jobs?.ydaemon_snapshot?.last_success_age_seconds),
+                },
+                {
+                  label: "Alerts Firing",
+                  value: String(Object.values(data.freshness.alerts ?? {}).filter((alert) => alert.is_firing).length),
+                },
+              ]}
+            />
+          </div>
         ) : (
           <p>Freshness metrics unavailable.</p>
         )}
@@ -281,8 +325,8 @@ export default function HomePage() {
       <section className="card">
         <h2>Protocol Context (DefiLlama)</h2>
         <p className="muted card-intro">
-          External context for Yearn total value locked (TVL) versus what this dashboard tracks. DefiLlama and yHelper use
-          different vault scopes, so tracked share can be above 100%.
+          External context for Yearn TVL and market cap. DefiLlama scope can differ from Yearn-aligned yDaemon scope, so values may
+          not match exactly.
         </p>
         {data?.protocol_context ? (
           <div className="stats-grid">
@@ -290,19 +334,31 @@ export default function HomePage() {
               <strong>Source Status:</strong> {data.protocol_context.status ?? "n/a"}
             </div>
             <div>
-              <strong>Protocol TVL:</strong> {formatUsd(data.protocol_context.tvl_usd)}
+              <strong>DefiLlama TVL:</strong> {formatUsd(data.protocol_context.tvl_usd)}
+            </div>
+            <div>
+              <strong>Yearn-Aligned Proxy TVL:</strong> {formatUsd(data.protocol_context.yearn_aligned_proxy?.tvl_usd)}
             </div>
             <div>
               <strong>Tracked TVL Share:</strong> {formatPct(data.protocol_context.eligible_vs_protocol_tvl_ratio)}
             </div>
             <div>
-              <strong>Protocol minus Tracked TVL:</strong> {formatUsd(data.protocol_context.eligible_vs_protocol_tvl_gap_usd)}
+              <strong>DefiLlama minus Tracked TVL:</strong> {formatUsd(data.protocol_context.eligible_vs_protocol_tvl_gap_usd)}
+            </div>
+            <div>
+              <strong>DefiLlama minus Yearn Proxy:</strong> {formatUsd(data.protocol_context.defillama_vs_yearn_proxy_gap_usd)}
+            </div>
+            <div>
+              <strong>DefiLlama / Yearn Proxy:</strong> {formatPct(data.protocol_context.defillama_vs_yearn_proxy_ratio)}
             </div>
             <div>
               <strong>Protocol MCap:</strong> {formatUsd(data.protocol_context.mcap_usd)}
             </div>
             <div>
               <strong>MCap / TVL:</strong> {formatPct(data.protocol_context.mcap_tvl_ratio)}
+            </div>
+            <div>
+              <strong>MCap Source:</strong> {data.protocol_context.mcap_source ?? "n/a"}
             </div>
             <div>
               <strong>Protocol TVL Change 7d:</strong> {formatPct(data.protocol_context.tvl_change_7d_pct)}
@@ -315,8 +371,11 @@ export default function HomePage() {
           <p>Protocol context unavailable.</p>
         )}
         <p className="muted">
-          If “Protocol minus Tracked TVL” is negative, this dashboard’s filtered vault set is larger than the DefiLlama Yearn
-          scope used for that snapshot.
+          DefiLlama currently reports protocol TVL from its own adapter scope. The Yearn-aligned proxy is derived from yDaemon
+          active, non-hidden, non-retired multi/single strategy vaults.
+        </p>
+        <p className="muted">
+          If market cap remains n/a, upstream sources did not provide it for this cycle.
         </p>
         {(data?.protocol_context?.top_chains ?? []).length > 0 ? (
           <BarList

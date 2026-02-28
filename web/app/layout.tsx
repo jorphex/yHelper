@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
 import Link from "next/link";
 import { AudienceToggle } from "./components/audience-toggle";
+import { ChunkRecovery } from "./components/chunk-recovery";
 import { FreshnessBadge } from "./components/freshness-badge";
 
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <ChunkRecovery />
         <header className="site-header">
           <nav className="site-nav">
             <div className="site-nav-links">

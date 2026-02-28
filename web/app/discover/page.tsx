@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
+import { chainLabel, formatPct, formatUsd, regimeLabel, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryBool, queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
-import { BarList, KpiGrid } from "../components/visuals";
+import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips } from "../components/visuals";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -60,6 +60,128 @@ type DiscoverResponse = {
 type DiscoverSortKey = "vault" | "chain" | "token" | "category" | "tvl" | "apy" | "momentum" | "consistency" | "risk" | "regime";
 type DiscoverApiSort = "quality" | "tvl" | "apy_7d" | "apy_30d" | "momentum" | "consistency";
 
+type DailyTrendRow = {
+  day: string;
+  weighted_apy_7d?: number | null;
+  weighted_apy_30d?: number | null;
+  weighted_apy_90d?: number | null;
+  weighted_momentum_7d_30d?: number | null;
+  bucket_neg_ratio?: number | null;
+  bucket_low_ratio?: number | null;
+  bucket_mid_ratio?: number | null;
+  bucket_high_ratio?: number | null;
+  riser_ratio?: number | null;
+  faller_ratio?: number | null;
+};
+
+type DailyTrendResponse = {
+  rows?: DailyTrendRow[];
+};
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function asFiniteInt(value: unknown): number | null {
+  const parsed = asFiniteNumber(value);
+  if (parsed === null) return null;
+  return Math.trunc(parsed);
+}
+
+function formatFixed(value: unknown, digits = 2): string {
+  const parsed = asFiniteNumber(value);
+  if (parsed === null) return "n/a";
+  return parsed.toFixed(digits);
+}
+
+function normalizeSummary(raw: unknown): DiscoverResponse["summary"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const entry = raw as Record<string, unknown>;
+  return {
+    vaults: asFiniteInt(entry.vaults) ?? undefined,
+    chains: asFiniteInt(entry.chains) ?? undefined,
+    tokens: asFiniteInt(entry.tokens) ?? undefined,
+    categories: asFiniteInt(entry.categories) ?? undefined,
+    total_tvl_usd: asFiniteNumber(entry.total_tvl_usd),
+    avg_safe_apy_30d: asFiniteNumber(entry.avg_safe_apy_30d),
+    median_safe_apy_30d: asFiniteNumber(entry.median_safe_apy_30d),
+    tvl_weighted_safe_apy_30d: asFiniteNumber(entry.tvl_weighted_safe_apy_30d),
+    avg_momentum_7d_30d: asFiniteNumber(entry.avg_momentum_7d_30d),
+    median_momentum_7d_30d: asFiniteNumber(entry.median_momentum_7d_30d),
+    avg_consistency_score: asFiniteNumber(entry.avg_consistency_score),
+    avg_feature_score: asFiniteNumber(entry.avg_feature_score),
+    retired_vaults: asFiniteInt(entry.retired_vaults) ?? undefined,
+    highlighted_vaults: asFiniteInt(entry.highlighted_vaults) ?? undefined,
+    migration_ready_vaults: asFiniteInt(entry.migration_ready_vaults) ?? undefined,
+    avg_strategies_per_vault: asFiniteNumber(entry.avg_strategies_per_vault),
+    apy_negative_vaults: asFiniteInt(entry.apy_negative_vaults) ?? undefined,
+    apy_low_vaults: asFiniteInt(entry.apy_low_vaults) ?? undefined,
+    apy_mid_vaults: asFiniteInt(entry.apy_mid_vaults) ?? undefined,
+    apy_high_vaults: asFiniteInt(entry.apy_high_vaults) ?? undefined,
+  };
+}
+
+function normalizeDiscoverRow(raw: unknown): DiscoverRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const candidate = raw as Partial<DiscoverRow>;
+  if (typeof candidate.vault_address !== "string" || candidate.vault_address.length === 0) return null;
+  if (typeof candidate.chain_id !== "number" || !Number.isFinite(candidate.chain_id)) return null;
+  return {
+    vault_address: candidate.vault_address,
+    chain_id: candidate.chain_id,
+    symbol: typeof candidate.symbol === "string" ? candidate.symbol : null,
+    token_symbol: typeof candidate.token_symbol === "string" ? candidate.token_symbol : null,
+    category: typeof candidate.category === "string" ? candidate.category : null,
+    tvl_usd: typeof candidate.tvl_usd === "number" && Number.isFinite(candidate.tvl_usd) ? candidate.tvl_usd : null,
+    safe_apy_30d:
+      typeof candidate.safe_apy_30d === "number" && Number.isFinite(candidate.safe_apy_30d) ? candidate.safe_apy_30d : null,
+    momentum_7d_30d:
+      typeof candidate.momentum_7d_30d === "number" && Number.isFinite(candidate.momentum_7d_30d)
+        ? candidate.momentum_7d_30d
+        : null,
+    consistency_score:
+      typeof candidate.consistency_score === "number" && Number.isFinite(candidate.consistency_score)
+        ? candidate.consistency_score
+        : null,
+    risk_level: typeof candidate.risk_level === "string" ? candidate.risk_level : null,
+    is_retired: Boolean(candidate.is_retired),
+    is_highlighted: Boolean(candidate.is_highlighted),
+    migration_available: Boolean(candidate.migration_available),
+    strategies_count:
+      typeof candidate.strategies_count === "number" && Number.isFinite(candidate.strategies_count)
+        ? candidate.strategies_count
+        : 0,
+    regime: typeof candidate.regime === "string" && candidate.regime.length > 0 ? candidate.regime : "unknown",
+  };
+}
+
+function normalizeRegimeMix(raw: unknown): Array<{ regime: string; vaults: number; tvl_usd: number | null }> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
+    .map((entry) => ({
+      regime: typeof entry.regime === "string" && entry.regime.length > 0 ? entry.regime : "unknown",
+      vaults: typeof entry.vaults === "number" && Number.isFinite(entry.vaults) ? entry.vaults : 0,
+      tvl_usd: typeof entry.tvl_usd === "number" && Number.isFinite(entry.tvl_usd) ? entry.tvl_usd : null,
+    }));
+}
+
+function normalizeRiskMix(raw: unknown): Array<{ risk_level: string; vaults: number; tvl_usd: number | null }> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
+    .map((entry) => ({
+      risk_level: typeof entry.risk_level === "string" && entry.risk_level.length > 0 ? entry.risk_level : "unknown",
+      vaults: typeof entry.vaults === "number" && Number.isFinite(entry.vaults) ? entry.vaults : 0,
+      tvl_usd: typeof entry.tvl_usd === "number" && Number.isFinite(entry.tvl_usd) ? entry.tvl_usd : null,
+    }));
+}
+
 function riskLevelLabel(value: string | null | undefined): string {
   if (!value || value === "unknown") return "Unknown";
   if (value === "-1") return "Unrated";
@@ -76,8 +198,11 @@ function DiscoverPageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [data, setData] = useState<DiscoverResponse | null>(null);
+  const [trends, setTrends] = useState<DailyTrendRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [trendError, setTrendError] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState<DiscoverSortKey>>({ key: "tvl", direction: "desc" });
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
 
   const query = useMemo(() => {
     const serverSort = queryChoice<DiscoverApiSort>(
@@ -120,6 +245,14 @@ function DiscoverPageContent() {
   }, [query.uiSort, query.uiDir]);
 
   useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const onChange = () => setIsCompactViewport(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     const run = async () => {
       try {
@@ -142,7 +275,33 @@ function DiscoverPageContent() {
           if (active) setError(`API error: ${res.status}`);
           return;
         }
-        const payload = (await res.json()) as DiscoverResponse;
+        const raw = (await res.json()) as Partial<DiscoverResponse>;
+        const normalizedRows = Array.isArray(raw.rows) ? raw.rows.map(normalizeDiscoverRow).filter((row): row is DiscoverRow => row !== null) : [];
+        const paginationRaw = raw.pagination;
+        const safePagination =
+          paginationRaw && typeof paginationRaw === "object"
+            ? {
+                total:
+                  typeof paginationRaw.total === "number" && Number.isFinite(paginationRaw.total)
+                    ? paginationRaw.total
+                    : normalizedRows.length,
+                limit:
+                  typeof paginationRaw.limit === "number" && Number.isFinite(paginationRaw.limit)
+                    ? paginationRaw.limit
+                    : query.limit,
+                offset:
+                  typeof paginationRaw.offset === "number" && Number.isFinite(paginationRaw.offset)
+                    ? paginationRaw.offset
+                    : 0,
+              }
+            : { total: normalizedRows.length, limit: query.limit, offset: 0 };
+        const payload: DiscoverResponse = {
+          pagination: safePagination,
+          rows: normalizedRows,
+          summary: normalizeSummary(raw.summary),
+          regime_mix: normalizeRegimeMix(raw.regime_mix),
+          risk_mix: normalizeRiskMix(raw.risk_mix),
+        };
         if (active) {
           setData(payload);
           setError(null);
@@ -156,6 +315,36 @@ function DiscoverPageContent() {
       active = false;
     };
   }, [query]);
+
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      try {
+        const params = new URLSearchParams({
+          universe: query.universe,
+          min_tvl_usd: String(query.minTvl),
+          min_points: String(query.minPoints),
+          days: "90",
+        });
+        if (query.chain) params.set("chain_id", String(query.chain));
+        const res = await fetch(`/api/trends/daily?${params.toString()}`, { cache: "no-store" });
+        if (!res.ok) {
+          if (active) setTrendError(`Trends API error: ${res.status}`);
+          return;
+        }
+        const payload = (await res.json()) as DailyTrendResponse;
+        if (!active) return;
+        setTrends(Array.isArray(payload.rows) ? payload.rows : []);
+        setTrendError(null);
+      } catch (err) {
+        if (active) setTrendError(`Trends load failed: ${String(err)}`);
+      }
+    };
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [query.universe, query.minTvl, query.minPoints, query.chain]);
 
   const rows = sortRows(data?.rows ?? [], sort, {
     vault: (row) => row.symbol ?? row.vault_address,
@@ -173,19 +362,178 @@ function DiscoverPageContent() {
     },
     regime: (row) => row.regime,
   });
+  const dataRows = useMemo(() => data?.rows ?? [], [data?.rows]);
 
   const availableChains = useMemo(
-    () => Array.from(new Set((data?.rows ?? []).map((row) => row.chain_id))).sort((a, b) => a - b),
-    [data?.rows],
+    () => Array.from(new Set(dataRows.map((row) => row.chain_id))).sort((a, b) => a - b),
+    [dataRows],
   );
   const availableCategories = useMemo(
-    () => Array.from(new Set((data?.rows ?? []).map((row) => row.category).filter((value): value is string => Boolean(value)))).sort(),
-    [data?.rows],
+    () => Array.from(new Set(dataRows.map((row) => row.category).filter((value): value is string => Boolean(value)))).sort(),
+    [dataRows],
   );
   const availableTokens = useMemo(
+    () => Array.from(new Set(dataRows.map((row) => row.token_symbol).filter((value): value is string => Boolean(value)))).sort(),
+    [dataRows],
+  );
+  const scatterRows = useMemo(
     () =>
-      Array.from(new Set((data?.rows ?? []).map((row) => row.token_symbol).filter((value): value is string => Boolean(value)))).sort(),
-    [data?.rows],
+      [...dataRows]
+        .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
+        .slice(0, isCompactViewport ? 70 : 120),
+    [dataRows, isCompactViewport],
+  );
+  const chainMomentumHeat = useMemo(() => {
+    const byChain = new Map<number, { tvl: number; weightedMomentum: number; weightedApy: number; vaults: number }>();
+    for (const row of dataRows) {
+      const tvl = row.tvl_usd ?? 0;
+      const momentum = row.momentum_7d_30d ?? 0;
+      const apy = row.safe_apy_30d ?? 0;
+      const existing = byChain.get(row.chain_id) ?? { tvl: 0, weightedMomentum: 0, weightedApy: 0, vaults: 0 };
+      existing.vaults += 1;
+      existing.tvl += tvl;
+      if (Number.isFinite(momentum)) {
+        existing.weightedMomentum += momentum * tvl;
+      }
+      if (Number.isFinite(apy)) {
+        existing.weightedApy += apy * tvl;
+      }
+      byChain.set(row.chain_id, existing);
+    }
+    return [...byChain.entries()]
+      .map(([chainId, entry]) => {
+        const weight = entry.tvl > 0 ? entry.tvl : 1;
+        return {
+          id: String(chainId),
+          label: chainLabel(chainId),
+          value: entry.weightedMomentum / weight,
+          note: `${formatUsd(entry.tvl)} TVL • APY ${formatPct(entry.weightedApy / weight)}`,
+        };
+      })
+      .sort((left, right) => {
+        const leftValue = left.value ?? Number.NEGATIVE_INFINITY;
+        const rightValue = right.value ?? Number.NEGATIVE_INFINITY;
+        return rightValue - leftValue;
+      })
+      .slice(0, isCompactViewport ? 8 : 12);
+  }, [dataRows, isCompactViewport]);
+  const tokenSpreadHeat = useMemo(() => {
+    const byToken = new Map<string, { tvl: number; apys: number[]; venues: number }>();
+    for (const row of dataRows) {
+      if (!row.token_symbol) continue;
+      const existing = byToken.get(row.token_symbol) ?? { tvl: 0, apys: [], venues: 0 };
+      existing.venues += 1;
+      existing.tvl += row.tvl_usd ?? 0;
+      if (row.safe_apy_30d !== null && row.safe_apy_30d !== undefined && Number.isFinite(row.safe_apy_30d)) {
+        existing.apys.push(row.safe_apy_30d);
+      }
+      byToken.set(row.token_symbol, existing);
+    }
+    return [...byToken.entries()]
+      .map(([token, entry]) => {
+        if (entry.apys.length < 2) return null;
+        const min = Math.min(...entry.apys);
+        const max = Math.max(...entry.apys);
+        return {
+          id: token,
+          label: token,
+          value: max - min,
+          note: `${entry.venues} venues • ${formatUsd(entry.tvl)} TVL`,
+          tvl: entry.tvl,
+        };
+      })
+      .filter((item): item is { id: string; label: string; value: number; note: string; tvl: number } => item !== null)
+      .sort((left, right) => right.tvl - left.tvl)
+      .slice(0, isCompactViewport ? 8 : 12)
+      .map(({ id, label, value, note }) => ({ id, label, value, note }));
+  }, [dataRows, isCompactViewport]);
+  const momentumQuadrantHeat = useMemo(() => {
+    const apyValues = dataRows
+      .map((row) => row.safe_apy_30d)
+      .filter((value): value is number => value !== null && value !== undefined && Number.isFinite(value))
+      .sort((a, b) => a - b);
+    const medianApy = apyValues.length > 0 ? apyValues[Math.floor(apyValues.length / 2)] : 0;
+    const bins = new Map<
+      string,
+      { label: string; count: number; tvl: number; note: string; order: number }
+    >([
+      ["hi_up", { label: "High APY + Positive Momentum", count: 0, tvl: 0, note: "Yield high and still improving", order: 0 }],
+      ["lo_up", { label: "Low APY + Positive Momentum", count: 0, tvl: 0, note: "Yield still low but improving", order: 1 }],
+      ["hi_down", { label: "High APY + Negative Momentum", count: 0, tvl: 0, note: "Yield high but cooling", order: 2 }],
+      ["lo_down", { label: "Low APY + Negative Momentum", count: 0, tvl: 0, note: "Yield low and weakening", order: 3 }],
+    ]);
+    for (const row of dataRows) {
+      if (row.safe_apy_30d === null || row.safe_apy_30d === undefined) continue;
+      if (row.momentum_7d_30d === null || row.momentum_7d_30d === undefined) continue;
+      const hi = row.safe_apy_30d >= medianApy;
+      const up = row.momentum_7d_30d >= 0;
+      const key = hi ? (up ? "hi_up" : "hi_down") : up ? "lo_up" : "lo_down";
+      const item = bins.get(key);
+      if (!item) continue;
+      item.count += 1;
+      item.tvl += row.tvl_usd ?? 0;
+    }
+    return [...bins.entries()]
+      .sort((left, right) => left[1].order - right[1].order)
+      .map(([id, item]) => ({
+        id,
+        label: item.label,
+        value: item.count,
+        note: `${item.note} • ${formatUsd(item.tvl)} TVL`,
+      }));
+  }, [dataRows]);
+  const trendSlice = useMemo(() => trends.slice(Math.max(0, trends.length - 60)), [trends]);
+  const apyBucketTrendItems = useMemo(
+    () => [
+      {
+        id: "neg",
+        label: "Negative APY share",
+        points: trendSlice.map((row) => row.bucket_neg_ratio),
+        note: "Share of eligible vaults with APY below 0%",
+      },
+      {
+        id: "low",
+        label: "Low APY share (0-5%)",
+        points: trendSlice.map((row) => row.bucket_low_ratio),
+        note: "Share of vaults in the 0% to <5% APY bucket",
+      },
+      {
+        id: "mid",
+        label: "Mid APY share (5-15%)",
+        points: trendSlice.map((row) => row.bucket_mid_ratio),
+        note: "Share of vaults in the 5% to <15% APY bucket",
+      },
+      {
+        id: "high",
+        label: "High APY share (15%+)",
+        points: trendSlice.map((row) => row.bucket_high_ratio),
+        note: "Share of vaults at 15% APY or above",
+      },
+    ],
+    [trendSlice],
+  );
+  const weightedApyTrendItems = useMemo(
+    () => [
+      {
+        id: "apy7",
+        label: "Weighted APY 7d",
+        points: trendSlice.map((row) => row.weighted_apy_7d),
+        note: "TVL-weighted protocol APY using the latest 7-day window",
+      },
+      {
+        id: "apy30",
+        label: "Weighted APY 30d",
+        points: trendSlice.map((row) => row.weighted_apy_30d),
+        note: "TVL-weighted APY baseline used for bucket labels",
+      },
+      {
+        id: "apy90",
+        label: "Weighted APY 90d",
+        points: trendSlice.map((row) => row.weighted_apy_90d),
+        note: "Longer-run APY context for trend direction",
+      },
+    ],
+    [trendSlice],
   );
 
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
@@ -220,11 +568,12 @@ function DiscoverPageContent() {
       </section>
 
       {error ? <section className="card">{error}</section> : null}
+      {trendError ? <section className="card">{trendError}</section> : null}
 
       <section className="card">
         <h2>Filters</h2>
         <p className="muted card-intro">All controls are encoded in the URL, so this exact view is shareable.</p>
-        <div className="inline-controls">
+        <div className="inline-controls controls-tight">
           <label>
             Chain:&nbsp;
             <select
@@ -277,7 +626,7 @@ function DiscoverPageContent() {
               ))}
             </select>
           </label>
-          <label>
+          <label className="field-compact">
             Min TVL (USD):&nbsp;
             <input
               type="number"
@@ -286,7 +635,7 @@ function DiscoverPageContent() {
               onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
             />
           </label>
-          <label>
+          <label className="field-compact">
             Min Points:&nbsp;
             <input
               type="number"
@@ -330,7 +679,7 @@ function DiscoverPageContent() {
             </select>
           </label>
           <label>
-            API Sort:&nbsp;
+            Sort:&nbsp;
             <select value={query.serverSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
               <option value="quality">Quality</option>
               <option value="tvl">TVL</option>
@@ -340,7 +689,7 @@ function DiscoverPageContent() {
             </select>
           </label>
           <label>
-            API Dir:&nbsp;
+            Direction:&nbsp;
             <select value={query.serverDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
               <option value="desc">Desc</option>
               <option value="asc">Asc</option>
@@ -349,10 +698,11 @@ function DiscoverPageContent() {
         </div>
       </section>
 
-      <section className="card split-grid">
-        <div>
-          <h2>Universe Snapshot</h2>
-          <p className="muted card-intro">Current size and quality profile for the filtered vault universe.</p>
+      <section className="card discover-universe-card">
+        <h2>Universe Snapshot</h2>
+        <p className="muted card-intro">Current size and quality profile for the filtered vault universe.</p>
+        <div className="discover-universe-layout">
+          <div className="discover-kpis">
           <KpiGrid
             items={[
               { label: "Vaults", value: String(data?.summary?.vaults ?? data?.pagination.total ?? "n/a") },
@@ -365,49 +715,113 @@ function DiscoverPageContent() {
               { label: "Avg Consistency", value: formatPct(data?.summary?.avg_consistency_score) },
               {
                 label: "Avg Strategies",
-                value:
-                  data?.summary?.avg_strategies_per_vault !== null && data?.summary?.avg_strategies_per_vault !== undefined
-                    ? data.summary.avg_strategies_per_vault.toFixed(2)
-                    : "n/a",
+                value: formatFixed(data?.summary?.avg_strategies_per_vault, 2),
               },
               { label: "Migration Ready", value: String(data?.summary?.migration_ready_vaults ?? "n/a") },
               { label: "Highlighted", value: String(data?.summary?.highlighted_vaults ?? "n/a") },
               { label: "Retired in Scope", value: String(data?.summary?.retired_vaults ?? "n/a") },
             ]}
           />
+          </div>
+          <div className="discover-mix-grid">
+            <BarList
+              title="Regime TVL Mix"
+              items={(data?.regime_mix ?? []).map((row) => ({
+                id: row.regime,
+                label: regimeLabel(row.regime),
+                value: row.tvl_usd,
+                note: `${row.vaults} vaults`,
+              }))}
+              valueFormatter={(value) => formatUsd(value)}
+            />
+            <BarList
+              title="APY Bucket Count"
+              items={[
+                { id: "neg", label: "Negative APY", value: data?.summary?.apy_negative_vaults ?? null },
+                { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
+                { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
+                { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
+              ]}
+              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+            />
+            <BarList
+              title="Risk Level Mix (TVL)"
+              items={(data?.risk_mix ?? []).map((row) => ({
+                id: String(row.risk_level),
+                label: riskLevelLabel(row.risk_level),
+                value: row.tvl_usd,
+                note: `${row.vaults} vaults`,
+              }))}
+              valueFormatter={(value) => formatUsd(value)}
+            />
+          </div>
         </div>
-        <div className="stack">
-          <BarList
-            title="Regime TVL Mix"
-            items={(data?.regime_mix ?? []).map((row) => ({
-              id: row.regime,
-              label: regimeLabel(row.regime),
-              value: row.tvl_usd,
-              note: `${row.vaults} vaults`,
+      </section>
+
+      <section className="card discover-analytics-card">
+        <h2>Yield Structure and Trend Maps</h2>
+        <p className="muted card-intro">
+          Visual view of yield level, momentum direction, and concentration patterns in the current filtered universe.
+        </p>
+        <div className="discover-visual-grid">
+          <ScatterPlot
+            title="APY vs Momentum Map (Top TVL Vaults)"
+            xLabel="Momentum (percentage points: 7-day APY minus 30-day APY)"
+            yLabel="APY over last 30 days (percent)"
+            points={scatterRows.map((row) => ({
+              id: row.vault_address,
+              x: row.momentum_7d_30d,
+              y: row.safe_apy_30d,
+              size: row.tvl_usd,
+              href: yearnVaultUrl(row.chain_id, row.vault_address),
+              tooltip:
+                `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
+                `APY 30d: ${formatPct(row.safe_apy_30d)}\nMomentum: ${formatPct(row.momentum_7d_30d)}\nTVL: ${formatUsd(row.tvl_usd)}`,
+              tone:
+                row.momentum_7d_30d !== null && row.momentum_7d_30d !== undefined
+                  ? row.momentum_7d_30d >= 0
+                    ? "positive"
+                    : "negative"
+                  : "neutral",
             }))}
-            valueFormatter={(value) => formatUsd(value)}
+            xFormatter={(value) => formatPct(value, 1)}
+            yFormatter={(value) => formatPct(value, 1)}
           />
-          <BarList
-            title="APY Bucket Count"
-            items={[
-              { id: "neg", label: "Negative APY", value: data?.summary?.apy_negative_vaults ?? null },
-              { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
-              { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
-              { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
-            ]}
+          <HeatGrid
+            title="Yield-Momentum Quadrants"
+            items={momentumQuadrantHeat}
             valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
           />
-          <BarList
-            title="Risk Level Mix (TVL)"
-            items={(data?.risk_mix ?? []).map((row) => ({
-              id: String(row.risk_level),
-              label: riskLevelLabel(row.risk_level),
-              value: row.tvl_usd,
-              note: `${row.vaults} vaults`,
-            }))}
-            valueFormatter={(value) => formatUsd(value)}
+          <HeatGrid
+            title="Chain Momentum Heatmap"
+            items={chainMomentumHeat}
+            valueFormatter={(value) => formatPct(value)}
+          />
+          <HeatGrid
+            title="Token APY Dispersion Heatmap"
+            items={tokenSpreadHeat}
+            valueFormatter={(value) => formatPct(value)}
+            emptyText="Need at least two venues per token to compute APY spread."
+          />
+          <TrendStrips
+            title="APY Bucket Drift (Last 60 Days)"
+            items={apyBucketTrendItems}
+            valueFormatter={(value) => formatPct(value, 1)}
+            deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 1)}`}
+            emptyText="Trend rows unavailable for this filter."
+          />
+          <TrendStrips
+            title="Weighted APY Trend (7d / 30d / 90d)"
+            items={weightedApyTrendItems}
+            valueFormatter={(value) => formatPct(value, 2)}
+            deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+            emptyText="Weighted APY trend unavailable for this filter."
           />
         </div>
+        <p className="muted">
+          Trend strips read left-to-right over time. Right-most value is latest day, and delta compares the latest point against
+          the previous day.
+        </p>
       </section>
 
       <section className="card">
@@ -417,40 +831,40 @@ function DiscoverPageContent() {
           {data?.pagination.total ?? "loading..."}
         </p>
         <div className="table-wrap">
-          <table>
+          <table className="discover-table">
             <thead>
               <tr>
-                <th>
+                <th className="col-vault">
                   <button className={`th-button ${sort.key === "vault" ? "is-active" : ""}`} onClick={() => onSort("vault")}>
                     Vault <span className="th-indicator">{sortIndicator(sort, "vault")}</span>
                   </button>
                 </th>
-                <th>
+                <th className="col-chain">
                   <button className={`th-button ${sort.key === "chain" ? "is-active" : ""}`} onClick={() => onSort("chain")}>
                     Chain <span className="th-indicator">{sortIndicator(sort, "chain")}</span>
                   </button>
                 </th>
-                <th>
+                <th className="col-token">
                   <button className={`th-button ${sort.key === "token" ? "is-active" : ""}`} onClick={() => onSort("token")}>
                     Token <span className="th-indicator">{sortIndicator(sort, "token")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only">
+                <th className="tablet-hide analyst-only col-category">
                   <button className={`th-button ${sort.key === "category" ? "is-active" : ""}`} onClick={() => onSort("category")}>
                     Category <span className="th-indicator">{sortIndicator(sort, "category")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-tvl">
                   <button className={`th-button ${sort.key === "tvl" ? "is-active" : ""}`} onClick={() => onSort("tvl")}>
                     TVL <span className="th-indicator">{sortIndicator(sort, "tvl")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-apy">
                   <button className={`th-button ${sort.key === "apy" ? "is-active" : ""}`} onClick={() => onSort("apy")}>
                     APY 30d <span className="th-indicator">{sortIndicator(sort, "apy")}</span>
                   </button>
                 </th>
-                <th className="is-numeric">
+                <th className="is-numeric col-momentum">
                   <button
                     className={`th-button ${sort.key === "momentum" ? "is-active" : ""}`}
                     onClick={() => onSort("momentum")}
@@ -458,7 +872,7 @@ function DiscoverPageContent() {
                     Momentum <span className="th-indicator">{sortIndicator(sort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="is-numeric tablet-hide analyst-only">
+                <th className="is-numeric tablet-hide analyst-only col-consistency">
                   <button
                     className={`th-button ${sort.key === "consistency" ? "is-active" : ""}`}
                     onClick={() => onSort("consistency")}
@@ -466,12 +880,12 @@ function DiscoverPageContent() {
                     Consistency <span className="th-indicator">{sortIndicator(sort, "consistency")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only">
+                <th className="tablet-hide analyst-only col-risk">
                   <button className={`th-button ${sort.key === "risk" ? "is-active" : ""}`} onClick={() => onSort("risk")}>
                     Risk <span className="th-indicator">{sortIndicator(sort, "risk")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only">
+                <th className="tablet-hide analyst-only col-regime">
                   <button className={`th-button ${sort.key === "regime" ? "is-active" : ""}`} onClick={() => onSort("regime")}>
                     Regime <span className="th-indicator">{sortIndicator(sort, "regime")}</span>
                   </button>
@@ -481,15 +895,15 @@ function DiscoverPageContent() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.vault_address}>
-                  <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td>
+                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
+                  <td className="col-chain">
                     <Link
                       href={`/regimes?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
-                  <td>
+                  <td className="col-token">
                     {row.token_symbol ? (
                       <Link
                         href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
@@ -500,19 +914,19 @@ function DiscoverPageContent() {
                       "n/a"
                     )}
                   </td>
-                  <td className="tablet-hide analyst-only">{row.category || "n/a"}</td>
-                  <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
-                  <td className="is-numeric">{formatPct(row.safe_apy_30d)}</td>
-                  <td className="is-numeric">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="is-numeric tablet-hide analyst-only">{formatPct(row.consistency_score)}</td>
-                  <td className="tablet-hide analyst-only">
+                  <td className="tablet-hide analyst-only col-category">{row.category || "n/a"}</td>
+                  <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
+                  <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
+                  <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
+                  <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
+                  <td className="tablet-hide analyst-only col-risk">
                     {riskLevelLabel(row.risk_level)}
                     {row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}
                     {row.migration_available ? " · Migration" : ""}
                     {row.is_highlighted ? " · Highlighted" : ""}
                     {row.is_retired ? " · Retired" : ""}
                   </td>
-                  <td className="tablet-hide analyst-only">{regimeLabel(row.regime)}</td>
+                  <td className="tablet-hide analyst-only col-regime">{regimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>
