@@ -116,6 +116,7 @@ function RegimesPageContent() {
       minPoints: queryInt(searchParams, "min_points", defaults.minPoints, { min: 0, max: 365 }),
       transitionSplit: queryChoice(searchParams, "transition_split", ["none", "chain", "category"] as const, "none"),
       transitionDays: queryChoice(searchParams, "transition_days", ["60", "120", "180", "365"] as const, "120"),
+      transitionMinCohortTvl: queryFloat(searchParams, "transition_min_cohort_tvl", 1000000, { min: 0 }),
       limit: queryInt(searchParams, "limit", 30, { min: 5, max: 300 }),
       summarySort: queryChoice<RegimeSummarySortKey>(
         searchParams,
@@ -187,7 +188,16 @@ function RegimesPageContent() {
     return () => {
       active = false;
     };
-  }, [query.universe, query.chain, query.minTvl, query.minPoints, query.limit, query.transitionSplit, query.transitionDays]);
+  }, [
+    query.universe,
+    query.chain,
+    query.minTvl,
+    query.minPoints,
+    query.limit,
+    query.transitionSplit,
+    query.transitionDays,
+    query.transitionMinCohortTvl,
+  ]);
 
   const summaryRows = sortRows(data?.summary ?? [], summarySort, {
     regime: (row) => row.regime,
@@ -249,6 +259,7 @@ function RegimesPageContent() {
     const series = transitionDailyGrouped?.series ?? {};
     const latest = transitionDailyGrouped?.latest ?? [];
     const ranked = [...latest]
+      .filter((row) => (row.tvl_total_usd ?? 0) >= query.transitionMinCohortTvl)
       .sort((left, right) => (right.tvl_total_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_total_usd ?? Number.NEGATIVE_INFINITY))
       .slice(0, 6);
     return ranked.map((row) => {
@@ -264,12 +275,15 @@ function RegimesPageContent() {
         note: `Latest churn ${formatPct(row.changed_ratio)} • TVL ${formatUsd(row.tvl_total_usd)}`,
       };
     });
-  }, [transitionDailyGrouped]);
+  }, [transitionDailyGrouped, query.transitionMinCohortTvl]);
   const groupedDriftItems = useMemo(() => {
     const series = transitionDailyGrouped?.series ?? {};
     const groupType = transitionDailyGrouped?.group_by;
+    const latestMap = new Map((transitionDailyGrouped?.latest ?? []).map((row) => [row.group_key, row]));
     const rows = Object.entries(series)
       .map(([key, points]) => {
+        const latestRow = latestMap.get(key);
+        if (!latestRow || (latestRow.tvl_total_usd ?? 0) < query.transitionMinCohortTvl) return null;
         const latest = points[points.length - 1]?.changed_ratio;
         const previous = points.length > 1 ? points[points.length - 2]?.changed_ratio : null;
         if (latest === null || latest === undefined) return null;
@@ -287,7 +301,7 @@ function RegimesPageContent() {
       .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))
       .slice(0, 8);
     return rows;
-  }, [transitionDailyGrouped]);
+  }, [transitionDailyGrouped, query.transitionMinCohortTvl]);
   const requestedTransitionDays = Number(query.transitionDays);
   const availableTransitionDays = transitionDaily.length;
   const transitionCoverageRatio = requestedTransitionDays > 0 ? availableTransitionDays / requestedTransitionDays : 1;
@@ -296,6 +310,7 @@ function RegimesPageContent() {
     const latest = transitionDailyGrouped?.latest ?? [];
     const groupType = transitionDailyGrouped?.group_by;
     return [...latest]
+      .filter((row) => (row.tvl_total_usd ?? 0) >= query.transitionMinCohortTvl)
       .sort((left, right) => (right.tvl_total_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_total_usd ?? Number.NEGATIVE_INFINITY))
       .slice(0, 12)
       .map((row) => {
@@ -307,11 +322,12 @@ function RegimesPageContent() {
           note: `Churn ${formatPct(row.changed_ratio)} • TVL ${formatUsd(row.tvl_total_usd)}`,
         };
       });
-  }, [transitionDailyGrouped]);
+  }, [transitionDailyGrouped, query.transitionMinCohortTvl]);
   const groupedLatestChurnBars = useMemo(() => {
     const latest = transitionDailyGrouped?.latest ?? [];
     const groupType = transitionDailyGrouped?.group_by;
     return [...latest]
+      .filter((row) => (row.tvl_total_usd ?? 0) >= query.transitionMinCohortTvl)
       .sort((left, right) => (right.changed_ratio ?? Number.NEGATIVE_INFINITY) - (left.changed_ratio ?? Number.NEGATIVE_INFINITY))
       .slice(0, 10)
       .map((row) => {
@@ -323,11 +339,13 @@ function RegimesPageContent() {
           note: `TVL ${formatUsd(row.tvl_total_usd)} • Churn TVL ${formatPct(row.changed_tvl_ratio)}`,
         };
       });
-  }, [transitionDailyGrouped]);
+  }, [transitionDailyGrouped, query.transitionMinCohortTvl]);
   const splitSnapshotRows = useMemo(() => {
     const latest = transitionDailyGrouped?.latest ?? [];
     const groupType = transitionDailyGrouped?.group_by;
-    const normalized = latest.map((row) => {
+    const normalized = latest
+      .filter((row) => (row.tvl_total_usd ?? 0) >= query.transitionMinCohortTvl)
+      .map((row) => {
       const key = row.group_key;
       const label = groupType === "chain" ? chainLabel(Number(key)) : key;
       return {
@@ -346,7 +364,7 @@ function RegimesPageContent() {
       momentum: (row) => row.momentum_spread ?? Number.NEGATIVE_INFINITY,
       tvl: (row) => row.tvl_total_usd ?? Number.NEGATIVE_INFINITY,
     });
-  }, [transitionDailyGrouped, splitSnapshotSort]);
+  }, [transitionDailyGrouped, splitSnapshotSort, query.transitionMinCohortTvl]);
   const summaryConfidence = clampScore(
     Math.min(1, (summaryRows.reduce((acc, row) => acc + row.vaults, 0) || 0) / 120) * 65 + Math.min(1, moverRows.length / 40) * 35,
   );
@@ -452,6 +470,15 @@ function RegimesPageContent() {
               <option value="180">180d</option>
               <option value="365">365d</option>
             </select>
+          </label>
+          <label>
+            Min Cohort TVL (USD):&nbsp;
+            <input
+              type="number"
+              min={0}
+              value={query.transitionMinCohortTvl}
+              onChange={(event) => updateQuery({ transition_min_cohort_tvl: Number(event.target.value || 0) })}
+            />
           </label>
         </div>
       </section>
