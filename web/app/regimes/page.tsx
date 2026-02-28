@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
-import { BarList, KpiGrid } from "../components/visuals";
+import { BarList, HeatGrid, KpiGrid, TrendStrips } from "../components/visuals";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -32,14 +32,67 @@ type RegimeResponse = {
   movers: RegimeMover[];
 };
 
+type TransitionRow = {
+  previous_regime: string;
+  current_regime: string;
+  vaults: number;
+  tvl_usd: number | null;
+  avg_current_momentum: number | null;
+  avg_previous_momentum: number | null;
+};
+
+type TransitionResponse = {
+  summary?: {
+    vaults_total?: number;
+    changed_vaults?: number;
+    changed_ratio?: number | null;
+    tvl_total_usd?: number | null;
+    changed_tvl_usd?: number | null;
+    changed_tvl_ratio?: number | null;
+  };
+  matrix?: TransitionRow[];
+  chain_breakdown?: Array<{
+    chain_id: number;
+    vaults: number;
+    tvl_usd: number | null;
+    changed_vaults: number;
+    changed_tvl_usd: number | null;
+    changed_ratio: number | null;
+  }>;
+};
+
+type TransitionDailyRow = {
+  day: string;
+  changed_ratio?: number | null;
+  changed_tvl_ratio?: number | null;
+  momentum_spread?: number | null;
+};
+
+type TransitionDailyResponse = {
+  rows?: TransitionDailyRow[];
+};
+
 type RegimeSummarySortKey = "regime" | "vaults" | "tvl";
 type RegimeMoverSortKey = "vault" | "chain" | "token" | "tvl" | "apy" | "momentum" | "regime";
+
+function confidenceBand(score: number): string {
+  if (score >= 80) return "High";
+  if (score >= 60) return "Moderate";
+  if (score >= 40) return "Watch";
+  return "Low";
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
 
 function RegimesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [data, setData] = useState<RegimeResponse | null>(null);
+  const [transitionData, setTransitionData] = useState<TransitionResponse | null>(null);
+  const [transitionDaily, setTransitionDaily] = useState<TransitionDailyRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [summarySort, setSummarySort] = useState<SortState<RegimeSummarySortKey>>({ key: "vaults", direction: "desc" });
   const [moverSort, setMoverSort] = useState<SortState<RegimeMoverSortKey>>({ key: "momentum", direction: "desc" });
@@ -89,14 +142,25 @@ function RegimesPageContent() {
           min_points: String(query.minPoints),
         });
         if (query.chain > 0) params.set("chain_id", String(query.chain));
-        const res = await fetch(`/api/regimes?${params.toString()}`, { cache: "no-store" });
-        if (!res.ok) {
-          if (active) setError(`API error: ${res.status}`);
+        const [regimesRes, transitionsRes, transitionsDailyRes] = await Promise.all([
+          fetch(`/api/regimes?${params.toString()}`, { cache: "no-store" }),
+          fetch(`/api/regimes/transitions?${params.toString()}`, { cache: "no-store" }),
+          fetch(`/api/regimes/transitions/daily?${params.toString()}&days=120`, { cache: "no-store" }),
+        ]);
+        if (!regimesRes.ok || !transitionsRes.ok || !transitionsDailyRes.ok) {
+          const status = !regimesRes.ok ? regimesRes.status : !transitionsRes.ok ? transitionsRes.status : transitionsDailyRes.status;
+          if (active) setError(`API error: ${status}`);
           return;
         }
-        const payload = (await res.json()) as RegimeResponse;
+        const [payload, transitionsPayload, transitionsDailyPayload] = (await Promise.all([
+          regimesRes.json(),
+          transitionsRes.json(),
+          transitionsDailyRes.json(),
+        ])) as [RegimeResponse, TransitionResponse, TransitionDailyResponse];
         if (active) {
           setData(payload);
+          setTransitionData(transitionsPayload);
+          setTransitionDaily(Array.isArray(transitionsDailyPayload.rows) ? transitionsDailyPayload.rows : []);
           setError(null);
         }
       } catch (err) {
@@ -127,6 +191,55 @@ function RegimesPageContent() {
   const availableChains = useMemo(
     () => Array.from(new Set((data?.movers ?? []).map((row) => row.chain_id))).sort((a, b) => a - b),
     [data?.movers],
+  );
+  const transitionHeat = useMemo(
+    () =>
+      (transitionData?.matrix ?? [])
+        .slice()
+        .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
+        .slice(0, 16)
+        .map((row) => ({
+          id: `${row.previous_regime}->${row.current_regime}`,
+          label: `${regimeLabel(row.previous_regime)} → ${regimeLabel(row.current_regime)}`,
+          value: row.tvl_usd,
+          note: `${row.vaults} vaults • current momentum ${formatPct(row.avg_current_momentum)}`,
+        })),
+    [transitionData?.matrix],
+  );
+  const transitionTrendItems = useMemo(
+    () => [
+      {
+        id: "changed-ratio",
+        label: "Regime change ratio",
+        points: transitionDaily.map((row) => row.changed_ratio),
+        note: "Share of tracked vaults where current and previous regime differ.",
+      },
+      {
+        id: "changed-tvl-ratio",
+        label: "Regime churn TVL ratio",
+        points: transitionDaily.map((row) => row.changed_tvl_ratio),
+        note: "Share of TVL sitting in vaults that switched regime state.",
+      },
+      {
+        id: "momentum-spread",
+        label: "Momentum spread (current minus previous)",
+        points: transitionDaily.map((row) => row.momentum_spread),
+        note: "Positive means short-term regime pressure is strengthening vs prior baseline.",
+      },
+    ],
+    [transitionDaily],
+  );
+  const summaryConfidence = clampScore(
+    Math.min(1, (summaryRows.reduce((acc, row) => acc + row.vaults, 0) || 0) / 120) * 65 + Math.min(1, moverRows.length / 40) * 35,
+  );
+  const transitionVaultsTotal = transitionData?.summary?.vaults_total ?? 0;
+  const transitionChangedRatio = transitionData?.summary?.changed_ratio ?? 0;
+  const transitionConfidence = clampScore(
+    transitionVaultsTotal > 0
+      ? Math.min(1, transitionVaultsTotal / 120) * 65 +
+          Math.min(1, transitionChangedRatio * 2) * 20 +
+          15
+      : 0,
   );
 
   return (
@@ -211,6 +324,9 @@ function RegimesPageContent() {
       <section className="card regime-summary-card">
         <h2>Regime Summary</h2>
         <p className="muted card-intro">Click column headers to sort by size, vault count, or regime name.</p>
+        <p className="muted confidence-line">
+          Confidence: <strong>{summaryConfidence}/100 ({confidenceBand(summaryConfidence)})</strong> from sample breadth and ranked mover coverage.
+        </p>
         <div className="regime-summary-layout">
           <div className="regime-summary-side">
             <KpiGrid
@@ -297,6 +413,56 @@ function RegimesPageContent() {
             valueFormatter={(value) => formatUsd(value)}
           />
         </div>
+      </section>
+
+      <section className="card">
+        <h2>Regime Transition Matrix</h2>
+        <p className="muted card-intro">
+          Transition view compares short-term regime (7d vs 30d APY) against prior baseline regime (30d vs 90d APY).
+        </p>
+        <p className="muted confidence-line">
+          Confidence: <strong>{transitionConfidence}/100 ({confidenceBand(transitionConfidence)})</strong> from vault coverage and transition sample size.
+        </p>
+        <KpiGrid
+          items={[
+            { label: "Vaults Tracked", value: String(transitionData?.summary?.vaults_total ?? "n/a") },
+            { label: "Changed Vaults", value: String(transitionData?.summary?.changed_vaults ?? "n/a") },
+            { label: "Changed Ratio", value: formatPct(transitionData?.summary?.changed_ratio) },
+            { label: "Changed TVL", value: formatUsd(transitionData?.summary?.changed_tvl_usd) },
+          ]}
+        />
+        <div className="changes-stale-grid">
+          <HeatGrid
+            title="Transition Weight by TVL"
+            items={transitionHeat}
+            valueFormatter={(value) => formatUsd(value)}
+            legend="Higher intensity means more TVL moved between regime states."
+          />
+          <BarList
+            title="Chains with Highest Regime Churn"
+            items={(transitionData?.chain_breakdown ?? []).map((row) => ({
+              id: String(row.chain_id),
+              label: chainLabel(row.chain_id),
+              value: row.changed_ratio,
+              note: `${row.changed_vaults}/${row.vaults} vaults • ${formatUsd(row.changed_tvl_usd)}`,
+            }))}
+            valueFormatter={(value) => formatPct(value, 1)}
+          />
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Regime Transition Trend (Last 120 Days)</h2>
+        <p className="muted card-intro">
+          Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.
+        </p>
+        <TrendStrips
+          title="Transition Churn Signals"
+          items={transitionTrendItems}
+          valueFormatter={(value) => formatPct(value, 2)}
+          deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+          emptyText="Transition trend is unavailable for this filter."
+        />
       </section>
 
       <section className="card">

@@ -123,6 +123,23 @@ type DailyTrendRow = {
 
 type DailyTrendResponse = {
   rows?: DailyTrendRow[];
+  grouped?: {
+    group_by?: "none" | "chain" | "category";
+    rows?: GroupedTrendRow[];
+    latest?: GroupedTrendRow[];
+    series?: Record<string, GroupedTrendRow[]>;
+  };
+};
+
+type GroupedTrendRow = {
+  day: string;
+  group_key: string;
+  vaults?: number;
+  total_tvl_usd?: number | null;
+  weighted_apy_7d?: number | null;
+  weighted_apy_30d?: number | null;
+  weighted_apy_90d?: number | null;
+  weighted_momentum_7d_30d?: number | null;
 };
 
 function staleThresholdLabel(value: StaleThresholdKey): string {
@@ -134,6 +151,17 @@ function runningLabel(value: boolean | undefined): string {
   if (value === true) return "active";
   if (value === false) return "idle";
   return "n/a";
+}
+
+function confidenceBand(score: number): string {
+  if (score >= 80) return "High";
+  if (score >= 60) return "Moderate";
+  if (score >= 40) return "Watch";
+  return "Low";
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function MoverTable({
@@ -273,6 +301,8 @@ function ChangesPageContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<ChangesResponse | null>(null);
   const [trends, setTrends] = useState<DailyTrendRow[]>([]);
+  const [chainTrendLatest, setChainTrendLatest] = useState<GroupedTrendRow[]>([]);
+  const [categoryTrendLatest, setCategoryTrendLatest] = useState<GroupedTrendRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [trendError, setTrendError] = useState<string | null>(null);
   const [staleChainSort, setStaleChainSort] = useState<SortState<StaleChainSortKey>>({
@@ -381,20 +411,41 @@ function ChangesPageContent() {
     let active = true;
     const load = async () => {
       try {
-        const params = new URLSearchParams({
+        const baseParams = new URLSearchParams({
           universe: query.universe,
           min_tvl_usd: String(query.minTvl),
           min_points: String(query.minPoints),
           days: "90",
         });
-        const res = await fetch(`/api/trends/daily?${params.toString()}`, { cache: "no-store" });
-        if (!res.ok) {
-          if (active) setTrendError(`Trends API error: ${res.status}`);
+        const globalParams = new URLSearchParams(baseParams);
+        const chainParams = new URLSearchParams(baseParams);
+        const categoryParams = new URLSearchParams(baseParams);
+        chainParams.set("group_by", "chain");
+        chainParams.set("group_limit", "10");
+        categoryParams.set("group_by", "category");
+        categoryParams.set("group_limit", "10");
+
+        const [globalRes, chainRes, categoryRes] = await Promise.all([
+          fetch(`/api/trends/daily?${globalParams.toString()}`, { cache: "no-store" }),
+          fetch(`/api/trends/daily?${chainParams.toString()}`, { cache: "no-store" }),
+          fetch(`/api/trends/daily?${categoryParams.toString()}`, { cache: "no-store" }),
+        ]);
+        if (!globalRes.ok || !chainRes.ok || !categoryRes.ok) {
+          const status = !globalRes.ok ? globalRes.status : !chainRes.ok ? chainRes.status : categoryRes.status;
+          if (active) setTrendError(`Trends API error: ${status}`);
           return;
         }
-        const payload = (await res.json()) as DailyTrendResponse;
+        const [globalPayload, chainPayload, categoryPayload] = (await Promise.all([
+          globalRes.json(),
+          chainRes.json(),
+          categoryRes.json(),
+        ])) as [DailyTrendResponse, DailyTrendResponse, DailyTrendResponse];
         if (!active) return;
-        setTrends(Array.isArray(payload.rows) ? payload.rows : []);
+        setTrends(Array.isArray(globalPayload.rows) ? globalPayload.rows : []);
+        const chainLatest = Array.isArray(chainPayload.grouped?.latest) ? chainPayload.grouped.latest : [];
+        const categoryLatest = Array.isArray(categoryPayload.grouped?.latest) ? categoryPayload.grouped.latest : [];
+        setChainTrendLatest(chainLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
+        setCategoryTrendLatest(categoryLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
         setTrendError(null);
       } catch (err) {
         if (active) setTrendError(`Trends load failed: ${String(err)}`);
@@ -589,6 +640,54 @@ function ChangesPageContent() {
     ],
     [trendSlice],
   );
+  const chainMomentumHeat = useMemo(
+    () =>
+      chainTrendLatest
+        .sort((left, right) => (right.total_tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.total_tvl_usd ?? Number.NEGATIVE_INFINITY))
+        .slice(0, isCompactViewport ? 8 : 12)
+        .map((row) => ({
+          id: `chain-${row.group_key}`,
+          label: chainLabel(Number(row.group_key)),
+          value: row.weighted_momentum_7d_30d,
+          note: `${formatUsd(row.total_tvl_usd)} • APY30 ${formatPct(row.weighted_apy_30d)}`,
+        })),
+    [chainTrendLatest, isCompactViewport],
+  );
+  const categoryMomentumHeat = useMemo(
+    () =>
+      categoryTrendLatest
+        .sort((left, right) => (right.total_tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.total_tvl_usd ?? Number.NEGATIVE_INFINITY))
+        .slice(0, isCompactViewport ? 8 : 12)
+        .map((row) => ({
+          id: `cat-${row.group_key}`,
+          label: row.group_key,
+          value: row.weighted_momentum_7d_30d,
+          note: `${formatUsd(row.total_tvl_usd)} • APY30 ${formatPct(row.weighted_apy_30d)}`,
+        })),
+    [categoryTrendLatest, isCompactViewport],
+  );
+  const windowCoverage = useMemo(() => {
+    const eligible = data?.summary.vaults_eligible ?? 0;
+    const withChange = data?.summary.vaults_with_change ?? 0;
+    if (eligible <= 0) return 0;
+    return withChange / eligible;
+  }, [data?.summary.vaults_eligible, data?.summary.vaults_with_change]);
+  const freshnessPenalty = useMemo(() => {
+    const stale = data?.freshness?.window_stale_ratio;
+    const latestAgeHours = (data?.freshness?.latest_pps_age_seconds ?? 0) / 3600;
+    const staleRatio = stale ?? data?.freshness?.pps_stale_ratio ?? 0;
+    return Math.min(1, staleRatio * 1.25) * 45 + Math.min(24, latestAgeHours) * 1.25;
+  }, [data?.freshness?.window_stale_ratio, data?.freshness?.pps_stale_ratio, data?.freshness?.latest_pps_age_seconds]);
+  const windowConfidence = clampScore(windowCoverage * 70 + 30 - freshnessPenalty);
+  const deltaConfidence = clampScore(
+    Math.min(1, moverScatterRows.length / 40) * 60 + Math.min(1, windowCoverage) * 25 + 15 - Math.min(22, freshnessPenalty * 0.5),
+  );
+  const freshnessConfidence = clampScore(
+    100 -
+      Math.min(70, (data?.freshness?.window_stale_ratio ?? data?.freshness?.pps_stale_ratio ?? 0) * 130) -
+      Math.min(20, ((data?.freshness?.latest_pps_age_seconds ?? 0) / 3600) * 1.5) -
+      Math.min(10, ((data?.freshness?.metrics_newest_age_seconds ?? 0) / 3600) * 1.0),
+  );
 
   return (
     <main className="container">
@@ -617,6 +716,9 @@ function ChangesPageContent() {
         <h2>Window Summary</h2>
         <p className="muted card-intro">
           Choose the APY lookback range and stale cutoff. Stale means the latest PPS point is older than the selected cutoff.
+        </p>
+        <p className="muted confidence-line">
+          Confidence: <strong>{windowConfidence}/100 ({confidenceBand(windowConfidence)})</strong> based on vault coverage and freshness.
         </p>
         <label>
           Range:&nbsp;
@@ -706,6 +808,9 @@ function ChangesPageContent() {
           tracked vaults. Job status <strong>idle</strong> is normal between scheduled runs; check Last Success age for actual
           health.
         </p>
+        <p className="muted confidence-line">
+          Confidence: <strong>{freshnessConfidence}/100 ({confidenceBand(freshnessConfidence)})</strong> for operational freshness.
+        </p>
         <KpiGrid
           items={[
             { label: "Latest PPS Age", value: formatHours(data?.freshness?.latest_pps_age_seconds) },
@@ -730,6 +835,9 @@ function ChangesPageContent() {
         <h2>Delta Visuals and Freshness Heatmaps</h2>
         <p className="muted card-intro">
           Delta bands use percentage points (for example, +2.0 means APY rose by two points versus the previous window).
+        </p>
+        <p className="muted confidence-line">
+          Confidence: <strong>{deltaConfidence}/100 ({confidenceBand(deltaConfidence)})</strong> from mover sample size + freshness.
         </p>
         <div className="changes-trend-grid">
           <TrendStrips
@@ -782,6 +890,27 @@ function ChangesPageContent() {
             />
             <HeatGrid title="Stale Ratio Heatmap by Category" items={staleCategoryHeat} valueFormatter={(value) => formatPct(value)} />
           </div>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Grouped Momentum Snapshot (Latest Day)</h2>
+        <p className="muted card-intro">
+          TVL-weighted momentum by chain/category (7d APY minus 30d APY). Positive values indicate short-term strengthening.
+        </p>
+        <div className="changes-stale-grid">
+          <HeatGrid
+            title="By Chain"
+            items={chainMomentumHeat}
+            valueFormatter={(value) => formatPct(value, 1)}
+            legend="Cells are sorted by latest TVL. Notes show TVL and weighted APY 30d for context."
+          />
+          <HeatGrid
+            title="By Category"
+            items={categoryMomentumHeat}
+            valueFormatter={(value) => formatPct(value, 1)}
+            legend="Use this to compare category momentum drift independent of single-vault outliers."
+          />
         </div>
       </section>
 

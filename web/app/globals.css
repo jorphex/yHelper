@@ -325,9 +325,10 @@ td {
   text-align: left;
   padding: 0.52rem;
   border-bottom: 1px solid var(--line);
-  vertical-align: top;
+  vertical-align: middle;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 th {
@@ -476,6 +477,11 @@ input[type="text"] {
 
 .card-intro {
   margin: 0 0 0.7rem;
+}
+
+.confidence-line {
+  margin: 0 0 0.62rem;
+  color: #c8d8ec;
 }
 
 .kpi-grid {
@@ -726,6 +732,11 @@ input[type="text"] {
   gap: 0.62rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
+}
+
+.changes-stale-grid > .viz-panel,
+.changes-stale-grid > .bar-panel {
+  height: 100%;
 }
 
 .changes-delta-layout {
