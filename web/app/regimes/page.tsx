@@ -93,6 +93,16 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function compactRegimeLabel(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+  const key = value.toLowerCase();
+  if (key === "rising") return "Rising";
+  if (key === "falling") return "Falling";
+  if (key === "stable") return "Stable";
+  if (key === "choppy") return "Choppy";
+  return value;
+}
+
 function RegimesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -305,7 +315,7 @@ function RegimesPageContent() {
   const requestedTransitionDays = Number(query.transitionDays);
   const availableTransitionDays = transitionDaily.length;
   const transitionCoverageRatio = requestedTransitionDays > 0 ? availableTransitionDays / requestedTransitionDays : 1;
-  const showTransitionCoverageWarning = availableTransitionDays > 0 && transitionCoverageRatio < 0.8;
+  const showTransitionCoverageWarning = availableTransitionDays > 0 && transitionCoverageRatio < 0.5 && availableTransitionDays < 90;
   const groupedLatestChurnHeat = useMemo(() => {
     const latest = transitionDailyGrouped?.latest ?? [];
     const groupType = transitionDailyGrouped?.group_by;
@@ -551,10 +561,8 @@ function RegimesPageContent() {
                 {summaryRows.map((row) => (
                   <tr key={row.regime}>
                     <td>
-                      <Link
-                        href={`/changes?window=7d&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}&regime_sort=tvl&regime_dir=desc`}
-                      >
-                        {regimeLabel(row.regime)}
+                      <Link href={`/changes?window=7d&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
+                        {compactRegimeLabel(row.regime)}
                       </Link>
                     </td>
                     <td className="is-numeric">{row.vaults}</td>
@@ -568,7 +576,7 @@ function RegimesPageContent() {
             title="Regime TVL Mix"
             items={summaryRows.map((row) => ({
               id: row.regime,
-              label: regimeLabel(row.regime),
+              label: compactRegimeLabel(row.regime),
               value: row.tvl_usd,
               note: `${row.vaults} vaults`,
             }))}
@@ -593,7 +601,7 @@ function RegimesPageContent() {
             { label: "Changed TVL", value: formatUsd(transitionData?.summary?.changed_tvl_usd) },
           ]}
         />
-        <div className="changes-stale-grid">
+        <div className="stack">
           {query.transitionSplit === "none" ? (
             <>
               <HeatGrid
@@ -614,7 +622,7 @@ function RegimesPageContent() {
               />
             </>
           ) : (
-            <>
+            <div className="changes-stale-grid">
               <HeatGrid
                 title={`Latest Churn TVL Share by ${query.transitionSplit === "chain" ? "Chain" : "Category"}`}
                 items={groupedLatestChurnHeat}
@@ -626,7 +634,7 @@ function RegimesPageContent() {
                 items={groupedLatestChurnBars}
                 valueFormatter={(value) => formatPct(value, 2)}
               />
-            </>
+            </div>
           )}
         </div>
       </section>
@@ -849,7 +857,7 @@ function RegimesPageContent() {
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="tablet-hide col-regime">{regimeLabel(row.regime)}</td>
+                  <td className="tablet-hide col-regime">{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>

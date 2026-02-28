@@ -969,7 +969,7 @@ input[type="text"] {
 }
 
 .composition-visuals-card .scatter-wrap svg {
-  min-height: 312px;
+  min-height: 384px;
 }
 
 .composition-crowding-grid {
@@ -991,7 +991,7 @@ input[type="text"] {
 .regime-summary-layout {
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: 230px minmax(0, 1fr) 320px;
+  grid-template-columns: 220px minmax(0, 1.1fr) minmax(260px, 0.9fr);
   align-items: start;
 }
 
@@ -1029,14 +1029,6 @@ input[type="text"] {
   align-items: start;
 }
 
-.changes-delta-grid {
-  align-items: start;
-}
-
-.changes-delta-side {
-  gap: 0.62rem;
-}
-
 .changes-stale-grid {
   display: grid;
   gap: 0.62rem;
@@ -1049,19 +1041,14 @@ input[type="text"] {
   height: 100%;
 }
 
-.changes-delta-layout {
+.changes-delta-panels {
   display: grid;
-  gap: 0.8rem;
-  grid-template-columns: minmax(0, 1.18fr) minmax(260px, 0.82fr);
+  gap: 0.62rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
 }
 
-.changes-delta-left {
-  display: grid;
-  gap: 0.62rem;
-}
-
-.changes-delta-left .scatter-wrap svg {
+.changes-delta-panels .scatter-wrap svg {
   min-height: 342px;
 }
 
@@ -1433,7 +1420,7 @@ input:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .changes-delta-layout {
+  .changes-delta-panels {
     grid-template-columns: 1fr;
   }
 

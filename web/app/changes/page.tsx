@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatHours, formatPct, formatUsd, regimeLabel, yearnVaultUrl } from "../lib/format";
+import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips } from "../components/visuals";
@@ -108,7 +108,6 @@ type ChangesResponse = {
 type MoverSortKey = "vault" | "chain" | "token" | "category" | "tvl" | "current" | "previous" | "delta" | "age";
 type StaleChainSortKey = "chain" | "vaults" | "stale_vaults" | "stale_ratio" | "tvl" | "stale_tvl";
 type StaleCategorySortKey = "category" | "vaults" | "stale_vaults" | "stale_ratio" | "tvl" | "stale_tvl";
-type RegimeSortKey = "regime" | "vaults" | "tvl";
 type TvlView = "both" | "filtered" | "yearn";
 
 type DailyTrendRow = {
@@ -146,12 +145,6 @@ type GroupedTrendRow = {
 function staleThresholdLabel(value: StaleThresholdKey): string {
   if (value === "auto") return "Auto (2× selected APY range)";
   return value;
-}
-
-function runningLabel(value: boolean | undefined): string {
-  if (value === true) return "active";
-  if (value === false) return "idle";
-  return "n/a";
 }
 
 function confidenceBand(score: number): string {
@@ -316,7 +309,6 @@ function ChangesPageContent() {
     key: "stale_ratio",
     direction: "desc",
   });
-  const [regimeSort, setRegimeSort] = useState<SortState<RegimeSortKey>>({ key: "tvl", direction: "desc" });
   const [isCompactViewport, setIsCompactViewport] = useState(false);
 
   const query = useMemo(() => {
@@ -350,23 +342,13 @@ function ChangesPageContent() {
         "stale_ratio",
       ),
       staleCategoryDir: queryChoice(searchParams, "stale_category_dir", ["asc", "desc"] as const, "desc"),
-      regimeSort: queryChoice<RegimeSortKey>(searchParams, "regime_sort", ["regime", "vaults", "tvl"] as const, "tvl"),
-      regimeDir: queryChoice(searchParams, "regime_dir", ["asc", "desc"] as const, "desc"),
     };
   }, [searchParams]);
 
   useEffect(() => {
     setStaleChainSort({ key: query.staleChainSort, direction: query.staleChainDir });
     setStaleCategorySort({ key: query.staleCategorySort, direction: query.staleCategoryDir });
-    setRegimeSort({ key: query.regimeSort, direction: query.regimeDir });
-  }, [
-    query.staleChainSort,
-    query.staleChainDir,
-    query.staleCategorySort,
-    query.staleCategoryDir,
-    query.regimeSort,
-    query.regimeDir,
-  ]);
+  }, [query.staleChainSort, query.staleChainDir, query.staleCategorySort, query.staleCategoryDir]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");
@@ -422,24 +404,19 @@ function ChangesPageContent() {
         });
         const globalParams = new URLSearchParams(baseParams);
         globalParams.set("days", "90");
-        const requests: Array<Promise<Response>> = [fetch(`/api/trends/daily?${globalParams.toString()}`, { cache: "no-store" })];
-        const fetchChainGrouped = query.trendGroup === "chain";
-        const fetchCategoryGrouped = query.trendGroup === "category";
-
-        if (fetchChainGrouped) {
-          const chainParams = new URLSearchParams(baseParams);
-          chainParams.set("days", "90");
-          chainParams.set("group_by", "chain");
-          chainParams.set("group_limit", "10");
-          requests.push(fetch(`/api/trends/daily?${chainParams.toString()}`, { cache: "no-store" }));
-        }
-        if (fetchCategoryGrouped) {
-          const categoryParams = new URLSearchParams(baseParams);
-          categoryParams.set("days", "90");
-          categoryParams.set("group_by", "category");
-          categoryParams.set("group_limit", "10");
-          requests.push(fetch(`/api/trends/daily?${categoryParams.toString()}`, { cache: "no-store" }));
-        }
+        const chainParams = new URLSearchParams(baseParams);
+        chainParams.set("days", "90");
+        chainParams.set("group_by", "chain");
+        chainParams.set("group_limit", "10");
+        const categoryParams = new URLSearchParams(baseParams);
+        categoryParams.set("days", "90");
+        categoryParams.set("group_by", "category");
+        categoryParams.set("group_limit", "10");
+        const requests: Array<Promise<Response>> = [
+          fetch(`/api/trends/daily?${globalParams.toString()}`, { cache: "no-store" }),
+          fetch(`/api/trends/daily?${chainParams.toString()}`, { cache: "no-store" }),
+          fetch(`/api/trends/daily?${categoryParams.toString()}`, { cache: "no-store" }),
+        ];
 
         const responses = await Promise.all(requests);
         const firstFailure = responses.find((response) => !response.ok);
@@ -451,20 +428,16 @@ function ChangesPageContent() {
 
         const payloads = (await Promise.all(responses.map((response) => response.json()))) as DailyTrendResponse[];
         const globalPayload = payloads[0];
-        const chainPayload = fetchChainGrouped ? payloads[1] : null;
-        const categoryPayload = fetchCategoryGrouped ? payloads[fetchChainGrouped ? 2 : 1] : null;
+        const chainPayload = payloads[1];
+        const categoryPayload = payloads[2];
         if (!active) return;
         setTrends(Array.isArray(globalPayload.rows) ? globalPayload.rows : []);
         const chainLatest = Array.isArray(chainPayload?.grouped?.latest) ? chainPayload.grouped.latest : [];
         const categoryLatest = Array.isArray(categoryPayload?.grouped?.latest) ? categoryPayload.grouped.latest : [];
         const chainSeries =
-          query.trendGroup === "chain" && chainPayload?.grouped?.series && typeof chainPayload.grouped.series === "object"
-            ? chainPayload.grouped.series
-            : {};
+          chainPayload?.grouped?.series && typeof chainPayload.grouped.series === "object" ? chainPayload.grouped.series : {};
         const categorySeries =
-          query.trendGroup === "category" && categoryPayload?.grouped?.series && typeof categoryPayload.grouped.series === "object"
-            ? categoryPayload.grouped.series
-            : {};
+          categoryPayload?.grouped?.series && typeof categoryPayload.grouped.series === "object" ? categoryPayload.grouped.series : {};
         setChainTrendLatest(chainLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
         setCategoryTrendLatest(categoryLatest.filter((row) => row.group_key && row.group_key !== "unknown"));
         setChainTrendSeries(chainSeries);
@@ -478,7 +451,7 @@ function ChangesPageContent() {
     return () => {
       active = false;
     };
-  }, [query.universe, query.minTvl, query.minPoints, query.trendGroup]);
+  }, [query.universe, query.minTvl, query.minPoints]);
 
   const staleByChain = sortRows(data?.freshness?.stale_by_chain ?? [], staleChainSort, {
     chain: (row) => chainLabel(row.chain_id),
@@ -498,11 +471,6 @@ function ChangesPageContent() {
     stale_tvl: (row) => row.stale_tvl_usd ?? Number.NEGATIVE_INFINITY,
   });
 
-  const regimeRows = sortRows(data?.regime_counts ?? [], regimeSort, {
-    regime: (row) => row.regime,
-    vaults: (row) => row.vaults,
-    tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-  });
   const moverScatterRows = useMemo(() => {
     const index = new Map<string, ChangeRow>();
     const allRows = [
@@ -754,22 +722,17 @@ function ChangesPageContent() {
       {trendError ? <section className="card">{trendError}</section> : null}
 
       <section className="card">
-        <h2>Window Summary</h2>
-        <p className="muted card-intro">
-          Choose the APY lookback range and stale cutoff. Stale means the latest PPS point is older than the selected cutoff.
-        </p>
-        <p className="muted confidence-line">
-          Confidence: <strong>{windowConfidence}/100 ({confidenceBand(windowConfidence)})</strong> based on vault coverage and freshness.
-        </p>
-        <label>
-          Range:&nbsp;
-          <select value={query.window} onChange={(event) => updateQuery({ window: event.target.value as WindowKey })}>
-            <option value="24h">24h</option>
-            <option value="7d">7d</option>
-            <option value="30d">30d</option>
-          </select>
-        </label>
+        <h2>Filters</h2>
+        <p className="muted card-intro">All controls are URL-backed so this view stays shareable.</p>
         <div className="inline-controls controls-tight">
+          <label>
+            Range:&nbsp;
+            <select value={query.window} onChange={(event) => updateQuery({ window: event.target.value as WindowKey })}>
+              <option value="24h">24h</option>
+              <option value="7d">7d</option>
+              <option value="30d">30d</option>
+            </select>
+          </label>
           <label>
             Stale Cutoff:&nbsp;
             <select
@@ -840,6 +803,16 @@ function ChangesPageContent() {
             />
           </label>
         </div>
+      </section>
+
+      <section className="card">
+        <h2>Window Summary</h2>
+        <p className="muted card-intro">
+          Current APY uses the selected range. Previous APY uses the immediately prior range. Delta is current minus previous.
+        </p>
+        <p className="muted confidence-line">
+          Confidence: <strong>{windowConfidence}/100 ({confidenceBand(windowConfidence)})</strong> based on vault coverage and freshness.
+        </p>
         <KpiGrid items={summaryKpiItems} />
         <p className="muted">
           TVL View controls the scope shown above: dashboard-filtered totals from yDaemon, Yearn-aligned proxy scope, or both.
@@ -849,16 +822,11 @@ function ChangesPageContent() {
       <section className="card" id="freshness-panels">
         <h2>Trust Signals</h2>
         <p className="muted card-intro">
-          These indicate whether the data stream is current enough for decision support. Current stale cutoff:{" "}
+          These metrics show whether recent data is fresh enough to trust changes. Current stale cutoff:{" "}
           {staleThresholdLabel(data?.filters?.stale_threshold ?? query.staleThreshold)}.
         </p>
-        <p className="muted">
-          Stale vault means its latest PPS data point is older than the selected cutoff. Stale ratio means stale vaults divided by
-          tracked vaults. Job status <strong>idle</strong> is normal between scheduled runs; check Last Success age for actual
-          health.
-        </p>
         <p className="muted confidence-line">
-          Confidence: <strong>{freshnessConfidence}/100 ({confidenceBand(freshnessConfidence)})</strong> for operational freshness.
+          Confidence: <strong>{freshnessConfidence}/100 ({confidenceBand(freshnessConfidence)})</strong> for data freshness.
         </p>
         <KpiGrid
           items={[
@@ -866,16 +834,6 @@ function ChangesPageContent() {
             { label: "Newest Metrics Age", value: formatHours(data?.freshness?.metrics_newest_age_seconds) },
             { label: "Global PPS Stale Ratio", value: formatPct(data?.freshness?.pps_stale_ratio) },
             { label: "Window Stale Ratio", value: formatPct(data?.freshness?.window_stale_ratio) },
-            {
-              label: "Kong Last Success",
-              value: formatHours(data?.freshness?.ingestion_jobs?.kong_pps_metrics?.last_success_age_seconds),
-            },
-            {
-              label: "yDaemon Last Success",
-              value: formatHours(data?.freshness?.ingestion_jobs?.ydaemon_snapshot?.last_success_age_seconds),
-            },
-            { label: "Kong Job Status", value: runningLabel(data?.freshness?.ingestion_jobs?.kong_pps_metrics?.running) },
-            { label: "yDaemon Job Status", value: runningLabel(data?.freshness?.ingestion_jobs?.ydaemon_snapshot?.running) },
           ]}
         />
       </section>
@@ -912,41 +870,34 @@ function ChangesPageContent() {
             }
           />
         </div>
-        <p className="muted">
-          Each strip is daily. Right-most value is latest, and the signed delta is day-over-day change for that metric.
-        </p>
-        <div className="changes-delta-layout">
-          <div className="changes-delta-left">
-            <ScatterPlot
-              title="Delta vs Current APY (Top Movers)"
-              xLabel="Delta (percentage points)"
-              yLabel="Current APY (percent)"
-              points={moverScatterRows.map((row) => ({
-                id: `${row.chain_id}:${row.vault_address}`,
-                x: row.delta_apy,
-                y: row.safe_apy_window,
-                size: row.tvl_usd,
-                href: yearnVaultUrl(row.chain_id, row.vault_address),
-                tooltip:
-                  `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
-                  `Current APY: ${formatPct(row.safe_apy_window)}\nPrevious APY: ${formatPct(row.safe_apy_prev_window)}\n` +
-                  `Delta: ${formatPct(row.delta_apy)}\nTVL: ${formatUsd(row.tvl_usd)}`,
-                tone: row.delta_apy !== null && row.delta_apy !== undefined ? (row.delta_apy >= 0 ? "positive" : "negative") : "neutral",
-              }))}
-              xFormatter={(value) => formatPct(value, 1)}
-              yFormatter={(value) => formatPct(value, 1)}
-              emptyText="No mover rows yet for this filter."
-            />
-            <HeatGrid title="Stale Ratio Heatmap by Chain" items={staleChainHeat} valueFormatter={(value) => formatPct(value)} />
-          </div>
-          <div className="stack changes-delta-side">
-            <BarList
-              title="Delta Distribution (Top Movers)"
-              items={deltaBandItems}
-              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
-            />
-            <HeatGrid title="Stale Ratio Heatmap by Category" items={staleCategoryHeat} valueFormatter={(value) => formatPct(value)} />
-          </div>
+        <div className="changes-delta-panels">
+          <ScatterPlot
+            title="Delta vs Current APY (Top Movers)"
+            xLabel="Delta (percentage points)"
+            yLabel="Current APY (percent)"
+            points={moverScatterRows.map((row) => ({
+              id: `${row.chain_id}:${row.vault_address}`,
+              x: row.delta_apy,
+              y: row.safe_apy_window,
+              size: row.tvl_usd,
+              href: yearnVaultUrl(row.chain_id, row.vault_address),
+              tooltip:
+                `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
+                `Current APY: ${formatPct(row.safe_apy_window)}\nPrevious APY: ${formatPct(row.safe_apy_prev_window)}\n` +
+                `Delta: ${formatPct(row.delta_apy)}\nTVL: ${formatUsd(row.tvl_usd)}`,
+              tone: row.delta_apy !== null && row.delta_apy !== undefined ? (row.delta_apy >= 0 ? "positive" : "negative") : "neutral",
+            }))}
+            xFormatter={(value) => formatPct(value, 1)}
+            yFormatter={(value) => formatPct(value, 1)}
+            emptyText="No mover rows yet for this filter."
+          />
+          <BarList
+            title="Delta Distribution (Top Movers)"
+            items={deltaBandItems}
+            valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+          />
+          <HeatGrid title="Stale Ratio Heatmap by Chain" items={staleChainHeat} valueFormatter={(value) => formatPct(value)} />
+          <HeatGrid title="Stale Ratio Heatmap by Category" items={staleCategoryHeat} valueFormatter={(value) => formatPct(value)} />
         </div>
       </section>
 
@@ -1156,77 +1107,6 @@ function ChangesPageContent() {
                   <td className="is-numeric">{formatPct(row.stale_ratio)}</td>
                   <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric tablet-hide analyst-only">{formatUsd(row.stale_tvl_usd)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>Regime Mix</h2>
-        <BarList
-          title="Regime TVL Mix (Current Window)"
-          items={regimeRows.map((row) => ({
-            id: row.regime,
-            label: regimeLabel(row.regime),
-            value: row.tvl_usd,
-            note: `${row.vaults} vaults`,
-          }))}
-          valueFormatter={(value) => formatUsd(value)}
-        />
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <button
-                    className={`th-button ${regimeSort.key === "regime" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(regimeSort, "regime");
-                      setRegimeSort(next);
-                      updateQuery({ regime_sort: next.key, regime_dir: next.direction });
-                    }}
-                  >
-                    Regime <span className="th-indicator">{sortIndicator(regimeSort, "regime")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric">
-                  <button
-                    className={`th-button ${regimeSort.key === "vaults" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(regimeSort, "vaults");
-                      setRegimeSort(next);
-                      updateQuery({ regime_sort: next.key, regime_dir: next.direction });
-                    }}
-                  >
-                    Vaults <span className="th-indicator">{sortIndicator(regimeSort, "vaults")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric">
-                  <button
-                    className={`th-button ${regimeSort.key === "tvl" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(regimeSort, "tvl");
-                      setRegimeSort(next);
-                      updateQuery({ regime_sort: next.key, regime_dir: next.direction });
-                    }}
-                  >
-                    TVL <span className="th-indicator">{sortIndicator(regimeSort, "tvl")}</span>
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {regimeRows.map((row) => (
-                <tr key={row.regime}>
-                  <td>
-                    <Link href={`/regimes?universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
-                      {regimeLabel(row.regime)}
-                    </Link>
-                  </td>
-                  <td className="is-numeric">{row.vaults}</td>
-                  <td className="is-numeric">{formatUsd(row.tvl_usd)}</td>
                 </tr>
               ))}
             </tbody>
