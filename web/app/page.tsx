@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatHours, formatPct, formatUsd, formatUtcDateTime } from "./lib/format";
-import { BarList, KpiGrid } from "./components/visuals";
+import { formatHours, formatPct, formatUtcDateTime } from "./lib/format";
+import { KpiGrid } from "./components/visuals";
 
 type OverviewResponse = {
   project: string;
@@ -108,21 +108,6 @@ type OverviewResponse = {
   };
 };
 
-function formatIntervalSeconds(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "n/a";
-  if (value < 60) return `${value}s`;
-  if (value % 3600 === 0) return `${value / 3600}h`;
-  if (value % 60 === 0) return `${value / 60}m`;
-  return `${value}s`;
-}
-
-function addSecondsIso(iso: string | null | undefined, seconds: number | null | undefined): string | null {
-  if (!iso || seconds === null || seconds === undefined) return null;
-  const baseMs = Date.parse(iso);
-  if (!Number.isFinite(baseMs)) return null;
-  return new Date(baseMs + seconds * 1000).toISOString();
-}
-
 export default function HomePage() {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,11 +163,6 @@ export default function HomePage() {
     return () => window.clearInterval(timer);
   }, [data?.server_time_utc]);
 
-  const ydaemonLastRunStart = data?.ingestion?.last_runs?.ydaemon_snapshot?.started_at ?? null;
-  const ydaemonLastRunEnd = data?.ingestion?.last_runs?.ydaemon_snapshot?.ended_at ?? null;
-  const ydaemonLastSuccessAt = data?.freshness?.ingestion_jobs?.ydaemon_snapshot?.last_success_at ?? null;
-  const nextExpectedTick = addSecondsIso(ydaemonLastRunStart, data?.data_policy?.worker_interval_sec);
-
   return (
     <main className="container">
       <section className="hero">
@@ -190,204 +170,47 @@ export default function HomePage() {
         <p>Public Yearn dashboard. Built for quick checks by newcomers and deeper diagnostics by power users.</p>
       </section>
 
-      <section className="card overview-lifecycle-card">
-        <h2>System Snapshot</h2>
-        <p className="muted card-intro">Live ingestion state. If these values stall, treat all dashboard signals as stale.</p>
+      <section className="card">
+        <h2>Data Snapshot</h2>
+        <p className="muted card-intro">Quick health view so users can trust what they read on the other pages.</p>
         {data ? (
           <>
             <KpiGrid
               items={[
-                { label: "Project", value: data.project },
-                { label: "Status", value: data.status },
-                { label: "Server Time (UTC, Live)", value: serverTimeLive },
-                { label: "Latest Cycle Start (UTC)", value: formatUtcDateTime(ydaemonLastRunStart) },
-                { label: "Latest Cycle End (UTC)", value: formatUtcDateTime(ydaemonLastRunEnd) },
-                { label: "Last Successful Cycle (UTC)", value: formatUtcDateTime(ydaemonLastSuccessAt) },
-                { label: "Next Expected Tick (UTC)", value: formatUtcDateTime(nextExpectedTick) },
-                {
-                  label: "Last Successful Run Age",
-                  value: formatHours(data.freshness?.ingestion_jobs?.ydaemon_snapshot?.last_success_age_seconds),
-                },
+                { label: "Updated (UTC)", value: serverTimeLive },
+                { label: "Latest PPS Age", value: formatHours(data.freshness?.latest_pps_age_seconds) },
+                { label: "Newest Metrics Age", value: formatHours(data.freshness?.metrics_newest_age_seconds) },
+                { label: "PPS Stale Ratio", value: formatPct(data.freshness?.pps_stale_ratio, 1) },
                 { label: "Active Vaults", value: String(data.ingestion?.active_vaults ?? "n/a") },
-                { label: "PPS Data Points", value: String(data.ingestion?.pps_points ?? "n/a") },
                 { label: "Metric Rows", value: String(data.ingestion?.metrics_count ?? "n/a") },
               ]}
             />
-            <p className="muted">
-              Latest Cycle Start/End are from the most recent yDaemon ingestion run record. Last Successful Cycle is the most recent
-              run that completed with status <strong>success</strong>.
-            </p>
             <p className="muted">{data.message}</p>
           </>
         ) : loading ? (
-          <p>Loading live status…</p>
+          <p>Loading snapshot…</p>
         ) : (
-          <p>Live status is temporarily unavailable. Refresh shortly; if this persists, ingestion or API services are down.</p>
+          <p>Snapshot is temporarily unavailable. Try again shortly.</p>
         )}
       </section>
 
       <section className="card">
-        <h2>Data Cadence and Retention</h2>
-        <p className="muted card-intro">
-          Ingestion frequency and retention windows decide how fast data updates and how far back history is kept.
-        </p>
-        {data?.data_policy ? (
+        <h2>Universe Snapshot</h2>
+        <p className="muted card-intro">Current scope stats for the Yearn-aligned vault universe used by this dashboard.</p>
+        {data?.lifecycle || data?.coverage?.global ? (
           <KpiGrid
             items={[
-              { label: "Worker Tick", value: formatIntervalSeconds(data.data_policy.worker_interval_sec) },
-              { label: "Kong Lookback", value: `${data.data_policy.kong_pps_lookback_days ?? "n/a"}d` },
-              { label: "PPS Retention", value: `${data.data_policy.pps_retention_days ?? "n/a"}d` },
-              { label: "Run-Log Retention", value: `${data.data_policy.ingestion_run_retention_days ?? "n/a"}d` },
-              { label: "Cleanup Cadence", value: formatIntervalSeconds(data.data_policy.db_cleanup_min_interval_sec) },
+              { label: "Active Vaults", value: String(data?.lifecycle?.active_vaults ?? data?.coverage?.global?.active_vaults ?? "n/a") },
+              { label: "Eligible Vaults", value: String(data?.coverage?.global?.eligible_vaults ?? "n/a") },
+              { label: "Highlighted Vaults", value: String(data?.lifecycle?.highlighted_vaults ?? "n/a") },
+              { label: "Migration Ready", value: String(data?.lifecycle?.migration_ready_vaults ?? "n/a") },
+              { label: "Excluded Vaults", value: String(data?.coverage?.global?.excluded_vaults ?? "n/a") },
+              { label: "Low Data Points", value: String(data?.coverage?.global?.low_points ?? "n/a") },
             ]}
           />
         ) : (
-          <p>Policy metadata is unavailable for this cycle.</p>
+          <p>Universe stats are unavailable for this cycle.</p>
         )}
-      </section>
-
-      <section className="card">
-        <h2>Lifecycle Snapshot (yDaemon Metadata)</h2>
-        <p className="muted card-intro">
-          Lifecycle flags help users avoid stale vault choices and find migration paths faster.
-        </p>
-        {data?.lifecycle ? (
-          <div className="split-grid overview-lifecycle-layout">
-            <KpiGrid
-              items={[
-                { label: "Active Vaults", value: String(data.lifecycle.active_vaults ?? "n/a") },
-                { label: "Retired Vaults", value: String(data.lifecycle.retired_vaults ?? "n/a") },
-                { label: "Highlighted Vaults", value: String(data.lifecycle.highlighted_vaults ?? "n/a") },
-                { label: "Migration Ready", value: String(data.lifecycle.migration_ready_vaults ?? "n/a") },
-              ]}
-            />
-            <BarList
-              title="Risk Level Count"
-              items={[
-                { id: "unrated", label: "Unrated (-1)", value: data.lifecycle.risk_unrated_vaults ?? null },
-                { id: "r0", label: "Risk 0", value: data.lifecycle.risk_0_vaults ?? null },
-                { id: "r1", label: "Risk 1", value: data.lifecycle.risk_1_vaults ?? null },
-                { id: "r2", label: "Risk 2", value: data.lifecycle.risk_2_vaults ?? null },
-                { id: "r3", label: "Risk 3", value: data.lifecycle.risk_3_vaults ?? null },
-                { id: "r4", label: "Risk 4", value: data.lifecycle.risk_4_vaults ?? null },
-              ]}
-              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
-            />
-          </div>
-        ) : (
-          <p>Lifecycle metadata is unavailable for this cycle.</p>
-        )}
-      </section>
-
-      <section className="card overview-freshness-card">
-        <h2>Data Freshness</h2>
-        <p className="muted card-intro">
-          PPS means Price Per Share (vault share value over time). Most yield estimates here come from PPS history.
-        </p>
-        {data?.freshness ? (
-          <div className="overview-freshness-kpis">
-            <KpiGrid
-              items={[
-                { label: "Latest PPS Age", value: formatHours(data.freshness.latest_pps_age_seconds) },
-                { label: "Newest Metrics Age", value: formatHours(data.freshness.metrics_newest_age_seconds) },
-                { label: "PPS Stale Ratio", value: formatPct(data.freshness.pps_stale_ratio, 1) },
-                { label: "PPS Vaults Tracked", value: String(data.freshness.pps_vaults_total ?? "n/a") },
-                { label: "PPS Vaults Stale", value: String(data.freshness.pps_vaults_stale ?? "n/a") },
-                {
-                  label: "Kong Last Success",
-                  value: formatHours(data.freshness.ingestion_jobs?.kong_pps_metrics?.last_success_age_seconds),
-                },
-                {
-                  label: "yDaemon Last Success",
-                  value: formatHours(data.freshness.ingestion_jobs?.ydaemon_snapshot?.last_success_age_seconds),
-                },
-                {
-                  label: "Alerts Firing",
-                  value: String(Object.values(data.freshness.alerts ?? {}).filter((alert) => alert.is_firing).length),
-                },
-              ]}
-            />
-          </div>
-        ) : (
-          <p>Freshness metrics are unavailable for this cycle.</p>
-        )}
-        {Object.entries(data?.freshness?.alerts ?? {}).length > 0 ? (
-          <div className="inline-controls">
-            {Object.entries(data?.freshness?.alerts ?? {}).map(([key, alert]) => (
-              <span className="pill" key={key}>
-                {(alert.job_name ?? key).replaceAll("_", " ")}: {alert.status ?? "unknown"}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="card">
-        <h2>Protocol Context (DefiLlama)</h2>
-        <p className="muted card-intro">
-          External context for Yearn TVL and market cap. DefiLlama scope can differ from Yearn-aligned yDaemon scope, so values may
-          not match exactly.
-        </p>
-        {data?.protocol_context ? (
-          <div className="stats-grid">
-            <div>
-              <strong>Source Status:</strong> {data.protocol_context.status ?? "n/a"}
-            </div>
-            <div>
-              <strong>DefiLlama TVL:</strong> {formatUsd(data.protocol_context.tvl_usd)}
-            </div>
-            <div>
-              <strong>Yearn-Aligned Proxy TVL:</strong> {formatUsd(data.protocol_context.yearn_aligned_proxy?.tvl_usd)}
-            </div>
-            <div>
-              <strong>Tracked TVL Share:</strong> {formatPct(data.protocol_context.eligible_vs_protocol_tvl_ratio)}
-            </div>
-            <div>
-              <strong>DefiLlama minus Tracked TVL:</strong> {formatUsd(data.protocol_context.eligible_vs_protocol_tvl_gap_usd)}
-            </div>
-            <div>
-              <strong>DefiLlama minus Yearn Proxy:</strong> {formatUsd(data.protocol_context.defillama_vs_yearn_proxy_gap_usd)}
-            </div>
-            <div>
-              <strong>DefiLlama / Yearn Proxy:</strong> {formatPct(data.protocol_context.defillama_vs_yearn_proxy_ratio)}
-            </div>
-            <div>
-              <strong>Protocol MCap:</strong> {formatUsd(data.protocol_context.mcap_usd)}
-            </div>
-            <div>
-              <strong>MCap / TVL:</strong> {formatPct(data.protocol_context.mcap_tvl_ratio)}
-            </div>
-            <div>
-              <strong>MCap Source:</strong> {data.protocol_context.mcap_source ?? "n/a"}
-            </div>
-            <div>
-              <strong>Protocol TVL Change 7d:</strong> {formatPct(data.protocol_context.tvl_change_7d_pct)}
-            </div>
-            <div>
-              <strong>Protocol TVL Change 30d:</strong> {formatPct(data.protocol_context.tvl_change_30d_pct)}
-            </div>
-          </div>
-        ) : (
-          <p>Protocol context is unavailable for this cycle.</p>
-        )}
-        <p className="muted">
-          DefiLlama currently reports protocol TVL from its own adapter scope. The Yearn-aligned proxy is derived from yDaemon
-          active, non-hidden, non-retired multi/single strategy vaults.
-        </p>
-        <p className="muted">
-          If market cap remains n/a, upstream sources did not provide it for this cycle.
-        </p>
-        {(data?.protocol_context?.top_chains ?? []).length > 0 ? (
-          <BarList
-            title="DefiLlama Chain TVL"
-            items={(data?.protocol_context?.top_chains ?? []).map((row) => ({
-              id: row.chain,
-              label: row.chain,
-              value: row.tvl_usd,
-            }))}
-            valueFormatter={(value) => formatUsd(value)}
-          />
-        ) : null}
       </section>
 
       <section className="card">

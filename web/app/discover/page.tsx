@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, regimeLabel, yearnVaultUrl } from "../lib/format";
+import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryBool, queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips } from "../components/visuals";
@@ -211,6 +211,16 @@ function riskLevelLabel(value: string | null | undefined): string {
   return value;
 }
 
+function compactRegimeLabel(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+  const key = value.toLowerCase();
+  if (key === "rising") return "Rising";
+  if (key === "falling") return "Falling";
+  if (key === "stable") return "Stable";
+  if (key === "choppy") return "Choppy";
+  return value;
+}
+
 function DiscoverPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -249,7 +259,6 @@ function DiscoverPageContent() {
       chain: chain > 0 ? chain : null,
       category: queryString(searchParams, "category", ""),
       token: queryString(searchParams, "token", ""),
-      includeRetired: queryBool(searchParams, "include_retired", false),
       migrationOnly: queryBool(searchParams, "migration_only", false),
       highlightedOnly: queryBool(searchParams, "highlighted_only", false),
       trendGroup: queryChoice(searchParams, "trend_group", ["none", "chain", "category"] as const, "none"),
@@ -287,7 +296,6 @@ function DiscoverPageContent() {
         if (query.chain) params.set("chain_id", String(query.chain));
         if (query.category) params.set("category", query.category);
         if (query.token) params.set("token_symbol", query.token);
-        if (query.includeRetired) params.set("include_retired", "true");
         if (query.migrationOnly) params.set("migration_only", "true");
         if (query.highlightedOnly) params.set("highlighted_only", "true");
         const res = await fetch(`/api/discover?${params.toString()}`, { cache: "no-store" });
@@ -690,14 +698,6 @@ function DiscoverPageContent() {
           <label className="toggle-label">
             <input
               type="checkbox"
-              checked={query.includeRetired}
-              onChange={(event) => updateQuery({ include_retired: event.target.checked ? "true" : null })}
-            />
-            <span>Include retired</span>
-          </label>
-          <label className="toggle-label">
-            <input
-              type="checkbox"
               checked={query.migrationOnly}
               onChange={(event) => updateQuery({ migration_only: event.target.checked ? "true" : null })}
             />
@@ -772,13 +772,26 @@ function DiscoverPageContent() {
               { label: "Chains", value: String(data?.summary?.chains ?? "n/a") },
               { label: "Tokens", value: String(data?.summary?.tokens ?? "n/a") },
               { label: "Total TVL", value: formatUsd(data?.summary?.total_tvl_usd) },
-              { label: "TVL-Weighted APY", value: formatPct(data?.summary?.tvl_weighted_safe_apy_30d) },
+              {
+                label: "TVL-Weighted APY",
+                value: formatPct(data?.summary?.tvl_weighted_safe_apy_30d),
+                hint: "Average APY weighted by where most TVL sits",
+              },
               { label: "Median APY", value: formatPct(data?.summary?.median_safe_apy_30d) },
-              { label: "Avg Momentum", value: formatPct(data?.summary?.avg_momentum_7d_30d) },
-              { label: "Avg Consistency", value: formatPct(data?.summary?.avg_consistency_score) },
+              {
+                label: "Avg Momentum",
+                value: formatPct(data?.summary?.avg_momentum_7d_30d),
+                hint: "7d APY minus 30d APY; positive means improving",
+              },
+              {
+                label: "Avg Consistency",
+                value: formatPct(data?.summary?.avg_consistency_score),
+                hint: "Higher means steadier yield behavior",
+              },
               {
                 label: "Avg Strategies",
                 value: formatFixed(data?.summary?.avg_strategies_per_vault, 2),
+                hint: "Average number of strategy slots per vault",
               },
               { label: "Migration Ready", value: String(data?.summary?.migration_ready_vaults ?? "n/a") },
               { label: "Highlighted", value: String(data?.summary?.highlighted_vaults ?? "n/a") },
@@ -791,7 +804,7 @@ function DiscoverPageContent() {
               title="Regime TVL Mix"
               items={(data?.regime_mix ?? []).map((row) => ({
                 id: row.regime,
-                label: regimeLabel(row.regime),
+                label: compactRegimeLabel(row.regime),
                 value: row.tvl_usd,
                 note: `${row.vaults} vaults`,
               }))}
@@ -893,10 +906,7 @@ function DiscoverPageContent() {
             }
           />
         </div>
-        <p className="muted">
-          Trend strips read left-to-right over time. Right-most value is latest day, and delta compares the latest point against
-          the previous day.
-        </p>
+        <p className="muted">Delta compares the latest point against the previous day.</p>
       </section>
 
       <section className="card">
@@ -973,7 +983,8 @@ function DiscoverPageContent() {
                   <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
                   <td className="col-chain">
                     <Link
-                      href={`/regimes?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
+                      href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
+                      scroll={false}
                     >
                       {chainLabel(row.chain_id)}
                     </Link>
@@ -982,8 +993,9 @@ function DiscoverPageContent() {
                     {row.token_symbol ? (
                       <Link
                         href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
+                        title="Open token venues in Assets"
                       >
-                        {row.token_symbol}
+                        {row.token_symbol} ↗
                       </Link>
                     ) : (
                       "n/a"
@@ -1001,7 +1013,7 @@ function DiscoverPageContent() {
                     {row.is_highlighted ? " · Highlighted" : ""}
                     {row.is_retired ? " · Retired" : ""}
                   </td>
-                  <td className="tablet-hide analyst-only col-regime">{regimeLabel(row.regime)}</td>
+                  <td className="tablet-hide analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>

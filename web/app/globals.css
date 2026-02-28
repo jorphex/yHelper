@@ -575,8 +575,12 @@ input[type="text"] {
   align-items: start;
 }
 
+.discover-analytics-card .scatter-wrap svg {
+  min-height: 286px;
+}
+
 .discover-table {
-  min-width: 1180px;
+  min-width: 1080px;
   table-layout: fixed;
 }
 
@@ -599,24 +603,24 @@ input[type="text"] {
 
 .discover-table th.col-vault,
 .discover-table td.col-vault {
-  width: 13.5rem;
+  width: 11.2rem;
 }
 
 .discover-table th.col-chain,
 .discover-table td.col-chain {
-  width: 8.8rem;
+  width: 6.8rem;
   white-space: nowrap;
 }
 
 .discover-table th.col-token,
 .discover-table td.col-token {
-  width: 9rem;
+  width: 7.6rem;
   white-space: nowrap;
 }
 
 .discover-table th.col-category,
 .discover-table td.col-category {
-  width: 10.2rem;
+  width: 8.2rem;
   white-space: nowrap;
 }
 
@@ -633,17 +637,17 @@ input[type="text"] {
 .discover-table td.col-momentum,
 .discover-table th.col-consistency,
 .discover-table td.col-consistency {
-  width: 7.45rem;
+  width: 6.7rem;
 }
 
 .discover-table th.col-risk,
 .discover-table td.col-risk {
-  width: 12rem;
+  width: 10.8rem;
 }
 
 .discover-table th.col-regime,
 .discover-table td.col-regime {
-  width: 8.2rem;
+  width: 6.9rem;
   white-space: nowrap;
 }
 
@@ -666,15 +670,15 @@ input[type="text"] {
 }
 
 .discover-table td.col-vault {
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .discover-table td.col-vault .vault-link {
-  max-width: 14.25rem;
-  white-space: normal;
+  max-width: 11rem;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .changes-mover-table {
@@ -811,11 +815,9 @@ input[type="text"] {
 
 .assets-venues-table th.col-category,
 .assets-venues-table td.col-category,
-.assets-venues-table th.col-version,
-.assets-venues-table td.col-version,
 .assets-venues-table th.col-regime,
 .assets-venues-table td.col-regime {
-  width: 8rem;
+  width: 8.6rem;
   white-space: nowrap;
 }
 
@@ -843,7 +845,6 @@ input[type="text"] {
 }
 
 .assets-venues-table td.col-category,
-.assets-venues-table td.col-version,
 .assets-venues-table td.col-regime {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -24,6 +24,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://yhelper:change_me@yhelper
 APY_MIN = -0.95
 APY_MAX = 3.0
 MOMENTUM_ABS_MAX = 1.0
+USER_VISIBLE_KIND = "Multi Strategy"
+USER_VISIBLE_VERSION_PREFIX = "3."
 DEFAULT_MIN_TVL_USD = 100000.0
 DEFAULT_MIN_POINTS = 30
 UNIVERSE_CORE_MIN_TVL_USD = 1000000.0
@@ -129,6 +131,17 @@ def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None) -> str:
         LIMIT %(max_vaults)s
     )
     """.format(alias=alias)
+
+
+def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> str:
+    clauses = [
+        f"{alias}.active = TRUE",
+        f"COALESCE({alias}.kind, '') = '{USER_VISIBLE_KIND}'",
+        f"COALESCE({alias}.version, '') LIKE '{USER_VISIBLE_VERSION_PREFIX}%%'",
+    ]
+    if not include_retired:
+        clauses.append(f"COALESCE(({alias}.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE")
+    return " AND ".join(clauses)
 
 
 def _freshness_snapshot(
@@ -1185,15 +1198,19 @@ async def discover(
     }
     order_expr = order_map[sort_by]
     order_dir = "ASC" if direction == "asc" else "DESC"
-    filters = ["d.active = TRUE", "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s", "COALESCE(m.points_count, 0) >= %(min_points)s"]
+    filters = [
+        _user_visible_filter_sql("d", include_retired=False),
+        "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s",
+        "COALESCE(m.points_count, 0) >= %(min_points)s",
+    ]
     params: dict[str, object] = {
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "limit": limit,
         "offset": offset,
     }
-    if not include_retired and not migration_only:
-        filters.append(f"{retired_sql} = FALSE")
+    # `include_retired` remains in the API for backward URL compatibility, but discover defaults
+    # to user-visible scope (active + non-retired + Multi Strategy v3).
     if migration_only:
         filters.append(f"{migration_sql} = TRUE")
     if highlighted_only:
@@ -2555,7 +2572,7 @@ async def assets(
             FROM vault_dim d
             JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
             WHERE
-                d.active = TRUE
+                {_user_visible_filter_sql("d", include_retired=False)}
                 AND COALESCE(d.token_symbol, '') <> ''
                 AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                 AND COALESCE(m.points_count, 0) >= %(min_points)s
@@ -2777,7 +2794,7 @@ async def asset_venues(
                 FROM vault_dim d
                 JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
                 WHERE
-                    d.active = TRUE
+                    {_user_visible_filter_sql("d", include_retired=False)}
                     AND LOWER(COALESCE(d.token_symbol, '')) = LOWER(%(token_symbol)s)
                     AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                     AND COALESCE(m.points_count, 0) >= %(min_points)s

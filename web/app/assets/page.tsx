@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
+import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, KpiGrid } from "../components/visuals";
@@ -81,9 +81,19 @@ type AssetVenuesResponse = {
 };
 
 type TokenSortKey = "token" | "venues" | "chains" | "tvl" | "best" | "weighted" | "spread";
-type VenueSortKey = "vault" | "chain" | "category" | "version" | "tvl" | "apy" | "momentum" | "consistency" | "regime";
+type VenueSortKey = "vault" | "chain" | "category" | "tvl" | "apy" | "momentum" | "consistency" | "regime";
 type AssetApiSort = "tvl" | "spread" | "best_apy" | "venues";
 type TokenScope = "featured" | "canonical" | "all";
+
+function compactRegimeLabel(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+  const key = value.toLowerCase();
+  if (key === "rising") return "Rising";
+  if (key === "falling") return "Falling";
+  if (key === "stable") return "Stable";
+  if (key === "choppy") return "Choppy";
+  return value;
+}
 
 function AssetsPageContent() {
   const router = useRouter();
@@ -118,7 +128,7 @@ function AssetsPageContent() {
       venueSort: queryChoice<VenueSortKey>(
         searchParams,
         "venue_sort",
-        ["vault", "chain", "category", "version", "tvl", "apy", "momentum", "consistency", "regime"] as const,
+        ["vault", "chain", "category", "tvl", "apy", "momentum", "consistency", "regime"] as const,
         "apy",
       ),
       venueDir: queryChoice(searchParams, "venue_dir", ["asc", "desc"] as const, "desc"),
@@ -229,7 +239,6 @@ function AssetsPageContent() {
     vault: (row) => row.symbol ?? row.vault_address,
     chain: (row) => chainLabel(row.chain_id),
     category: (row) => row.category ?? "",
-    version: (row) => row.version ?? "",
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
     apy: (row) => row.safe_apy_30d ?? Number.NEGATIVE_INFINITY,
     momentum: (row) => row.momentum_7d_30d ?? Number.NEGATIVE_INFINITY,
@@ -540,6 +549,9 @@ function AssetsPageContent() {
         <p className="muted card-intro">
           Venue-level detail for the selected token. Sort to compare alternatives quickly. Dense mode adds extra context columns.
         </p>
+        <p className="muted">
+          Scope: active, non-retired <strong>Multi Strategy v3</strong> vaults only.
+        </p>
         {!selectedSymbol ? <p className="muted">Select a token above to load venue-level details.</p> : null}
         <div className="split-grid">
           <KpiGrid
@@ -558,7 +570,7 @@ function AssetsPageContent() {
             title="Regime Count (Selected Token)"
             items={(detail?.summary.regime_counts ?? []).map((row) => ({
               id: row.regime,
-              label: regimeLabel(row.regime),
+              label: compactRegimeLabel(row.regime),
               value: row.vaults,
             }))}
             valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
@@ -603,18 +615,6 @@ function AssetsPageContent() {
                     }}
                   >
                     Category <span className="th-indicator">{sortIndicator(venueSort, "category")}</span>
-                  </button>
-                </th>
-                <th className="tablet-hide analyst-only col-version">
-                  <button
-                    className={`th-button ${venueSort.key === "version" ? "is-active" : ""}`}
-                    onClick={() => {
-                      const next = toggleSort(venueSort, "version");
-                      setVenueSort(next);
-                      updateQuery({ venue_sort: next.key, venue_dir: next.direction });
-                    }}
-                  >
-                    Version <span className="th-indicator">{sortIndicator(venueSort, "version")}</span>
                   </button>
                 </th>
                 <th className="is-numeric col-tvl">
@@ -693,12 +693,11 @@ function AssetsPageContent() {
                     </Link>
                   </td>
                   <td className="tablet-hide analyst-only col-category">{row.category || "n/a"}</td>
-                  <td className="tablet-hide analyst-only col-version">{row.version || "n/a"}</td>
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
                   <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
-                  <td className="tablet-hide analyst-only col-regime">{regimeLabel(row.regime)}</td>
+                  <td className="tablet-hide analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>
