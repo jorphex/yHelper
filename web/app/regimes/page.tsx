@@ -112,14 +112,6 @@ function regimeOrder(value: string): number {
   return 4;
 }
 
-function transitionTone(value: number): string {
-  if (!Number.isFinite(value)) return "#3f5f82";
-  if (value >= 0.22) return "#7ed957";
-  if (value >= 0.14) return "#4ca4ff";
-  if (value >= 0.08) return "#f6b73c";
-  return "#d86a7f";
-}
-
 function formatUsdCompact(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
   return new Intl.NumberFormat("en-US", {
@@ -221,66 +213,6 @@ function RegimeFlowSankey({
   );
 }
 
-function RegimeCalendarHeatmap({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: TransitionDailyRow[];
-}) {
-  const valid = rows
-    .map((row) => {
-      const date = new Date(`${row.day}T00:00:00Z`);
-      if (Number.isNaN(date.getTime())) return null;
-      return { date, value: row.changed_ratio ?? null };
-    })
-    .filter((row): row is { date: Date; value: number | null } => row !== null)
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
-  if (valid.length === 0) {
-    return (
-      <section className="viz-panel">
-        <h3>{title}</h3>
-        <p className="muted">No daily transition rows available.</p>
-      </section>
-    );
-  }
-  const first = valid[0].date;
-  const startOffset = first.getUTCDay();
-  const cell = 13;
-  const gap = 3;
-  const width = Math.max(240, (Math.ceil((valid.length + startOffset) / 7) + 1) * (cell + gap) + 42);
-  const height = 7 * (cell + gap) + 48;
-  const max = Math.max(...valid.map((row) => row.value ?? 0), 0.001);
-
-  return (
-    <section className="viz-panel">
-      <h3>{title}</h3>
-      <div className="scatter-wrap">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
-          {valid.map((row, index) => {
-            const slot = index + startOffset;
-            const col = Math.floor(slot / 7);
-            const day = row.date.getUTCDay();
-            const x = 36 + col * (cell + gap);
-            const y = 18 + day * (cell + gap);
-            const tone = transitionTone((row.value ?? 0) / max);
-            return (
-              <rect key={row.date.toISOString()} x={x} y={y} width={cell} height={cell} rx={3} fill={tone} opacity={0.85}>
-                <title>{`${row.date.toISOString().slice(0, 10)}\nChanged ratio: ${formatPct(row.value, 2)}`}</title>
-              </rect>
-            );
-          })}
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, index) => (
-            <text key={label} x={4} y={28 + index * (cell + gap)} className="viz-tick">
-              {label}
-            </text>
-          ))}
-        </svg>
-      </div>
-      <p className="muted viz-legend">Calendar intensity reflects daily regime-change ratio; darker cells indicate higher churn days.</p>
-    </section>
-  );
-}
 
 function RegimesPageContent() {
   const router = useRouter();
@@ -491,10 +423,6 @@ function RegimesPageContent() {
       .slice(0, 8);
     return rows;
   }, [transitionDailyGrouped, query.transitionMinCohortTvl]);
-  const requestedTransitionDays = Number(query.transitionDays);
-  const availableTransitionDays = transitionDaily.length;
-  const transitionCoverageRatio = requestedTransitionDays > 0 ? availableTransitionDays / requestedTransitionDays : 1;
-  const showTransitionCoverageWarning = availableTransitionDays > 0 && transitionCoverageRatio < 0.5 && availableTransitionDays < 90;
   const groupedLatestChurnHeat = useMemo(() => {
     const latest = transitionDailyGrouped?.latest ?? [];
     const groupType = transitionDailyGrouped?.group_by;
@@ -791,16 +719,6 @@ function RegimesPageContent() {
                   legend="Higher intensity means more TVL moved between regime states."
                 />
               </div>
-              <BarList
-                title="Chains with Highest Regime Churn"
-                items={(transitionData?.chain_breakdown ?? []).map((row) => ({
-                  id: String(row.chain_id),
-                  label: chainLabel(row.chain_id),
-                  value: row.changed_ratio,
-                  note: `${row.changed_vaults}/${row.vaults} vaults • ${formatUsd(row.changed_tvl_usd)}`,
-                }))}
-                valueFormatter={(value) => formatPct(value, 1)}
-              />
             </>
           ) : (
             <div className="changes-stale-grid">
@@ -823,9 +741,8 @@ function RegimesPageContent() {
       <section className="card">
         <h2>Regime Flow Story</h2>
         <p className="muted card-intro">Visual flow of where TVL moved between prior and current regime states.</p>
-        <div className="changes-stale-grid">
+        <div>
           <RegimeFlowSankey title="Regime Flow Sankey (TVL-weighted)" rows={transitionData?.matrix ?? []} />
-          <RegimeCalendarHeatmap title="Regime Churn Calendar" rows={transitionDaily} />
         </div>
       </section>
 
@@ -834,12 +751,6 @@ function RegimesPageContent() {
         <p className="muted card-intro">
           Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.
         </p>
-        {showTransitionCoverageWarning ? (
-          <p className="muted">
-            Coverage warning: requested {requestedTransitionDays} days, but only {availableTransitionDays} daily points are currently available.
-            Long-window views are truncated by retained PPS history.
-          </p>
-        ) : null}
         <TrendStrips
           title="Transition Churn Signals"
           items={transitionTrendItems}

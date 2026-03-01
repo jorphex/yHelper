@@ -260,7 +260,7 @@ export function ScatterPlot({
   }
 
   const width = 700;
-  const height = 320;
+  const height = 352;
   const xValues = finiteValues(valid.map((point) => point.x));
   const yValues = finiteValues(valid.map((point) => point.y));
   const sizeValues = finiteValues(valid.map((point) => point.size));
@@ -276,13 +276,13 @@ export function ScatterPlot({
   const widestYTick = yTickLabels.reduce((max, label) => Math.max(max, label.length), 0);
   const paddingLeft = Math.min(92, Math.max(56, 18 + widestYTick * 7));
   const paddingRight = 20;
-  const paddingTop = 22;
-  const paddingBottom = 62;
+  const paddingTop = 24;
+  const paddingBottom = 66;
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
   const densityBins = new Map<string, number>();
-  const densityColumns = 20;
-  const densityRows = 12;
+  const densityColumns = 18;
+  const densityRows = 10;
   if (densityBackdrop) {
     for (const point of valid) {
       const x = Number(point.x);
@@ -306,18 +306,17 @@ export function ScatterPlot({
                 const [colRaw, rowRaw] = key.split(":");
                 const col = Number(colRaw);
                 const row = Number(rowRaw);
-                const x = paddingLeft + (col / densityColumns) * innerWidth;
-                const y = paddingTop + (row / densityRows) * innerHeight;
                 const cellW = innerWidth / densityColumns;
                 const cellH = innerHeight / densityRows;
+                const x = paddingLeft + (col + 0.5) * cellW;
+                const y = paddingTop + (row + 0.5) * cellH;
                 const alpha = 0.03 + (count / maxDensity) * 0.2;
                 return (
-                  <rect
+                  <circle
                     key={`density-${key}`}
-                    x={x}
-                    y={y}
-                    width={cellW}
-                    height={cellH}
+                    cx={x}
+                    cy={y}
+                    r={Math.max(cellW, cellH) * 0.72}
                     fill="rgba(125, 176, 228, 1)"
                     opacity={alpha}
                   />
@@ -417,13 +416,7 @@ export function ScatterPlot({
           <text x={paddingLeft + innerWidth / 2} y={height - 26} className="viz-axis-label" textAnchor="middle">
             {xLabel}
           </text>
-          <text
-            x={24}
-            y={paddingTop + innerHeight / 2}
-            transform={`rotate(-90 24 ${paddingTop + innerHeight / 2})`}
-            className="viz-axis-label"
-            textAnchor="middle"
-          >
+          <text x={paddingLeft + 4} y={14} className="viz-axis-label" textAnchor="start">
             {yLabel}
           </text>
         </svg>

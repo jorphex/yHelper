@@ -451,7 +451,7 @@ function AssetsPageContent() {
               const spread = row.spread_safe_apy_30d ?? 0;
               const worst = best - spread;
               const maxAbs = Math.max(0.5, Math.abs(best), Math.abs(weighted), Math.abs(worst));
-              const toY = (value: number) => 26 - ((value + maxAbs) / (2 * maxAbs)) * 22;
+              const toY = (value: number) => 34 - ((value + maxAbs) / (2 * maxAbs)) * 28;
               const spark = `M2,${toY(worst).toFixed(2)} L26,${toY(weighted).toFixed(2)} L50,${toY(best).toFixed(2)}`;
               return (
                 <button
@@ -461,7 +461,7 @@ function AssetsPageContent() {
                   onClick={() => updateQuery({ token: row.token_symbol })}
                 >
                   <p className="assets-spread-token">{row.token_symbol}</p>
-                  <svg viewBox="0 0 52 28" aria-label={`${row.token_symbol} APY spread shape`}>
+                  <svg viewBox="0 0 52 36" aria-label={`${row.token_symbol} APY spread shape`}>
                     <path d={spark} className="assets-spread-line" />
                   </svg>
                   <p className="assets-spread-value">{formatPct(spread)}</p>

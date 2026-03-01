@@ -238,8 +238,8 @@ function DiscoverRidgeline({
     );
   }
   const width = 760;
-  const rowH = 52;
-  const height = 24 + valid.length * rowH;
+  const rowH = 38;
+  const height = 18 + valid.length * rowH + 18;
   const bins = 24;
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);
@@ -252,7 +252,7 @@ function DiscoverRidgeline({
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {valid.map((row, idx) => {
-            const yBase = 20 + idx * rowH + 24;
+            const yBase = 18 + idx * rowH + 18;
             const counts = new Array<number>(bins).fill(0);
             for (const value of row.values) {
               const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
@@ -276,14 +276,14 @@ function DiscoverRidgeline({
             return (
               <g key={row.id}>
                 <path d={`${pathTop} ${pathBottom} Z`} fill="rgba(87, 152, 214, 0.36)" stroke="#6fb2e5" strokeWidth={1.2} />
-                <text x={8} y={yBase - 8} className="viz-tick">{row.label}</text>
-                <text x={8} y={yBase + 8} className="viz-tick">{row.note}</text>
+                <text x={8} y={yBase - 4} className="viz-tick">{row.label}</text>
+                <text x={120} y={yBase - 4} className="viz-tick">{row.note}</text>
               </g>
             );
           })}
-          <line x1={128} x2={width - 40} y1={height - 12} y2={height - 12} className="viz-axis" />
-          <text x={128} y={height - 2} className="viz-tick">{formatPct(min, 1)}</text>
-          <text x={width - 40} y={height - 2} className="viz-tick" textAnchor="end">{formatPct(max, 1)}</text>
+          <line x1={128} x2={width - 40} y1={height - 14} y2={height - 14} className="viz-axis" />
+          <text x={128} y={height - 4} className="viz-tick">{formatPct(min, 1)}</text>
+          <text x={width - 40} y={height - 4} className="viz-tick" textAnchor="end">{formatPct(max, 1)}</text>
         </svg>
       </div>
       <p className="muted viz-legend">Ridgelines approximate APY distribution shape by chain (peak = most common APY zone).</p>
@@ -999,7 +999,9 @@ function DiscoverPageContent() {
                 : "Grouped APY trend unavailable for this filter."
             }
           />
-          <DiscoverRidgeline title="APY Distribution Ridgelines (Top Chains by TVL)" series={chainRidgelineSeries} />
+          <div className="discover-ridgeline">
+            <DiscoverRidgeline title="APY Distribution Ridgelines (Top Chains by TVL)" series={chainRidgelineSeries} />
+          </div>
         </div>
         <p className="muted discover-analytics-note">Delta compares the latest point against the previous day.</p>
       </section>

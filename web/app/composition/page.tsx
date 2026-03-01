@@ -79,7 +79,7 @@ function TvlTreemap({
   tokens: BreakdownRow[];
 }) {
   const width = 760;
-  const height = 270;
+  const height = 220;
   const topChains = [...chains]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
@@ -93,9 +93,9 @@ function TvlTreemap({
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
     .slice(0, 8);
   const groups = [
-    { key: "chain", label: "Chain", color: "rgba(70, 140, 210, 0.8)", rows: topChains, text: (row: BreakdownRow) => chainLabel(row.chain_id) },
-    { key: "category", label: "Category", color: "rgba(76, 182, 146, 0.8)", rows: topCategories, text: (row: BreakdownRow) => row.category || "unknown" },
-    { key: "token", label: "Token", color: "rgba(230, 172, 78, 0.8)", rows: topTokens, text: (row: BreakdownRow) => row.token_symbol || "unknown" },
+    { key: "chain", label: "Chain", color: "rgba(6, 87, 249, 0.78)", rows: topChains, text: (row: BreakdownRow) => chainLabel(row.chain_id) },
+    { key: "category", label: "Category", color: "rgba(72, 130, 212, 0.74)", rows: topCategories, text: (row: BreakdownRow) => row.category || "unknown" },
+    { key: "token", label: "Token", color: "rgba(122, 170, 255, 0.7)", rows: topTokens, text: (row: BreakdownRow) => row.token_symbol || "unknown" },
   ];
   const validGroups = groups.filter((group) => group.rows.length > 0);
   if (validGroups.length === 0) {
@@ -118,7 +118,7 @@ function TvlTreemap({
             const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
             let x = 0;
             return (
-              <g key={group.key}>
+              <g key={group.key} className={`treemap-group treemap-group-${group.key}`}>
                 <text x={0} y={y - 4} className="viz-axis-label">{group.label}</text>
                 {group.rows.map((row) => {
                   const value = Number(row.tvl_usd ?? 0);
@@ -128,9 +128,9 @@ function TvlTreemap({
                   x += w;
                   const name = group.text(row);
                   return (
-                    <g key={`${group.key}-${name}`}>
+                    <g key={`${group.key}-${name}`} className="treemap-cell">
                       <rect x={rectX} y={y} width={w} height={laneHeight} fill={group.color} opacity={0.85} stroke="#0f1f36" />
-                      {w >= 70 ? (
+                      {w >= 92 ? (
                         <text x={rectX + 6} y={y + 16} className="viz-tick">
                           {name}
                         </text>

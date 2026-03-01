@@ -158,130 +158,6 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function DeltaContributionWaterfall({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: GroupedTrendRow[];
-}) {
-  const valid = rows
-    .filter((row) => row.weighted_momentum_7d_30d !== null && row.weighted_momentum_7d_30d !== undefined && (row.total_tvl_usd ?? 0) > 0)
-    .slice()
-    .sort((left, right) => (right.total_tvl_usd ?? 0) - (left.total_tvl_usd ?? 0))
-    .slice(0, 10);
-  const totalTvl = valid.reduce((acc, row) => acc + Number(row.total_tvl_usd ?? 0), 0);
-  const bars = valid
-    .map((row) => {
-      const momentum = Number(row.weighted_momentum_7d_30d ?? 0);
-      const weight = totalTvl > 0 ? Number(row.total_tvl_usd ?? 0) / totalTvl : 0;
-      return {
-        id: row.group_key,
-        label: chainLabel(Number(row.group_key)),
-        value: momentum * weight,
-        note: `Momentum ${formatPct(row.weighted_momentum_7d_30d, 2)} • TVL ${formatUsd(row.total_tvl_usd)}`,
-      };
-    })
-    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
-  const maxAbs = Math.max(0.001, ...bars.map((row) => Math.abs(row.value)));
-
-  return (
-    <section className="viz-panel">
-      <h3>{title}</h3>
-      <ul className="waterfall-list">
-        {bars.map((row) => {
-          const pct = Math.abs(row.value / maxAbs) * 100;
-          const positive = row.value >= 0;
-          return (
-            <li key={row.id} className="waterfall-row">
-              <span className="waterfall-label">{row.label}</span>
-              <div className="waterfall-track">
-                <div className={`waterfall-bar ${positive ? "is-positive" : "is-negative"}`} style={{ width: `${Math.max(4, pct)}%` }} />
-              </div>
-              <span className={`waterfall-value ${positive ? "text-positive" : "text-negative"}`}>{formatPct(row.value, 2)}</span>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="muted viz-legend">Contribution score = chain momentum multiplied by TVL share in the selected universe.</p>
-    </section>
-  );
-}
-
-function RankBumpChart({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: ChangeRow[];
-}) {
-  const ranked = rows
-    .filter(
-      (row) =>
-        row.safe_apy_window !== null &&
-        row.safe_apy_window !== undefined &&
-        row.safe_apy_prev_window !== null &&
-        row.safe_apy_prev_window !== undefined,
-    )
-    .slice(0, 24);
-  if (ranked.length === 0) {
-    return (
-      <section className="viz-panel">
-        <h3>{title}</h3>
-        <p className="muted">Not enough rows with both current and previous APY.</p>
-      </section>
-    );
-  }
-  const curr = [...ranked].sort((a, b) => Number(b.safe_apy_window) - Number(a.safe_apy_window));
-  const prev = [...ranked].sort((a, b) => Number(b.safe_apy_prev_window) - Number(a.safe_apy_prev_window));
-  const currRank = new Map(curr.map((row, index) => [row.vault_address, index + 1]));
-  const prevRank = new Map(prev.map((row, index) => [row.vault_address, index + 1]));
-  const maxRank = Math.max(curr.length, prev.length);
-  const width = 760;
-  const height = 300;
-  const leftX = 150;
-  const rightX = width - 150;
-  const top = 24;
-  const bottom = height - 28;
-  const yForRank = (rank: number) => top + ((rank - 1) / Math.max(1, maxRank - 1)) * (bottom - top);
-  const focused = curr.slice(0, 10);
-
-  return (
-    <section className="viz-panel">
-      <h3>{title}</h3>
-      <div className="scatter-wrap">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
-          <line x1={leftX} x2={leftX} y1={top} y2={bottom} className="viz-axis" />
-          <line x1={rightX} x2={rightX} y1={top} y2={bottom} className="viz-axis" />
-          <text x={leftX} y={16} className="viz-axis-label" textAnchor="middle">Previous APY Rank</text>
-          <text x={rightX} y={16} className="viz-axis-label" textAnchor="middle">Current APY Rank</text>
-          {focused.map((row) => {
-            const pRank = prevRank.get(row.vault_address) ?? maxRank;
-            const cRank = currRank.get(row.vault_address) ?? maxRank;
-            const y1 = yForRank(pRank);
-            const y2 = yForRank(cRank);
-            const positive = cRank < pRank;
-            return (
-              <g key={`bump-${row.vault_address}`}>
-                <path
-                  d={`M${leftX},${y1} C${leftX + 120},${y1} ${rightX - 120},${y2} ${rightX},${y2}`}
-                  fill="none"
-                  stroke={positive ? "rgba(99, 197, 50, 0.85)" : "rgba(223, 83, 106, 0.85)"}
-                  strokeWidth={2.2}
-                />
-                <circle cx={leftX} cy={y1} r={3} fill="#8db3dc" />
-                <circle cx={rightX} cy={y2} r={3} fill={positive ? "#63c532" : "#df536a"} />
-                <title>{`${row.symbol || row.vault_address}\nPrevious rank: ${pRank}\nCurrent rank: ${cRank}`}</title>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      <p className="muted viz-legend">Top current APY movers with two-point rank transition from previous to current APY window.</p>
-    </section>
-  );
-}
-
 function MoverTable({
   title,
   rows,
@@ -450,7 +326,6 @@ function ChangesPageContent() {
         "auto",
       ),
       trendGroup: queryChoice<TrendGroupKey>(searchParams, "trend_group", ["none", "chain", "category"] as const, "none"),
-      storyMode: queryChoice(searchParams, "story_mode", ["off", "on"] as const, "off"),
       tvlView: queryChoice<TvlView>(searchParams, "tvl_view", ["both", "filtered", "yearn"] as const, "both"),
       limit: queryInt(searchParams, "limit", 20, { min: 5, max: 80 }),
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
@@ -802,12 +677,6 @@ function ChangesPageContent() {
         })),
     [categoryTrendLatest, isCompactViewport],
   );
-  const chainContributionRows = useMemo(
-    () =>
-      [...chainTrendLatest]
-        .sort((left, right) => (right.total_tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.total_tvl_usd ?? Number.NEGATIVE_INFINITY)),
-    [chainTrendLatest],
-  );
   const windowCoverage = useMemo(() => {
     const eligible = data?.summary.vaults_eligible ?? 0;
     const withChange = data?.summary.vaults_with_change ?? 0;
@@ -917,13 +786,6 @@ function ChangesPageContent() {
             </select>
           </label>
           <label>
-            Story Mode:&nbsp;
-            <select value={query.storyMode} onChange={(event) => updateQuery({ story_mode: event.target.value })}>
-              <option value="off">Off</option>
-              <option value="on">What changed today?</option>
-            </select>
-          </label>
-          <label>
             Movers Limit:&nbsp;
             <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
               <option value={10}>10</option>
@@ -988,39 +850,6 @@ function ChangesPageContent() {
         <p className="muted confidence-line">
           Confidence: <strong>{deltaConfidence}/100 ({confidenceBand(deltaConfidence)})</strong> from mover sample size + freshness.
         </p>
-        {query.storyMode === "on" ? (
-          <section className="changes-story-mode">
-            <h3>What Changed Today</h3>
-            <p className="muted card-intro">
-              Guided snapshot: delta scatter for vault moves, chain contributors for aggregate drift, and stale-chain heatmap for trust checks.
-            </p>
-            <div className="changes-story-grid">
-              <ScatterPlot
-                className="changes-main-scatter"
-                title="Delta vs Current APY (Story)"
-                xLabel="Delta (percentage points)"
-                yLabel="Current APY (percent)"
-                points={moverScatterRows.map((row) => ({
-                  id: `story-${row.chain_id}:${row.vault_address}`,
-                  x: row.delta_apy,
-                  y: row.safe_apy_window,
-                  size: row.tvl_usd,
-                  href: yearnVaultUrl(row.chain_id, row.vault_address),
-                  tooltip:
-                    `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
-                    `Current APY: ${formatPct(row.safe_apy_window)}\nPrevious APY: ${formatPct(row.safe_apy_prev_window)}\n` +
-                    `Delta: ${formatPct(row.delta_apy)}\nTVL: ${formatUsd(row.tvl_usd)}`,
-                  tone: row.delta_apy !== null && row.delta_apy !== undefined ? (row.delta_apy >= 0 ? "positive" : "negative") : "neutral",
-                }))}
-                xFormatter={(value) => formatPct(value, 1)}
-                yFormatter={(value) => formatPct(value, 1)}
-                emptyText="No mover rows yet for this filter."
-              />
-              <DeltaContributionWaterfall title="Chain Delta Contributors (Story)" rows={chainContributionRows} />
-              <HeatGrid title="Stale Ratio by Chain (Story)" items={staleChainHeat} valueFormatter={(value) => formatPct(value)} />
-            </div>
-          </section>
-        ) : null}
         <div className="changes-trend-grid">
           <TrendStrips
             title="Riser/Faller Drift (Last 60 Days)"
@@ -1074,10 +903,6 @@ function ChangesPageContent() {
           />
           <HeatGrid title="Stale Ratio Heatmap by Chain" items={staleChainHeat} valueFormatter={(value) => formatPct(value)} />
           <HeatGrid title="Stale Ratio Heatmap by Category" items={staleCategoryHeat} valueFormatter={(value) => formatPct(value)} />
-        </div>
-        <div className="changes-stale-grid">
-          <RankBumpChart title="Top APY Rank Bump (Previous vs Current)" rows={data?.movers.largest_abs_delta ?? []} />
-          <DeltaContributionWaterfall title="Chain APY Delta Contributors" rows={chainContributionRows} />
         </div>
       </section>
 
