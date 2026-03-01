@@ -454,7 +454,12 @@ function AssetsPageContent() {
               const toY = (value: number) => 26 - ((value + maxAbs) / (2 * maxAbs)) * 22;
               const spark = `M2,${toY(worst).toFixed(2)} L26,${toY(weighted).toFixed(2)} L50,${toY(best).toFixed(2)}`;
               return (
-                <article key={`spread-card-${row.token_symbol}`} className="assets-spread-card" onClick={() => updateQuery({ token: row.token_symbol })}>
+                <button
+                  key={`spread-card-${row.token_symbol}`}
+                  type="button"
+                  className="assets-spread-card"
+                  onClick={() => updateQuery({ token: row.token_symbol })}
+                >
                   <p className="assets-spread-token">{row.token_symbol}</p>
                   <svg viewBox="0 0 52 28" aria-label={`${row.token_symbol} APY spread shape`}>
                     <path d={spark} className="assets-spread-line" />
@@ -463,7 +468,7 @@ function AssetsPageContent() {
                   <p className="assets-spread-note muted">
                     best {formatPct(best, 2)} · weighted {formatPct(weighted, 2)} · worst {formatPct(worst, 2)}
                   </p>
-                </article>
+                </button>
               );
             })}
           </div>

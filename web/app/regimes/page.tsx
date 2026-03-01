@@ -120,6 +120,16 @@ function transitionTone(value: number): string {
   return "#d86a7f";
 }
 
+function formatUsdCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 function RegimeFlowSankey({
   title,
   rows,
@@ -195,10 +205,10 @@ function RegimeFlowSankey({
               <g key={`left-${regime}`}>
                 <rect x={12} y={y - 12} width={90} height={24} rx={6} fill="#0f2548" stroke="#2f4d72" />
                 <text x={16} y={y + 4} className="viz-tick">{compactRegimeLabel(regime)}</text>
-                <text x={106} y={y + 4} className="viz-tick" textAnchor="end">{formatUsd(outValue)}</text>
+                <text x={106} y={y + 4} className="viz-tick" textAnchor="end">{formatUsdCompact(outValue)}</text>
                 <rect x={width - 102} y={y - 12} width={90} height={24} rx={6} fill="#102947" stroke="#2f4d72" />
                 <text x={width - 98} y={y + 4} className="viz-tick">{compactRegimeLabel(regime)}</text>
-                <text x={width - 8} y={y + 4} className="viz-tick" textAnchor="end">{formatUsd(inValue)}</text>
+                <text x={width - 8} y={y + 4} className="viz-tick" textAnchor="end">{formatUsdCompact(inValue)}</text>
               </g>
             );
           })}
