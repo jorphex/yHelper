@@ -515,7 +515,7 @@ function RegimesPageContent() {
               ]}
             />
             <div className="table-wrap">
-              <table>
+              <table className="regimes-summary-table">
                 <thead>
                   <tr>
                     <th>
@@ -679,7 +679,7 @@ function RegimesPageContent() {
               <h3>{`Latest ${query.transitionSplit === "chain" ? "Chain" : "Category"} Snapshot`}</h3>
               <p className="muted card-intro">Sortable latest-day cohort metrics for quick comparison and sanity checks.</p>
               <div className="table-wrap">
-                <table>
+                <table className="regimes-split-table">
                   <thead>
                     <tr>
                       <th>

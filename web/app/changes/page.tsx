@@ -930,7 +930,7 @@ function ChangesPageContent() {
       <section className="card">
         <h2>Freshness by Chain</h2>
         <div className="table-wrap">
-          <table>
+          <table className="changes-stale-table">
             <thead>
               <tr>
                 <th>
@@ -1026,7 +1026,7 @@ function ChangesPageContent() {
       <section className="card">
         <h2>Freshness by Category</h2>
         <div className="table-wrap">
-          <table>
+          <table className="changes-stale-table">
             <thead>
               <tr>
                 <th>

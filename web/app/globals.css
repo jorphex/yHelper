@@ -845,6 +845,17 @@ input[type="text"] {
   text-overflow: ellipsis;
 }
 
+.changes-stale-table {
+  min-width: 760px;
+  table-layout: fixed;
+}
+
+.changes-stale-table th:first-child,
+.changes-stale-table td:first-child {
+  width: 30%;
+  white-space: nowrap;
+}
+
 .composition-crowding-table {
   min-width: 900px;
   table-layout: fixed;
@@ -1054,6 +1065,19 @@ input[type="text"] {
   overflow: hidden;
   text-overflow: ellipsis;
   flex-wrap: wrap;
+}
+
+.regimes-summary-table,
+.regimes-split-table {
+  min-width: 720px;
+  table-layout: fixed;
+}
+
+.regimes-summary-table th:first-child,
+.regimes-summary-table td:first-child,
+.regimes-split-table th:first-child,
+.regimes-split-table td:first-child {
+  width: 34%;
 }
 
 .assets-universe-card .kpi-grid {
@@ -1784,7 +1808,7 @@ input:focus-visible {
 
   th.is-numeric,
   td.is-numeric {
-    white-space: normal;
+    white-space: nowrap;
   }
 
   .mobile-hide {
@@ -1798,10 +1822,11 @@ input:focus-visible {
     z-index: 2;
     background: var(--surface-3);
     box-shadow: 1px 0 0 var(--line);
+    max-width: 7.4rem;
   }
 
   .vault-link {
-    max-width: 9.5rem;
+    max-width: 7.2rem;
   }
 
   .pill {
@@ -1862,7 +1887,7 @@ input:focus-visible {
 
   .discover-table th.col-vault,
   .discover-table td.col-vault {
-    width: 9.6rem;
+    width: 7.4rem;
   }
 
   .discover-table th.col-tvl,
@@ -1891,6 +1916,60 @@ input:focus-visible {
   .discover-table th.col-regime,
   .discover-table td.col-regime {
     width: 7.2rem;
+  }
+
+  .changes-mover-table {
+    min-width: 900px;
+  }
+
+  .changes-mover-table th.col-vault,
+  .changes-mover-table td.col-vault {
+    width: 7.4rem;
+  }
+
+  .discover-table td.col-vault .vault-link,
+  .changes-mover-table td.col-vault .vault-link,
+  .composition-crowding-table td.col-vault .vault-link,
+  .assets-venues-table td.col-vault .vault-link,
+  .regimes-mover-table td.col-vault .vault-link {
+    max-width: 7rem;
+  }
+
+  .composition-crowding-table {
+    min-width: 900px;
+  }
+
+  .composition-crowding-table th.col-vault,
+  .composition-crowding-table td.col-vault {
+    width: 7.4rem;
+  }
+
+  .assets-venues-table {
+    min-width: 940px;
+  }
+
+  .assets-venues-table th.col-vault,
+  .assets-venues-table td.col-vault {
+    width: 7.6rem;
+  }
+
+  .regimes-mover-table {
+    min-width: 900px;
+  }
+
+  .regimes-mover-table th.col-vault,
+  .regimes-mover-table td.col-vault {
+    width: 7.6rem;
+  }
+
+  .chains-rollup-table {
+    min-width: 760px;
+  }
+
+  .changes-stale-table,
+  .regimes-summary-table,
+  .regimes-split-table {
+    min-width: 740px;
   }
 
   .assets-universe-card .kpi-grid,
