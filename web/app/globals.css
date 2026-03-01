@@ -1245,6 +1245,10 @@ input[type="text"] {
   grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
 }
 
+.overview-guardrails-note {
+  margin: 0.42rem 0 0;
+}
+
 .discover-analytics-note {
   margin: 0.2rem 0 0;
 }

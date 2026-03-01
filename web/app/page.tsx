@@ -191,7 +191,7 @@ export default function HomePage() {
                 { label: "Low Data Points", value: String(data?.coverage?.global?.low_points ?? "n/a") },
               ]}
             />
-            <p className="muted">
+            <p className="muted overview-guardrails-note">
               Inclusion filter: TVL (Total Value Locked) ≥ {data?.coverage?.filters?.min_tvl_usd?.toLocaleString("en-US") ?? "n/a"} and
               data points ≥ {data?.coverage?.filters?.min_points ?? "n/a"}.
             </p>
