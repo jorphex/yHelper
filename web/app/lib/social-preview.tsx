@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
+import { chainLabel, formatPct } from "./format";
 
 type RegimesPayload = {
   summary?: Array<{
@@ -10,11 +11,35 @@ type RegimesPayload = {
 };
 
 type PreviewStats = {
+  trackedTvlActiveUsd: number | null;
+  totalVaults: number | null;
+  activeVaults: number | null;
+  highestApyVault: {
+    name: string | null;
+    chainId: number | null;
+    tvlUsd: number | null;
+    apy30d: number | null;
+  } | null;
   regimeCounts: Array<{
     regime: string;
     vaults: number;
     tvlUsd: number | null;
   }>;
+};
+
+type SocialPreviewPayload = {
+  summary?: {
+    tracked_tvl_active_usd?: number | null;
+    total_vaults?: number | null;
+    active_vaults?: number | null;
+  } | null;
+  highest_apy_vault?: {
+    name?: string | null;
+    symbol?: string | null;
+    chain_id?: number | null;
+    tvl_usd?: number | null;
+    safe_apy_30d?: number | null;
+  } | null;
 };
 type PreviewFont = {
   name: string;
@@ -49,7 +74,7 @@ function colorTile(seed: number, size: number, step: number): string {
     [36, 24, 112],
     [32, 54, 132],
     [34, 92, 146],
-    [18, 118, 126],
+    [31, 108, 134],
     [14, 25, 62],
   ];
   for (let y = 0; y < size; y += step) {
@@ -96,6 +121,28 @@ function formatUsdCompact(value: number | null | undefined): string {
   }).format(value);
 }
 
+function formatPctCompact(value: number | null | undefined, digits = 1): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
+  return formatPct(value, digits);
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function shortLabel(value: string | null | undefined, max = 28): string {
+  if (!value) return "n/a";
+  const text = value.trim();
+  if (!text) return "n/a";
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(3, max - 1))}…`;
+}
+
 function regimeLabel(value: string): string {
   const key = value.toLowerCase();
   if (key === "rising") return "Rising (improving)";
@@ -124,6 +171,10 @@ async function fetchFromCandidates<T>(urls: string[]): Promise<T | null> {
 async function fetchPreviewStats(): Promise<PreviewStats> {
   const publicSite = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app");
   const internalApiBase = (process.env.YHELPER_API_INTERNAL_URL || "http://yhelper-api:8000").replace(/\/+$/, "");
+  const socialPayload = await fetchFromCandidates<SocialPreviewPayload>([
+    `${internalApiBase}/api/meta/social-preview`,
+    `${publicSite}/api/meta/social-preview`,
+  ]);
   const regimesPayload = await fetchFromCandidates<RegimesPayload>([
     `${internalApiBase}/api/regimes?universe=raw&min_tvl_usd=0&min_points=0&limit=1`,
     `${publicSite}/api/regimes?universe=raw&min_tvl_usd=0&min_points=0&limit=1`,
@@ -148,7 +199,20 @@ async function fetchPreviewStats(): Promise<PreviewStats> {
     };
   });
 
+  const summary = socialPayload?.summary ?? {};
+  const highest = socialPayload?.highest_apy_vault;
   return {
+    trackedTvlActiveUsd: toFiniteNumber(summary.tracked_tvl_active_usd),
+    totalVaults: toFiniteNumber(summary.total_vaults),
+    activeVaults: toFiniteNumber(summary.active_vaults),
+    highestApyVault: highest
+      ? {
+          name: (highest.name || highest.symbol || null) as string | null,
+          chainId: toFiniteNumber(highest.chain_id),
+          tvlUsd: toFiniteNumber(highest.tvl_usd),
+          apy30d: toFiniteNumber(highest.safe_apy_30d),
+        }
+      : null,
     regimeCounts,
   };
 }
@@ -172,6 +236,31 @@ export async function renderSocialPreviewImage({
         { regime: "Falling", vaults: 0, tvlUsd: null },
         { regime: "Choppy", vaults: 0, tvlUsd: null },
       ];
+  const topCards = [
+    {
+      key: "tracked-tvl",
+      label: "Tracked TVL (Active)",
+      value: formatUsdCompact(stats.trackedTvlActiveUsd),
+    },
+    {
+      key: "total-vaults",
+      label: "Vaults (Total)",
+      value: compactNumber(stats.totalVaults),
+    },
+    {
+      key: "active-vaults",
+      label: "Vaults (Active)",
+      value: compactNumber(stats.activeVaults),
+    },
+    {
+      key: "highest-apy",
+      label: "Highest APY Vault (30d)",
+      value: shortLabel(stats.highestApyVault?.name ?? null, 24),
+      note: stats.highestApyVault
+        ? `${chainLabel(stats.highestApyVault.chainId)} • TVL ${formatUsdCompact(stats.highestApyVault.tvlUsd)} • APY ${formatPctCompact(stats.highestApyVault.apy30d, 1)}`
+        : "No active vault with APY metrics.",
+    },
+  ];
   return new ImageResponse(
     (
       <div
@@ -185,7 +274,7 @@ export async function renderSocialPreviewImage({
           background:
             "linear-gradient(150deg, #060c1f 0%, #10285a 30%, #281081 56%, #102a72 77%, #09235a 100%)",
           overflow: "hidden",
-          padding: "56px 62px",
+          padding: "46px 56px",
           flexDirection: "column",
           justifyContent: "space-between",
         }}
@@ -207,9 +296,9 @@ export async function renderSocialPreviewImage({
             inset: "auto -220px -120px auto",
             width: 700,
             height: 500,
-            opacity: 0.4,
+            opacity: 0.34,
             background:
-              "radial-gradient(closest-side, rgba(40,220,150,0.58) 0%, rgba(40,220,150,0.13) 42%, rgba(40,220,150,0) 74%)",
+              "radial-gradient(closest-side, rgba(58,174,195,0.52) 0%, rgba(58,174,195,0.1) 42%, rgba(58,174,195,0) 74%)",
           }}
         />
         <div
@@ -218,7 +307,7 @@ export async function renderSocialPreviewImage({
             inset: 0,
             opacity: 0.22,
             background:
-              "radial-gradient(100% 85% at 68% 22%, rgba(78,114,255,0.24) 0%, rgba(78,114,255,0.06) 42%, rgba(78,114,255,0) 74%), radial-gradient(75% 80% at 84% 54%, rgba(49,178,146,0.2) 0%, rgba(49,178,146,0.05) 38%, rgba(49,178,146,0) 71%)",
+              "radial-gradient(100% 85% at 68% 22%, rgba(78,114,255,0.24) 0%, rgba(78,114,255,0.06) 42%, rgba(78,114,255,0) 74%), radial-gradient(75% 80% at 84% 54%, rgba(61,153,189,0.2) 0%, rgba(61,153,189,0.05) 38%, rgba(61,153,189,0) 71%)",
           }}
         />
         <div
@@ -276,9 +365,9 @@ export async function renderSocialPreviewImage({
             opacity: 0.3,
           }}
         />
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, zIndex: 2 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, zIndex: 2 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 22 }}>
-            <div style={{ fontSize: 82, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1 }}>yHelper</div>
+            <div style={{ fontSize: 74, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1 }}>yHelper</div>
             <img
               src={yearnLogoSrc}
               alt="Yearn"
@@ -287,14 +376,19 @@ export async function renderSocialPreviewImage({
               style={{ objectFit: "contain", opacity: 0.95 }}
             />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 34, color: "#d5e6ff", maxWidth: 960 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+            <div style={{ fontSize: 27, color: "#d5e6ff", maxWidth: 960 }}>
               Track vault opportunities, yield shifts, and protocol structure in one dashboard.
             </div>
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12, zIndex: 2 }}>
+          <div style={{ display: "flex", gap: 12 }}>
+            {topCards.map((item) => (
+              <StatCard key={item.key} label={item.label} value={item.value} note={item.note} />
+            ))}
+          </div>
           <div style={{ display: "flex", gap: 12 }}>
             {regimeCards.map((item) => (
               <StatCard
@@ -320,15 +414,15 @@ function StatCard({ label, value, note }: { label: string; value: string; note?:
         display: "flex",
         flexDirection: "column",
         gap: 6,
-        borderRadius: 18,
+        borderRadius: 14,
         border: "1px solid rgba(122,170,255,0.34)",
         background: "linear-gradient(180deg, rgba(18,40,79,0.82) 0%, rgba(9,20,41,0.92) 100%)",
         padding: "12px 14px",
       }}
     >
-      <div style={{ fontSize: 16, color: "#b9d4fb", textTransform: "none", letterSpacing: "0.02em" }}>{label}</div>
-      <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: "-0.01em" }}>{value}</div>
-      {note ? <div style={{ fontSize: 16, color: "#cfe0ff", letterSpacing: "0.01em" }}>{note}</div> : null}
+      <div style={{ fontSize: 17, color: "#b9d4fb", textTransform: "none", letterSpacing: "0.01em" }}>{label}</div>
+      <div style={{ fontSize: 31, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1 }}>{value}</div>
+      {note ? <div style={{ fontSize: 13, color: "#cfe0ff", letterSpacing: "0.01em" }}>{note}</div> : null}
     </div>
   );
 }

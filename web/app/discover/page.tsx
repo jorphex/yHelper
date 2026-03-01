@@ -237,6 +237,12 @@ function DiscoverRidgeline({
   title: string;
   series: Array<{ id: string; label: string; values: number[]; note: string }>;
 }) {
+  const ridgelinePalette = [
+    { stroke: "#88b1ff", fill: "rgba(92, 126, 242, 0.24)" },
+    { stroke: "#79afd8", fill: "rgba(77, 158, 214, 0.22)" },
+    { stroke: "#9a96ff", fill: "rgba(112, 104, 227, 0.22)" },
+    { stroke: "#70b5c7", fill: "rgba(69, 156, 175, 0.2)" },
+  ];
   const valid = series.filter((row) => row.values.length >= 4);
   if (valid.length === 0) {
     return (
@@ -261,6 +267,7 @@ function DiscoverRidgeline({
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {valid.map((row, idx) => {
+            const tone = ridgelinePalette[idx % ridgelinePalette.length];
             const yBase = 12 + idx * rowH + 14;
             const counts = new Array<number>(bins).fill(0);
             for (const value of row.values) {
@@ -284,7 +291,7 @@ function DiscoverRidgeline({
               .join(" ");
             return (
               <g key={row.id}>
-                <path d={`${pathTop} ${pathBottom} Z`} fill="rgba(87, 152, 214, 0.28)" stroke="#6fb2e5" strokeWidth={0.9} />
+                <path d={`${pathTop} ${pathBottom} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth={0.9} />
                 <text x={8} y={yBase - 3} className="ridgeline-label">{row.label}</text>
                 <text x={width - 6} y={yBase - 3} className="ridgeline-note" textAnchor="end">{row.note}</text>
               </g>

@@ -49,6 +49,20 @@ function normalize(value: number, min: number, max: number): number {
   return (value - min) / (max - min);
 }
 
+const TREND_STROKE_COLORS = [
+  "#80b2ec",
+  "#84abff",
+  "#74a5d9",
+  "#938be0",
+  "#68b4c5",
+];
+
+function pickTrendStroke(id: string, index: number): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return TREND_STROKE_COLORS[(hash + index) % TREND_STROKE_COLORS.length];
+}
+
 export function KpiGrid({ items }: { items: Kpi[] }) {
   return (
     <div className="kpi-grid">
@@ -180,7 +194,7 @@ export function TrendStrips({
     <section className="viz-panel">
       <h3>{title}</h3>
       <div className={`trend-strip-list trend-strip-cols-${Math.min(4, Math.max(1, columns))}`}>
-        {validItems.map((item) => {
+        {validItems.map((item, index) => {
           const finite = finiteValues(item.points);
           const latest = finite[finite.length - 1];
           const previous = finite.length >= 2 ? finite[finite.length - 2] : finite[0];
@@ -199,8 +213,9 @@ export function TrendStrips({
             })
             .join(" ");
           const toneClass = delta > 0 ? "text-positive" : delta < 0 ? "text-negative" : "";
+          const strokeColor = pickTrendStroke(item.id, index);
           return (
-            <article className="trend-strip" key={item.id}>
+            <article className="trend-strip" key={item.id} style={{ "--trend-stroke": strokeColor } as CSSProperties}>
               <div className="trend-strip-head">
                 <p className="trend-strip-label">{item.label}</p>
                 <p className="trend-strip-value">
@@ -317,7 +332,7 @@ export function ScatterPlot({
                     cx={x}
                     cy={y}
                     r={Math.max(cellW, cellH) * 0.72}
-                    fill="rgba(125, 176, 228, 1)"
+                    fill="rgba(124, 163, 255, 1)"
                     opacity={alpha}
                   />
                 );

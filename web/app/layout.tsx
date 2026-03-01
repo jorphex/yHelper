@@ -11,13 +11,13 @@ const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "yHelper Dashboard",
+  title: "yHelper",
   description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
   openGraph: {
     type: "website",
     url: siteUrl,
     siteName: "yHelper",
-    title: "yHelper Dashboard",
+    title: "yHelper",
     description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
     images: [
       {
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "yHelper Dashboard",
+    title: "yHelper",
     description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
     images: ["/twitter-image"],
   },

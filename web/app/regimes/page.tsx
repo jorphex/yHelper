@@ -103,6 +103,15 @@ function compactRegimeLabel(value: string | null | undefined): string {
   return value;
 }
 
+function regimeColor(value: string | null | undefined): [number, number, number] {
+  const key = (value ?? "").toLowerCase();
+  if (key === "rising") return [92, 145, 238];
+  if (key === "stable") return [132, 170, 255];
+  if (key === "falling") return [173, 116, 196];
+  if (key === "choppy") return [104, 146, 190];
+  return [114, 153, 206];
+}
+
 function regimeOrder(value: string): number {
   const key = value.toLowerCase();
   if (key === "rising") return 0;
@@ -172,10 +181,12 @@ function RegimeFlowSankey({
             const value = Number(row.tvl_usd);
             const strokeWidth = 1.8 + (value / maxFlow) * 11.8;
             const intensity = Math.max(0, Math.min(1, value / maxFlow));
-            const strokeR = Math.round(82 + intensity * 78);
-            const strokeG = Math.round(128 + intensity * 64);
-            const strokeB = Math.round(188 + intensity * 38);
-            const stroke = `rgba(${strokeR}, ${strokeG}, ${strokeB}, ${0.26 + intensity * 0.52})`;
+            const [prevR, prevG, prevB] = regimeColor(row.previous_regime);
+            const [currR, currG, currB] = regimeColor(row.current_regime);
+            const strokeR = Math.round((prevR + currR) / 2);
+            const strokeG = Math.round((prevG + currG) / 2);
+            const strokeB = Math.round((prevB + currB) / 2);
+            const stroke = `rgba(${strokeR}, ${strokeG}, ${strokeB}, ${0.26 + intensity * 0.5})`;
             const c1x = xLeft + (xRight - xLeft) * 0.34;
             const c2x = xLeft + (xRight - xLeft) * 0.66;
             const path = `M${xLeft},${y1} C${c1x},${y1} ${c2x},${y2} ${xRight},${y2}`;
@@ -199,12 +210,15 @@ function RegimeFlowSankey({
             const y = yPos.get(regime) ?? laneTop;
             const outValue = outgoingByRegime.get(regime) ?? 0;
             const inValue = incomingByRegime.get(regime) ?? 0;
+            const [r, g, b] = regimeColor(regime);
+            const fill = `rgba(${r}, ${g}, ${b}, 0.24)`;
+            const stroke = `rgba(${Math.min(255, r + 36)}, ${Math.min(255, g + 36)}, ${Math.min(255, b + 36)}, 0.78)`;
             return (
               <g key={`left-${regime}`}>
-                <rect x={8} y={y - 12} width={88} height={26} rx={6} fill="#0f2548" stroke="#2f4d72" />
+                <rect x={8} y={y - 12} width={88} height={26} rx={6} fill={fill} stroke={stroke} />
                 <text x={12} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
                 <text x={92} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
-                <rect x={width - 96} y={y - 12} width={88} height={26} rx={6} fill="#102947" stroke="#2f4d72" />
+                <rect x={width - 96} y={y - 12} width={88} height={26} rx={6} fill={fill} stroke={stroke} />
                 <text x={width - 92} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
                 <text x={width - 12} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(inValue)}</text>
               </g>

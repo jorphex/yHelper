@@ -819,6 +819,127 @@ async def meta_movers(
     }
 
 
+@app.get("/api/meta/social-preview")
+async def meta_social_preview() -> dict[str, object]:
+    summary_row: dict[str, object] = {}
+    highest_row: dict[str, object] = {}
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                WITH all_vaults AS (
+                    SELECT
+                        d.vault_address,
+                        d.active,
+                        COALESCE(d.kind, '') AS kind,
+                        COALESCE(d.tvl_usd, 0.0)::numeric AS tvl_usd,
+                        COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) AS is_retired,
+                        COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) AS is_hidden
+                    FROM vault_dim d
+                ),
+                active_visible AS (
+                    SELECT *
+                    FROM all_vaults
+                    WHERE active = TRUE
+                      AND is_retired = FALSE
+                      AND is_hidden = FALSE
+                ),
+                strategy_debt_usd AS (
+                    SELECT
+                        LOWER(s->>'address') AS vault_address,
+                        SUM(
+                            (
+                                COALESCE(NULLIF(s->'details'->>'totalDebt', '')::numeric, 0)
+                                / POWER(10::numeric, COALESCE(NULLIF(v.raw->>'decimals', '')::numeric, 18))
+                            )
+                            * COALESCE(NULLIF(v.raw->'tvl'->>'price', '')::numeric, 0)
+                        ) AS debt_usd
+                    FROM vault_dim m
+                    CROSS JOIN LATERAL jsonb_array_elements(COALESCE(m.raw->'strategies', '[]'::jsonb)) s
+                    JOIN vault_dim v ON LOWER(v.vault_address) = LOWER(s->>'address')
+                    WHERE m.active = TRUE
+                      AND COALESCE(m.kind, '') = 'Multi Strategy'
+                      AND COALESCE((m.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
+                      AND COALESCE((m.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
+                    GROUP BY 1
+                ),
+                single_independent AS (
+                    SELECT
+                        SUM(
+                            GREATEST(
+                                a.tvl_usd - COALESCE(sd.debt_usd, 0),
+                                0
+                            )
+                        ) AS tvl_usd
+                    FROM active_visible a
+                    LEFT JOIN strategy_debt_usd sd
+                      ON LOWER(a.vault_address) = sd.vault_address
+                    WHERE a.kind = 'Single Strategy'
+                ),
+                multi_visible AS (
+                    SELECT SUM(a.tvl_usd) AS tvl_usd
+                    FROM active_visible a
+                    WHERE a.kind = 'Multi Strategy'
+                ),
+                other_visible AS (
+                    SELECT SUM(a.tvl_usd) AS tvl_usd
+                    FROM active_visible a
+                    WHERE a.kind NOT IN ('Multi Strategy', 'Single Strategy')
+                )
+                SELECT
+                    (SELECT COUNT(*) FROM all_vaults) AS total_vaults,
+                    (SELECT COUNT(*) FROM active_visible) AS active_vaults,
+                    (
+                        COALESCE((SELECT tvl_usd FROM multi_visible), 0)
+                        + COALESCE((SELECT tvl_usd FROM single_independent), 0)
+                        + COALESCE((SELECT tvl_usd FROM other_visible), 0)
+                    )::double precision AS tracked_tvl_active_usd,
+                    (
+                        SELECT COUNT(DISTINCT a.vault_address)
+                        FROM all_vaults a
+                        JOIN vault_metrics_latest m ON m.vault_address = a.vault_address
+                        WHERE a.active = TRUE
+                    ) AS active_with_metrics
+                """
+            )
+            summary_row = cur.fetchone() or {}
+            cur.execute(
+                """
+                SELECT
+                    a.vault_address,
+                    a.name,
+                    a.symbol,
+                    a.chain_id,
+                    a.tvl_usd,
+                    LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s) AS safe_apy_30d
+                FROM vault_dim a
+                JOIN vault_metrics_latest m ON m.vault_address = a.vault_address
+                WHERE m.apy_30d IS NOT NULL
+                  AND a.active = TRUE
+                  AND COALESCE(a.kind, '') <> 'Single Strategy'
+                  AND COALESCE((a.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
+                  AND COALESCE((a.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
+                ORDER BY safe_apy_30d DESC, COALESCE(a.tvl_usd, 0.0) DESC, a.vault_address
+                LIMIT 1
+                """,
+                {"apy_min": APY_MIN, "apy_max": APY_MAX},
+            )
+            highest_row = cur.fetchone() or {}
+    return {
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "filters": {
+            "total_vaults_scope": "all vaults in vault_dim",
+            "active_vaults_scope": "active + non-retired + non-hidden vaults in vault_dim",
+            "tracked_tvl_scope": "active + non-retired + non-hidden, debt-adjusted for single strategy overlap",
+            "highest_apy_scope": "active + non-single-strategy + non-retired + non-hidden",
+            "exclude_retired": True,
+            "exclude_hidden": True,
+        },
+        "summary": summary_row,
+        "highest_apy_vault": highest_row,
+    }
+
+
 @app.get("/api/overview")
 async def overview() -> dict[str, object]:
     active_vaults = None
