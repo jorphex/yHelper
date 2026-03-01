@@ -880,13 +880,14 @@ function DiscoverPageContent() {
               emptyText="Need at least two venues per token to compute APY spread."
             />
           </div>
-          <HeatGrid
-            className="discover-chain-heatmap"
-            title="Chain Momentum Heatmap"
-            items={chainMomentumHeat}
-            valueFormatter={(value) => formatPct(value)}
-            emptyText="No chain momentum values for this filter yet."
-          />
+          <div className="discover-chain-heatmap">
+            <HeatGrid
+              title="Chain Momentum Heatmap"
+              items={chainMomentumHeat}
+              valueFormatter={(value) => formatPct(value)}
+              emptyText="No chain momentum values for this filter yet."
+            />
+          </div>
           <TrendStrips
             title="APY Bucket Drift (Last 60 Days)"
             items={apyBucketTrendItems}
