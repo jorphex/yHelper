@@ -873,18 +873,19 @@ function DiscoverPageContent() {
               items={momentumQuadrantHeat}
               valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
             />
+            <HeatGrid
+              title="Token APY Dispersion Heatmap"
+              items={tokenSpreadHeat}
+              valueFormatter={(value) => formatPct(value)}
+              emptyText="Need at least two venues per token to compute APY spread."
+            />
           </div>
           <HeatGrid
+            className="discover-chain-heatmap"
             title="Chain Momentum Heatmap"
             items={chainMomentumHeat}
             valueFormatter={(value) => formatPct(value)}
             emptyText="No chain momentum values for this filter yet."
-          />
-          <HeatGrid
-            title="Token APY Dispersion Heatmap"
-            items={tokenSpreadHeat}
-            valueFormatter={(value) => formatPct(value)}
-            emptyText="Need at least two venues per token to compute APY spread."
           />
           <TrendStrips
             title="APY Bucket Drift (Last 60 Days)"
