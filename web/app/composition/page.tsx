@@ -67,6 +67,88 @@ function formatUsdCompact(value: number): string {
   }).format(value);
 }
 
+function TvlTreemap({
+  title,
+  chains,
+  categories,
+  tokens,
+}: {
+  title: string;
+  chains: BreakdownRow[];
+  categories: BreakdownRow[];
+  tokens: BreakdownRow[];
+}) {
+  const width = 760;
+  const height = 270;
+  const topChains = [...chains]
+    .filter((row) => (row.tvl_usd ?? 0) > 0)
+    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
+    .slice(0, 6);
+  const topCategories = [...categories]
+    .filter((row) => (row.tvl_usd ?? 0) > 0)
+    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
+    .slice(0, 6);
+  const topTokens = [...tokens]
+    .filter((row) => (row.tvl_usd ?? 0) > 0)
+    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
+    .slice(0, 8);
+  const groups = [
+    { key: "chain", label: "Chain", color: "rgba(70, 140, 210, 0.8)", rows: topChains, text: (row: BreakdownRow) => chainLabel(row.chain_id) },
+    { key: "category", label: "Category", color: "rgba(76, 182, 146, 0.8)", rows: topCategories, text: (row: BreakdownRow) => row.category || "unknown" },
+    { key: "token", label: "Token", color: "rgba(230, 172, 78, 0.8)", rows: topTokens, text: (row: BreakdownRow) => row.token_symbol || "unknown" },
+  ];
+  const validGroups = groups.filter((group) => group.rows.length > 0);
+  if (validGroups.length === 0) {
+    return (
+      <section className="viz-panel">
+        <h3>{title}</h3>
+        <p className="muted">No composition rows available.</p>
+      </section>
+    );
+  }
+  const laneHeight = (height - 28 - (validGroups.length - 1) * 10) / validGroups.length;
+
+  return (
+    <section className="viz-panel">
+      <h3>{title}</h3>
+      <div className="scatter-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+          {validGroups.map((group, groupIndex) => {
+            const y = 18 + groupIndex * (laneHeight + 10);
+            const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
+            let x = 0;
+            return (
+              <g key={group.key}>
+                <text x={0} y={y - 4} className="viz-axis-label">{group.label}</text>
+                {group.rows.map((row) => {
+                  const value = Number(row.tvl_usd ?? 0);
+                  const widthRatio = total > 0 ? value / total : 0;
+                  const w = Math.max(16, widthRatio * width);
+                  const rectX = x;
+                  x += w;
+                  const name = group.text(row);
+                  return (
+                    <g key={`${group.key}-${name}`}>
+                      <rect x={rectX} y={y} width={w} height={laneHeight} fill={group.color} opacity={0.85} stroke="#0f1f36" />
+                      {w >= 70 ? (
+                        <text x={rectX + 6} y={y + 16} className="viz-tick">
+                          {name}
+                        </text>
+                      ) : null}
+                      <title>{`${group.label}: ${name}\nTVL: ${formatUsd(row.tvl_usd)}\nShare: ${formatPct(row.share_tvl, 1)}`}</title>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <p className="muted viz-legend">Treemap lanes show top TVL contributors by chain, category, and token for quick concentration scanning.</p>
+    </section>
+  );
+}
+
 function CompositionPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -368,6 +450,9 @@ function CompositionPageContent() {
             }))}
             valueFormatter={(value) => formatPct(value)}
           />
+        </div>
+        <div className="composition-treemap-panel">
+          <TvlTreemap title="TVL Treemap (Chain → Category → Token Lens)" chains={chainRows} categories={categoryRows} tokens={tokenRows} />
         </div>
       </section>
 

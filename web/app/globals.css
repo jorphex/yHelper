@@ -1124,6 +1124,10 @@ input[type="text"] {
   align-items: start;
 }
 
+.composition-treemap-panel {
+  margin-top: 0.72rem;
+}
+
 .composition-visuals-card .scatter-wrap svg {
   min-height: 236px;
 }
