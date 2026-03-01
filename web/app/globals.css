@@ -1633,6 +1633,51 @@ input[type="text"] {
   font-size: 0.74rem;
 }
 
+.waterfall-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.waterfall-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.waterfall-label {
+  font-size: 0.78rem;
+  color: #d6e6f8;
+}
+
+.waterfall-track {
+  height: 0.58rem;
+  border-radius: 999px;
+  background: rgba(31, 61, 99, 0.48);
+  overflow: hidden;
+}
+
+.waterfall-bar {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.waterfall-bar.is-positive {
+  background: linear-gradient(90deg, #2ea26f 0%, #63c532 100%);
+}
+
+.waterfall-bar.is-negative {
+  background: linear-gradient(90deg, #b74a63 0%, #df536a 100%);
+}
+
+.waterfall-value {
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+}
+
 .action-button {
   border: 1px solid var(--line);
   background: linear-gradient(180deg, #0f203d 0%, #0a162b 100%);
