@@ -221,6 +221,76 @@ function compactRegimeLabel(value: string | null | undefined): string {
   return value;
 }
 
+function DiscoverRidgeline({
+  title,
+  series,
+}: {
+  title: string;
+  series: Array<{ id: string; label: string; values: number[]; note: string }>;
+}) {
+  const valid = series.filter((row) => row.values.length >= 4);
+  if (valid.length === 0) {
+    return (
+      <section className="viz-panel">
+        <h3>{title}</h3>
+        <p className="muted">Need more APY samples for distribution curves.</p>
+      </section>
+    );
+  }
+  const width = 760;
+  const rowH = 52;
+  const height = 24 + valid.length * rowH;
+  const bins = 24;
+  const allValues = valid.flatMap((row) => row.values);
+  const min = Math.min(...allValues);
+  const max = Math.max(...allValues);
+  const span = Math.max(0.0001, max - min);
+
+  return (
+    <section className="viz-panel">
+      <h3>{title}</h3>
+      <div className="scatter-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+          {valid.map((row, idx) => {
+            const yBase = 20 + idx * rowH + 24;
+            const counts = new Array<number>(bins).fill(0);
+            for (const value of row.values) {
+              const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
+              counts[bucket] += 1;
+            }
+            const maxCount = Math.max(1, ...counts);
+            const pathTop = counts
+              .map((count, bIdx) => {
+                const x = 128 + (bIdx / (bins - 1)) * (width - 168);
+                const y = yBase - (count / maxCount) * 18;
+                return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+              })
+              .join(" ");
+            const pathBottom = counts
+              .map((_, bIdx) => {
+                const rev = bins - 1 - bIdx;
+                const x = 128 + (rev / (bins - 1)) * (width - 168);
+                return `L${x.toFixed(2)},${yBase.toFixed(2)}`;
+              })
+              .join(" ");
+            return (
+              <g key={row.id}>
+                <path d={`${pathTop} ${pathBottom} Z`} fill="rgba(87, 152, 214, 0.36)" stroke="#6fb2e5" strokeWidth={1.2} />
+                <text x={8} y={yBase - 8} className="viz-tick">{row.label}</text>
+                <text x={8} y={yBase + 8} className="viz-tick">{row.note}</text>
+              </g>
+            );
+          })}
+          <line x1={128} x2={width - 40} y1={height - 12} y2={height - 12} className="viz-axis" />
+          <text x={128} y={height - 2} className="viz-tick">{formatPct(min, 1)}</text>
+          <text x={width - 40} y={height - 2} className="viz-tick" textAnchor="end">{formatPct(max, 1)}</text>
+        </svg>
+      </div>
+      <p className="muted viz-legend">Ridgelines approximate APY distribution shape by chain (peak = most common APY zone).</p>
+    </section>
+  );
+}
+
 function DiscoverPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -414,6 +484,25 @@ function DiscoverPageContent() {
         .slice(0, isCompactViewport ? 70 : 120),
     [dataRows, isCompactViewport],
   );
+  const chainRidgelineSeries = useMemo(() => {
+    const groups = new Map<number, { values: number[]; tvl: number }>();
+    for (const row of dataRows) {
+      if (row.safe_apy_30d === null || row.safe_apy_30d === undefined || !Number.isFinite(row.safe_apy_30d)) continue;
+      const entry = groups.get(row.chain_id) ?? { values: [], tvl: 0 };
+      entry.values.push(Number(row.safe_apy_30d));
+      entry.tvl += Number(row.tvl_usd ?? 0);
+      groups.set(row.chain_id, entry);
+    }
+    return [...groups.entries()]
+      .sort((a, b) => b[1].tvl - a[1].tvl)
+      .slice(0, 6)
+      .map(([chainId, entry]) => ({
+        id: `ridge-${chainId}`,
+        label: chainLabel(chainId),
+        values: entry.values,
+        note: `${entry.values.length} vaults • TVL ${formatUsd(entry.tvl)}`,
+      }));
+  }, [dataRows]);
   const chainMomentumHeat = useMemo(() => {
     const byChain = new Map<number, { tvl: number; weightedMomentum: number; weightedApy: number; vaults: number }>();
     for (const row of dataRows) {
@@ -910,6 +999,7 @@ function DiscoverPageContent() {
                 : "Grouped APY trend unavailable for this filter."
             }
           />
+          <DiscoverRidgeline title="APY Distribution Ridgelines (Top Chains by TVL)" series={chainRidgelineSeries} />
         </div>
         <p className="muted discover-analytics-note">Delta compares the latest point against the previous day.</p>
       </section>
