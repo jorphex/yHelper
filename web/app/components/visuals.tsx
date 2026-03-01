@@ -233,6 +233,7 @@ export function ScatterPlot({
   yFormatter,
   emptyText = "No points available for this filter.",
   className,
+  densityBackdrop = true,
 }: {
   title: string;
   xLabel: string;
@@ -242,6 +243,7 @@ export function ScatterPlot({
   yFormatter: (value: number) => string;
   emptyText?: string;
   className?: string;
+  densityBackdrop?: boolean;
 }) {
   const valid = points.filter((point) => {
     const x = point.x;
@@ -278,6 +280,20 @@ export function ScatterPlot({
   const paddingBottom = 62;
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
+  const densityBins = new Map<string, number>();
+  const densityColumns = 20;
+  const densityRows = 12;
+  if (densityBackdrop) {
+    for (const point of valid) {
+      const x = Number(point.x);
+      const y = Number(point.y);
+      const col = Math.min(densityColumns - 1, Math.max(0, Math.floor(normalize(x, xMin, xMax) * densityColumns)));
+      const row = Math.min(densityRows - 1, Math.max(0, Math.floor((1 - normalize(y, yMin, yMax)) * densityRows)));
+      const key = `${col}:${row}`;
+      densityBins.set(key, (densityBins.get(key) ?? 0) + 1);
+    }
+  }
+  const maxDensity = densityBins.size > 0 ? Math.max(...densityBins.values()) : 0;
 
   return (
     <section className={`viz-panel ${className ?? ""}`.trim()}>
@@ -285,6 +301,29 @@ export function ScatterPlot({
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           <rect x={paddingLeft} y={paddingTop} width={innerWidth} height={innerHeight} className="viz-plot-bg" rx="6" ry="6" />
+          {densityBackdrop && maxDensity > 0
+            ? [...densityBins.entries()].map(([key, count]) => {
+                const [colRaw, rowRaw] = key.split(":");
+                const col = Number(colRaw);
+                const row = Number(rowRaw);
+                const x = paddingLeft + (col / densityColumns) * innerWidth;
+                const y = paddingTop + (row / densityRows) * innerHeight;
+                const cellW = innerWidth / densityColumns;
+                const cellH = innerHeight / densityRows;
+                const alpha = 0.03 + (count / maxDensity) * 0.2;
+                return (
+                  <rect
+                    key={`density-${key}`}
+                    x={x}
+                    y={y}
+                    width={cellW}
+                    height={cellH}
+                    fill="rgba(125, 176, 228, 1)"
+                    opacity={alpha}
+                  />
+                );
+              })
+            : null}
           <line
             x1={paddingLeft}
             x2={width - paddingRight}
