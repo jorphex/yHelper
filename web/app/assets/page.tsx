@@ -254,6 +254,14 @@ function AssetsPageContent() {
   );
   const featuredMinVenues = assetData?.filters?.featured_min_venues;
   const featuredMinChains = assetData?.filters?.featured_min_chains;
+  const tokenSpreadCards = useMemo(
+    () =>
+      [...tokenRows]
+        .filter((row) => row.spread_safe_apy_30d !== null && row.spread_safe_apy_30d !== undefined)
+        .sort((left, right) => (right.spread_safe_apy_30d ?? Number.NEGATIVE_INFINITY) - (left.spread_safe_apy_30d ?? Number.NEGATIVE_INFINITY))
+        .slice(0, 8),
+    [tokenRows],
+  );
 
   return (
     <main className="container">
@@ -434,6 +442,33 @@ function AssetsPageContent() {
             valueFormatter={(value) => formatUsd(value)}
           />
         </div>
+        <section className="assets-spread-cards">
+          <h3>Token Spread Cards</h3>
+          <div className="assets-spread-card-grid">
+            {tokenSpreadCards.map((row) => {
+              const best = row.best_safe_apy_30d ?? 0;
+              const weighted = row.weighted_safe_apy_30d ?? 0;
+              const spread = row.spread_safe_apy_30d ?? 0;
+              const worst = best - spread;
+              const maxAbs = Math.max(0.5, Math.abs(best), Math.abs(weighted), Math.abs(worst));
+              const toY = (value: number) => 26 - ((value + maxAbs) / (2 * maxAbs)) * 22;
+              const spark = `M2,${toY(worst).toFixed(2)} L26,${toY(weighted).toFixed(2)} L50,${toY(best).toFixed(2)}`;
+              return (
+                <article key={`spread-card-${row.token_symbol}`} className="assets-spread-card" onClick={() => updateQuery({ token: row.token_symbol })}>
+                  <p className="assets-spread-token">{row.token_symbol}</p>
+                  <svg viewBox="0 0 52 28" aria-label={`${row.token_symbol} APY spread shape`}>
+                    <path d={spark} className="assets-spread-line" />
+                  </svg>
+                  <p className="assets-spread-value">{formatPct(spread)}</p>
+                  <p className="assets-spread-note muted">
+                    best {formatPct(best, 2)} · weighted {formatPct(weighted, 2)} · worst {formatPct(worst, 2)}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+          <p className="muted viz-legend">Cards rank by APY spread; sparkline points are worst → weighted → best current APY.</p>
+        </section>
         {tokenRows.length === 0 ? (
           <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch List mode.</p>
         ) : (
