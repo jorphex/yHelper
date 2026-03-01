@@ -118,7 +118,7 @@ function formatUsdCompact(value: number | null | undefined): string {
     style: "currency",
     currency: "USD",
     notation: "compact",
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 0,
   }).format(value);
 }
 
@@ -132,24 +132,24 @@ function RegimeFlowSankey({
   const validRows = rows
     .filter((row) => row.tvl_usd !== null && row.tvl_usd !== undefined && Number.isFinite(row.tvl_usd) && Number(row.tvl_usd) > 0)
     .sort((left, right) => Number(right.tvl_usd) - Number(left.tvl_usd))
-    .slice(0, 24);
+    .slice(0, 20);
   const regimes = Array.from(
     new Set(validRows.flatMap((row) => [row.previous_regime, row.current_regime]).filter(Boolean)),
   ).sort((a, b) => regimeOrder(a) - regimeOrder(b));
   if (validRows.length === 0 || regimes.length === 0) {
     return (
-      <section className="viz-panel">
+      <section className="viz-panel regime-sankey-panel">
         <h3>{title}</h3>
         <p className="muted">No transition flows available.</p>
       </section>
     );
   }
-  const width = 760;
-  const height = 320;
-  const xLeft = 110;
-  const xRight = width - 110;
-  const laneTop = 26;
-  const laneBottom = height - 38;
+  const width = 620;
+  const height = 216;
+  const xLeft = 96;
+  const xRight = width - 96;
+  const laneTop = 34;
+  const laneBottom = height - 24;
   const laneHeight = laneBottom - laneTop;
   const laneStep = regimes.length > 1 ? laneHeight / (regimes.length - 1) : laneHeight / 2;
   const yPos = new Map(regimes.map((key, index) => [key, laneTop + index * laneStep]));
@@ -162,7 +162,7 @@ function RegimeFlowSankey({
   }
 
   return (
-    <section className="viz-panel">
+    <section className="viz-panel regime-sankey-panel">
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
@@ -170,23 +170,29 @@ function RegimeFlowSankey({
             const y1 = yPos.get(row.previous_regime) ?? laneTop;
             const y2 = yPos.get(row.current_regime) ?? laneTop;
             const value = Number(row.tvl_usd);
-            const strokeWidth = 2 + (value / maxFlow) * 16;
+            const strokeWidth = 1.8 + (value / maxFlow) * 11.8;
+            const intensity = Math.max(0, Math.min(1, value / maxFlow));
+            const strokeR = Math.round(82 + intensity * 78);
+            const strokeG = Math.round(128 + intensity * 64);
+            const strokeB = Math.round(188 + intensity * 38);
+            const stroke = `rgba(${strokeR}, ${strokeG}, ${strokeB}, ${0.26 + intensity * 0.52})`;
             const c1x = xLeft + (xRight - xLeft) * 0.34;
             const c2x = xLeft + (xRight - xLeft) * 0.66;
             const path = `M${xLeft},${y1} C${c1x},${y1} ${c2x},${y2} ${xRight},${y2}`;
             return (
-              <path
-                key={`${row.previous_regime}-${row.current_regime}-${row.vaults}`}
-                d={path}
-                fill="none"
-                stroke="rgba(108, 165, 221, 0.42)"
-                strokeWidth={strokeWidth}
-                strokeLinecap="round"
-              >
-                <title>
-                  {`${compactRegimeLabel(row.previous_regime)} → ${compactRegimeLabel(row.current_regime)}\nTVL ${formatUsd(row.tvl_usd)}\nVaults ${row.vaults}`}
-                </title>
-              </path>
+              <g key={`${row.previous_regime}-${row.current_regime}-${row.vaults}`} className="sankey-flow">
+                <path
+                  d={path}
+                  fill="none"
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                >
+                  <title>
+                    {`${compactRegimeLabel(row.previous_regime)} → ${compactRegimeLabel(row.current_regime)}\nTVL ${formatUsd(row.tvl_usd)}\nVaults ${row.vaults}`}
+                  </title>
+                </path>
+              </g>
             );
           })}
           {regimes.map((regime) => {
@@ -195,17 +201,17 @@ function RegimeFlowSankey({
             const inValue = incomingByRegime.get(regime) ?? 0;
             return (
               <g key={`left-${regime}`}>
-                <rect x={12} y={y - 12} width={90} height={24} rx={6} fill="#0f2548" stroke="#2f4d72" />
-                <text x={16} y={y + 4} className="viz-tick">{compactRegimeLabel(regime)}</text>
-                <text x={106} y={y + 4} className="viz-tick" textAnchor="end">{formatUsdCompact(outValue)}</text>
-                <rect x={width - 102} y={y - 12} width={90} height={24} rx={6} fill="#102947" stroke="#2f4d72" />
-                <text x={width - 98} y={y + 4} className="viz-tick">{compactRegimeLabel(regime)}</text>
-                <text x={width - 8} y={y + 4} className="viz-tick" textAnchor="end">{formatUsdCompact(inValue)}</text>
+                <rect x={8} y={y - 12} width={88} height={26} rx={6} fill="#0f2548" stroke="#2f4d72" />
+                <text x={12} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
+                <text x={92} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
+                <rect x={width - 96} y={y - 12} width={88} height={26} rx={6} fill="#102947" stroke="#2f4d72" />
+                <text x={width - 92} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
+                <text x={width - 12} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(inValue)}</text>
               </g>
             );
           })}
-          <text x={12} y={14} className="viz-axis-label">Previous Regime</text>
-          <text x={width - 12} y={14} className="viz-axis-label" textAnchor="end">Current Regime</text>
+          <text x={8} y={11} className="sankey-axis-label">Previous Regime</text>
+          <text x={width - 8} y={11} className="sankey-axis-label" textAnchor="end">Current Regime</text>
         </svg>
       </div>
       <p className="muted viz-legend">Stroke width scales by transitioned TVL; labels show total outgoing vs incoming TVL per regime.</p>

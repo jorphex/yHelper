@@ -233,7 +233,7 @@ export function ScatterPlot({
   yFormatter,
   emptyText = "No points available for this filter.",
   className,
-  densityBackdrop = true,
+  densityBackdrop = false,
 }: {
   title: string;
   xLabel: string;

@@ -875,34 +875,42 @@ function ChangesPageContent() {
           />
         </div>
         <div className="changes-delta-panels">
-          <ScatterPlot
-            className="changes-main-scatter"
-            title="Delta vs Current APY (Top Movers)"
-            xLabel="Delta (percentage points)"
-            yLabel="Current APY (percent)"
-            points={moverScatterRows.map((row) => ({
-              id: `${row.chain_id}:${row.vault_address}`,
-              x: row.delta_apy,
-              y: row.safe_apy_window,
-              size: row.tvl_usd,
-              href: yearnVaultUrl(row.chain_id, row.vault_address),
-              tooltip:
-                `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
-                `Current APY: ${formatPct(row.safe_apy_window)}\nPrevious APY: ${formatPct(row.safe_apy_prev_window)}\n` +
-                `Delta: ${formatPct(row.delta_apy)}\nTVL: ${formatUsd(row.tvl_usd)}`,
-              tone: row.delta_apy !== null && row.delta_apy !== undefined ? (row.delta_apy >= 0 ? "positive" : "negative") : "neutral",
-            }))}
-            xFormatter={(value) => formatPct(value, 1)}
-            yFormatter={(value) => formatPct(value, 1)}
-            emptyText="No mover rows yet for this filter."
-          />
-          <BarList
-            title="Delta Distribution (Top Movers)"
-            items={deltaBandItems}
-            valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
-          />
-          <HeatGrid title="Stale Ratio Heatmap by Chain" items={staleChainHeat} valueFormatter={(value) => formatPct(value)} />
-          <HeatGrid title="Stale Ratio Heatmap by Category" items={staleCategoryHeat} valueFormatter={(value) => formatPct(value)} />
+          <div className="changes-main-scatter-slot">
+            <ScatterPlot
+              className="changes-main-scatter"
+              title="Delta vs Current APY (Top Movers)"
+              xLabel="Delta (percentage points)"
+              yLabel="Current APY (percent)"
+              points={moverScatterRows.map((row) => ({
+                id: `${row.chain_id}:${row.vault_address}`,
+                x: row.delta_apy,
+                y: row.safe_apy_window,
+                size: row.tvl_usd,
+                href: yearnVaultUrl(row.chain_id, row.vault_address),
+                tooltip:
+                  `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
+                  `Current APY: ${formatPct(row.safe_apy_window)}\nPrevious APY: ${formatPct(row.safe_apy_prev_window)}\n` +
+                  `Delta: ${formatPct(row.delta_apy)}\nTVL: ${formatUsd(row.tvl_usd)}`,
+                tone: row.delta_apy !== null && row.delta_apy !== undefined ? (row.delta_apy >= 0 ? "positive" : "negative") : "neutral",
+              }))}
+              xFormatter={(value) => formatPct(value, 1)}
+              yFormatter={(value) => formatPct(value, 1)}
+              emptyText="No mover rows yet for this filter."
+            />
+          </div>
+          <div className="changes-delta-distribution-slot">
+            <BarList
+              title="Delta Distribution (Top Movers)"
+              items={deltaBandItems}
+              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+            />
+          </div>
+          <div className="changes-stale-category-slot">
+            <HeatGrid title="Stale Ratio Heatmap by Category" items={staleCategoryHeat} valueFormatter={(value) => formatPct(value)} />
+          </div>
+          <div className="changes-stale-chain-slot">
+            <HeatGrid title="Stale Ratio Heatmap by Chain" items={staleChainHeat} valueFormatter={(value) => formatPct(value)} />
+          </div>
         </div>
       </section>
 

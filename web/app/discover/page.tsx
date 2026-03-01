@@ -117,6 +117,15 @@ function formatFixed(value: unknown, digits = 2): string {
   return parsed.toFixed(digits);
 }
 
+function formatUsdCompact(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 function normalizeSummary(raw: unknown): DiscoverResponse["summary"] | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const entry = raw as Record<string, unknown>;
@@ -231,28 +240,28 @@ function DiscoverRidgeline({
   const valid = series.filter((row) => row.values.length >= 4);
   if (valid.length === 0) {
     return (
-      <section className="viz-panel">
+      <section className="viz-panel discover-ridgeline-panel">
         <h3>{title}</h3>
         <p className="muted">Need more APY samples for distribution curves.</p>
       </section>
     );
   }
-  const width = 760;
-  const rowH = 38;
-  const height = 18 + valid.length * rowH + 18;
-  const bins = 24;
+  const width = 640;
+  const rowH = 24;
+  const height = 14 + valid.length * rowH + 12;
+  const bins = 16;
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);
   const max = Math.max(...allValues);
   const span = Math.max(0.0001, max - min);
 
   return (
-    <section className="viz-panel">
+    <section className="viz-panel discover-ridgeline-panel">
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {valid.map((row, idx) => {
-            const yBase = 18 + idx * rowH + 18;
+            const yBase = 12 + idx * rowH + 14;
             const counts = new Array<number>(bins).fill(0);
             for (const value of row.values) {
               const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
@@ -261,32 +270,32 @@ function DiscoverRidgeline({
             const maxCount = Math.max(1, ...counts);
             const pathTop = counts
               .map((count, bIdx) => {
-                const x = 128 + (bIdx / (bins - 1)) * (width - 168);
-                const y = yBase - (count / maxCount) * 18;
+                const x = 108 + (bIdx / (bins - 1)) * (width - 140);
+                const y = yBase - (count / maxCount) * 8;
                 return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
               })
               .join(" ");
             const pathBottom = counts
               .map((_, bIdx) => {
                 const rev = bins - 1 - bIdx;
-                const x = 128 + (rev / (bins - 1)) * (width - 168);
+                const x = 108 + (rev / (bins - 1)) * (width - 140);
                 return `L${x.toFixed(2)},${yBase.toFixed(2)}`;
               })
               .join(" ");
             return (
               <g key={row.id}>
-                <path d={`${pathTop} ${pathBottom} Z`} fill="rgba(87, 152, 214, 0.36)" stroke="#6fb2e5" strokeWidth={1.2} />
-                <text x={8} y={yBase - 4} className="viz-tick">{row.label}</text>
-                <text x={120} y={yBase - 4} className="viz-tick">{row.note}</text>
+                <path d={`${pathTop} ${pathBottom} Z`} fill="rgba(87, 152, 214, 0.28)" stroke="#6fb2e5" strokeWidth={0.9} />
+                <text x={8} y={yBase - 3} className="ridgeline-label">{row.label}</text>
+                <text x={width - 6} y={yBase - 3} className="ridgeline-note" textAnchor="end">{row.note}</text>
               </g>
             );
           })}
-          <line x1={128} x2={width - 40} y1={height - 14} y2={height - 14} className="viz-axis" />
-          <text x={128} y={height - 4} className="viz-tick">{formatPct(min, 1)}</text>
-          <text x={width - 40} y={height - 4} className="viz-tick" textAnchor="end">{formatPct(max, 1)}</text>
+          <line x1={108} x2={width - 30} y1={height - 10} y2={height - 10} className="viz-axis" />
+          <text x={108} y={height - 1} className="ridgeline-axis">{formatPct(min, 1)}</text>
+          <text x={width - 38} y={height - 2} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
         </svg>
       </div>
-      <p className="muted viz-legend">Ridgelines approximate APY distribution shape by chain (peak = most common APY zone).</p>
+      <p className="muted viz-legend">Ridgelines show APY shape by chain. Taller peaks mean more vaults at that APY zone.</p>
     </section>
   );
 }
@@ -495,12 +504,12 @@ function DiscoverPageContent() {
     }
     return [...groups.entries()]
       .sort((a, b) => b[1].tvl - a[1].tvl)
-      .slice(0, 6)
+      .slice(0, 4)
       .map(([chainId, entry]) => ({
         id: `ridge-${chainId}`,
         label: chainLabel(chainId),
         values: entry.values,
-        note: `${entry.values.length} vaults • TVL ${formatUsd(entry.tvl)}`,
+        note: `${entry.values.length}v ${formatUsdCompact(entry.tvl)}`,
       }));
   }, [dataRows]);
   const chainMomentumHeat = useMemo(() => {

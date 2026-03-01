@@ -78,8 +78,8 @@ function TvlTreemap({
   categories: BreakdownRow[];
   tokens: BreakdownRow[];
 }) {
-  const width = 760;
-  const height = 220;
+  const width = 640;
+  const height = 154;
   const topChains = [...chains]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
@@ -100,39 +100,46 @@ function TvlTreemap({
   const validGroups = groups.filter((group) => group.rows.length > 0);
   if (validGroups.length === 0) {
     return (
-      <section className="viz-panel">
+      <section className="viz-panel composition-treemap-viz">
         <h3>{title}</h3>
         <p className="muted">No composition rows available.</p>
       </section>
     );
   }
-  const laneHeight = (height - 28 - (validGroups.length - 1) * 10) / validGroups.length;
+  const laneGap = 10;
+  const laneHeight = (height - 18 - (validGroups.length - 1) * laneGap) / validGroups.length;
 
   return (
-    <section className="viz-panel">
+    <section className="viz-panel composition-treemap-viz">
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {validGroups.map((group, groupIndex) => {
-            const y = 18 + groupIndex * (laneHeight + 10);
+            const y = 10 + groupIndex * (laneHeight + laneGap);
             const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
+            const labelOffset = 54;
+            const laneWidth = width - labelOffset - 6;
             let x = 0;
             return (
               <g key={group.key} className={`treemap-group treemap-group-${group.key}`}>
-                <text x={0} y={y - 4} className="viz-axis-label">{group.label}</text>
+                <text x={0} y={y + laneHeight / 2 + 0.5} className="treemap-group-label" dominantBaseline="central">
+                  {group.label}
+                </text>
                 {group.rows.map((row) => {
                   const value = Number(row.tvl_usd ?? 0);
                   const widthRatio = total > 0 ? value / total : 0;
-                  const w = Math.max(16, widthRatio * width);
-                  const rectX = x;
+                  const w = Math.max(10, widthRatio * laneWidth);
+                  const rectX = labelOffset + x;
                   x += w;
                   const name = group.text(row);
+                  const maxChars = Math.max(0, Math.floor((w - 8) / 5.3));
+                  const compactName = maxChars > 0 ? (name.length > maxChars ? `${name.slice(0, Math.max(2, maxChars - 1))}…` : name) : "";
                   return (
                     <g key={`${group.key}-${name}`} className="treemap-cell">
                       <rect x={rectX} y={y} width={w} height={laneHeight} fill={group.color} opacity={0.85} stroke="#0f1f36" />
-                      {w >= 92 ? (
-                        <text x={rectX + 6} y={y + 16} className="viz-tick">
-                          {name}
+                      {w >= 50 && compactName ? (
+                        <text x={rectX + 4} y={y + Math.min(12, laneHeight - 4)} className="treemap-cell-label">
+                          {compactName}
                         </text>
                       ) : null}
                       <title>{`${group.label}: ${name}\nTVL: ${formatUsd(row.tvl_usd)}\nShare: ${formatPct(row.share_tvl, 1)}`}</title>

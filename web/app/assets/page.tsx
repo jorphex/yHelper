@@ -450,9 +450,10 @@ function AssetsPageContent() {
               const weighted = row.weighted_safe_apy_30d ?? 0;
               const spread = row.spread_safe_apy_30d ?? 0;
               const worst = best - spread;
-              const maxAbs = Math.max(0.5, Math.abs(best), Math.abs(weighted), Math.abs(worst));
-              const toY = (value: number) => 34 - ((value + maxAbs) / (2 * maxAbs)) * 28;
-              const spark = `M2,${toY(worst).toFixed(2)} L26,${toY(weighted).toFixed(2)} L50,${toY(best).toFixed(2)}`;
+              const maxAbs = Math.max(0.08, Math.abs(best), Math.abs(weighted), Math.abs(worst));
+              const toY = (value: number) => 40 - ((value + maxAbs) / (2 * maxAbs)) * 34;
+              const spark = `M3,${toY(worst).toFixed(2)} L30,${toY(weighted).toFixed(2)} L57,${toY(best).toFixed(2)}`;
+              const nearFlat = spread < 0.15;
               return (
                 <button
                   key={`spread-card-${row.token_symbol}`}
@@ -461,18 +462,25 @@ function AssetsPageContent() {
                   onClick={() => updateQuery({ token: row.token_symbol })}
                 >
                   <p className="assets-spread-token">{row.token_symbol}</p>
-                  <svg viewBox="0 0 52 36" aria-label={`${row.token_symbol} APY spread shape`}>
+                  <svg viewBox="0 0 60 44" aria-label={`${row.token_symbol} APY spread shape`}>
+                    <line x1={3} y1={40} x2={57} y2={40} className="assets-spread-baseline" />
                     <path d={spark} className="assets-spread-line" />
+                    <circle cx={3} cy={toY(worst)} r={2} className="assets-spread-point" />
+                    <circle cx={30} cy={toY(weighted)} r={2} className="assets-spread-point" />
+                    <circle cx={57} cy={toY(best)} r={2} className="assets-spread-point" />
                   </svg>
                   <p className="assets-spread-value">{formatPct(spread)}</p>
                   <p className="assets-spread-note muted">
-                    best {formatPct(best, 2)} · weighted {formatPct(weighted, 2)} · worst {formatPct(worst, 2)}
+                    {nearFlat ? "Near-flat spread." : "Worst → weighted → best."} {formatPct(worst, 1)} · {formatPct(weighted, 1)} ·{" "}
+                    {formatPct(best, 1)}
                   </p>
                 </button>
               );
             })}
           </div>
-          <p className="muted viz-legend">Cards rank by APY spread; sparkline points are worst → weighted → best current APY.</p>
+          <p className="muted viz-legend">
+            Cards rank by APY spread. Sparkline points are worst → weighted → best APY; flatter lines mean token venues are currently similar.
+          </p>
         </section>
         {tokenRows.length === 0 ? (
           <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch List mode.</p>
