@@ -103,6 +103,175 @@ function compactRegimeLabel(value: string | null | undefined): string {
   return value;
 }
 
+function regimeOrder(value: string): number {
+  const key = value.toLowerCase();
+  if (key === "rising") return 0;
+  if (key === "stable") return 1;
+  if (key === "choppy") return 2;
+  if (key === "falling") return 3;
+  return 4;
+}
+
+function transitionTone(value: number): string {
+  if (!Number.isFinite(value)) return "#3f5f82";
+  if (value >= 0.22) return "#7ed957";
+  if (value >= 0.14) return "#4ca4ff";
+  if (value >= 0.08) return "#f6b73c";
+  return "#d86a7f";
+}
+
+function RegimeFlowSankey({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: TransitionRow[];
+}) {
+  const validRows = rows
+    .filter((row) => row.tvl_usd !== null && row.tvl_usd !== undefined && Number.isFinite(row.tvl_usd) && Number(row.tvl_usd) > 0)
+    .sort((left, right) => Number(right.tvl_usd) - Number(left.tvl_usd))
+    .slice(0, 24);
+  const regimes = Array.from(
+    new Set(validRows.flatMap((row) => [row.previous_regime, row.current_regime]).filter(Boolean)),
+  ).sort((a, b) => regimeOrder(a) - regimeOrder(b));
+  if (validRows.length === 0 || regimes.length === 0) {
+    return (
+      <section className="viz-panel">
+        <h3>{title}</h3>
+        <p className="muted">No transition flows available.</p>
+      </section>
+    );
+  }
+  const width = 760;
+  const height = 320;
+  const xLeft = 110;
+  const xRight = width - 110;
+  const laneTop = 26;
+  const laneBottom = height - 38;
+  const laneHeight = laneBottom - laneTop;
+  const laneStep = regimes.length > 1 ? laneHeight / (regimes.length - 1) : laneHeight / 2;
+  const yPos = new Map(regimes.map((key, index) => [key, laneTop + index * laneStep]));
+  const maxFlow = Math.max(...validRows.map((row) => Number(row.tvl_usd)));
+  const incomingByRegime = new Map<string, number>();
+  const outgoingByRegime = new Map<string, number>();
+  for (const row of validRows) {
+    outgoingByRegime.set(row.previous_regime, (outgoingByRegime.get(row.previous_regime) ?? 0) + Number(row.tvl_usd));
+    incomingByRegime.set(row.current_regime, (incomingByRegime.get(row.current_regime) ?? 0) + Number(row.tvl_usd));
+  }
+
+  return (
+    <section className="viz-panel">
+      <h3>{title}</h3>
+      <div className="scatter-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+          {validRows.map((row) => {
+            const y1 = yPos.get(row.previous_regime) ?? laneTop;
+            const y2 = yPos.get(row.current_regime) ?? laneTop;
+            const value = Number(row.tvl_usd);
+            const strokeWidth = 2 + (value / maxFlow) * 16;
+            const c1x = xLeft + (xRight - xLeft) * 0.34;
+            const c2x = xLeft + (xRight - xLeft) * 0.66;
+            const path = `M${xLeft},${y1} C${c1x},${y1} ${c2x},${y2} ${xRight},${y2}`;
+            return (
+              <path
+                key={`${row.previous_regime}-${row.current_regime}-${row.vaults}`}
+                d={path}
+                fill="none"
+                stroke="rgba(108, 165, 221, 0.42)"
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+              >
+                <title>
+                  {`${compactRegimeLabel(row.previous_regime)} → ${compactRegimeLabel(row.current_regime)}\nTVL ${formatUsd(row.tvl_usd)}\nVaults ${row.vaults}`}
+                </title>
+              </path>
+            );
+          })}
+          {regimes.map((regime) => {
+            const y = yPos.get(regime) ?? laneTop;
+            const outValue = outgoingByRegime.get(regime) ?? 0;
+            const inValue = incomingByRegime.get(regime) ?? 0;
+            return (
+              <g key={`left-${regime}`}>
+                <rect x={12} y={y - 12} width={90} height={24} rx={6} fill="#0f2548" stroke="#2f4d72" />
+                <text x={16} y={y + 4} className="viz-tick">{compactRegimeLabel(regime)}</text>
+                <text x={106} y={y + 4} className="viz-tick" textAnchor="end">{formatUsd(outValue)}</text>
+                <rect x={width - 102} y={y - 12} width={90} height={24} rx={6} fill="#102947" stroke="#2f4d72" />
+                <text x={width - 98} y={y + 4} className="viz-tick">{compactRegimeLabel(regime)}</text>
+                <text x={width - 8} y={y + 4} className="viz-tick" textAnchor="end">{formatUsd(inValue)}</text>
+              </g>
+            );
+          })}
+          <text x={12} y={14} className="viz-axis-label">Previous Regime</text>
+          <text x={width - 12} y={14} className="viz-axis-label" textAnchor="end">Current Regime</text>
+        </svg>
+      </div>
+      <p className="muted viz-legend">Stroke width scales by transitioned TVL; labels show total outgoing vs incoming TVL per regime.</p>
+    </section>
+  );
+}
+
+function RegimeCalendarHeatmap({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: TransitionDailyRow[];
+}) {
+  const valid = rows
+    .map((row) => {
+      const date = new Date(`${row.day}T00:00:00Z`);
+      if (Number.isNaN(date.getTime())) return null;
+      return { date, value: row.changed_ratio ?? null };
+    })
+    .filter((row): row is { date: Date; value: number | null } => row !== null)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  if (valid.length === 0) {
+    return (
+      <section className="viz-panel">
+        <h3>{title}</h3>
+        <p className="muted">No daily transition rows available.</p>
+      </section>
+    );
+  }
+  const first = valid[0].date;
+  const startOffset = first.getUTCDay();
+  const cell = 13;
+  const gap = 3;
+  const width = Math.max(240, (Math.ceil((valid.length + startOffset) / 7) + 1) * (cell + gap) + 42);
+  const height = 7 * (cell + gap) + 48;
+  const max = Math.max(...valid.map((row) => row.value ?? 0), 0.001);
+
+  return (
+    <section className="viz-panel">
+      <h3>{title}</h3>
+      <div className="scatter-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+          {valid.map((row, index) => {
+            const slot = index + startOffset;
+            const col = Math.floor(slot / 7);
+            const day = row.date.getUTCDay();
+            const x = 36 + col * (cell + gap);
+            const y = 18 + day * (cell + gap);
+            const tone = transitionTone((row.value ?? 0) / max);
+            return (
+              <rect key={row.date.toISOString()} x={x} y={y} width={cell} height={cell} rx={3} fill={tone} opacity={0.85}>
+                <title>{`${row.date.toISOString().slice(0, 10)}\nChanged ratio: ${formatPct(row.value, 2)}`}</title>
+              </rect>
+            );
+          })}
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label, index) => (
+            <text key={label} x={4} y={28 + index * (cell + gap)} className="viz-tick">
+              {label}
+            </text>
+          ))}
+        </svg>
+      </div>
+      <p className="muted viz-legend">Calendar intensity reflects daily regime-change ratio; darker cells indicate higher churn days.</p>
+    </section>
+  );
+}
+
 function RegimesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -638,6 +807,15 @@ function RegimesPageContent() {
               />
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Regime Flow Story</h2>
+        <p className="muted card-intro">Visual flow of where TVL moved between prior and current regime states.</p>
+        <div className="changes-stale-grid">
+          <RegimeFlowSankey title="Regime Flow Sankey (TVL-weighted)" rows={transitionData?.matrix ?? []} />
+          <RegimeCalendarHeatmap title="Regime Churn Calendar" rows={transitionDaily} />
         </div>
       </section>
 
