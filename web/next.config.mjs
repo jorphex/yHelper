@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/opengraph-image.png",
+        destination: "/opengraph-image",
+        permanent: false,
+      },
+      {
+        source: "/twitter-image.png",
+        destination: "/twitter-image",
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     const base = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
     if (base === "/api") {
