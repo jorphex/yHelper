@@ -146,7 +146,7 @@ export default function HomePage() {
     <main className="container">
       <section className="hero">
         <h1>yHelper</h1>
-        <p>Public Yearn dashboard. Built for quick checks by newcomers and deeper diagnostics by power users.</p>
+        <p>Yearn dashboard for quick vault discovery and deeper analysis of yield changes, composition, and regimes.</p>
       </section>
 
       <section className="card">
