@@ -6,9 +6,34 @@ import { ChunkRecovery } from "./components/chunk-recovery";
 import { FreshnessBadge } from "./components/freshness-badge";
 import { NavLinks } from "./components/nav-links";
 
+const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
+const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "yHelper Dashboard",
-  description: "Public Yearn dashboard for vault discovery, regimes, composition, and change monitoring."
+  description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    siteName: "yHelper",
+    title: "yHelper Dashboard",
+    description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "yHelper dashboard preview",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "yHelper Dashboard",
+    description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
+    images: ["/twitter-image"],
+  },
 };
 
 export const viewport: Viewport = {
