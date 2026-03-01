@@ -708,7 +708,7 @@ function AssetsPageContent() {
                     Momentum <span className="th-indicator">{sortIndicator(venueSort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="is-numeric tablet-hide analyst-only col-consistency">
+                <th className="is-numeric analyst-only col-consistency">
                   <button
                     className={`th-button ${venueSort.key === "consistency" ? "is-active" : ""}`}
                     onClick={() => {
@@ -720,7 +720,7 @@ function AssetsPageContent() {
                     Consistency <span className="th-indicator">{sortIndicator(venueSort, "consistency")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only col-regime">
+                <th className="analyst-only col-regime">
                   <button
                     className={`th-button ${venueSort.key === "regime" ? "is-active" : ""}`}
                     onClick={() => {
@@ -751,8 +751,8 @@ function AssetsPageContent() {
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
-                  <td className="tablet-hide analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
+                  <td className="is-numeric analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
+                  <td className="analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>

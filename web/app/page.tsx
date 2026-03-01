@@ -149,58 +149,6 @@ export default function HomePage() {
         <p>Public Yearn dashboard. Built for quick checks by newcomers and deeper diagnostics by power users.</p>
       </section>
 
-      <section className="card overview-snapshot-card">
-        <h2>Data Snapshot</h2>
-        <p className="muted card-intro">Quick health view so users can trust what they read on the other pages.</p>
-        {data ? (
-          <>
-            <KpiGrid
-              items={[
-                { label: "Server Time (UTC)", value: formatUtcDateTime(data.server_time_utc) },
-                { label: "Latest PPS Age", value: formatHours(data.freshness?.latest_pps_age_seconds) },
-                { label: "Newest Metrics Age", value: formatHours(data.freshness?.metrics_newest_age_seconds) },
-                { label: "PPS Stale Ratio", value: formatPct(data.freshness?.pps_stale_ratio, 1) },
-                { label: "Active Vaults", value: String(data.ingestion?.active_vaults ?? "n/a") },
-                { label: "Metric Rows", value: String(data.ingestion?.metrics_count ?? "n/a") },
-              ]}
-            />
-          </>
-        ) : loading ? (
-          <p>Loading snapshot…</p>
-        ) : (
-          <p>Snapshot is temporarily unavailable. Try again shortly.</p>
-        )}
-      </section>
-
-      <section className="card overview-guardrails-card">
-        <h2>Universe and Guardrails</h2>
-        <p className="muted card-intro">
-          Current scope stats plus inclusion guardrails (minimum TVL and minimum data points) used across dashboard pages.
-        </p>
-        {data?.lifecycle || data?.coverage?.global ? (
-          <>
-            <KpiGrid
-              items={[
-                { label: "Active Vaults", value: String(data?.lifecycle?.active_vaults ?? data?.coverage?.global?.active_vaults ?? "n/a") },
-                { label: "Eligible Vaults", value: String(data?.coverage?.global?.eligible_vaults ?? "n/a") },
-                { label: "Highlighted Vaults", value: String(data?.lifecycle?.highlighted_vaults ?? "n/a") },
-                { label: "Migration Ready", value: String(data?.lifecycle?.migration_ready_vaults ?? "n/a") },
-                { label: "Excluded Vaults", value: String(data?.coverage?.global?.excluded_vaults ?? "n/a") },
-                { label: "Missing Metrics", value: String(data?.coverage?.global?.missing_metrics ?? "n/a") },
-                { label: "Below TVL Filter", value: String(data?.coverage?.global?.below_tvl ?? "n/a") },
-                { label: "Low Data Points", value: String(data?.coverage?.global?.low_points ?? "n/a") },
-              ]}
-            />
-            <p className="muted overview-guardrails-note">
-              Inclusion filter: TVL (Total Value Locked) ≥ {data?.coverage?.filters?.min_tvl_usd?.toLocaleString("en-US") ?? "n/a"} and
-              data points ≥ {data?.coverage?.filters?.min_points ?? "n/a"}.
-            </p>
-          </>
-        ) : (
-          <p>Universe stats are unavailable for this cycle.</p>
-        )}
-      </section>
-
       <section className="card">
         <h2>Dashboards</h2>
         <p className="muted card-intro">
@@ -254,6 +202,39 @@ export default function HomePage() {
             <strong>HHI:</strong> concentration index from 0 to 1. Higher means more concentrated.
           </li>
         </ul>
+      </section>
+
+      <section className="card overview-snapshot-card">
+        <h2>Snapshot and Scope</h2>
+        <p className="muted card-intro">
+          Lightweight freshness and universe context for the data shown across dashboards.
+        </p>
+        {data ? (
+          <>
+            <KpiGrid
+              items={[
+                { label: "Server Time (UTC)", value: formatUtcDateTime(data.server_time_utc) },
+                { label: "Latest PPS Age", value: formatHours(data.freshness?.latest_pps_age_seconds) },
+                { label: "Newest Metrics Age", value: formatHours(data.freshness?.metrics_newest_age_seconds) },
+                { label: "PPS Stale Ratio", value: formatPct(data.freshness?.pps_stale_ratio, 1) },
+                { label: "Active Vaults", value: String(data?.lifecycle?.active_vaults ?? data?.coverage?.global?.active_vaults ?? "n/a") },
+                { label: "Eligible Vaults", value: String(data?.coverage?.global?.eligible_vaults ?? "n/a") },
+                { label: "Migration Ready", value: String(data?.lifecycle?.migration_ready_vaults ?? "n/a") },
+                { label: "Highlighted Vaults", value: String(data?.lifecycle?.highlighted_vaults ?? "n/a") },
+                { label: "Excluded Vaults", value: String(data?.coverage?.global?.excluded_vaults ?? "n/a") },
+                { label: "Low Data Points", value: String(data?.coverage?.global?.low_points ?? "n/a") },
+              ]}
+            />
+            <p className="muted overview-guardrails-note">
+              Inclusion filter: TVL (Total Value Locked) ≥ {data?.coverage?.filters?.min_tvl_usd?.toLocaleString("en-US") ?? "n/a"} and
+              data points ≥ {data?.coverage?.filters?.min_points ?? "n/a"}.
+            </p>
+          </>
+        ) : loading ? (
+          <p>Loading snapshot…</p>
+        ) : (
+          <p>Snapshot is temporarily unavailable. Try again shortly.</p>
+        )}
       </section>
     </main>
   );

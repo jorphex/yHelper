@@ -1040,7 +1040,7 @@ function DiscoverPageContent() {
                     Token <span className="th-indicator">{sortIndicator(sort, "token")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only col-category">
+                <th className="analyst-only col-category">
                   <button className={`th-button ${sort.key === "category" ? "is-active" : ""}`} onClick={() => onSort("category")}>
                     Category <span className="th-indicator">{sortIndicator(sort, "category")}</span>
                   </button>
@@ -1076,7 +1076,7 @@ function DiscoverPageContent() {
                     Risk <span className="th-indicator">{sortIndicator(sort, "risk")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only col-regime">
+                <th className="analyst-only col-regime">
                   <button className={`th-button ${sort.key === "regime" ? "is-active" : ""}`} onClick={() => onSort("regime")}>
                     Regime <span className="th-indicator">{sortIndicator(sort, "regime")}</span>
                   </button>
@@ -1107,7 +1107,7 @@ function DiscoverPageContent() {
                       "n/a"
                     )}
                   </td>
-                  <td className="tablet-hide analyst-only col-category">{row.category || "n/a"}</td>
+                  <td className="analyst-only col-category">{row.category || "n/a"}</td>
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
@@ -1119,7 +1119,7 @@ function DiscoverPageContent() {
                     {row.is_highlighted ? " · Highlighted" : ""}
                     {row.is_retired ? " · Retired" : ""}
                   </td>
-                  <td className="tablet-hide analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
+                  <td className="analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>
