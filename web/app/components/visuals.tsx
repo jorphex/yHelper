@@ -259,13 +259,6 @@ export function ScatterPlot({
 
   const width = 700;
   const height = 320;
-  const paddingLeft = 64;
-  const paddingRight = 20;
-  const paddingTop = 22;
-  const paddingBottom = 62;
-  const innerWidth = width - paddingLeft - paddingRight;
-  const innerHeight = height - paddingTop - paddingBottom;
-
   const xValues = finiteValues(valid.map((point) => point.x));
   const yValues = finiteValues(valid.map((point) => point.y));
   const sizeValues = finiteValues(valid.map((point) => point.size));
@@ -277,12 +270,49 @@ export function ScatterPlot({
   const sizeMax = sizeValues.length > 0 ? Math.max(...sizeValues) : 1;
   const xMid = (xMin + xMax) / 2;
   const yMid = (yMin + yMax) / 2;
+  const yTickLabels = [yFormatter(yMin), yFormatter(yMid), yFormatter(yMax)];
+  const widestYTick = yTickLabels.reduce((max, label) => Math.max(max, label.length), 0);
+  const paddingLeft = Math.min(92, Math.max(56, 18 + widestYTick * 7));
+  const paddingRight = 20;
+  const paddingTop = 22;
+  const paddingBottom = 62;
+  const innerWidth = width - paddingLeft - paddingRight;
+  const innerHeight = height - paddingTop - paddingBottom;
 
   return (
     <section className={`viz-panel ${className ?? ""}`.trim()}>
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+          <rect x={paddingLeft} y={paddingTop} width={innerWidth} height={innerHeight} className="viz-plot-bg" rx="6" ry="6" />
+          <line
+            x1={paddingLeft}
+            x2={width - paddingRight}
+            y1={paddingTop + innerHeight * 0.25}
+            y2={paddingTop + innerHeight * 0.25}
+            className="viz-axis viz-axis-grid"
+          />
+          <line
+            x1={paddingLeft}
+            x2={width - paddingRight}
+            y1={paddingTop + innerHeight * 0.75}
+            y2={paddingTop + innerHeight * 0.75}
+            className="viz-axis viz-axis-grid"
+          />
+          <line
+            x1={paddingLeft + innerWidth * 0.25}
+            x2={paddingLeft + innerWidth * 0.25}
+            y1={paddingTop}
+            y2={height - paddingBottom}
+            className="viz-axis viz-axis-grid"
+          />
+          <line
+            x1={paddingLeft + innerWidth * 0.75}
+            x2={paddingLeft + innerWidth * 0.75}
+            y1={paddingTop}
+            y2={height - paddingBottom}
+            className="viz-axis viz-axis-grid"
+          />
           <line x1={paddingLeft} x2={width - paddingRight} y1={height - paddingBottom} y2={height - paddingBottom} className="viz-axis" />
           <line x1={paddingLeft} x2={paddingLeft} y1={paddingTop} y2={height - paddingBottom} className="viz-axis" />
           <line
@@ -337,18 +367,24 @@ export function ScatterPlot({
             {xFormatter(xMax)}
           </text>
           <text x={paddingLeft - 10} y={height - paddingBottom} className="viz-tick" textAnchor="end" dominantBaseline="central">
-            {yFormatter(yMin)}
+            {yTickLabels[0]}
           </text>
           <text x={paddingLeft - 10} y={paddingTop + innerHeight / 2} className="viz-tick" textAnchor="end" dominantBaseline="central">
-            {yFormatter(yMid)}
+            {yTickLabels[1]}
           </text>
           <text x={paddingLeft - 10} y={paddingTop} className="viz-tick" textAnchor="end" dominantBaseline="hanging">
-            {yFormatter(yMax)}
+            {yTickLabels[2]}
           </text>
           <text x={paddingLeft + innerWidth / 2} y={height - 26} className="viz-axis-label" textAnchor="middle">
             {xLabel}
           </text>
-          <text x={paddingLeft} y={13} className="viz-axis-label" textAnchor="start">
+          <text
+            x={24}
+            y={paddingTop + innerHeight / 2}
+            transform={`rotate(-90 24 ${paddingTop + innerHeight / 2})`}
+            className="viz-axis-label"
+            textAnchor="middle"
+          >
             {yLabel}
           </text>
         </svg>

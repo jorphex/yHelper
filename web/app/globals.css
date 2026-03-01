@@ -1091,7 +1091,6 @@ input[type="text"] {
 }
 
 .composition-visuals-card .scatter-wrap svg {
-  height: 236px;
   min-height: 236px;
 }
 
@@ -1412,9 +1411,21 @@ input[type="text"] {
   display: block;
 }
 
+.viz-plot-bg {
+  fill: rgba(6, 14, 28, 0.5);
+  stroke: #1f3a5f;
+  stroke-width: 1;
+}
+
 .viz-axis {
   stroke: #44658b;
   stroke-width: 1;
+}
+
+.viz-axis-grid {
+  stroke: #2a476b;
+  stroke-dasharray: 2 4;
+  opacity: 0.68;
 }
 
 .viz-axis-mid {
@@ -1437,6 +1448,12 @@ input[type="text"] {
   opacity: 1;
   stroke: #c9def5;
   stroke-width: 1.2;
+}
+
+.viz-point-link:focus-visible .viz-point {
+  opacity: 1;
+  stroke: #d7ebff;
+  stroke-width: 1.4;
 }
 
 .viz-point-positive {
@@ -1879,5 +1896,13 @@ input:focus-visible {
 
   .scatter-wrap svg {
     min-height: 240px;
+  }
+
+  .viz-tick {
+    font-size: 11px;
+  }
+
+  .viz-axis-label {
+    font-size: 10px;
   }
 }
