@@ -450,6 +450,7 @@ function ChangesPageContent() {
         "auto",
       ),
       trendGroup: queryChoice<TrendGroupKey>(searchParams, "trend_group", ["none", "chain", "category"] as const, "none"),
+      storyMode: queryChoice(searchParams, "story_mode", ["off", "on"] as const, "off"),
       tvlView: queryChoice<TvlView>(searchParams, "tvl_view", ["both", "filtered", "yearn"] as const, "both"),
       limit: queryInt(searchParams, "limit", 20, { min: 5, max: 80 }),
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
@@ -916,6 +917,13 @@ function ChangesPageContent() {
             </select>
           </label>
           <label>
+            Story Mode:&nbsp;
+            <select value={query.storyMode} onChange={(event) => updateQuery({ story_mode: event.target.value })}>
+              <option value="off">Off</option>
+              <option value="on">What changed today?</option>
+            </select>
+          </label>
+          <label>
             Movers Limit:&nbsp;
             <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
               <option value={10}>10</option>
@@ -980,6 +988,39 @@ function ChangesPageContent() {
         <p className="muted confidence-line">
           Confidence: <strong>{deltaConfidence}/100 ({confidenceBand(deltaConfidence)})</strong> from mover sample size + freshness.
         </p>
+        {query.storyMode === "on" ? (
+          <section className="changes-story-mode">
+            <h3>What Changed Today</h3>
+            <p className="muted card-intro">
+              Guided snapshot: delta scatter for vault moves, chain contributors for aggregate drift, and stale-chain heatmap for trust checks.
+            </p>
+            <div className="changes-story-grid">
+              <ScatterPlot
+                className="changes-main-scatter"
+                title="Delta vs Current APY (Story)"
+                xLabel="Delta (percentage points)"
+                yLabel="Current APY (percent)"
+                points={moverScatterRows.map((row) => ({
+                  id: `story-${row.chain_id}:${row.vault_address}`,
+                  x: row.delta_apy,
+                  y: row.safe_apy_window,
+                  size: row.tvl_usd,
+                  href: yearnVaultUrl(row.chain_id, row.vault_address),
+                  tooltip:
+                    `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
+                    `Current APY: ${formatPct(row.safe_apy_window)}\nPrevious APY: ${formatPct(row.safe_apy_prev_window)}\n` +
+                    `Delta: ${formatPct(row.delta_apy)}\nTVL: ${formatUsd(row.tvl_usd)}`,
+                  tone: row.delta_apy !== null && row.delta_apy !== undefined ? (row.delta_apy >= 0 ? "positive" : "negative") : "neutral",
+                }))}
+                xFormatter={(value) => formatPct(value, 1)}
+                yFormatter={(value) => formatPct(value, 1)}
+                emptyText="No mover rows yet for this filter."
+              />
+              <DeltaContributionWaterfall title="Chain Delta Contributors (Story)" rows={chainContributionRows} />
+              <HeatGrid title="Stale Ratio by Chain (Story)" items={staleChainHeat} valueFormatter={(value) => formatPct(value)} />
+            </div>
+          </section>
+        ) : null}
         <div className="changes-trend-grid">
           <TrendStrips
             title="Riser/Faller Drift (Last 60 Days)"

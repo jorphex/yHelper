@@ -1280,6 +1280,17 @@ input[type="text"] {
   margin-bottom: 0.5rem;
 }
 
+.changes-story-mode {
+  margin: 0.2rem 0 0.72rem;
+}
+
+.changes-story-grid {
+  display: grid;
+  gap: 0.62rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
 .changes-trend-grid {
   display: grid;
   gap: 0.72rem;
@@ -1807,6 +1818,10 @@ input:focus-visible {
   }
 
   .changes-trend-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .changes-story-grid {
     grid-template-columns: 1fr;
   }
 
