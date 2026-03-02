@@ -148,7 +148,7 @@ def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> st
 
 
 def _freshness_snapshot(
-    conn: psycopg.Connection, *, stale_threshold_seconds: int, split_limit: int = 8
+    conn: psycopg.Connection, *, stale_threshold_seconds: int, split_limit: int = 8, min_tvl_usd: float = DEFAULT_MIN_TVL_USD
 ) -> dict[str, object]:
     now = datetime.now(UTC)
     now_epoch = int(now.timestamp())
@@ -156,6 +156,7 @@ def _freshness_snapshot(
         "as_of_utc": now.isoformat(),
         "stale_threshold_seconds": stale_threshold_seconds,
         "stale_threshold_hours": round(stale_threshold_seconds / 3600, 2),
+        "min_tvl_usd": min_tvl_usd,
         "latest_pps_at": None,
         "latest_pps_age_seconds": None,
         "pps_vaults_total": 0,
@@ -173,13 +174,29 @@ def _freshness_snapshot(
 
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            """
+            f"""
+            WITH latest AS (
+                SELECT p.vault_address, MAX(p.ts) AS latest_ts
+                FROM pps_timeseries p
+                GROUP BY p.vault_address
+            ),
+            counts AS (
+                SELECT p.vault_address, COUNT(*) AS points_count
+                FROM pps_timeseries p
+                GROUP BY p.vault_address
+            )
             SELECT
-                MAX(to_timestamp(ts)) AS latest_pps_at,
-                COUNT(*) AS pps_points,
-                COUNT(DISTINCT vault_address) AS pps_vaults
-            FROM pps_timeseries
-            """
+                MAX(to_timestamp(l.latest_ts)) AS latest_pps_at,
+                SUM(c.points_count) AS pps_points,
+                COUNT(*) AS pps_vaults
+            FROM latest l
+            JOIN counts c ON c.vault_address = l.vault_address
+            JOIN vault_dim d
+              ON d.vault_address = l.vault_address
+             AND {_user_visible_filter_sql("d", include_retired=False)}
+             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
+            """,
+            {"min_tvl_usd": min_tvl_usd},
         )
         row = cur.fetchone() or {}
         latest_pps_at = row.get("latest_pps_at")
@@ -187,7 +204,7 @@ def _freshness_snapshot(
         result["latest_pps_age_seconds"] = _seconds_since(latest_pps_at, now)
 
         cur.execute(
-            """
+            f"""
             WITH latest AS (
                 SELECT vault_address, MAX(ts) AS latest_ts
                 FROM pps_timeseries
@@ -196,9 +213,13 @@ def _freshness_snapshot(
             SELECT
                 COUNT(*) AS pps_vaults_total,
                 COUNT(*) FILTER (WHERE %(now_epoch)s - latest_ts > %(stale_threshold)s) AS pps_vaults_stale
-            FROM latest
+            FROM latest l
+            JOIN vault_dim d
+              ON d.vault_address = l.vault_address
+             AND {_user_visible_filter_sql("d", include_retired=False)}
+             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             """,
-            {"now_epoch": now_epoch, "stale_threshold": stale_threshold_seconds},
+            {"now_epoch": now_epoch, "stale_threshold": stale_threshold_seconds, "min_tvl_usd": min_tvl_usd},
         )
         row = cur.fetchone() or {}
         pps_vaults_total = int(row.get("pps_vaults_total") or 0)
@@ -238,8 +259,9 @@ def _freshness_snapshot(
                     (%(now_epoch)s - l.latest_ts) AS age_seconds
                 FROM latest l
                 JOIN vault_dim d
-                  ON d.vault_address = l.vault_address
+                 ON d.vault_address = l.vault_address
                  AND {_user_visible_filter_sql("d", include_retired=False)}
+                 AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             )
             SELECT
                 chain_id,
@@ -261,6 +283,7 @@ def _freshness_snapshot(
                 "now_epoch": now_epoch,
                 "stale_threshold": stale_threshold_seconds,
                 "split_limit": split_limit,
+                "min_tvl_usd": min_tvl_usd,
             },
         )
         result["stale_by_chain"] = cur.fetchall()
@@ -281,8 +304,9 @@ def _freshness_snapshot(
                     (%(now_epoch)s - l.latest_ts) AS age_seconds
                 FROM latest l
                 JOIN vault_dim d
-                  ON d.vault_address = l.vault_address
+                 ON d.vault_address = l.vault_address
                  AND {_user_visible_filter_sql("d", include_retired=False)}
+                 AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             )
             SELECT
                 category,
@@ -304,6 +328,7 @@ def _freshness_snapshot(
                 "now_epoch": now_epoch,
                 "stale_threshold": stale_threshold_seconds,
                 "split_limit": split_limit,
+                "min_tvl_usd": min_tvl_usd,
             },
         )
         result["stale_by_category"] = cur.fetchall()
@@ -721,10 +746,16 @@ async def health() -> dict[str, str]:
 async def meta_freshness(
     threshold: Literal["24h", "7d", "30d"] = "24h",
     split_limit: int = Query(default=8, ge=1, le=25),
+    min_tvl_usd: float = Query(default=DEFAULT_MIN_TVL_USD, ge=0.0),
 ) -> dict[str, object]:
     threshold_seconds = {"24h": 24 * 3600, "7d": 7 * 24 * 3600, "30d": 30 * 24 * 3600}[threshold]
     with psycopg.connect(DATABASE_URL) as conn:
-        snapshot = _freshness_snapshot(conn, stale_threshold_seconds=threshold_seconds, split_limit=split_limit)
+        snapshot = _freshness_snapshot(
+            conn,
+            stale_threshold_seconds=threshold_seconds,
+            split_limit=split_limit,
+            min_tvl_usd=min_tvl_usd,
+        )
     snapshot["threshold"] = threshold
     return snapshot
 
@@ -761,7 +792,7 @@ async def meta_movers(
         "apy_max": APY_MAX,
         "now_epoch": int(datetime.now(UTC).timestamp()),
     }
-    base_cte = _changes_base_cte()
+    base_cte = _changes_base_cte(max_vaults=None)
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -796,7 +827,12 @@ async def meta_movers(
 
         freshness = None
         if include_freshness:
-            freshness = _freshness_snapshot(conn, stale_threshold_seconds=2 * window_seconds, split_limit=5)
+            freshness = _freshness_snapshot(
+                conn,
+                stale_threshold_seconds=2 * window_seconds,
+                split_limit=5,
+                min_tvl_usd=min_tvl_usd,
+            )
 
     return {
         "generated_at_utc": datetime.now(UTC).isoformat(),
@@ -1007,7 +1043,12 @@ async def overview() -> dict[str, object]:
                             "error_summary": row["error_summary"],
                         }
                 yearn_proxy = _yearn_aligned_proxy_scope(cur)
-            freshness = _freshness_snapshot(conn, stale_threshold_seconds=24 * 3600, split_limit=8)
+            freshness = _freshness_snapshot(
+                conn,
+                stale_threshold_seconds=24 * 3600,
+                split_limit=8,
+                min_tvl_usd=DEFAULT_MIN_TVL_USD,
+            )
             coverage = _coverage_snapshot(
                 conn,
                 min_tvl_usd=DEFAULT_MIN_TVL_USD,
@@ -3316,7 +3357,12 @@ async def changes(
                 """
             )
             yearn_scope = cur.fetchone() or {}
-        freshness = _freshness_snapshot(conn, stale_threshold_seconds=stale_threshold_seconds, split_limit=8)
+        freshness = _freshness_snapshot(
+            conn,
+            stale_threshold_seconds=stale_threshold_seconds,
+            split_limit=8,
+            min_tvl_usd=min_tvl_usd,
+        )
 
     filtered_total_tvl = float(summary.get("total_tvl_usd") or 0.0)
     yearn_proxy_tvl = float(yearn_scope.get("tvl_usd") or 0.0)

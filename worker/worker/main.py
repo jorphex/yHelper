@@ -38,6 +38,8 @@ ALERT_TELEGRAM_CHAT_ID = os.getenv("ALERT_TELEGRAM_CHAT_ID", "").strip()
 ALERT_DISCORD_WEBHOOK_URL = os.getenv("ALERT_DISCORD_WEBHOOK_URL", "").strip()
 # Running jobs older than this are automatically marked stale failed.
 RUNNING_STALE_SECONDS = 1800
+SNAPSHOT_MIN_ACTIVE_RATIO = float(os.getenv("SNAPSHOT_MIN_ACTIVE_RATIO", "0.9"))
+SNAPSHOT_MIN_DROP_COUNT = int(os.getenv("SNAPSHOT_MIN_DROP_COUNT", "25"))
 LAST_CLEANUP_AT: datetime | None = None
 
 KONG_PPS_QUERY = """
@@ -135,6 +137,16 @@ def _validate_data_policy_config() -> None:
             "Invalid retention policy: PPS_RETENTION_DAYS must be >= KONG_PPS_LOOKBACK_DAYS "
             f"(got retention={PPS_RETENTION_DAYS}, lookback={KONG_PPS_LOOKBACK_DAYS})"
         )
+    if not 0 < SNAPSHOT_MIN_ACTIVE_RATIO <= 1:
+        raise ValueError(
+            "Invalid snapshot guard: SNAPSHOT_MIN_ACTIVE_RATIO must be in (0, 1] "
+            f"(got {SNAPSHOT_MIN_ACTIVE_RATIO})"
+        )
+    if SNAPSHOT_MIN_DROP_COUNT < 0:
+        raise ValueError(
+            "Invalid snapshot guard: SNAPSHOT_MIN_DROP_COUNT must be >= 0 "
+            f"(got {SNAPSHOT_MIN_DROP_COUNT})"
+        )
 
 UPSERT_SQL = """
 INSERT INTO vault_dim (
@@ -201,32 +213,113 @@ def configure_logging() -> None:
 def _to_float(value: object) -> float | None:
     if value is None:
         return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        return numeric if math.isfinite(numeric) else None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if cleaned.lower() in {"n/a", "na", "none", "null", "nan", "-", "--"}:
+            return None
+        cleaned = cleaned.replace(",", "")
+        try:
+            numeric = float(cleaned)
+        except ValueError:
+            return None
+        return numeric if math.isfinite(numeric) else None
     try:
-        return float(value)
+        numeric = float(value)
     except (TypeError, ValueError):
         return None
+    return numeric if math.isfinite(numeric) else None
 
 
-def _normalize_vault(vault: dict) -> dict:
-    token = vault.get("token") or {}
-    tvl = vault.get("tvl") or {}
-    apr = vault.get("apr") or {}
-    return {
-        "vault_address": str(vault.get("address", "")).lower(),
-        "chain_id": int(vault.get("chainID") or 0),
+def _first_present(mapping: dict[str, object], keys: tuple[str, ...]) -> object:
+    for key in keys:
+        if key in mapping and mapping[key] is not None:
+            return mapping[key]
+    return None
+
+
+def _has_raw_numeric_value(value: object) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return False
+        return cleaned.lower() not in {"n/a", "na", "none", "null", "nan", "-", "--"}
+    return True
+
+
+def _parse_chain_id(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        value = cleaned
+    try:
+        chain_id = int(value)
+    except (TypeError, ValueError):
+        return None
+    return chain_id if chain_id > 0 else None
+
+
+def _normalize_optional_address(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return text.lower() if text.startswith("0x") else text
+
+
+def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple[dict, list[str]]:
+    token = vault.get("token")
+    token_obj = token if isinstance(token, dict) else {}
+    tvl = vault.get("tvl")
+    tvl_obj = tvl if isinstance(tvl, dict) else {}
+    apr = vault.get("apr")
+    apr_obj = apr if isinstance(apr, dict) else {}
+    raw_tvl = _first_present(tvl_obj, ("tvl", "tvlUsd", "usd", "totalValueLockedUSD"))
+    if raw_tvl is None:
+        raw_tvl = _first_present(vault, ("tvlUsd", "tvl_usd", "totalValueLockedUSD"))
+    raw_apr = _first_present(apr_obj, ("netAPR", "aprNet", "net"))
+    if raw_apr is None:
+        raw_apr = _first_present(vault, ("aprNet", "netAPR", "apr_net"))
+    raw_feature_score = _first_present(vault, ("featuringScore", "featureScore", "score"))
+    tvl_usd = _to_float(raw_tvl)
+    apr_net = _to_float(raw_apr)
+    feature_score = _to_float(raw_feature_score)
+    numeric_parse_failures: list[str] = []
+    if tvl_usd is None and _has_raw_numeric_value(raw_tvl):
+        numeric_parse_failures.append("tvl_usd")
+    if apr_net is None and _has_raw_numeric_value(raw_apr):
+        numeric_parse_failures.append("apr_net")
+    if feature_score is None and _has_raw_numeric_value(raw_feature_score):
+        numeric_parse_failures.append("feature_score")
+    row = {
+        "vault_address": vault_address,
+        "chain_id": chain_id,
         "name": vault.get("name"),
         "symbol": vault.get("symbol"),
         "category": vault.get("category"),
         "kind": vault.get("kind"),
         "version": vault.get("version"),
-        "token_address": token.get("address"),
-        "token_symbol": token.get("symbol"),
-        "token_name": token.get("name"),
-        "tvl_usd": _to_float(tvl.get("tvl")),
-        "apr_net": _to_float(apr.get("netAPR")),
-        "feature_score": _to_float(vault.get("featuringScore")),
+        "token_address": _normalize_optional_address(_first_present(token_obj, ("address", "tokenAddress"))),
+        "token_symbol": _first_present(token_obj, ("symbol", "tokenSymbol")),
+        "token_name": _first_present(token_obj, ("name", "tokenName")),
+        "tvl_usd": tvl_usd,
+        "apr_net": apr_net,
+        "feature_score": feature_score,
         "raw": Json(vault),
     }
+    return row, numeric_parse_failures
 
 
 def _connect() -> psycopg.Connection:
@@ -237,6 +330,33 @@ def _ensure_schema(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute(DDL)
     conn.commit()
+
+
+def _active_vault_count(conn: psycopg.Connection) -> int:
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM vault_dim WHERE active = TRUE")
+        row = cur.fetchone()
+    return int(row[0] if row else 0)
+
+
+def _assert_snapshot_size_guard(
+    conn: psycopg.Connection,
+    *,
+    normalized_count: int,
+    payload_count: int,
+    skipped_missing_identity: int,
+) -> None:
+    previous_active = _active_vault_count(conn)
+    if previous_active <= 0 or normalized_count >= previous_active:
+        return
+    drop_count = previous_active - normalized_count
+    min_allowed_rows = max(1, math.ceil(previous_active * SNAPSHOT_MIN_ACTIVE_RATIO))
+    if normalized_count < min_allowed_rows and drop_count >= SNAPSHOT_MIN_DROP_COUNT:
+        raise ValueError(
+            "Snapshot guard triggered: normalized rows dropped below safety threshold "
+            f"(previous_active={previous_active}, normalized={normalized_count}, min_allowed={min_allowed_rows}, "
+            f"drop_count={drop_count}, payload={payload_count}, skipped_missing_identity={skipped_missing_identity})"
+        )
 
 
 def _insert_run(conn: psycopg.Connection, job_name: str, started_at: datetime) -> int:
@@ -578,17 +698,89 @@ def _fetch_ydaemon_snapshot() -> list[dict]:
     response = requests.get(YDAEMON_URL, timeout=30)
     response.raise_for_status()
     payload = response.json()
-    if not isinstance(payload, list):
-        raise ValueError("yDaemon response is not a list")
-    return payload
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for key in ("data", "vaults", "items", "results"):
+            candidate = payload.get(key)
+            if isinstance(candidate, list):
+                logging.warning("yDaemon payload is wrapped; using list under key '%s'", key)
+                return candidate
+            if isinstance(candidate, dict):
+                nested = _first_present(candidate, ("vaults", "items", "results"))
+                if isinstance(nested, list):
+                    logging.warning("yDaemon payload is wrapped; using nested list under key '%s'", key)
+                    return nested
+    raise ValueError("yDaemon response does not contain a vault list")
 
 
 def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
-    rows = [_normalize_vault(v) for v in vaults if v.get("address") and v.get("chainID") is not None]
-    with conn.cursor() as cur:
-        cur.execute("UPDATE vault_dim SET active = FALSE")
-        cur.executemany(UPSERT_SQL, rows)
-    conn.commit()
+    rows_by_address: dict[str, dict] = {}
+    numeric_failures = {"tvl_usd": 0, "apr_net": 0, "feature_score": 0}
+    skipped_missing_identity = 0
+    duplicate_addresses = 0
+    chain_conflicts = 0
+    chain_conflict_samples: list[str] = []
+    for vault in vaults:
+        raw_address = _first_present(vault, ("address", "vaultAddress", "vault_address"))
+        vault_address = str(raw_address or "").strip().lower()
+        raw_chain_id = _first_present(vault, ("chainID", "chainId", "chain_id"))
+        chain_id = _parse_chain_id(raw_chain_id)
+        if not vault_address or chain_id is None:
+            skipped_missing_identity += 1
+            continue
+        row, parse_failures = _normalize_vault(vault, vault_address=vault_address, chain_id=chain_id)
+        for field in parse_failures:
+            numeric_failures[field] += 1
+        existing = rows_by_address.get(vault_address)
+        if existing is not None:
+            duplicate_addresses += 1
+            if existing["chain_id"] != chain_id:
+                chain_conflicts += 1
+                if len(chain_conflict_samples) < 10:
+                    chain_conflict_samples.append(f"{vault_address}:{existing['chain_id']}->{chain_id}")
+                continue
+        rows_by_address[vault_address] = row
+
+    rows = list(rows_by_address.values())
+    if chain_conflicts:
+        logging.warning(
+            "Snapshot normalization found cross-chain duplicate vault addresses; "
+            "keeping first-seen rows (count=%s, samples=%s)",
+            chain_conflicts,
+            chain_conflict_samples,
+        )
+    if not rows:
+        raise ValueError(
+            "Snapshot normalization produced 0 valid rows "
+            f"(payload={len(vaults)}, skipped_missing_identity={skipped_missing_identity})"
+        )
+    _assert_snapshot_size_guard(
+        conn,
+        normalized_count=len(rows),
+        payload_count=len(vaults),
+        skipped_missing_identity=skipped_missing_identity,
+    )
+
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("UPDATE vault_dim SET active = FALSE WHERE active = TRUE")
+            cur.executemany(UPSERT_SQL, rows)
+
+    if skipped_missing_identity or duplicate_addresses or chain_conflicts:
+        logging.warning(
+            "Snapshot normalization anomalies: skipped_missing_identity=%s duplicate_addresses=%s chain_conflicts=%s",
+            skipped_missing_identity,
+            duplicate_addresses,
+            chain_conflicts,
+        )
+    if any(numeric_failures.values()):
+        logging.warning(
+            "Snapshot numeric parse fallbacks: tvl_usd=%s apr_net=%s feature_score=%s",
+            numeric_failures["tvl_usd"],
+            numeric_failures["apr_net"],
+            numeric_failures["feature_score"],
+        )
     return len(rows)
 
 
