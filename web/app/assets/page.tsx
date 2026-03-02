@@ -118,6 +118,7 @@ function AssetsPageContent() {
       apiSort: queryChoice<AssetApiSort>(searchParams, "api_sort", ["tvl", "spread", "best_apy", "venues"] as const, "tvl"),
       apiDir: queryChoice(searchParams, "api_dir", ["asc", "desc"] as const, "desc"),
       token: queryString(searchParams, "token", ""),
+      tokenQuery: queryString(searchParams, "token_query", ""),
       tokenSort: queryChoice<TokenSortKey>(
         searchParams,
         "token_sort",
@@ -175,20 +176,7 @@ function AssetsPageContent() {
     };
   }, [query.universe, query.minTvl, query.minPoints, query.limit, query.tokenScope, query.apiSort, query.apiDir]);
 
-  const selectedSymbol = query.token || assetData?.rows[0]?.token_symbol || "";
-
-  useEffect(() => {
-    if (!query.token && assetData?.rows[0]?.token_symbol) {
-      replaceQuery(router, pathname, searchParams, { token: assetData.rows[0].token_symbol });
-      return;
-    }
-    if (query.token && assetData?.rows.length) {
-      const exists = assetData.rows.some((row) => row.token_symbol === query.token);
-      if (!exists) {
-        replaceQuery(router, pathname, searchParams, { token: assetData.rows[0].token_symbol });
-      }
-    }
-  }, [assetData, pathname, query.token, router, searchParams]);
+  const selectedSymbol = query.token || "";
 
   useEffect(() => {
     if (!selectedSymbol) {
@@ -234,6 +222,28 @@ function AssetsPageContent() {
     weighted: (row) => row.weighted_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
     spread: (row) => row.spread_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
   });
+  const tokenQueryNormalized = query.tokenQuery.trim().toLowerCase();
+  const filteredTokenRows = useMemo(
+    () =>
+      tokenQueryNormalized.length === 0
+        ? tokenRows
+        : tokenRows.filter((row) => row.token_symbol.toLowerCase().includes(tokenQueryNormalized)),
+    [tokenRows, tokenQueryNormalized],
+  );
+
+  useEffect(() => {
+    const firstSymbol = filteredTokenRows[0]?.token_symbol;
+    if (!query.token) {
+      if (firstSymbol) {
+        replaceQuery(router, pathname, searchParams, { token: firstSymbol });
+      }
+      return;
+    }
+    const exists = filteredTokenRows.some((row) => row.token_symbol === query.token);
+    if (!exists) {
+      replaceQuery(router, pathname, searchParams, { token: firstSymbol ?? null });
+    }
+  }, [filteredTokenRows, pathname, query.token, router, searchParams]);
 
   const venueRows = sortRows(detail?.rows ?? [], venueSort, {
     vault: (row) => row.symbol ?? row.vault_address,
@@ -247,20 +257,20 @@ function AssetsPageContent() {
   });
   const topTokenByTvl = useMemo(
     () =>
-      [...(assetData?.rows ?? [])]
+      [...filteredTokenRows]
         .sort((left, right) => (right.total_tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.total_tvl_usd ?? Number.NEGATIVE_INFINITY))
         .slice(0, 8),
-    [assetData?.rows],
+    [filteredTokenRows],
   );
   const featuredMinVenues = assetData?.filters?.featured_min_venues;
   const featuredMinChains = assetData?.filters?.featured_min_chains;
   const tokenSpreadCards = useMemo(
     () =>
-      [...tokenRows]
+      [...filteredTokenRows]
         .filter((row) => row.spread_safe_apy_30d !== null && row.spread_safe_apy_30d !== undefined)
         .sort((left, right) => (right.spread_safe_apy_30d ?? Number.NEGATIVE_INFINITY) - (left.spread_safe_apy_30d ?? Number.NEGATIVE_INFINITY))
         .slice(0, 8),
-    [tokenRows],
+    [filteredTokenRows],
   );
 
   return (
@@ -352,6 +362,15 @@ function AssetsPageContent() {
               <option value="asc">Lowest first</option>
             </select>
           </label>
+          <label>
+            Token Search:&nbsp;
+            <input
+              type="text"
+              value={query.tokenQuery}
+              onChange={(event) => updateQuery({ token_query: event.target.value, token: null })}
+              placeholder="e.g. DAI, WETH"
+            />
+          </label>
         </div>
       </section>
 
@@ -365,10 +384,10 @@ function AssetsPageContent() {
           <label>
             Token:&nbsp;
             <select value={selectedSymbol} onChange={(event) => updateQuery({ token: event.target.value })}>
-              {tokenRows.length === 0 ? (
+              {filteredTokenRows.length === 0 ? (
                 <option value="">No tokens available</option>
               ) : (
-                tokenRows.map((row) => (
+                filteredTokenRows.map((row) => (
                   <option key={row.token_symbol} value={row.token_symbol}>
                     {row.token_symbol}
                   </option>
@@ -384,7 +403,7 @@ function AssetsPageContent() {
             {featuredMinChains === 1 ? "chain" : "chains"}.
           </p>
         ) : null}
-        {tokenRows.length === 0 ? (
+        {filteredTokenRows.length === 0 ? (
           <p className="muted card-intro">
             No tokens matched this filter set. Lower <strong>Min TVL</strong>, lower <strong>Min Points</strong>, or switch list mode.
           </p>
@@ -479,7 +498,7 @@ function AssetsPageContent() {
             Cards rank by APY spread. Sparkline points are worst → weighted → best APY; flatter lines mean token venues are currently similar.
           </p>
         </section>
-        {tokenRows.length === 0 ? (
+        {filteredTokenRows.length === 0 ? (
           <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch List mode.</p>
         ) : (
           <div className="table-wrap">
@@ -574,7 +593,7 @@ function AssetsPageContent() {
                 </tr>
               </thead>
               <tbody>
-                {tokenRows.map((row) => (
+                {filteredTokenRows.map((row) => (
                   <tr
                     key={row.token_symbol}
                     className={row.token_symbol === selectedSymbol ? "row-selected" : "row-clickable"}
@@ -599,7 +618,7 @@ function AssetsPageContent() {
       <section className="card assets-venues-card">
         <h2>{detail?.token_symbol || selectedSymbol || "Token"} Venues</h2>
         <p className="muted card-intro">
-          Venue-level detail for the selected token. Sort to compare alternatives quickly. Dense mode adds extra context columns.
+          Venue-level detail for the selected token. Sort to compare alternatives quickly. Pro mode adds extra context columns.
         </p>
         <p className="muted">
           Scope: active, non-retired <strong>Multi Strategy v3</strong> vaults only.

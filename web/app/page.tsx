@@ -1,237 +1,246 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatHours, formatPct, formatUtcDateTime } from "./lib/format";
-import { KpiGrid } from "./components/visuals";
+import { formatHours, formatPct, formatUsd } from "./lib/format";
 
 type OverviewResponse = {
-  project: string;
-  status: string;
-  server_time_utc: string;
-  message: string;
-  ingestion?: {
-    active_vaults?: number | null;
-    total_vaults?: number | null;
-    pps_points?: number | null;
-    metrics_count?: number | null;
-    last_runs?: Record<
-      string,
-      {
-        status?: string;
-        started_at?: string | null;
-        ended_at?: string | null;
-        records?: number | null;
-      } | null
-    >;
-  };
   freshness?: {
     latest_pps_age_seconds?: number | null;
-    pps_vaults_total?: number;
-    pps_vaults_stale?: number;
     pps_stale_ratio?: number | null;
-    metrics_newest_age_seconds?: number | null;
-    ingestion_jobs?: Record<
-      string,
-      {
-        running?: boolean;
-        last_success_at?: string | null;
-        last_success_age_seconds?: number | null;
-      }
-    >;
-    alerts?: Record<
-      string,
-      {
-        status?: string;
-        is_firing?: boolean;
-        job_name?: string;
-        last_notified_at?: string | null;
-      }
-    >;
   } | null;
   coverage?: {
-    filters?: {
-      min_tvl_usd?: number;
-      min_points?: number;
-    };
     global?: {
-      active_vaults?: number;
       eligible_vaults?: number;
-      excluded_vaults?: number;
-      missing_metrics?: number;
-      below_tvl?: number;
-      low_points?: number;
     };
   } | null;
   protocol_context?: {
-    status?: string;
-    protocol_name?: string;
-    tvl_usd?: number | null;
-    mcap_usd?: number | null;
-    mcap_source?: string | null;
-    gecko_id?: string | null;
-    mcap_tvl_ratio?: number | null;
     tvl_change_7d_pct?: number | null;
-    tvl_change_30d_pct?: number | null;
-    eligible_vs_protocol_tvl_ratio?: number | null;
-    eligible_vs_protocol_tvl_gap_usd?: number | null;
     yearn_aligned_proxy?: {
-      vaults?: number;
       tvl_usd?: number | null;
     } | null;
-    defillama_vs_yearn_proxy_gap_usd?: number | null;
-    defillama_vs_yearn_proxy_ratio?: number | null;
-    top_chains?: Array<{ chain: string; tvl_usd: number }>;
-    error?: string;
   } | null;
-  lifecycle?: {
-    active_vaults?: number;
-    retired_vaults?: number;
-    highlighted_vaults?: number;
-    migration_ready_vaults?: number;
-    risk_unrated_vaults?: number;
-    risk_0_vaults?: number;
-    risk_1_vaults?: number;
-    risk_2_vaults?: number;
-    risk_3_vaults?: number;
-    risk_4_vaults?: number;
-  } | null;
-  sources: {
-    ydaemon: string;
-    kong_gql: string;
+};
+
+type MetaMoverRow = {
+  symbol?: string | null;
+  token_symbol?: string | null;
+  delta_apy?: number | null;
+  safe_apy_window?: number | null;
+};
+
+type MetaMoversResponse = {
+  summary?: {
+    avg_delta_apy?: number | null;
   };
-  data_policy?: {
-    worker_interval_sec?: number;
-    pps_retention_days?: number;
-    ingestion_run_retention_days?: number;
-    db_cleanup_min_interval_sec?: number;
-    kong_pps_lookback_days?: number;
+  movers?: {
+    risers?: MetaMoverRow[];
   };
 };
 
+function pctDelta(value: number | null | undefined, digits = 2): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
+  const signed = value * 100;
+  const prefix = signed > 0 ? "+" : "";
+  return `${prefix}${signed.toFixed(digits)}%`;
+}
+
+function moverTitle(row: MetaMoverRow | undefined): string {
+  if (!row) return "n/a";
+  if (row.symbol && row.symbol.trim().length > 0) return row.symbol.trim();
+  if (row.token_symbol && row.token_symbol.trim().length > 0) return row.token_symbol.trim();
+  return "Vault";
+}
+
+function liveSummary(
+  topRiser: MetaMoverRow | undefined,
+  avgDeltaApy: number | null | undefined,
+  eligibleVaults: number | undefined,
+): string {
+  const parts: string[] = [];
+  if (topRiser) {
+    const moverParts: string[] = [`Top mover ${moverTitle(topRiser)}`];
+    if (Number.isFinite(topRiser.safe_apy_window ?? null)) {
+      moverParts.push(`APY ${formatPct(topRiser.safe_apy_window ?? null, 2)}`);
+    }
+    if (Number.isFinite(topRiser.delta_apy ?? null)) {
+      moverParts.push(`24h delta ${pctDelta(topRiser.delta_apy, 2)}`);
+    }
+    parts.push(moverParts.join(" "));
+  } else {
+    parts.push("Top mover syncing");
+  }
+  if (Number.isFinite(avgDeltaApy ?? null)) {
+    parts.push(`Avg 24h delta ${pctDelta(avgDeltaApy, 2)}`);
+  }
+  if (Number.isFinite(eligibleVaults ?? null)) {
+    parts.push(`${eligibleVaults} vaults tracked`);
+  }
+  return parts.join(" | ");
+}
+
+function freshnessSummary(ageSeconds: number | null | undefined): string {
+  const value = formatHours(ageSeconds ?? null, 1);
+  if (value === "n/a") return "Freshness syncing";
+  return `Freshness ${value}`;
+}
+
 export default function HomePage() {
-  const [data, setData] = useState<OverviewResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [overview, setOverview] = useState<OverviewResponse | null>(null);
+  const [movers, setMovers] = useState<MetaMoversResponse | null>(null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
-      try {
-        const res = await fetch("/api/overview", { cache: "no-store" });
-        if (!res.ok) {
-          if (active) {
-            setData(null);
-            setLoading(false);
-          }
-          return;
-        }
-        const payload = (await res.json()) as OverviewResponse;
-        if (active) {
-          setData(payload);
-          setLoading(false);
-        }
-      } catch {
-        if (active) {
-          setData(null);
-          setLoading(false);
-        }
+      const [overviewResult, moversResult] = await Promise.allSettled([
+        fetch("/api/overview", { cache: "no-store" }),
+        fetch("/api/meta/movers?window=24h&limit=1&include_freshness=false", { cache: "no-store" }),
+      ]);
+      if (!active) return;
+
+      if (overviewResult.status === "fulfilled" && overviewResult.value.ok) {
+        setOverview((await overviewResult.value.json()) as OverviewResponse);
+      }
+      if (moversResult.status === "fulfilled" && moversResult.value.ok) {
+        setMovers((await moversResult.value.json()) as MetaMoversResponse);
       }
     };
+
     void load();
     return () => {
       active = false;
     };
   }, []);
 
+  useEffect(() => {
+    const revealNodes = Array.from(document.querySelectorAll<HTMLElement>(".home-reveal"));
+    if (revealNodes.length === 0) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      revealNodes.forEach((node) => node.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.14, rootMargin: "0px 0px -8% 0px" },
+    );
+
+    revealNodes.forEach((node) => observer.observe(node));
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  const topRiser = movers?.movers?.risers?.[0];
+  const liveNowLine = liveSummary(topRiser, movers?.summary?.avg_delta_apy ?? null, overview?.coverage?.global?.eligible_vaults);
+  const liveFreshnessLine = freshnessSummary(overview?.freshness?.latest_pps_age_seconds ?? null);
+
   return (
-    <main className="container">
-      <section className="hero">
-        <h1>yHelper</h1>
-        <p>Yearn dashboard for quick vault discovery and deeper analysis of yield changes, composition, and regimes.</p>
+    <main className="container home-minimal">
+      <section className="card home-minimal-hero home-reveal">
+        <div className="home-minimal-hero-copy">
+          <h1>Clear signals for faster vault decisions</h1>
+          <p>
+            See where yield moves, what is crowded, and whether data is fresh enough to trust.
+          </p>
+          <div className="home-minimal-cta-row">
+            <Link href="/discover" className="home-lite-cta primary">Start in Discover</Link>
+            <Link href="/changes" className="home-lite-cta">See recent changes</Link>
+          </div>
+        </div>
+        <div className="home-minimal-hero-art" aria-hidden="true">
+          <span className="prism-hero-scene" />
+        </div>
       </section>
 
-      <section className="card">
-        <h2>Dashboards</h2>
-        <p className="muted card-intro">
-          All pages apply quality filters so tiny/noisy vaults do not dominate rankings.
-        </p>
-        <ol>
-          <li>
-            <a href="/discover">Discover</a>: sortable vault scanner by yield, trend, and stability.
-          </li>
-          <li>
-            <a href="/assets">Assets</a>: compare venues for the same token and see spread between best and worst yield.
-          </li>
-          <li>
-            <a href="/composition">Composition</a>: concentration and crowding across chains, categories, and tokens.
-          </li>
-          <li>
-            <a href="/changes">Changes</a>: changefeed for rising/falling yield using 24h, 7d, or 30d windows.
-          </li>
-          <li>
-            <a href="/regimes">Regimes</a>: vault behavior classes (rising, falling, stable, choppy).
-          </li>
-          <li>
-            <a href="/chains">Chains</a>: chain-level weighted yield and consistency.
-          </li>
-        </ol>
+      <div className="home-minimal-break prism-divider" aria-hidden="true" />
+
+      <section className="card home-minimal-purpose home-reveal">
+        <div className="home-minimal-purpose-art prism-purpose-art" aria-hidden="true" />
+        <div className="home-minimal-purpose-content">
+          <article className="home-minimal-step step-a">
+            <p className="home-minimal-step-index">01</p>
+            <h2>What It Is</h2>
+            <p className="muted">A compact Yearn intelligence layer for discovery and monitoring.</p>
+          </article>
+          <article className="home-minimal-step step-b">
+            <p className="home-minimal-step-index">02</p>
+            <h2>What It Solves</h2>
+            <p className="muted">Cuts scan time by turning raw vault metrics into directional signals.</p>
+          </article>
+          <article className="home-minimal-step step-c">
+            <p className="home-minimal-step-index">03</p>
+            <h2>How To Use It</h2>
+            <p className="muted">Discover for scan. Changes for timing. Composition and Regimes for context.</p>
+          </article>
+        </div>
       </section>
 
-      <section className="card">
-        <h2>Metric Guide</h2>
-        <p className="muted card-intro">Quick glossary for common values used across pages.</p>
-        <ul>
-          <li>
-            <strong>APY:</strong> annualized yield estimate. It turns a shorter return window into yearly terms.
-          </li>
-          <li>
-            <strong>TVL:</strong> total dollar value currently deposited in a vault or group.
-          </li>
-          <li>
-            <strong>PPS:</strong> price per share. If PPS rises, the vault share value has increased.
-          </li>
-          <li>
-            <strong>Momentum:</strong> 7d APY minus 30d APY. Positive means recent yield is improving.
-          </li>
-          <li>
-            <strong>Consistency:</strong> score for steadier, less erratic returns.
-          </li>
-          <li>
-            <strong>Regime:</strong> rule label from momentum and volatility (rising, falling, stable, choppy).
-          </li>
-          <li>
-            <strong>HHI:</strong> concentration index from 0 to 1. Higher means more concentrated.
-          </li>
-        </ul>
+      <div className="home-minimal-break home-minimal-break-soft prism-divider" aria-hidden="true" />
+
+      <section className="home-minimal-signals">
+        <article className="card home-sparse-signal-card home-reveal">
+          <p className="home-sparse-signal-label">Tracked TVL</p>
+          <p className="home-sparse-signal-value">{formatUsd(overview?.protocol_context?.yearn_aligned_proxy?.tvl_usd ?? null, 0)}</p>
+        </article>
+        <article className="card home-sparse-signal-card home-reveal">
+          <p className="home-sparse-signal-label">TVL Change 7d</p>
+          <p className="home-sparse-signal-value">{formatPct(overview?.protocol_context?.tvl_change_7d_pct ?? null, 2)}</p>
+        </article>
+        <article className="card home-sparse-signal-card home-reveal">
+          <p className="home-sparse-signal-label">Data Freshness</p>
+          <p className="home-sparse-signal-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}</p>
+        </article>
       </section>
 
-      <section className="card overview-snapshot-card">
-        <h2>Snapshot and Scope</h2>
-        <p className="muted card-intro">
-          Lightweight freshness and universe context for the data shown across dashboards.
-        </p>
-        {data ? (
-          <>
-            <KpiGrid
-              items={[
-                { label: "Active Vaults", value: String(data?.lifecycle?.active_vaults ?? data?.coverage?.global?.active_vaults ?? "n/a") },
-                { label: "Eligible Vaults", value: String(data?.coverage?.global?.eligible_vaults ?? "n/a") },
-                { label: "Migration Ready", value: String(data?.lifecycle?.migration_ready_vaults ?? "n/a") },
-                { label: "Highlighted Vaults", value: String(data?.lifecycle?.highlighted_vaults ?? "n/a") },
-                { label: "Excluded Vaults", value: String(data?.coverage?.global?.excluded_vaults ?? "n/a") },
-                { label: "Low Data Points", value: String(data?.coverage?.global?.low_points ?? "n/a") },
-              ]}
-            />
-            <p className="muted overview-guardrails-note">
-              Inclusion filter: TVL (Total Value Locked) ≥ {data?.coverage?.filters?.min_tvl_usd?.toLocaleString("en-US") ?? "n/a"} and
-              data points ≥ {data?.coverage?.filters?.min_points ?? "n/a"}.
-            </p>
-          </>
-        ) : loading ? (
-          <p>Loading snapshot…</p>
-        ) : (
-          <p>Snapshot is temporarily unavailable. Try again shortly.</p>
-        )}
+      <section className="home-minimal-routes">
+        <Link href="/discover" className="card home-sparse-route-card home-route-clickable home-reveal">
+          <div className="home-route-head">
+            <h2>Discover</h2>
+          </div>
+          <p className="muted">Find opportunities quickly with sortable quality-filtered vault signals.</p>
+          <span className="home-route-arrow" aria-hidden="true">→</span>
+        </Link>
+        <Link href="/composition" className="card home-sparse-route-card home-route-clickable home-reveal">
+          <div className="home-route-head">
+            <h2>Composition</h2>
+          </div>
+          <p className="muted">Understand chain, category, and token concentration before sizing risk.</p>
+          <span className="home-route-arrow" aria-hidden="true">→</span>
+        </Link>
+        <Link href="/regimes" className="card home-sparse-route-card home-route-clickable home-reveal">
+          <div className="home-route-head">
+            <h2>Regimes</h2>
+          </div>
+          <p className="muted">Monitor rising, stable, falling, and choppy behavior transitions.</p>
+          <span className="home-route-arrow" aria-hidden="true">→</span>
+        </Link>
       </section>
+
+      <section className="card home-live-strip home-reveal" aria-live="polite">
+        <span className="home-live-dot" aria-hidden="true" />
+        <div className="home-live-copy">
+          <p className="home-live-label">Live now</p>
+          <p className="home-live-text">{liveNowLine}</p>
+          <p className="home-live-meta">{liveFreshnessLine}</p>
+        </div>
+      </section>
+
+      <footer className="card home-minimal-footer home-reveal">
+        <p className="home-minimal-footer-title">Official channels</p>
+        <div className="home-minimal-footer-links">
+          <a href="https://yearn.fi" target="_blank" rel="noopener noreferrer">Yearn</a>
+          <a href="https://x.com/yearnfi" target="_blank" rel="noopener noreferrer">X / Twitter</a>
+        </div>
+      </footer>
+
     </main>
   );
 }
