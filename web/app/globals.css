@@ -110,6 +110,14 @@
   --heat-border: #214579;
   --heat-label: #c7dcfa;
   --shadow: rgba(0, 0, 0, 0.4);
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --motion-chart: 320ms;
+  --motion-step: 36ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-reveal: cubic-bezier(0.2, 0.85, 0.35, 1);
   --font-sans: "Aeonik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Aeonik Mono", "Source Code Pro", Consolas, "Courier New", monospace;
   --font-fono: "Aeonik Fono", "Aeonik Mono", "Source Code Pro", Consolas, "Courier New", monospace;
@@ -237,9 +245,9 @@ body::after {
   pointer-events: none;
   opacity: 0;
   transition:
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    width 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 120ms ease;
+    transform var(--motion-base) var(--ease-emphasis),
+    width var(--motion-base) var(--ease-emphasis),
+    opacity var(--motion-fast) var(--ease-standard);
 }
 
 .site-nav-links[data-ready="true"]::before {
@@ -260,7 +268,10 @@ body::after {
   justify-content: center;
   line-height: 1.24;
   font-size: 0.9rem;
-  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .site-nav-links a:hover {
@@ -327,7 +338,9 @@ body::after {
   background: linear-gradient(180deg, var(--control-top) 0%, var(--panel-bottom-strong) 100%);
   text-decoration: none;
   cursor: default;
-  transition: border-color 120ms ease, transform 120ms ease;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .freshness-badge:hover {
@@ -439,15 +452,15 @@ body::after {
 .container:not(.home-minimal) > .card {
   opacity: 0;
   transform: translateY(10px);
-  animation: section-in 220ms ease-out forwards;
+  animation: section-in var(--motion-slow) var(--ease-emphasis) forwards;
 }
 
 .container:not(.home-minimal) > .card:nth-of-type(2) {
-  animation-delay: 40ms;
+  animation-delay: var(--motion-step);
 }
 
 .container:not(.home-minimal) > .card:nth-of-type(3) {
-  animation-delay: 74ms;
+  animation-delay: calc(var(--motion-step) * 2);
 }
 
 @keyframes section-in {
@@ -670,7 +683,10 @@ body::after {
   text-decoration: none;
   color: inherit;
   background: linear-gradient(180deg, rgba(13, 32, 72, 0.95) 0%, rgba(9, 20, 46, 0.93) 100%);
-  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
 }
 
 .home-nav-tile:hover {
@@ -768,7 +784,10 @@ body::after {
   color: var(--ink-soft);
   text-decoration: none;
   font-size: 0.86rem;
-  transition: border-color 160ms ease, transform 160ms ease, box-shadow 180ms ease;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
 }
 
 .home-lite-cta:hover,
@@ -980,7 +999,7 @@ td.is-numeric {
   white-space: nowrap;
   font: inherit;
   color: inherit;
-  transition: color 120ms ease;
+  transition: color var(--motion-fast) var(--ease-standard);
 }
 
 th.is-numeric .th-button {
@@ -1030,7 +1049,7 @@ input[type="text"] {
 
 .row-clickable {
   cursor: pointer;
-  transition: background-color 120ms ease;
+  transition: background-color var(--motion-fast) var(--ease-standard);
 }
 
 .row-clickable:hover {
@@ -1851,7 +1870,10 @@ input[type="text"] {
 }
 
 .treemap-cell rect {
-  transition: opacity 140ms ease, stroke-width 140ms ease, filter 140ms ease;
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    stroke-width var(--motion-fast) var(--ease-standard),
+    filter var(--motion-fast) var(--ease-standard);
 }
 
 .treemap-cell:hover rect {
@@ -2155,10 +2177,12 @@ input[type="text"] {
 }
 
 .sankey-flow path {
-  transition: filter 140ms ease, opacity 140ms ease;
+  transition:
+    filter var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: line-draw 0.32s ease-out forwards;
+  animation: line-draw var(--motion-chart) var(--ease-emphasis) forwards;
   animation-play-state: paused;
 }
 
@@ -2184,7 +2208,7 @@ input[type="text"] {
 }
 
 .ridgeline-curve {
-  animation: ridge-in 0.34s ease-out both;
+  animation: ridge-in var(--motion-chart) var(--ease-emphasis) both;
   animation-play-state: paused;
 }
 
@@ -2329,7 +2353,7 @@ input[type="text"] {
   border-radius: 999px;
   background: linear-gradient(90deg, var(--bar-fill-start) 0%, var(--bar-fill-mid) 68%, var(--bar-fill-end) 100%);
   transform-origin: left center;
-  animation: bar-fill-in 0.28s ease-out both;
+  animation: bar-fill-in var(--motion-chart) var(--ease-emphasis) both;
   animation-delay: var(--bar-delay, 0s);
   animation-play-state: paused;
 }
@@ -2368,7 +2392,7 @@ input[type="text"] {
     rgba(6, 14, 33, 0.98) 100%
   );
   opacity: 0;
-  animation: heat-in 0.28s ease-out both;
+  animation: heat-in var(--motion-chart) var(--ease-emphasis) both;
   animation-delay: var(--heat-delay, 0s);
   animation-play-state: paused;
 }
@@ -2436,9 +2460,11 @@ input[type="text"] {
   opacity: 0.88;
   stroke: transparent;
   stroke-width: 0;
-  transition: transform 120ms ease, opacity 120ms ease;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
   transform-origin: center;
-  animation: point-in 0.24s ease-out both;
+  animation: point-in var(--motion-slow) var(--ease-emphasis) both;
   animation-delay: var(--point-delay, 0s);
   animation-play-state: paused;
 }
@@ -2535,7 +2561,7 @@ input[type="text"] {
   stroke-linejoin: round;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: line-draw 0.32s ease-out forwards;
+  animation: line-draw var(--motion-chart) var(--ease-emphasis) forwards;
   animation-play-state: paused;
 }
 
@@ -2557,7 +2583,7 @@ input[type="text"] {
 
 .treemap-cell-rect {
   transform-origin: left center;
-  animation: bar-fill-in 0.28s ease-out both;
+  animation: bar-fill-in var(--motion-chart) var(--ease-emphasis) both;
   animation-delay: var(--treemap-delay, 0s);
   animation-play-state: paused;
 }
@@ -2610,6 +2636,16 @@ input:focus-visible {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .site-nav-links::before,
+  .home-route-clickable,
+  .home-route-clickable::before,
+  .home-route-arrow,
+  .home-live-dot {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
 }
 
@@ -3463,7 +3499,10 @@ input:focus-visible {
   color: inherit;
   min-height: 170px;
   padding: 1.15rem;
-  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
 }
 
 .home-sparse-route-card:hover {
@@ -3522,7 +3561,9 @@ input:focus-visible {
 .home-reveal {
   opacity: 0;
   transform: translateY(16px) scale(0.995);
-  transition: opacity 240ms ease, transform 240ms cubic-bezier(0.2, 0.85, 0.35, 1);
+  transition:
+    opacity var(--motion-slow) var(--ease-standard),
+    transform var(--motion-slow) var(--ease-reveal);
 }
 
 .home-reveal.is-visible {
@@ -3532,25 +3573,25 @@ input:focus-visible {
 
 .home-minimal-signals .home-reveal:nth-child(1),
 .home-minimal-routes .home-reveal:nth-child(1) {
-  transition-delay: 32ms;
+  transition-delay: var(--motion-step);
 }
 
 .home-minimal-signals .home-reveal:nth-child(2),
 .home-minimal-routes .home-reveal:nth-child(2) {
-  transition-delay: 68ms;
+  transition-delay: calc(var(--motion-step) * 2);
 }
 
 .home-minimal-signals .home-reveal:nth-child(3),
 .home-minimal-routes .home-reveal:nth-child(3) {
-  transition-delay: 104ms;
+  transition-delay: calc(var(--motion-step) * 3);
 }
 
 .home-live-strip.home-reveal {
-  transition-delay: 78ms;
+  transition-delay: calc(var(--motion-step) * 2);
 }
 
 .home-minimal-footer.home-reveal {
-  transition-delay: 112ms;
+  transition-delay: calc(var(--motion-step) * 3);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3742,7 +3783,10 @@ input:focus-visible {
   gap: 0.58rem;
   border-color: rgba(82, 109, 173, 0.55);
   background: linear-gradient(180deg, rgba(14, 33, 69, 0.52), rgba(8, 20, 44, 0.7));
-  transition: border-color 180ms ease, transform 180ms ease, box-shadow 200ms ease;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
 }
 
 .home-route-clickable::before {
@@ -3752,7 +3796,7 @@ input:focus-visible {
   pointer-events: none;
   background: radial-gradient(circle at 84% 18%, rgba(143, 183, 255, 0.2), rgba(143, 183, 255, 0));
   opacity: 0;
-  transition: opacity 180ms ease;
+  transition: opacity var(--motion-base) var(--ease-standard);
 }
 
 .home-route-clickable:hover,
@@ -3784,7 +3828,7 @@ input:focus-visible {
   color: var(--accent-2);
   font-size: 1.06rem;
   transform: translateX(0);
-  transition: transform 180ms ease;
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 
 .home-route-clickable:hover .home-route-arrow,
@@ -3806,8 +3850,8 @@ input:focus-visible {
   margin-top: 0.36rem;
   border-radius: 999px;
   background: rgba(143, 183, 255, 0.95);
-  box-shadow: 0 0 0 0 rgba(143, 183, 255, 0.48);
-  animation: home-live-pulse 2.2s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(143, 183, 255, 0.4);
+  animation: home-live-pulse 2.6s var(--ease-standard) infinite;
 }
 
 @keyframes home-live-pulse {
@@ -3816,7 +3860,7 @@ input:focus-visible {
   }
 
   70% {
-    box-shadow: 0 0 0 9px rgba(143, 183, 255, 0);
+    box-shadow: 0 0 0 7px rgba(143, 183, 255, 0);
   }
 
   100% {
@@ -3878,7 +3922,9 @@ input:focus-visible {
   border-radius: 999px;
   padding: 0.3rem 0.68rem;
   font-size: 0.86rem;
-  transition: border-color 160ms ease, transform 160ms ease;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 .home-minimal-footer-links a:hover,

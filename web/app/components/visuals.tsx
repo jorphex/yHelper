@@ -72,6 +72,10 @@ export function useInViewOnce<T extends HTMLElement>() {
 
   useEffect(() => {
     if (!node) return;
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setIsInView(true);
+      return;
+    }
     if (typeof IntersectionObserver === "undefined") {
       setIsInView(true);
       return;
