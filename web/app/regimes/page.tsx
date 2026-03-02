@@ -82,17 +82,6 @@ type RegimeSummarySortKey = "regime" | "vaults" | "tvl";
 type RegimeMoverSortKey = "vault" | "chain" | "token" | "tvl" | "apy" | "momentum" | "regime";
 type SplitSnapshotSortKey = "cohort" | "churn" | "churn_tvl" | "momentum" | "tvl";
 
-function confidenceBand(score: number): string {
-  if (score >= 80) return "High";
-  if (score >= 60) return "Moderate";
-  if (score >= 40) return "Watch";
-  return "Low";
-}
-
-function clampScore(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
 function compactRegimeLabel(value: string | null | undefined): string {
   if (!value) return "Unknown";
   const key = value.toLowerCase();
@@ -295,13 +284,15 @@ function RegimesPageContent() {
           min_points: String(query.minPoints),
         });
         if (query.chain > 0) params.set("chain_id", String(query.chain));
+        const transitionsParams = new URLSearchParams(params);
+        transitionsParams.set("limit", String(Math.min(query.limit, 30)));
         const dailyParams = new URLSearchParams(params);
         dailyParams.set("days", query.transitionDays);
         dailyParams.set("group_by", query.transitionSplit);
         dailyParams.set("group_limit", "8");
         const [regimesRes, transitionsRes, transitionsDailyRes] = await Promise.all([
           fetch(`/api/regimes?${params.toString()}`, { cache: "no-store" }),
-          fetch(`/api/regimes/transitions?${params.toString()}`, { cache: "no-store" }),
+          fetch(`/api/regimes/transitions?${transitionsParams.toString()}`, { cache: "no-store" }),
           fetch(`/api/regimes/transitions/daily?${dailyParams.toString()}`, { cache: "no-store" }),
         ]);
         if (!regimesRes.ok || !transitionsRes.ok || !transitionsDailyRes.ok) {
@@ -502,18 +493,6 @@ function RegimesPageContent() {
       tvl: (row) => row.tvl_total_usd ?? Number.NEGATIVE_INFINITY,
     });
   }, [transitionDailyGrouped, splitSnapshotSort, query.transitionMinCohortTvl]);
-  const summaryConfidence = clampScore(
-    Math.min(1, (summaryRows.reduce((acc, row) => acc + row.vaults, 0) || 0) / 120) * 65 + Math.min(1, moverRows.length / 40) * 35,
-  );
-  const transitionVaultsTotal = transitionData?.summary?.vaults_total ?? 0;
-  const transitionChangedRatio = transitionData?.summary?.changed_ratio ?? 0;
-  const transitionConfidence = clampScore(
-    transitionVaultsTotal > 0
-      ? Math.min(1, transitionVaultsTotal / 120) * 65 +
-          Math.min(1, transitionChangedRatio * 2) * 20 +
-          15
-      : 0,
-  );
 
   return (
     <main className="container">
@@ -623,9 +602,6 @@ function RegimesPageContent() {
       <section className="card regime-summary-card">
         <h2>Regime Summary</h2>
         <p className="muted card-intro">Click column headers to sort by size, vault count, or regime name.</p>
-        <p className="muted confidence-line">
-          Confidence: <strong>{summaryConfidence}/100 ({confidenceBand(summaryConfidence)})</strong> from sample breadth and ranked mover coverage.
-        </p>
         <div className="regime-summary-layout">
           <div className="regime-summary-main">
             <KpiGrid
@@ -634,10 +610,6 @@ function RegimesPageContent() {
                 {
                   label: "Total Vaults",
                   value: String(summaryRows.reduce((acc, row) => acc + row.vaults, 0)),
-                },
-                {
-                  label: "Total TVL",
-                  value: formatUsd(summaryRows.reduce((acc, row) => acc + Number(row.tvl_usd || 0), 0)),
                 },
               ]}
             />
@@ -716,9 +688,6 @@ function RegimesPageContent() {
         <h2>Regime Transition Matrix</h2>
         <p className="muted card-intro">
           Transition view compares short-term regime (7d vs 30d APY) against prior baseline regime (30d vs 90d APY).
-        </p>
-        <p className="muted confidence-line">
-          Confidence: <strong>{transitionConfidence}/100 ({confidenceBand(transitionConfidence)})</strong> from vault coverage and transition sample size.
         </p>
         <KpiGrid
           items={[

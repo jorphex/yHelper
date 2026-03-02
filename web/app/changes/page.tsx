@@ -147,17 +147,6 @@ function staleThresholdLabel(value: StaleThresholdKey): string {
   return value;
 }
 
-function confidenceBand(score: number): string {
-  if (score >= 80) return "High";
-  if (score >= 60) return "Moderate";
-  if (score >= 40) return "Watch";
-  return "Low";
-}
-
-function clampScore(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
 function MoverTable({
   title,
   rows,
@@ -677,29 +666,6 @@ function ChangesPageContent() {
         })),
     [categoryTrendLatest, isCompactViewport],
   );
-  const windowCoverage = useMemo(() => {
-    const eligible = data?.summary.vaults_eligible ?? 0;
-    const withChange = data?.summary.vaults_with_change ?? 0;
-    if (eligible <= 0) return 0;
-    return withChange / eligible;
-  }, [data?.summary.vaults_eligible, data?.summary.vaults_with_change]);
-  const freshnessPenalty = useMemo(() => {
-    const stale = data?.freshness?.window_stale_ratio;
-    const latestAgeHours = (data?.freshness?.latest_pps_age_seconds ?? 0) / 3600;
-    const staleRatio = stale ?? data?.freshness?.pps_stale_ratio ?? 0;
-    return Math.min(1, staleRatio * 1.25) * 45 + Math.min(24, latestAgeHours) * 1.25;
-  }, [data?.freshness?.window_stale_ratio, data?.freshness?.pps_stale_ratio, data?.freshness?.latest_pps_age_seconds]);
-  const windowConfidence = clampScore(windowCoverage * 70 + 30 - freshnessPenalty);
-  const deltaConfidence = clampScore(
-    Math.min(1, moverScatterRows.length / 40) * 60 + Math.min(1, windowCoverage) * 25 + 15 - Math.min(22, freshnessPenalty * 0.5),
-  );
-  const freshnessConfidence = clampScore(
-    100 -
-      Math.min(70, (data?.freshness?.window_stale_ratio ?? data?.freshness?.pps_stale_ratio ?? 0) * 130) -
-      Math.min(20, ((data?.freshness?.latest_pps_age_seconds ?? 0) / 3600) * 1.5) -
-      Math.min(10, ((data?.freshness?.metrics_newest_age_seconds ?? 0) / 3600) * 1.0),
-  );
-
   return (
     <main className="container">
       <section className="hero">
@@ -812,9 +778,6 @@ function ChangesPageContent() {
         <p className="muted card-intro">
           Current APY uses the selected range. Previous APY uses the immediately prior range. Delta is current minus previous.
         </p>
-        <p className="muted confidence-line">
-          Confidence: <strong>{windowConfidence}/100 ({confidenceBand(windowConfidence)})</strong> based on vault coverage and freshness.
-        </p>
         <div className="changes-summary-kpis">
           <KpiGrid items={summaryKpiItems} />
         </div>
@@ -828,9 +791,6 @@ function ChangesPageContent() {
         <p className="muted card-intro">
           These metrics show whether recent data is fresh enough to trust changes. Current stale cutoff:{" "}
           {staleThresholdLabel(data?.filters?.stale_threshold ?? query.staleThreshold)}.
-        </p>
-        <p className="muted confidence-line">
-          Confidence: <strong>{freshnessConfidence}/100 ({confidenceBand(freshnessConfidence)})</strong> for data freshness.
         </p>
         <KpiGrid
           items={[
@@ -846,9 +806,6 @@ function ChangesPageContent() {
         <h2>Delta Visuals and Freshness Heatmaps</h2>
         <p className="muted card-intro">
           Delta bands use percentage points (for example, +2.0 means APY rose by two points versus the previous window).
-        </p>
-        <p className="muted confidence-line">
-          Confidence: <strong>{deltaConfidence}/100 ({confidenceBand(deltaConfidence)})</strong> from mover sample size + freshness.
         </p>
         <div className="changes-trend-grid">
           <TrendStrips

@@ -214,9 +214,6 @@ export default function HomePage() {
             <KpiGrid
               items={[
                 { label: "Server Time (UTC)", value: formatUtcDateTime(data.server_time_utc) },
-                { label: "Latest PPS Age", value: formatHours(data.freshness?.latest_pps_age_seconds) },
-                { label: "Newest Metrics Age", value: formatHours(data.freshness?.metrics_newest_age_seconds) },
-                { label: "PPS Stale Ratio", value: formatPct(data.freshness?.pps_stale_ratio, 1) },
                 { label: "Active Vaults", value: String(data?.lifecycle?.active_vaults ?? data?.coverage?.global?.active_vaults ?? "n/a") },
                 { label: "Eligible Vaults", value: String(data?.coverage?.global?.eligible_vaults ?? "n/a") },
                 { label: "Migration Ready", value: String(data?.lifecycle?.migration_ready_vaults ?? "n/a") },

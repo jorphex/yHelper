@@ -50,11 +50,11 @@ function normalize(value: number, min: number, max: number): number {
 }
 
 const TREND_STROKE_COLORS = [
-  "#80b2ec",
-  "#84abff",
-  "#74a5d9",
-  "#938be0",
-  "#68b4c5",
+  "var(--viz-line-1)",
+  "var(--viz-line-2)",
+  "var(--viz-line-3)",
+  "var(--viz-line-4)",
+  "var(--viz-line-5)",
 ];
 
 function pickTrendStroke(id: string, index: number): string {
@@ -332,7 +332,7 @@ export function ScatterPlot({
                     cx={x}
                     cy={y}
                     r={Math.max(cellW, cellH) * 0.72}
-                    fill="rgba(124, 163, 255, 1)"
+                    fill="rgba(var(--accent-2-rgb), 1)"
                     opacity={alpha}
                   />
                 );

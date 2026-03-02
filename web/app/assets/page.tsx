@@ -393,16 +393,10 @@ function AssetsPageContent() {
           <KpiGrid
             items={[
               { label: "Tokens", value: String(assetData?.summary?.tokens ?? tokenRows.length) },
-              { label: "Total TVL", value: formatUsd(assetData?.summary?.total_tvl_usd) },
               {
                 label: "Featured Available",
                 value: String(assetData?.summary?.tokens_available_featured ?? "n/a"),
                 hint: "Large + multi-venue",
-              },
-              {
-                label: "TVL-Weighted APY",
-                value: formatPct(assetData?.summary?.tvl_weighted_safe_apy_30d),
-                hint: "Average APY weighted by where most token TVL sits",
               },
               {
                 label: "Median Spread",

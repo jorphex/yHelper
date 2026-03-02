@@ -93,9 +93,9 @@ function TvlTreemap({
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
     .slice(0, 8);
   const groups = [
-    { key: "chain", label: "Chain", color: "rgba(80, 115, 255, 0.78)", rows: topChains, text: (row: BreakdownRow) => chainLabel(row.chain_id) },
-    { key: "category", label: "Category", color: "rgba(58, 174, 195, 0.7)", rows: topCategories, text: (row: BreakdownRow) => row.category || "unknown" },
-    { key: "token", label: "Token", color: "rgba(138, 148, 230, 0.72)", rows: topTokens, text: (row: BreakdownRow) => row.token_symbol || "unknown" },
+    { key: "chain", label: "Chain", color: "rgba(var(--accent-rgb), 0.78)", rows: topChains, text: (row: BreakdownRow) => chainLabel(row.chain_id) },
+    { key: "category", label: "Category", color: "rgba(var(--accent-teal-rgb), 0.7)", rows: topCategories, text: (row: BreakdownRow) => row.category || "unknown" },
+    { key: "token", label: "Token", color: "rgba(var(--accent-purple-rgb), 0.72)", rows: topTokens, text: (row: BreakdownRow) => row.token_symbol || "unknown" },
   ];
   const validGroups = groups.filter((group) => group.rows.length > 0);
   if (validGroups.length === 0) {
@@ -136,7 +136,7 @@ function TvlTreemap({
                   const compactName = maxChars > 0 ? (name.length > maxChars ? `${name.slice(0, Math.max(2, maxChars - 1))}…` : name) : "";
                   return (
                     <g key={`${group.key}-${name}`} className="treemap-cell">
-                      <rect x={rectX} y={y} width={w} height={laneHeight} fill={group.color} opacity={0.85} stroke="#193a73" />
+                      <rect x={rectX} y={y} width={w} height={laneHeight} fill={group.color} opacity={0.85} stroke="var(--line-3)" />
                       {w >= 50 && compactName ? (
                         <text x={rectX + 4} y={y + Math.min(12, laneHeight - 4)} className="treemap-cell-label">
                           {compactName}
@@ -440,7 +440,6 @@ function CompositionPageContent() {
           <KpiGrid
             items={[
               { label: "Eligible Vaults", value: String(data?.summary.vaults ?? "n/a") },
-              { label: "Total TVL", value: formatUsd(data?.summary.total_tvl_usd) },
               { label: "Average APY 30d", value: formatPct(data?.summary.avg_safe_apy_30d) },
               { label: "Universe Chain HHI", value: data?.concentration.chain_hhi?.toFixed(3) ?? "n/a" },
               { label: "Universe Category HHI", value: data?.concentration.category_hhi?.toFixed(3) ?? "n/a" },

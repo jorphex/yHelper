@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
-import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryBool, queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips } from "../components/visuals";
 import { VaultLink } from "../components/vault-link";
@@ -57,7 +56,6 @@ type DiscoverResponse = {
   rows: DiscoverRow[];
 };
 
-type DiscoverSortKey = "vault" | "chain" | "token" | "category" | "tvl" | "apy" | "momentum" | "consistency" | "risk" | "regime";
 type DiscoverApiSort = "quality" | "tvl" | "apy_7d" | "apy_30d" | "momentum" | "consistency";
 
 type DailyTrendRow = {
@@ -238,10 +236,10 @@ function DiscoverRidgeline({
   series: Array<{ id: string; label: string; values: number[]; note: string }>;
 }) {
   const ridgelinePalette = [
-    { stroke: "#88b1ff", fill: "rgba(92, 126, 242, 0.24)" },
-    { stroke: "#79afd8", fill: "rgba(77, 158, 214, 0.22)" },
-    { stroke: "#9a96ff", fill: "rgba(112, 104, 227, 0.22)" },
-    { stroke: "#70b5c7", fill: "rgba(69, 156, 175, 0.2)" },
+    { stroke: "var(--viz-line-2)", fill: "rgba(var(--accent-rgb), 0.24)" },
+    { stroke: "var(--viz-line-5)", fill: "rgba(var(--accent-teal-rgb), 0.22)" },
+    { stroke: "var(--viz-line-4)", fill: "rgba(var(--accent-purple-rgb), 0.22)" },
+    { stroke: "var(--viz-line-3)", fill: "rgba(var(--accent-2-rgb), 0.2)" },
   ];
   const valid = series.filter((row) => row.values.length >= 4);
   if (valid.length === 0) {
@@ -316,7 +314,6 @@ function DiscoverPageContent() {
   const [trendGrouped, setTrendGrouped] = useState<DailyTrendResponse["grouped"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [trendError, setTrendError] = useState<string | null>(null);
-  const [sort, setSort] = useState<SortState<DiscoverSortKey>>({ key: "tvl", direction: "desc" });
   const [isCompactViewport, setIsCompactViewport] = useState(false);
 
   const query = useMemo(() => {
@@ -327,13 +324,6 @@ function DiscoverPageContent() {
       "quality",
     );
     const serverDir = queryChoice(searchParams, "api_dir", ["asc", "desc"] as const, "desc");
-    const uiSort = queryChoice<DiscoverSortKey>(
-      searchParams,
-      "sort",
-      ["vault", "chain", "token", "category", "tvl", "apy", "momentum", "consistency", "risk", "regime"] as const,
-      "tvl",
-    );
-    const uiDir = queryChoice(searchParams, "dir", ["asc", "desc"] as const, "desc");
     const chain = queryInt(searchParams, "chain", 0, { min: 0 });
     const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
     const defaults = universeDefaults(universe);
@@ -350,14 +340,8 @@ function DiscoverPageContent() {
       trendGroup: queryChoice(searchParams, "trend_group", ["none", "chain", "category"] as const, "none"),
       serverSort,
       serverDir,
-      uiSort,
-      uiDir,
     };
   }, [searchParams]);
-
-  useEffect(() => {
-    setSort({ key: query.uiSort, direction: query.uiDir });
-  }, [query.uiSort, query.uiDir]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");
@@ -463,22 +447,7 @@ function DiscoverPageContent() {
     };
   }, [query.universe, query.minTvl, query.minPoints, query.chain, query.trendGroup]);
 
-  const rows = sortRows(data?.rows ?? [], sort, {
-    vault: (row) => row.symbol ?? row.vault_address,
-    chain: (row) => chainLabel(row.chain_id),
-    token: (row) => row.token_symbol ?? "",
-    category: (row) => row.category ?? "",
-    tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.safe_apy_30d ?? Number.NEGATIVE_INFINITY,
-    momentum: (row) => row.momentum_7d_30d ?? Number.NEGATIVE_INFINITY,
-    consistency: (row) => row.consistency_score ?? Number.NEGATIVE_INFINITY,
-    risk: (row) => {
-      if (!row.risk_level || row.risk_level === "unknown") return Number.POSITIVE_INFINITY;
-      const parsed = Number.parseInt(row.risk_level, 10);
-      return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
-    },
-    regime: (row) => row.regime,
-  });
+  const rows = data?.rows ?? [];
   const dataRows = useMemo(() => data?.rows ?? [], [data?.rows]);
 
   const availableChains = useMemo(
@@ -694,12 +663,6 @@ function DiscoverPageContent() {
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
 
-  const onSort = (key: DiscoverSortKey) => {
-    const next = toggleSort(sort, key);
-    setSort(next);
-    updateQuery({ sort: next.key, dir: next.direction });
-  };
-
   return (
     <main className="container">
       <section className="hero">
@@ -876,12 +839,6 @@ function DiscoverPageContent() {
               { label: "Vaults", value: String(data?.summary?.vaults ?? data?.pagination.total ?? "n/a") },
               { label: "Chains", value: String(data?.summary?.chains ?? "n/a") },
               { label: "Tokens", value: String(data?.summary?.tokens ?? "n/a") },
-              { label: "Total TVL", value: formatUsd(data?.summary?.total_tvl_usd) },
-              {
-                label: "TVL-Weighted APY",
-                value: formatPct(data?.summary?.tvl_weighted_safe_apy_30d),
-                hint: "Average APY weighted by where most TVL sits",
-              },
               { label: "Median APY", value: formatPct(data?.summary?.median_safe_apy_30d) },
               {
                 label: "Avg Momentum",
@@ -906,17 +863,6 @@ function DiscoverPageContent() {
           </div>
           <div className="discover-mix-grid">
             <BarList
-              title="Regime TVL Mix"
-              items={(data?.regime_mix ?? []).map((row) => ({
-                id: row.regime,
-                label: compactRegimeLabel(row.regime),
-                value: row.tvl_usd,
-                note: `${row.vaults} vaults`,
-              }))}
-              valueFormatter={(value) => formatUsd(value)}
-              emptyText="No regime mix for this filter yet."
-            />
-            <BarList
               title="APY Bucket Count"
               items={[
                 { id: "neg", label: "Negative APY", value: data?.summary?.apy_negative_vaults ?? null },
@@ -940,6 +886,7 @@ function DiscoverPageContent() {
             />
           </div>
         </div>
+        <p className="muted card-intro">Regime mix is shown on the Regimes page to avoid duplicated charts.</p>
       </section>
 
       <section className="card discover-analytics-card">
@@ -1025,69 +972,24 @@ function DiscoverPageContent() {
       <section className="card">
         <h2>Vault Universe</h2>
         <p className="muted card-intro">
-          Filtered vaults with enough TVL and data history to reduce noisy outliers. Switch to Dense mode for extra context columns. Rows:{" "}
+          Filtered vaults with enough TVL and data history to reduce noisy outliers. Sort order follows the API sort controls above.
+          Switch to Dense mode for extra context columns. Rows:{" "}
           {data?.pagination.total ?? "loading..."}
         </p>
         <div className="table-wrap">
           <table className="discover-table">
             <thead>
               <tr>
-                <th className="col-vault">
-                  <button className={`th-button ${sort.key === "vault" ? "is-active" : ""}`} onClick={() => onSort("vault")}>
-                    Vault <span className="th-indicator">{sortIndicator(sort, "vault")}</span>
-                  </button>
-                </th>
-                <th className="col-chain">
-                  <button className={`th-button ${sort.key === "chain" ? "is-active" : ""}`} onClick={() => onSort("chain")}>
-                    Chain <span className="th-indicator">{sortIndicator(sort, "chain")}</span>
-                  </button>
-                </th>
-                <th className="col-token">
-                  <button className={`th-button ${sort.key === "token" ? "is-active" : ""}`} onClick={() => onSort("token")}>
-                    Token <span className="th-indicator">{sortIndicator(sort, "token")}</span>
-                  </button>
-                </th>
-                <th className="analyst-only col-category">
-                  <button className={`th-button ${sort.key === "category" ? "is-active" : ""}`} onClick={() => onSort("category")}>
-                    Category <span className="th-indicator">{sortIndicator(sort, "category")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric col-tvl">
-                  <button className={`th-button ${sort.key === "tvl" ? "is-active" : ""}`} onClick={() => onSort("tvl")}>
-                    TVL <span className="th-indicator">{sortIndicator(sort, "tvl")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric col-apy">
-                  <button className={`th-button ${sort.key === "apy" ? "is-active" : ""}`} onClick={() => onSort("apy")}>
-                    APY 30d <span className="th-indicator">{sortIndicator(sort, "apy")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric col-momentum">
-                  <button
-                    className={`th-button ${sort.key === "momentum" ? "is-active" : ""}`}
-                    onClick={() => onSort("momentum")}
-                  >
-                    Momentum <span className="th-indicator">{sortIndicator(sort, "momentum")}</span>
-                  </button>
-                </th>
-                <th className="is-numeric tablet-hide analyst-only col-consistency">
-                  <button
-                    className={`th-button ${sort.key === "consistency" ? "is-active" : ""}`}
-                    onClick={() => onSort("consistency")}
-                  >
-                    Consistency <span className="th-indicator">{sortIndicator(sort, "consistency")}</span>
-                  </button>
-                </th>
-                <th className="tablet-hide analyst-only col-risk">
-                  <button className={`th-button ${sort.key === "risk" ? "is-active" : ""}`} onClick={() => onSort("risk")}>
-                    Risk <span className="th-indicator">{sortIndicator(sort, "risk")}</span>
-                  </button>
-                </th>
-                <th className="analyst-only col-regime">
-                  <button className={`th-button ${sort.key === "regime" ? "is-active" : ""}`} onClick={() => onSort("regime")}>
-                    Regime <span className="th-indicator">{sortIndicator(sort, "regime")}</span>
-                  </button>
-                </th>
+                <th className="col-vault">Vault</th>
+                <th className="col-chain">Chain</th>
+                <th className="col-token">Token</th>
+                <th className="analyst-only col-category">Category</th>
+                <th className="is-numeric col-tvl">TVL</th>
+                <th className="is-numeric col-apy">APY 30d</th>
+                <th className="is-numeric col-momentum">Momentum</th>
+                <th className="is-numeric tablet-hide analyst-only col-consistency">Consistency</th>
+                <th className="tablet-hide analyst-only col-risk">Risk</th>
+                <th className="analyst-only col-regime">Regime</th>
               </tr>
             </thead>
             <tbody>
