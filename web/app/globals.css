@@ -392,6 +392,22 @@ body::after {
   padding: 0.85rem;
 }
 
+:root[data-audience="analyst"] .home-minimal .card.home-minimal-hero {
+  padding: 2.8rem 2.2rem;
+}
+
+:root[data-audience="analyst"] .home-minimal .card.home-minimal-purpose {
+  padding: 1.7rem;
+}
+
+:root[data-audience="analyst"] .home-minimal .card.home-live-strip {
+  padding: 1rem 1.1rem;
+}
+
+:root[data-audience="analyst"] .home-minimal .card.home-minimal-footer {
+  padding: 1.1rem;
+}
+
 :root[data-audience="analyst"] .container.home-minimal {
   gap: 3.2rem;
 }
@@ -1197,7 +1213,7 @@ input[type="text"] {
 
 .discover-table th.col-vault,
 .discover-table td.col-vault {
-  width: 7.2rem;
+  width: 6.4rem;
 }
 
 .discover-table th.col-chain,
@@ -1208,13 +1224,13 @@ input[type="text"] {
 
 .discover-table th.col-token,
 .discover-table td.col-token {
-  width: 4.6rem;
+  width: 4.3rem;
   white-space: nowrap;
 }
 
 .discover-table th.col-category,
 .discover-table td.col-category {
-  width: 4.7rem;
+  width: 4.4rem;
   white-space: nowrap;
 }
 
@@ -1231,7 +1247,7 @@ input[type="text"] {
 .discover-table td.col-momentum,
 .discover-table th.col-consistency,
 .discover-table td.col-consistency {
-  width: 5.1rem;
+  width: 4.9rem;
 }
 
 .discover-table th.col-momentum,
@@ -1282,7 +1298,7 @@ input[type="text"] {
 }
 
 .discover-table td.col-vault .vault-link {
-  max-width: 7rem;
+  max-width: 6.2rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1365,24 +1381,24 @@ input[type="text"] {
 
 .changes-mover-table th.col-vault,
 .changes-mover-table td.col-vault {
-  width: 8.5%;
+  width: 6rem;
 }
 
 .changes-mover-table th.col-chain,
 .changes-mover-table td.col-chain {
-  width: 7%;
+  width: 4.2rem;
   white-space: nowrap;
 }
 
 .changes-mover-table th.col-token,
 .changes-mover-table td.col-token {
-  width: 7%;
+  width: 4.1rem;
   white-space: nowrap;
 }
 
 .changes-mover-table th.col-category,
 .changes-mover-table td.col-category {
-  width: 8%;
+  width: 4.8rem;
   white-space: nowrap;
 }
 
@@ -1394,12 +1410,12 @@ input[type="text"] {
 .changes-mover-table td.col-previous,
 .changes-mover-table th.col-delta,
 .changes-mover-table td.col-delta {
-  width: 9%;
+  width: 5.35rem;
 }
 
 .changes-mover-table th.col-age,
 .changes-mover-table td.col-age {
-  width: 8%;
+  width: 4.6rem;
 }
 
 .changes-mover-table td.col-vault {
@@ -1407,7 +1423,7 @@ input[type="text"] {
 }
 
 .changes-mover-table td.col-vault .vault-link {
-  max-width: 8.4rem;
+  max-width: 5.8rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1469,24 +1485,24 @@ input[type="text"] {
 
 .composition-crowding-table th.col-vault,
 .composition-crowding-table td.col-vault {
-  width: 15%;
+  width: 12%;
 }
 
 .composition-crowding-table th.col-chain,
 .composition-crowding-table td.col-chain {
-  width: 10%;
+  width: 8%;
   white-space: nowrap;
 }
 
 .composition-crowding-table th.col-token,
 .composition-crowding-table td.col-token {
-  width: 10%;
+  width: 8%;
   white-space: nowrap;
 }
 
 .composition-crowding-table th.col-category,
 .composition-crowding-table td.col-category {
-  width: 12%;
+  width: 10%;
   white-space: nowrap;
 }
 
@@ -1496,7 +1512,7 @@ input[type="text"] {
 .composition-crowding-table td.col-apy,
 .composition-crowding-table th.col-crowding,
 .composition-crowding-table td.col-crowding {
-  width: 17.66%;
+  width: 20.66%;
 }
 
 .composition-crowding-table td.col-vault {
@@ -1518,7 +1534,7 @@ input[type="text"] {
 
 .assets-venues-table th.col-vault,
 .assets-venues-table td.col-vault {
-  width: 6.4rem;
+  width: 5.2rem;
 }
 
 .assets-venues-table th.col-chain,
@@ -1551,7 +1567,7 @@ input[type="text"] {
 }
 
 .assets-venues-table td.col-vault .vault-link {
-  max-width: 6.1rem;
+  max-width: 4.8rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1571,7 +1587,7 @@ input[type="text"] {
 
 .assets-token-table th.col-token,
 .assets-token-table td.col-token {
-  width: 5.5rem;
+  width: 4.6rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1600,9 +1616,9 @@ input[type="text"] {
 
 .assets-token-table th.col-venues,
 .assets-token-table td.col-venues {
-  width: 3.9rem;
-  padding-left: 0.08rem;
-  padding-right: 0.08rem;
+  width: 3.6rem;
+  padding-left: 0.52rem;
+  padding-right: 0.52rem;
   text-align: right;
 }
 
@@ -1633,7 +1649,7 @@ input[type="text"] {
 .chains-rollup-table td.col-momentum,
 .chains-rollup-table th.col-consistency,
 .chains-rollup-table td.col-consistency {
-  width: 6.6rem;
+  width: 6.1rem;
 }
 
 .regimes-mover-table {
@@ -1643,24 +1659,24 @@ input[type="text"] {
 
 .regimes-mover-table th.col-vault,
 .regimes-mover-table td.col-vault {
-  width: 12%;
+  width: 10%;
 }
 
 .regimes-mover-table th.col-chain,
 .regimes-mover-table td.col-chain {
-  width: 9%;
+  width: 8%;
   white-space: nowrap;
 }
 
 .regimes-mover-table th.col-token,
 .regimes-mover-table td.col-token {
-  width: 9%;
+  width: 8%;
   white-space: nowrap;
 }
 
 .regimes-mover-table th.col-regime,
 .regimes-mover-table td.col-regime {
-  width: 10%;
+  width: 9%;
   white-space: nowrap;
 }
 
@@ -1670,7 +1686,7 @@ input[type="text"] {
 .regimes-mover-table td.col-apy,
 .regimes-mover-table th.col-momentum,
 .regimes-mover-table td.col-momentum {
-  width: 12%;
+  width: 9.5%;
 }
 
 .regimes-mover-table td.col-vault {
@@ -1678,7 +1694,7 @@ input[type="text"] {
 }
 
 .regimes-mover-table td.col-vault .vault-link {
-  max-width: 10.8rem;
+  max-width: 6rem;
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2116,7 +2132,7 @@ input[type="text"] {
 
 .regimes-mover-table th.col-regime,
 .regimes-mover-table td.col-regime {
-  width: 8%;
+  width: 9%;
 }
 
 .regimes-mover-table th.col-tvl,
@@ -2125,11 +2141,11 @@ input[type="text"] {
 .regimes-mover-table td.col-apy,
 .regimes-mover-table th.col-momentum,
 .regimes-mover-table td.col-momentum {
-  width: 9%;
+  width: 9.5%;
 }
 
 .chains-rollup-table th.col-active .th-button {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .regime-sankey-panel .scatter-wrap svg {
@@ -2900,7 +2916,7 @@ input:focus-visible {
 
   .discover-table th.col-vault,
   .discover-table td.col-vault {
-    width: 4.5rem;
+    width: 4.1rem;
   }
 
   .discover-table th.col-chain,
@@ -2910,12 +2926,12 @@ input:focus-visible {
 
   .discover-table th.col-token,
   .discover-table td.col-token {
-    width: 3.7rem;
+    width: 3.5rem;
   }
 
   .discover-table th.col-category,
   .discover-table td.col-category {
-    width: 3.9rem;
+    width: 3.7rem;
   }
 
   .discover-table th.col-tvl,
@@ -2950,17 +2966,18 @@ input:focus-visible {
   }
 
   .changes-mover-table {
-    min-width: 900px;
+    min-width: 820px;
+    table-layout: auto;
   }
 
   .changes-mover-table th.col-vault,
   .changes-mover-table td.col-vault {
-    width: 3.2rem;
+    width: 3.7rem;
   }
 
   .changes-mover-table th.col-chain,
   .changes-mover-table td.col-chain {
-    width: 3.6rem;
+    width: 3.3rem;
   }
 
   .changes-mover-table th.col-tvl,
@@ -2973,7 +2990,7 @@ input:focus-visible {
   .changes-mover-table td.col-delta,
   .changes-mover-table th.col-age,
   .changes-mover-table td.col-age {
-    width: 5.3rem;
+    width: 4.95rem;
   }
 
   .changes-stale-table th:first-child,
@@ -3019,7 +3036,7 @@ input:focus-visible {
 
   .changes-mover-table td.col-vault .vault-link,
   .regimes-mover-table td.col-vault .vault-link {
-    max-width: 3.3rem;
+    max-width: 3.7rem;
   }
 
   .composition-crowding-table {
@@ -3028,19 +3045,19 @@ input:focus-visible {
 
   .composition-crowding-table th.col-vault,
   .composition-crowding-table td.col-vault {
-    width: 4.8rem;
+    width: 4.2rem;
   }
 
   .composition-crowding-table th.col-chain,
   .composition-crowding-table td.col-chain,
   .composition-crowding-table th.col-token,
   .composition-crowding-table td.col-token {
-    width: 3.7rem;
+    width: 3.4rem;
   }
 
   .composition-crowding-table th.col-category,
   .composition-crowding-table td.col-category {
-    width: 4.2rem;
+    width: 3.9rem;
   }
 
   .composition-crowding-table th.col-tvl,
@@ -3049,7 +3066,7 @@ input:focus-visible {
   .composition-crowding-table td.col-apy,
   .composition-crowding-table th.col-crowding,
   .composition-crowding-table td.col-crowding {
-    width: 4.6rem;
+    width: 4.35rem;
   }
 
   .assets-venues-table {
@@ -3058,12 +3075,12 @@ input:focus-visible {
 
   .assets-venues-table th.col-vault,
   .assets-venues-table td.col-vault {
-    width: 4.8rem;
+    width: 4.1rem;
   }
 
   .assets-venues-table th.col-chain,
   .assets-venues-table td.col-chain {
-    width: 3.6rem;
+    width: 3.3rem;
   }
 
   .assets-venues-table th.col-tvl,
@@ -3074,26 +3091,27 @@ input:focus-visible {
   .assets-venues-table td.col-momentum,
   .assets-venues-table th.col-consistency,
   .assets-venues-table td.col-consistency {
-    width: 4.6rem;
+    width: 4.25rem;
   }
 
   .assets-venues-table th.col-regime,
   .assets-venues-table td.col-regime {
-    width: 4rem;
+    width: 3.7rem;
   }
 
   .regimes-mover-table {
-    min-width: 900px;
+    min-width: 820px;
+    table-layout: auto;
   }
 
   .regimes-mover-table th.col-vault,
   .regimes-mover-table td.col-vault {
-    width: 3.3rem;
+    width: 3.8rem;
   }
 
   .regimes-mover-table th.col-chain,
   .regimes-mover-table td.col-chain {
-    width: 3.6rem;
+    width: 3.3rem;
   }
 
   .regimes-mover-table th.col-tvl,
@@ -3102,12 +3120,12 @@ input:focus-visible {
   .regimes-mover-table td.col-apy,
   .regimes-mover-table th.col-momentum,
   .regimes-mover-table td.col-momentum {
-    width: 5.2rem;
+    width: 4.9rem;
   }
 
   .regimes-mover-table th.col-regime,
   .regimes-mover-table td.col-regime {
-    width: 4.2rem;
+    width: 3.9rem;
   }
 
   .chains-rollup-table th.col-chain,
@@ -3117,7 +3135,7 @@ input:focus-visible {
 
   .chains-rollup-table th.col-active,
   .chains-rollup-table td.col-active {
-    width: 5.4rem;
+    width: 5.1rem;
   }
 
   .chains-rollup-table th.col-tvl,
@@ -3137,7 +3155,7 @@ input:focus-visible {
 
   .assets-token-table th.col-token,
   .assets-token-table td.col-token {
-    width: 4.2rem;
+    width: 3.8rem;
   }
 
   .assets-token-table th.col-type,
@@ -3159,9 +3177,9 @@ input:focus-visible {
 
   .assets-token-table th.col-venues,
   .assets-token-table td.col-venues {
-    width: 3.45rem;
-    padding-left: 0.04rem;
-    padding-right: 0.04rem;
+    width: 3.2rem;
+    padding-left: 0.32rem;
+    padding-right: 0.32rem;
     text-align: right;
   }
 

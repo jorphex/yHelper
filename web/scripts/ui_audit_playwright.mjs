@@ -177,7 +177,12 @@ async function run() {
 
             const rows = Array.from(table.querySelectorAll('tbody tr')).slice(0, 12);
             for (let i = 0; i < rows.length; i += 1) {
-              const cells = Array.from(rows[i].children);
+              const cells = Array.from(rows[i].children).filter((cell) => {
+                const cs = window.getComputedStyle(cell);
+                if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+                const cr = cell.getBoundingClientRect();
+                return cr.width > 1 && cr.height > 1;
+              });
               let prevRight = -Infinity;
               for (let c = 0; c < cells.length; c += 1) {
                 const cr = cells[c].getBoundingClientRect();
