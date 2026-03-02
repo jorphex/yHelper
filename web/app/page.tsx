@@ -26,7 +26,7 @@ type MetaMoverRow = {
   symbol?: string | null;
   token_symbol?: string | null;
   delta_apy?: number | null;
-  safe_apy_window?: number | null;
+  safe_apy_30d?: number | null;
 };
 
 type MetaMoversResponse = {
@@ -60,8 +60,8 @@ function liveSummary(
   const parts: string[] = [];
   if (topRiser) {
     const moverParts: string[] = [`Top mover ${moverTitle(topRiser)}`];
-    if (Number.isFinite(topRiser.safe_apy_window ?? null)) {
-      moverParts.push(`APY ${formatPct(topRiser.safe_apy_window ?? null, 2)}`);
+    if (Number.isFinite(topRiser.safe_apy_30d ?? null)) {
+      moverParts.push(`APY 30d ${formatPct(topRiser.safe_apy_30d ?? null, 2)}`);
     }
     if (Number.isFinite(topRiser.delta_apy ?? null)) {
       moverParts.push(`24h delta ${pctDelta(topRiser.delta_apy, 2)}`);
@@ -227,7 +227,7 @@ export default function HomePage() {
       <section className="card home-live-strip home-reveal" aria-live="polite">
         <span className="home-live-dot" aria-hidden="true" />
         <div className="home-live-copy">
-          <p className="home-live-label">Live now</p>
+          <p className="home-live-label">Live now (core universe)</p>
           <p className="home-live-text">{liveNowLine}</p>
           <p className="home-live-meta">{liveFreshnessLine}</p>
         </div>
