@@ -171,6 +171,7 @@ export function TrendStrips({
   valueFormatter,
   deltaFormatter,
   columns = 1,
+  embedded = false,
   emptyText = "No trend data available.",
 }: {
   title: string;
@@ -178,10 +179,19 @@ export function TrendStrips({
   valueFormatter: (value: number) => string;
   deltaFormatter: (value: number) => string;
   columns?: number;
+  embedded?: boolean;
   emptyText?: string;
 }) {
   const validItems = items.filter((item) => finiteValues(item.points).length > 0);
   if (validItems.length === 0) {
+    if (embedded) {
+      return (
+        <div>
+          <h3>{title}</h3>
+          <p className="muted">{emptyText}</p>
+        </div>
+      );
+    }
     return (
       <section className="viz-panel">
         <h3>{title}</h3>
@@ -190,8 +200,8 @@ export function TrendStrips({
     );
   }
 
-  return (
-    <section className="viz-panel">
+  const content = (
+    <>
       <h3>{title}</h3>
       <div className={`trend-strip-list trend-strip-cols-${Math.min(4, Math.max(1, columns))}`}>
         {validItems.map((item, index) => {
@@ -235,6 +245,14 @@ export function TrendStrips({
           );
         })}
       </div>
+    </>
+  );
+
+  if (embedded) return <div>{content}</div>;
+
+  return (
+    <section className="viz-panel">
+      {content}
     </section>
   );
 }

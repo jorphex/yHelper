@@ -136,16 +136,16 @@ function RegimeFlowSankey({
   ).sort((a, b) => regimeOrder(a) - regimeOrder(b));
   if (validRows.length === 0 || regimes.length === 0) {
     return (
-      <section className="viz-panel regime-sankey-panel">
+      <section className="regime-sankey-panel">
         <h3>{title}</h3>
         <p className="muted">No transition flows available.</p>
       </section>
     );
   }
-  const width = 620;
-  const height = 216;
-  const xLeft = 96;
-  const xRight = width - 96;
+  const width = 760;
+  const height = 260;
+  const xLeft = 120;
+  const xRight = width - 120;
   const laneTop = 34;
   const laneBottom = height - 24;
   const laneHeight = laneBottom - laneTop;
@@ -160,7 +160,7 @@ function RegimeFlowSankey({
   }
 
   return (
-    <section className="viz-panel regime-sankey-panel">
+    <section className="regime-sankey-panel">
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
@@ -204,11 +204,11 @@ function RegimeFlowSankey({
             const stroke = `rgba(${Math.min(255, r + 36)}, ${Math.min(255, g + 36)}, ${Math.min(255, b + 36)}, 0.78)`;
             return (
               <g key={`left-${regime}`}>
-                <rect x={8} y={y - 12} width={88} height={26} rx={6} fill={fill} stroke={stroke} />
+                <rect x={8} y={y - 12} width={112} height={26} rx={6} fill={fill} stroke={stroke} />
                 <text x={12} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
-                <text x={92} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
-                <rect x={width - 96} y={y - 12} width={88} height={26} rx={6} fill={fill} stroke={stroke} />
-                <text x={width - 92} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
+                <text x={116} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
+                <rect x={width - 120} y={y - 12} width={112} height={26} rx={6} fill={fill} stroke={stroke} />
+                <text x={width - 116} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
                 <text x={width - 12} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(inValue)}</text>
               </g>
             );
@@ -746,6 +746,7 @@ function RegimesPageContent() {
           valueFormatter={(value) => formatPct(value, 2)}
           deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
           columns={3}
+          embedded
           emptyText="Transition trend is unavailable for this filter."
         />
         {query.transitionSplit !== "none" ? (

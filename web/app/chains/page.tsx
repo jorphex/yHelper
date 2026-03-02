@@ -197,7 +197,6 @@ function ChainsPageContent() {
             valueFormatter={(value) => formatUsd(value)}
           />
         </div>
-        <h3>Chain Rollups</h3>
         <p className="muted card-intro">
           Weighted metrics are TVL-weighted across filtered vaults. Click any header to sort.
         </p>

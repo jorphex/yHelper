@@ -250,9 +250,9 @@ function DiscoverRidgeline({
       </section>
     );
   }
-  const width = 640;
-  const rowH = 24;
-  const height = 14 + valid.length * rowH + 12;
+  const width = 860;
+  const rowH = 30;
+  const height = 20 + valid.length * rowH + 24;
   const bins = 16;
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);
@@ -275,29 +275,29 @@ function DiscoverRidgeline({
             const maxCount = Math.max(1, ...counts);
             const pathTop = counts
               .map((count, bIdx) => {
-                const x = 108 + (bIdx / (bins - 1)) * (width - 140);
-                const y = yBase - (count / maxCount) * 8;
+                const x = 138 + (bIdx / (bins - 1)) * (width - 182);
+                const y = yBase - (count / maxCount) * 10.5;
                 return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
               })
               .join(" ");
             const pathBottom = counts
               .map((_, bIdx) => {
                 const rev = bins - 1 - bIdx;
-                const x = 108 + (rev / (bins - 1)) * (width - 140);
+                const x = 138 + (rev / (bins - 1)) * (width - 182);
                 return `L${x.toFixed(2)},${yBase.toFixed(2)}`;
               })
               .join(" ");
             return (
               <g key={row.id}>
                 <path d={`${pathTop} ${pathBottom} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth={0.9} />
-                <text x={8} y={yBase - 3} className="ridgeline-label">{row.label}</text>
-                <text x={width - 6} y={yBase - 3} className="ridgeline-note" textAnchor="end">{row.note}</text>
+                <text x={10} y={yBase - 5} className="ridgeline-label">{row.label}</text>
+                <text x={width - 8} y={yBase - 5} className="ridgeline-note" textAnchor="end">{row.note}</text>
               </g>
             );
           })}
-          <line x1={108} x2={width - 30} y1={height - 10} y2={height - 10} className="viz-axis" />
-          <text x={108} y={height - 1} className="ridgeline-axis">{formatPct(min, 1)}</text>
-          <text x={width - 38} y={height - 2} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
+          <line x1={138} x2={width - 42} y1={height - 12} y2={height - 12} className="viz-axis" />
+          <text x={138} y={height - 2} className="ridgeline-axis">{formatPct(min, 1)}</text>
+          <text x={width - 42} y={height - 2} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
         </svg>
       </div>
       <p className="muted viz-legend">Ridgelines show APY shape by chain. Taller peaks mean more vaults at that APY zone.</p>

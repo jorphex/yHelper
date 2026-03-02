@@ -462,6 +462,7 @@ a:hover {
 }
 
 .table-wrap {
+  position: relative;
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
@@ -795,6 +796,11 @@ input[type="text"] {
 .discover-table td.col-regime {
   width: 5.2rem;
   white-space: nowrap;
+  text-align: right;
+}
+
+.discover-table th.col-regime .th-button {
+  justify-content: flex-end;
 }
 
 .discover-table td.col-token,
@@ -804,8 +810,7 @@ input[type="text"] {
   text-overflow: ellipsis;
 }
 
-.discover-table td.col-token > a,
-.discover-table td.col-category {
+.discover-table td.col-token > a {
   display: block;
 }
 
@@ -859,18 +864,18 @@ input[type="text"] {
 
 .ridgeline-label {
   fill: var(--ink-soft);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 
 .ridgeline-note {
   fill: #a9c4ea;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .ridgeline-axis {
   fill: #bed6f6;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .discover-ridgeline-panel .viz-legend {
@@ -1607,18 +1612,18 @@ input[type="text"] {
 
 .sankey-label {
   fill: var(--ink-soft);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .sankey-value {
   fill: #c8dcfa;
-  font-size: 9px;
+  font-size: 10px;
   font-family: var(--font-mono);
 }
 
 .sankey-axis-label {
   fill: #bad3f5;
-  font-size: 8.8px;
+  font-size: 9.8px;
 }
 
 .trend-strip-list.trend-strip-cols-2 {
@@ -2035,9 +2040,12 @@ input:focus-visible {
   }
 
   .overview-snapshot-card .kpi-grid,
-  .overview-guardrails-card .kpi-grid,
+  .overview-guardrails-card .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
   .chains-snapshot-kpis .kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 
   .changes-stale-grid {
@@ -2064,6 +2072,7 @@ input:focus-visible {
 
 @media (max-width: 720px) {
   .site-nav {
+    padding-top: 0.2rem;
     align-items: flex-start;
     flex-direction: column;
     width: 100%;
@@ -2129,7 +2138,7 @@ input:focus-visible {
 
   th,
   td {
-    padding: 0.4rem;
+    padding: 0.34rem 0.38rem;
     max-width: 9.5rem;
   }
 
@@ -2149,11 +2158,31 @@ input:focus-visible {
     z-index: 2;
     background: var(--surface-3);
     box-shadow: 1px 0 0 var(--line);
-    max-width: 6.2rem;
+    max-width: 5.2rem;
   }
 
   .vault-link {
-    max-width: 6rem;
+    max-width: 5rem;
+  }
+
+  .table-wrap::after {
+    content: "Swipe \2194";
+    position: sticky;
+    right: 0.36rem;
+    bottom: 0.2rem;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.08rem 0.34rem;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(8, 16, 38, 0.9);
+    color: var(--ink-soft);
+    font-size: 0.62rem;
+    font-family: var(--font-mono);
+    pointer-events: none;
+    z-index: 3;
   }
 
   .pill {
@@ -2209,27 +2238,27 @@ input:focus-visible {
   }
 
   .discover-table {
-    min-width: 1000px;
+    min-width: 860px;
   }
 
   .discover-table th.col-vault,
   .discover-table td.col-vault {
-    width: 6.3rem;
+    width: 5.4rem;
   }
 
   .discover-table th.col-chain,
   .discover-table td.col-chain {
-    width: 4rem;
+    width: 3.7rem;
   }
 
   .discover-table th.col-token,
   .discover-table td.col-token {
-    width: 4.6rem;
+    width: 4rem;
   }
 
   .discover-table th.col-category,
   .discover-table td.col-category {
-    width: 4.8rem;
+    width: 4.1rem;
   }
 
   .discover-table th.col-tvl,
@@ -2240,41 +2269,41 @@ input:focus-visible {
   .discover-table td.col-momentum,
   .discover-table th.col-consistency,
   .discover-table td.col-consistency {
-    width: 5.3rem;
+    width: 4.9rem;
   }
 
   .discover-table th.col-momentum,
   .discover-table td.col-momentum {
-    width: 5.5rem;
+    width: 5rem;
   }
 
   .discover-table th.col-consistency,
   .discover-table td.col-consistency {
-    width: 5.7rem;
+    width: 5.1rem;
   }
 
   .discover-table th.col-risk,
   .discover-table td.col-risk {
-    width: 7.6rem;
+    width: 6.1rem;
   }
 
   .discover-table th.col-regime,
   .discover-table td.col-regime {
-    width: 4.8rem;
+    width: 4.5rem;
   }
 
   .changes-mover-table {
-    min-width: 900px;
+    min-width: 780px;
   }
 
   .changes-mover-table th.col-vault,
   .changes-mover-table td.col-vault {
-    width: 6.3rem;
+    width: 5.2rem;
   }
 
   .changes-stale-table th:first-child,
   .changes-stale-table td:first-child {
-    width: 12%;
+    width: 10%;
   }
 
   .changes-stale-table th:nth-child(2),
@@ -2283,17 +2312,17 @@ input:focus-visible {
   .changes-stale-table td:nth-child(3),
   .changes-stale-table th:nth-child(4),
   .changes-stale-table td:nth-child(4) {
-    width: 14%;
+    width: 12%;
   }
 
   .changes-stale-table th:nth-child(5),
   .changes-stale-table td:nth-child(5) {
-    width: 22%;
+    width: 16%;
   }
 
   .changes-stale-table th:nth-child(6),
   .changes-stale-table td:nth-child(6) {
-    width: 24%;
+    width: 18%;
   }
 
   .discover-table td.col-vault .vault-link,
@@ -2301,28 +2330,28 @@ input:focus-visible {
   .composition-crowding-table td.col-vault .vault-link,
   .assets-venues-table td.col-vault .vault-link,
   .regimes-mover-table td.col-vault .vault-link {
-    max-width: 6rem;
+    max-width: 5rem;
   }
 
   .composition-crowding-table {
-    min-width: 920px;
+    min-width: 800px;
   }
 
   .composition-crowding-table th.col-vault,
   .composition-crowding-table td.col-vault {
-    width: 6.2rem;
+    width: 5.2rem;
   }
 
   .composition-crowding-table th.col-chain,
   .composition-crowding-table td.col-chain,
   .composition-crowding-table th.col-token,
   .composition-crowding-table td.col-token {
-    width: 4.6rem;
+    width: 4rem;
   }
 
   .composition-crowding-table th.col-category,
   .composition-crowding-table td.col-category {
-    width: 5.4rem;
+    width: 4.6rem;
   }
 
   .composition-crowding-table th.col-tvl,
@@ -2331,21 +2360,21 @@ input:focus-visible {
   .composition-crowding-table td.col-apy,
   .composition-crowding-table th.col-crowding,
   .composition-crowding-table td.col-crowding {
-    width: 5.8rem;
+    width: 5rem;
   }
 
   .assets-venues-table {
-    min-width: 1020px;
+    min-width: 860px;
   }
 
   .assets-venues-table th.col-vault,
   .assets-venues-table td.col-vault {
-    width: 6.3rem;
+    width: 5.2rem;
   }
 
   .assets-venues-table th.col-chain,
   .assets-venues-table td.col-chain {
-    width: 4.6rem;
+    width: 3.9rem;
   }
 
   .assets-venues-table th.col-tvl,
@@ -2356,39 +2385,49 @@ input:focus-visible {
   .assets-venues-table td.col-momentum,
   .assets-venues-table th.col-consistency,
   .assets-venues-table td.col-consistency {
-    width: 5.8rem;
+    width: 5rem;
   }
 
   .assets-venues-table th.col-regime,
   .assets-venues-table td.col-regime {
-    width: 5rem;
+    width: 4.4rem;
   }
 
   .regimes-mover-table {
-    min-width: 900px;
+    min-width: 780px;
   }
 
   .regimes-mover-table th.col-vault,
   .regimes-mover-table td.col-vault {
-    width: 6.3rem;
+    width: 5.2rem;
+  }
+
+  .regimes-mover-table th.col-regime,
+  .regimes-mover-table td.col-regime {
+    width: 4.9rem;
   }
 
   .chains-rollup-table th.col-chain,
   .chains-rollup-table td.col-chain {
-    width: 4.4rem;
+    width: 4rem;
+  }
+
+  .chains-rollup-table th.col-active,
+  .chains-rollup-table td.col-active {
+    width: 5rem;
   }
 
   .chains-rollup-table {
-    min-width: 760px;
+    min-width: 680px;
   }
 
   .assets-token-table {
-    min-width: 860px;
+    min-width: 760px;
   }
 
   .assets-token-table th.col-token,
   .assets-token-table td.col-token {
-    width: 7.1rem;
+    width: 5.5rem;
   }
 
   .assets-token-table th.col-type,
@@ -2405,7 +2444,7 @@ input:focus-visible {
   .assets-token-table td.col-weighted,
   .assets-token-table th.col-spread,
   .assets-token-table td.col-spread {
-    width: 5.8rem;
+    width: 4.9rem;
   }
 
   .composition-summary-table {
@@ -2414,13 +2453,19 @@ input:focus-visible {
 
   .changes-stale-table,
   .regimes-split-table {
-    min-width: 740px;
+    min-width: 680px;
   }
 
   .assets-universe-card .kpi-grid,
   .assets-venues-card .kpi-grid,
-  .regime-summary-card .kpi-grid {
+  .regime-summary-card .kpi-grid,
+  .overview-snapshot-card .kpi-grid,
+  .overview-guardrails-card .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chains-snapshot-kpis .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 
   .assets-spread-card-grid {
@@ -2441,9 +2486,16 @@ input:focus-visible {
   }
 
   .discover-ridgeline-panel .scatter-wrap svg,
-  .composition-treemap-viz .scatter-wrap svg,
+  .composition-treemap-viz .scatter-wrap svg {
+    min-height: 280px;
+  }
+
   .regime-sankey-panel .scatter-wrap svg {
-    min-height: 0;
+    min-height: 320px;
+  }
+
+  .regime-transition-heat .heat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .viz-tick {
