@@ -39,6 +39,18 @@ docker compose up -d --build yhelper-web
 python3 scripts/post_deploy_smoke.py --base-url http://127.0.0.1:3010
 ```
 
+## Home Asset Rendering
+Render the landing page Blender assets with deterministic names and sizes:
+```bash
+blender --background --python scripts/generate_yearn_blender_assets.py -- \
+  --output-dir web/public/home-assets-yearn-blender \
+  --scenes hero,purpose,divider
+```
+
+Useful flags:
+- `--logo-png` override logo source directly (defaults to `web/public/yearn-symbol-white-rgb.png`).
+- `--scenes` render a subset (for example `hero` or `hero,divider`).
+
 ## Scope
 - Public dashboards only
 - No wallet connect / EOA input flow
