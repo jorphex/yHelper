@@ -44,21 +44,21 @@ export function AudienceToggle() {
         type="button"
         className={mode === "guide" ? "is-active" : ""}
         aria-pressed={mode === "guide"}
-        aria-label="Guided mode: shows explanations and hides advanced columns"
-        title="Guided: explanations visible, advanced columns hidden"
+        aria-label="Noob mode: shows explanations and hides advanced columns"
+        title="Noob: explanations visible, advanced columns hidden"
         onClick={() => setMode("guide")}
       >
-        Guided
+        Noob
       </button>
       <button
         type="button"
         className={mode === "analyst" ? "is-active" : ""}
         aria-pressed={mode === "analyst"}
-        aria-label="Dense mode: compact layout with advanced columns"
-        title="Dense: compact layout with advanced columns"
+        aria-label="Pro mode: compact layout with advanced columns"
+        title="Pro: compact layout with advanced columns"
         onClick={() => setMode("analyst")}
       >
-        Dense
+        Pro
       </button>
     </div>
   );

@@ -12,8 +12,6 @@ type RegimesPayload = {
 
 type PreviewStats = {
   trackedTvlActiveUsd: number | null;
-  totalVaults: number | null;
-  activeVaults: number | null;
   highestApyVault: {
     name: string | null;
     chainId: number | null;
@@ -94,10 +92,10 @@ function shortLabel(value: string | null | undefined, max = 28): string {
 
 function regimeLabel(value: string): string {
   const key = value.toLowerCase();
-  if (key === "rising") return "Rising (improving)";
-  if (key === "stable") return "Stable (steady)";
-  if (key === "falling") return "Falling (weakening)";
-  if (key === "choppy") return "Choppy (volatile)";
+  if (key === "rising") return "Rising";
+  if (key === "stable") return "Stable";
+  if (key === "falling") return "Falling";
+  if (key === "choppy") return "Choppy";
   return value;
 }
 
@@ -152,8 +150,6 @@ async function fetchPreviewStats(): Promise<PreviewStats> {
   const highest = socialPayload?.highest_apy_vault;
   return {
     trackedTvlActiveUsd: toFiniteNumber(summary.tracked_tvl_active_usd),
-    totalVaults: toFiniteNumber(summary.total_vaults),
-    activeVaults: toFiniteNumber(summary.active_vaults),
     highestApyVault: highest
       ? {
           name: (highest.name || highest.symbol || null) as string | null,
@@ -190,16 +186,6 @@ export async function renderSocialPreviewImage({
       key: "tracked-tvl",
       label: "Tracked TVL (Active)",
       value: formatUsdCompact(stats.trackedTvlActiveUsd),
-    },
-    {
-      key: "total-vaults",
-      label: "Vaults (Total)",
-      value: compactNumber(stats.totalVaults),
-    },
-    {
-      key: "active-vaults",
-      label: "Vaults (Active)",
-      value: compactNumber(stats.activeVaults),
     },
     {
       key: "highest-apy",
@@ -251,7 +237,7 @@ export async function renderSocialPreviewImage({
           style={{
             position: "absolute",
             inset: 0,
-            opacity: 0.22,
+            opacity: 0.12,
             background:
               "radial-gradient(100% 85% at 68% 22%, rgba(78,114,255,0.24) 0%, rgba(78,114,255,0.06) 42%, rgba(78,114,255,0) 74%), radial-gradient(75% 80% at 84% 54%, rgba(61,153,189,0.2) 0%, rgba(61,153,189,0.05) 38%, rgba(61,153,189,0) 71%)",
           }}
@@ -267,7 +253,7 @@ export async function renderSocialPreviewImage({
           style={{
             position: "absolute",
             inset: 0,
-            opacity: 0.16,
+            opacity: 0.1,
             background:
               "radial-gradient(120% 100% at 18% 22%, rgba(95,130,255,0.18) 0%, rgba(95,130,255,0) 58%), radial-gradient(95% 85% at 84% 46%, rgba(89,80,246,0.2) 0%, rgba(89,80,246,0) 61%)",
           }}
@@ -276,7 +262,7 @@ export async function renderSocialPreviewImage({
           style={{
             position: "absolute",
             inset: 0,
-            opacity: 0.26,
+            opacity: 0.12,
             background:
               "radial-gradient(120% 95% at 50% 48%, rgba(0,0,0,0) 56%, rgba(0,0,0,0.48) 100%), linear-gradient(17deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 9%, rgba(0,0,0,0) 34%, rgba(255,255,255,0.03) 55%, rgba(0,0,0,0) 76%, rgba(255,255,255,0.02) 100%)",
           }}
@@ -313,7 +299,7 @@ export async function renderSocialPreviewImage({
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", gap: 12 }}>
               {topCards.map((item) => (
-                <StatCard key={item.key} label={item.label} value={item.value} note={item.note} />
+                <StatCard key={item.key} label={item.label} value={item.value} note={item.note} featured />
               ))}
             </div>
             <div style={{ display: "flex", gap: 12 }}>
@@ -322,7 +308,7 @@ export async function renderSocialPreviewImage({
                   key={`regime-${item.regime}`}
                   label={item.regime}
                   value={compactNumber(item.vaults)}
-                  note={`${compactNumber(item.vaults)} vaults • TVL ${formatUsdCompact(item.tvlUsd)}`}
+                  note={`TVL ${formatUsdCompact(item.tvlUsd)}`}
                 />
               ))}
             </div>
@@ -334,23 +320,66 @@ export async function renderSocialPreviewImage({
   );
 }
 
-function StatCard({ label, value, note }: { label: string; value: string; note?: string }) {
+function StatCard({
+  label,
+  value,
+  note,
+  featured = false,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  featured?: boolean;
+}) {
   return (
     <div
       style={{
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        gap: 6,
-        borderRadius: 14,
-        border: "1px solid rgba(122,170,255,0.34)",
-        background: "linear-gradient(180deg, rgba(18,40,79,0.82) 0%, rgba(9,20,41,0.92) 100%)",
-        padding: "12px 14px",
+        gap: featured ? 8 : 6,
+        minHeight: featured ? 188 : 168,
+        borderRadius: featured ? 16 : 14,
+        border: featured ? "1px solid rgba(146,190,255,0.5)" : "1px solid rgba(122,170,255,0.34)",
+        background: featured
+          ? "linear-gradient(180deg, rgba(26,54,106,0.86) 0%, rgba(10,24,52,0.94) 100%)"
+          : "linear-gradient(180deg, rgba(18,40,79,0.82) 0%, rgba(9,20,41,0.92) 100%)",
+        padding: featured ? "16px 18px" : "15px 16px",
       }}
     >
-      <div style={{ fontSize: 17, color: "#b9d4fb", textTransform: "none", letterSpacing: "0.01em" }}>{label}</div>
-      <div style={{ fontSize: 31, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1 }}>{value}</div>
-      {note ? <div style={{ fontSize: 13, color: "#cfe0ff", letterSpacing: "0.01em" }}>{note}</div> : null}
+      <div
+        style={{
+          fontSize: featured ? 31 : 27,
+          color: featured ? "#dcecff" : "#b9d4fb",
+          textTransform: "none",
+          letterSpacing: "0.01em",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: featured ? 62 : 46,
+          fontWeight: 700,
+          letterSpacing: "-0.01em",
+          lineHeight: 1,
+          color: featured ? "#f7fbff" : "#f4f8ff",
+        }}
+      >
+        {value}
+      </div>
+      {note ? (
+        <div
+          style={{
+            fontSize: featured ? 28 : 27,
+            color: featured ? "#deebff" : "#cfe0ff",
+            letterSpacing: "0.01em",
+            lineHeight: 1.08,
+          }}
+        >
+          {note}
+        </div>
+      ) : null}
     </div>
   );
 }

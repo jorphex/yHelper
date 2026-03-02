@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
-import { BarList, HeatGrid, KpiGrid, TrendStrips } from "../components/visuals";
+import { BarList, HeatGrid, KpiGrid, TrendStrips, useInViewOnce } from "../components/visuals";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -127,6 +127,7 @@ function RegimeFlowSankey({
   title: string;
   rows: TransitionRow[];
 }) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
   const validRows = rows
     .filter((row) => row.tvl_usd !== null && row.tvl_usd !== undefined && Number.isFinite(row.tvl_usd) && Number(row.tvl_usd) > 0)
     .sort((left, right) => Number(right.tvl_usd) - Number(left.tvl_usd))
@@ -137,17 +138,17 @@ function RegimeFlowSankey({
   if (validRows.length === 0 || regimes.length === 0) {
     return (
       <section className="regime-sankey-panel">
-        <h3>{title}</h3>
+        {title ? <h3>{title}</h3> : null}
         <p className="muted">No transition flows available.</p>
       </section>
     );
   }
   const width = 760;
-  const height = 260;
-  const xLeft = 120;
-  const xRight = width - 120;
-  const laneTop = 34;
-  const laneBottom = height - 24;
+  const height = 178;
+  const xLeft = 124;
+  const xRight = width - 124;
+  const laneTop = 30;
+  const laneBottom = height - 18;
   const laneHeight = laneBottom - laneTop;
   const laneStep = regimes.length > 1 ? laneHeight / (regimes.length - 1) : laneHeight / 2;
   const yPos = new Map(regimes.map((key, index) => [key, laneTop + index * laneStep]));
@@ -160,15 +161,15 @@ function RegimeFlowSankey({
   }
 
   return (
-    <section className="regime-sankey-panel">
-      <h3>{title}</h3>
+    <section ref={ref} className={`regime-sankey-panel ${isInView ? "is-in-view" : ""}`.trim()}>
+      {title ? <h3>{title}</h3> : null}
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {validRows.map((row) => {
             const y1 = yPos.get(row.previous_regime) ?? laneTop;
             const y2 = yPos.get(row.current_regime) ?? laneTop;
             const value = Number(row.tvl_usd);
-            const strokeWidth = 1.8 + (value / maxFlow) * 11.8;
+            const strokeWidth = 1.4 + (value / maxFlow) * 7.2;
             const intensity = Math.max(0, Math.min(1, value / maxFlow));
             const [prevR, prevG, prevB] = regimeColor(row.previous_regime);
             const [currR, currG, currB] = regimeColor(row.current_regime);
@@ -187,6 +188,7 @@ function RegimeFlowSankey({
                   stroke={stroke}
                   strokeWidth={strokeWidth}
                   strokeLinecap="round"
+                  pathLength={1}
                 >
                   <title>
                     {`${compactRegimeLabel(row.previous_regime)} → ${compactRegimeLabel(row.current_regime)}\nTVL ${formatUsd(row.tvl_usd)}\nVaults ${row.vaults}`}
@@ -204,17 +206,17 @@ function RegimeFlowSankey({
             const stroke = `rgba(${Math.min(255, r + 36)}, ${Math.min(255, g + 36)}, ${Math.min(255, b + 36)}, 0.78)`;
             return (
               <g key={`left-${regime}`}>
-                <rect x={8} y={y - 12} width={112} height={26} rx={6} fill={fill} stroke={stroke} />
-                <text x={12} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
-                <text x={116} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
-                <rect x={width - 120} y={y - 12} width={112} height={26} rx={6} fill={fill} stroke={stroke} />
-                <text x={width - 116} y={y - 2} className="sankey-label">{compactRegimeLabel(regime)}</text>
-                <text x={width - 12} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(inValue)}</text>
+                <rect x={8} y={y - 12} width={102} height={26} rx={6} fill={fill} stroke={stroke} />
+                <text x={13} y={y + 5} className="sankey-label">{compactRegimeLabel(regime)}</text>
+                <text x={104} y={y + 10} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
+                <rect x={width - 110} y={y - 12} width={102} height={26} rx={6} fill={fill} stroke={stroke} />
+                <text x={width - 105} y={y + 5} className="sankey-label">{compactRegimeLabel(regime)}</text>
+                <text x={width - 13} y={y + 10} className="sankey-value" textAnchor="end">{formatUsdCompact(inValue)}</text>
               </g>
             );
           })}
-          <text x={8} y={11} className="sankey-axis-label">Previous Regime</text>
-          <text x={width - 8} y={11} className="sankey-axis-label" textAnchor="end">Current Regime</text>
+          <text x={8} y={9} className="sankey-axis-label">Previous Regime</text>
+          <text x={width - 8} y={9} className="sankey-axis-label" textAnchor="end">Current Regime</text>
         </svg>
       </div>
       <p className="muted viz-legend">Stroke width scales by transitioned TVL; labels show total outgoing vs incoming TVL per regime.</p>
@@ -702,9 +704,10 @@ function RegimesPageContent() {
             <>
               <div className="regime-transition-heat">
                 <HeatGrid
-                  title="Transition Weight by TVL"
+                  title=""
                   items={transitionHeat}
                   valueFormatter={(value) => formatUsd(value)}
+                  embedded
                   legend="Higher intensity means more TVL moved between regime states."
                 />
               </div>
@@ -731,7 +734,7 @@ function RegimesPageContent() {
         <h2>Regime Flow Story</h2>
         <p className="muted card-intro">Visual flow of where TVL moved between prior and current regime states.</p>
         <div>
-          <RegimeFlowSankey title="Regime Flow Sankey (TVL-weighted)" rows={transitionData?.matrix ?? []} />
+          <RegimeFlowSankey title="" rows={transitionData?.matrix ?? []} />
         </div>
       </section>
 
@@ -741,7 +744,7 @@ function RegimesPageContent() {
           Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.
         </p>
         <TrendStrips
-          title="Transition Churn Signals"
+          title=""
           items={transitionTrendItems}
           valueFormatter={(value) => formatPct(value, 2)}
           deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
 type Kpi = {
   label: string;
@@ -63,6 +63,36 @@ function pickTrendStroke(id: string, index: number): string {
   return TREND_STROKE_COLORS[(hash + index) % TREND_STROKE_COLORS.length];
 }
 
+export function useInViewOnce<T extends HTMLElement>() {
+  const [node, setNode] = useState<T | null>(null);
+  const [isInView, setIsInView] = useState(false);
+  const ref = useCallback((value: T | null) => {
+    setNode(value);
+  }, []);
+
+  useEffect(() => {
+    if (!node) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setIsInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry?.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { root: null, threshold: 0.2, rootMargin: "0px 0px -10% 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [node]);
+
+  return { ref, isInView };
+}
+
 export function KpiGrid({ items }: { items: Kpi[] }) {
   return (
     <div className="kpi-grid">
@@ -88,17 +118,18 @@ export function BarList({
   valueFormatter: (value: number | null | undefined) => string;
   emptyText?: string;
 }) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
   const valid = items.filter((item) => item.value !== null && item.value !== undefined && Number.isFinite(item.value));
   const max = valid.reduce((acc, item) => Math.max(acc, Number(item.value)), 0);
 
   return (
-    <section className="bar-panel">
+    <section ref={ref} className={`bar-panel ${isInView ? "is-in-view" : ""}`.trim()}>
       <h3>{title}</h3>
       {valid.length === 0 ? (
         <p className="muted">{emptyText}</p>
       ) : (
         <ul className="bar-list">
-          {valid.map((item) => {
+          {valid.map((item, index) => {
             const value = Number(item.value);
             const width = max > 0 ? Math.max(3, (value / max) * 100) : 0;
             return (
@@ -108,7 +139,10 @@ export function BarList({
                   <span className="bar-value">{valueFormatter(item.value)}</span>
                 </div>
                 <div className="bar-track">
-                  <div className="bar-fill" style={{ width: `${width}%` }} />
+                  <div
+                    className="bar-fill"
+                    style={{ width: `${width}%`, "--bar-delay": `${Math.min(index, 8) * 0.012}s` } as CSSProperties}
+                  />
                 </div>
                 {item.note ? <p className="bar-note muted">{item.note}</p> : null}
               </li>
@@ -125,32 +159,44 @@ export function HeatGrid({
   items,
   valueFormatter,
   legend,
+  embedded = false,
   emptyText = "No data available.",
 }: {
   title: string;
   items: HeatCellDatum[];
   valueFormatter: (value: number | null | undefined) => string;
   legend?: string;
+  embedded?: boolean;
   emptyText?: string;
 }) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
   const valid = items.filter((item) => item.value !== null && item.value !== undefined && Number.isFinite(item.value));
   const min = valid.reduce((acc, item) => Math.min(acc, Number(item.value)), Number.POSITIVE_INFINITY);
   const max = valid.reduce((acc, item) => Math.max(acc, Number(item.value)), Number.NEGATIVE_INFINITY);
 
-  return (
-    <section className="viz-panel">
-      <h3>{title}</h3>
+  const content = (
+    <>
+      {title ? <h3>{title}</h3> : null}
       {valid.length === 0 ? (
         <p className="muted">{emptyText}</p>
       ) : (
         <>
           <div className="heat-grid">
-            {valid.map((item) => {
+            {valid.map((item, index) => {
               const value = Number(item.value);
               const intensity = normalize(value, min, max);
               const emphasized = Math.pow(intensity, 0.62);
               return (
-                <article className="heat-cell" key={item.id} style={{ "--heat-alpha": `${0.16 + emphasized * 0.78}` } as CSSProperties}>
+                <article
+                  className="heat-cell"
+                  key={item.id}
+                  style={
+                    {
+                      "--heat-alpha": `${0.16 + emphasized * 0.78}`,
+                      "--heat-delay": `${Math.min(index, 10) * 0.012}s`,
+                    } as CSSProperties
+                  }
+                >
                   <p className="heat-label">{item.label}</p>
                   <p className="heat-value">{valueFormatter(item.value)}</p>
                   {item.note ? <p className="heat-note muted">{item.note}</p> : null}
@@ -161,8 +207,12 @@ export function HeatGrid({
           {legend ? <p className="muted viz-legend">{legend}</p> : null}
         </>
       )}
-    </section>
+    </>
   );
+
+  if (embedded) return <div ref={ref} className={isInView ? "is-in-view" : undefined}>{content}</div>;
+
+  return <section ref={ref} className={`viz-panel ${isInView ? "is-in-view" : ""}`.trim()}>{content}</section>;
 }
 
 export function TrendStrips({
@@ -182,18 +232,19 @@ export function TrendStrips({
   embedded?: boolean;
   emptyText?: string;
 }) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
   const validItems = items.filter((item) => finiteValues(item.points).length > 0);
   if (validItems.length === 0) {
     if (embedded) {
       return (
-        <div>
-          <h3>{title}</h3>
+        <div ref={ref} className={isInView ? "is-in-view" : undefined}>
+          {title ? <h3>{title}</h3> : null}
           <p className="muted">{emptyText}</p>
         </div>
       );
     }
     return (
-      <section className="viz-panel">
+      <section ref={ref} className={`viz-panel ${isInView ? "is-in-view" : ""}`.trim()}>
         <h3>{title}</h3>
         <p className="muted">{emptyText}</p>
       </section>
@@ -202,7 +253,7 @@ export function TrendStrips({
 
   const content = (
     <>
-      <h3>{title}</h3>
+      {title ? <h3>{title}</h3> : null}
       <div className={`trend-strip-list trend-strip-cols-${Math.min(4, Math.max(1, columns))}`}>
         {validItems.map((item, index) => {
           const finite = finiteValues(item.points);
@@ -215,6 +266,8 @@ export function TrendStrips({
           const height = 34;
           const innerW = width - 8;
           const innerH = height - 8;
+          const zeroNorm = Math.max(0, Math.min(1, normalize(0, min, max)));
+          const zeroY = 4 + (1 - zeroNorm) * innerH;
           const path = finite
             .map((value, index) => {
               const x = 4 + (finite.length > 1 ? (index / (finite.length - 1)) * innerW : innerW / 2);
@@ -238,7 +291,8 @@ export function TrendStrips({
                 role="img"
                 aria-label={`${item.label} trend`}
               >
-                <path d={path} className="trend-strip-line" />
+                <line x1={4} x2={width - 4} y1={zeroY} y2={zeroY} className="trend-strip-zero" />
+                <path d={path} className="trend-strip-line" pathLength={1} />
               </svg>
               {item.note ? <p className="trend-strip-note muted">{item.note}</p> : null}
             </article>
@@ -248,10 +302,10 @@ export function TrendStrips({
     </>
   );
 
-  if (embedded) return <div>{content}</div>;
+  if (embedded) return <div ref={ref} className={isInView ? "is-in-view" : undefined}>{content}</div>;
 
   return (
-    <section className="viz-panel">
+    <section ref={ref} className={`viz-panel ${isInView ? "is-in-view" : ""}`.trim()}>
       {content}
     </section>
   );
@@ -278,6 +332,7 @@ export function ScatterPlot({
   className?: string;
   densityBackdrop?: boolean;
 }) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
   const valid = points.filter((point) => {
     const x = point.x;
     const y = point.y;
@@ -285,15 +340,15 @@ export function ScatterPlot({
   });
   if (valid.length === 0) {
     return (
-      <section className={`viz-panel ${className ?? ""}`.trim()}>
+      <section ref={ref} className={`viz-panel ${className ?? ""} ${isInView ? "is-in-view" : ""}`.trim()}>
         <h3>{title}</h3>
         <p className="muted">{emptyText}</p>
       </section>
     );
   }
 
-  const width = 700;
-  const height = 352;
+  const width = 520;
+  const height = 268;
   const xValues = finiteValues(valid.map((point) => point.x));
   const yValues = finiteValues(valid.map((point) => point.y));
   const sizeValues = finiteValues(valid.map((point) => point.size));
@@ -307,10 +362,10 @@ export function ScatterPlot({
   const yMid = (yMin + yMax) / 2;
   const yTickLabels = [yFormatter(yMin), yFormatter(yMid), yFormatter(yMax)];
   const widestYTick = yTickLabels.reduce((max, label) => Math.max(max, label.length), 0);
-  const paddingLeft = Math.min(92, Math.max(56, 18 + widestYTick * 7));
-  const paddingRight = 20;
-  const paddingTop = 24;
-  const paddingBottom = 66;
+  const paddingLeft = Math.min(84, Math.max(50, 16 + widestYTick * 6.4));
+  const paddingRight = 16;
+  const paddingTop = 18;
+  const paddingBottom = 54;
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
   const densityBins = new Map<string, number>();
@@ -329,7 +384,7 @@ export function ScatterPlot({
   const maxDensity = densityBins.size > 0 ? Math.max(...densityBins.values()) : 0;
 
   return (
-    <section className={`viz-panel ${className ?? ""}`.trim()}>
+    <section ref={ref} className={`viz-panel ${className ?? ""} ${isInView ? "is-in-view" : ""}`.trim()}>
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
@@ -400,7 +455,7 @@ export function ScatterPlot({
             y2={height - paddingBottom}
             className="viz-axis viz-axis-mid"
           />
-          {valid.map((point) => {
+          {valid.map((point, index) => {
             const x = Number(point.x);
             const y = Number(point.y);
             const xNorm = normalize(x, xMin, xMax);
@@ -417,14 +472,26 @@ export function ScatterPlot({
               return (
                 <a key={point.id} href={point.href} target="_blank" rel="noreferrer noopener" className="viz-point-link">
                   <title>{title}</title>
-                  <circle cx={cx} cy={cy} r={radius} className={`viz-point ${toneClass}`} />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={radius}
+                    className={`viz-point ${toneClass}`}
+                    style={{ "--point-delay": `${Math.min(index, 12) * 0.01}s` } as CSSProperties}
+                  />
                 </a>
               );
             }
             return (
               <g key={point.id}>
                 <title>{title}</title>
-                <circle cx={cx} cy={cy} r={radius} className={`viz-point ${toneClass}`} />
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={radius}
+                  className={`viz-point ${toneClass}`}
+                  style={{ "--point-delay": `${Math.min(index, 12) * 0.01}s` } as CSSProperties}
+                />
               </g>
             );
           })}

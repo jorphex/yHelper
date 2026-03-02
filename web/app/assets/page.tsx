@@ -445,8 +445,11 @@ function AssetsPageContent() {
               const spread = row.spread_safe_apy_30d ?? 0;
               const worst = best - spread;
               const maxAbs = Math.max(0.08, Math.abs(best), Math.abs(weighted), Math.abs(worst));
-              const toY = (value: number) => 40 - ((value + maxAbs) / (2 * maxAbs)) * 34;
-              const spark = `M3,${toY(worst).toFixed(2)} L30,${toY(weighted).toFixed(2)} L57,${toY(best).toFixed(2)}`;
+              const toY = (value: number) => 44 - ((value + maxAbs) / (2 * maxAbs)) * 37;
+              const sparkLeft = 1;
+              const sparkMid = 38;
+              const sparkRight = 75;
+              const spark = `M${sparkLeft},${toY(worst).toFixed(2)} L${sparkMid},${toY(weighted).toFixed(2)} L${sparkRight},${toY(best).toFixed(2)}`;
               const nearFlat = spread < 0.15;
               return (
                 <button
@@ -456,12 +459,12 @@ function AssetsPageContent() {
                   onClick={() => updateQuery({ token: row.token_symbol })}
                 >
                   <p className="assets-spread-token">{row.token_symbol}</p>
-                  <svg viewBox="0 0 60 44" aria-label={`${row.token_symbol} APY spread shape`}>
-                    <line x1={3} y1={40} x2={57} y2={40} className="assets-spread-baseline" />
+                  <svg viewBox="0 0 76 48" aria-label={`${row.token_symbol} APY spread shape`}>
+                    <line x1={sparkLeft} y1={44} x2={sparkRight} y2={44} className="assets-spread-baseline" />
                     <path d={spark} className="assets-spread-line" />
-                    <circle cx={3} cy={toY(worst)} r={2} className="assets-spread-point" />
-                    <circle cx={30} cy={toY(weighted)} r={2} className="assets-spread-point" />
-                    <circle cx={57} cy={toY(best)} r={2} className="assets-spread-point" />
+                    <circle cx={sparkLeft} cy={toY(worst)} r={2.25} className="assets-spread-point" />
+                    <circle cx={sparkMid} cy={toY(weighted)} r={2.25} className="assets-spread-point" />
+                    <circle cx={sparkRight} cy={toY(best)} r={2.25} className="assets-spread-point" />
                   </svg>
                   <p className="assets-spread-value">{formatPct(spread)}</p>
                   <p className="assets-spread-note muted">

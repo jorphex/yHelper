@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { formatHours, formatPct } from "../lib/format";
 
 type FreshnessResponse = {
@@ -97,21 +96,15 @@ export function FreshnessBadge() {
   }, []);
 
   const badge = deriveBadgeState(payload);
-  const href = "/changes?window=24h&stale_threshold=24h#freshness-panels";
   const staleText = badge.staleRatio === null ? null : formatPct(badge.staleRatio, 0);
   const detail = `${badge.detail} Latest PPS age: ${formatHours(badge.ageSeconds)}. 24h stale ratio: ${staleText ?? "n/a"}.`;
 
   return (
-    <Link
-      href={href}
-      className={`freshness-badge is-${badge.tone}`}
-      title={detail}
-      aria-label={`Data freshness ${badge.label}. Open freshness diagnostics.`}
-    >
+    <div className={`freshness-badge is-${badge.tone}`} title={detail} aria-label={`Data freshness ${badge.label}.`} role="status">
       <span className="freshness-dot" aria-hidden />
       <span className="freshness-label">Data: {badge.label}</span>
       <span className="freshness-age">{formatHours(badge.ageSeconds)}</span>
       {staleText ? <span className="freshness-meta">{staleText} stale</span> : null}
-    </Link>
+    </div>
   );
 }

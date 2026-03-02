@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { queryBool, queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
-import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips } from "../components/visuals";
+import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips, useInViewOnce } from "../components/visuals";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -235,13 +235,14 @@ function DiscoverRidgeline({
   title: string;
   series: Array<{ id: string; label: string; values: number[]; note: string }>;
 }) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
   const ridgelinePalette = [
     { stroke: "var(--viz-line-2)", fill: "rgba(var(--accent-rgb), 0.24)" },
     { stroke: "var(--viz-line-5)", fill: "rgba(var(--accent-teal-rgb), 0.22)" },
     { stroke: "var(--viz-line-4)", fill: "rgba(var(--accent-purple-rgb), 0.22)" },
     { stroke: "var(--viz-line-3)", fill: "rgba(var(--accent-2-rgb), 0.2)" },
   ];
-  const valid = series.filter((row) => row.values.length >= 4);
+  const valid = series.filter((row) => row.values.length >= 4).slice(0, 6);
   if (valid.length === 0) {
     return (
       <section className="viz-panel discover-ridgeline-panel">
@@ -250,9 +251,12 @@ function DiscoverRidgeline({
       </section>
     );
   }
-  const width = 860;
-  const rowH = 30;
-  const height = 20 + valid.length * rowH + 24;
+  const width = 820;
+  const rowH = 19;
+  const chartLeft = 88;
+  const chartRight = 20;
+  const chartWidth = width - chartLeft - chartRight;
+  const height = 6 + valid.length * rowH + 9;
   const bins = 16;
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);
@@ -260,13 +264,13 @@ function DiscoverRidgeline({
   const span = Math.max(0.0001, max - min);
 
   return (
-    <section className="viz-panel discover-ridgeline-panel">
+    <section ref={ref} className={`viz-panel discover-ridgeline-panel ${isInView ? "is-in-view" : ""}`.trim()}>
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {valid.map((row, idx) => {
             const tone = ridgelinePalette[idx % ridgelinePalette.length];
-            const yBase = 12 + idx * rowH + 14;
+            const yBase = 5 + idx * rowH + 10;
             const counts = new Array<number>(bins).fill(0);
             for (const value of row.values) {
               const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
@@ -275,29 +279,30 @@ function DiscoverRidgeline({
             const maxCount = Math.max(1, ...counts);
             const pathTop = counts
               .map((count, bIdx) => {
-                const x = 138 + (bIdx / (bins - 1)) * (width - 182);
-                const y = yBase - (count / maxCount) * 10.5;
+                const x = chartLeft + (bIdx / (bins - 1)) * chartWidth;
+                const y = yBase - (count / maxCount) * 6.1;
                 return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
               })
               .join(" ");
             const pathBottom = counts
               .map((_, bIdx) => {
                 const rev = bins - 1 - bIdx;
-                const x = 138 + (rev / (bins - 1)) * (width - 182);
+                const x = chartLeft + (rev / (bins - 1)) * chartWidth;
                 return `L${x.toFixed(2)},${yBase.toFixed(2)}`;
               })
               .join(" ");
             return (
               <g key={row.id}>
-                <path d={`${pathTop} ${pathBottom} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth={0.9} />
-                <text x={10} y={yBase - 5} className="ridgeline-label">{row.label}</text>
-                <text x={width - 8} y={yBase - 5} className="ridgeline-note" textAnchor="end">{row.note}</text>
+                <title>{`${row.label}\n${row.note}\nAPY range ${formatPct(min, 1)} to ${formatPct(max, 1)}`}</title>
+                <path d={`${pathTop} ${pathBottom} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth={0.9} className="ridgeline-curve" />
+                <text x={4} y={yBase - 1} className="ridgeline-label" dominantBaseline="central">{row.label}</text>
+                <text x={width - 4} y={yBase - 1} className="ridgeline-note" textAnchor="end" dominantBaseline="central">{row.note}</text>
               </g>
             );
           })}
-          <line x1={138} x2={width - 42} y1={height - 12} y2={height - 12} className="viz-axis" />
-          <text x={138} y={height - 2} className="ridgeline-axis">{formatPct(min, 1)}</text>
-          <text x={width - 42} y={height - 2} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
+          <line x1={chartLeft} x2={width - chartRight} y1={height - 8} y2={height - 8} className="viz-axis" />
+          <text x={chartLeft} y={height - 1} className="ridgeline-axis">{formatPct(min, 1)}</text>
+          <text x={width - chartRight} y={height - 1} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
         </svg>
       </div>
       <p className="muted viz-legend">Ridgelines show APY shape by chain. Taller peaks mean more vaults at that APY zone.</p>
@@ -940,28 +945,32 @@ function DiscoverPageContent() {
               emptyText="No chain momentum values for this filter yet."
             />
           </div>
-          <TrendStrips
-            title="APY Bucket Drift (Last 60 Days)"
-            items={apyBucketTrendItems}
-            valueFormatter={(value) => formatPct(value, 1)}
-            deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 1)}`}
-            emptyText="Trend rows unavailable for this filter."
-          />
-          <TrendStrips
-            title={
-              query.trendGroup === "none"
-                ? "Weighted APY Trend (7d / 30d / 90d)"
-                : `Weighted APY 30d Trend (${query.trendGroup === "chain" ? "By Chain" : "By Category"})`
-            }
-            items={query.trendGroup === "none" ? weightedApyTrendItems : groupedWeightedApyTrendItems}
-            valueFormatter={(value) => formatPct(value, 2)}
-            deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
-            emptyText={
-              query.trendGroup === "none"
-                ? "Weighted APY trend unavailable for this filter."
-                : "Grouped APY trend unavailable for this filter."
-            }
-          />
+          <div className="discover-trend-card">
+            <TrendStrips
+              title="APY Bucket Drift (Last 60 Days)"
+              items={apyBucketTrendItems}
+              valueFormatter={(value) => formatPct(value, 1)}
+              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 1)}`}
+              emptyText="Trend rows unavailable for this filter."
+            />
+          </div>
+          <div className="discover-trend-card">
+            <TrendStrips
+              title={
+                query.trendGroup === "none"
+                  ? "Weighted APY Trend (7d / 30d / 90d)"
+                  : `Weighted APY 30d Trend (${query.trendGroup === "chain" ? "By Chain" : "By Category"})`
+              }
+              items={query.trendGroup === "none" ? weightedApyTrendItems : groupedWeightedApyTrendItems}
+              valueFormatter={(value) => formatPct(value, 2)}
+              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+              emptyText={
+                query.trendGroup === "none"
+                  ? "Weighted APY trend unavailable for this filter."
+                  : "Grouped APY trend unavailable for this filter."
+              }
+            />
+          </div>
           <div className="discover-ridgeline">
             <DiscoverRidgeline title="APY Distribution Ridgelines (Top Chains by TVL)" series={chainRidgelineSeries} />
           </div>

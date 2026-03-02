@@ -200,7 +200,7 @@ function ChainsPageContent() {
         <p className="muted card-intro">
           Weighted metrics are TVL-weighted across filtered vaults. Click any header to sort.
         </p>
-        <div className="table-wrap">
+        <div className="table-wrap chains-rollup-wrap">
           <table className="chains-rollup-table">
             <thead>
               <tr>

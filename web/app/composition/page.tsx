@@ -1,12 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
-import { BarList, HeatGrid, KpiGrid, ScatterPlot } from "../components/visuals";
+import { BarList, HeatGrid, KpiGrid, ScatterPlot, useInViewOnce } from "../components/visuals";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -78,8 +78,9 @@ function TvlTreemap({
   categories: BreakdownRow[];
   tokens: BreakdownRow[];
 }) {
-  const width = 640;
-  const height = 154;
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
+  const width = 760;
+  const height = 78;
   const topChains = [...chains]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
@@ -106,29 +107,32 @@ function TvlTreemap({
       </section>
     );
   }
-  const laneGap = 10;
-  const laneHeight = (height - 18 - (validGroups.length - 1) * laneGap) / validGroups.length;
+  const laneGap = 3;
+  const laneHeight = (height - 8 - (validGroups.length - 1) * laneGap) / validGroups.length;
 
   return (
-    <section className="viz-panel composition-treemap-viz">
+    <section ref={ref} className={`viz-panel composition-treemap-viz ${isInView ? "is-in-view" : ""}`.trim()}>
       <h3>{title}</h3>
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {validGroups.map((group, groupIndex) => {
-            const y = 10 + groupIndex * (laneHeight + laneGap);
+            const y = 4 + groupIndex * (laneHeight + laneGap);
             const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
-            const labelOffset = 54;
-            const laneWidth = width - labelOffset - 6;
+            const labelOffset = 44;
+            const laneWidth = width - labelOffset - 4;
+            const scaledWidths = group.rows.map((row) => {
+              const value = Number(row.tvl_usd ?? 0);
+              return total > 0 ? (value / total) * laneWidth : 0;
+            });
             let x = 0;
             return (
               <g key={group.key} className={`treemap-group treemap-group-${group.key}`}>
                 <text x={0} y={y + laneHeight / 2 + 0.5} className="treemap-group-label" dominantBaseline="central">
                   {group.label}
                 </text>
-                {group.rows.map((row) => {
-                  const value = Number(row.tvl_usd ?? 0);
-                  const widthRatio = total > 0 ? value / total : 0;
-                  const w = Math.max(10, widthRatio * laneWidth);
+                {group.rows.map((row, rowIndex) => {
+                  const targetWidth = scaledWidths[rowIndex] ?? 0;
+                  const w = rowIndex === group.rows.length - 1 ? Math.max(0, laneWidth - x) : Math.max(0, targetWidth);
                   const rectX = labelOffset + x;
                   x += w;
                   const name = group.text(row);
@@ -136,7 +140,17 @@ function TvlTreemap({
                   const compactName = maxChars > 0 ? (name.length > maxChars ? `${name.slice(0, Math.max(2, maxChars - 1))}…` : name) : "";
                   return (
                     <g key={`${group.key}-${name}`} className="treemap-cell">
-                      <rect x={rectX} y={y} width={w} height={laneHeight} fill={group.color} opacity={0.85} stroke="var(--line-3)" />
+                      <rect
+                        x={rectX}
+                        y={y}
+                        width={w}
+                        height={laneHeight}
+                        fill={group.color}
+                        opacity={0.85}
+                        stroke="var(--line-3)"
+                        className="treemap-cell-rect"
+                        style={{ "--treemap-delay": `${Math.min(rowIndex, 10) * 0.02}s` } as CSSProperties}
+                      />
                       {w >= 50 && compactName ? (
                         <text x={rectX + 4} y={y + Math.min(12, laneHeight - 4)} className="treemap-cell-label">
                           {compactName}

@@ -213,7 +213,6 @@ export default function HomePage() {
           <>
             <KpiGrid
               items={[
-                { label: "Server Time (UTC)", value: formatUtcDateTime(data.server_time_utc) },
                 { label: "Active Vaults", value: String(data?.lifecycle?.active_vaults ?? data?.coverage?.global?.active_vaults ?? "n/a") },
                 { label: "Eligible Vaults", value: String(data?.coverage?.global?.eligible_vaults ?? "n/a") },
                 { label: "Migration Ready", value: String(data?.lifecycle?.migration_ready_vaults ?? "n/a") },
