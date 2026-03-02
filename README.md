@@ -39,6 +39,21 @@ docker compose up -d --build yhelper-web
 python3 scripts/post_deploy_smoke.py --base-url http://127.0.0.1:3010
 ```
 
+Capture visual baseline (first run or intentional redesign):
+```bash
+UI_AUDIT_CAPTURE_BASELINE=1 \
+UI_AUDIT_BASELINE_DIR=tmp/ui-baseline/current \
+node web/scripts/ui_audit_playwright.mjs
+```
+
+Compare current UI against baseline (strict mode fails on structural regressions):
+```bash
+UI_AUDIT_COMPARE_BASELINE=1 \
+UI_AUDIT_STRICT=1 \
+UI_AUDIT_BASELINE_DIR=tmp/ui-baseline/current \
+node web/scripts/ui_audit_playwright.mjs
+```
+
 ## Home Asset Rendering
 Render the landing page Blender assets with deterministic names and sizes:
 ```bash

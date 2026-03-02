@@ -1,11 +1,16 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import crypto from 'node:crypto';
 import { chromium, devices } from 'playwright';
 
 const baseUrl = process.env.UI_AUDIT_BASE_URL || 'http://127.0.0.1:3010';
 const runId = new Date().toISOString().replace(/[:.]/g, '-');
 const outDir = process.env.UI_AUDIT_OUT_DIR || path.join('tmp', 'ui-audit', runId);
+const baselineDir = process.env.UI_AUDIT_BASELINE_DIR || path.join('tmp', 'ui-baseline', 'current');
+const captureBaseline = process.env.UI_AUDIT_CAPTURE_BASELINE === '1';
+const compareBaseline = process.env.UI_AUDIT_COMPARE_BASELINE === '1';
+const strictCompare = process.env.UI_AUDIT_STRICT === '1';
 
 const pages = [
   { id: 'overview', route: '/' },
@@ -42,6 +47,78 @@ async function ensureDir(dir) {
   await fs.mkdir(dir, { recursive: true });
 }
 
+async function fileSha256(filePath) {
+  const buf = await fs.readFile(filePath);
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+function overflowCount(findings) {
+  return (findings?.overflow?.length ?? 0) + (findings?.clippedText?.length ?? 0) + (findings?.navTopClip?.length ?? 0);
+}
+
+function structuralRiskCount(findings) {
+  return (findings?.cellOverlap?.length ?? 0) + (findings?.firstColWide?.length ?? 0) + (findings?.navTopClip?.length ?? 0);
+}
+
+async function loadJsonIfExists(filePath) {
+  try {
+    const data = await fs.readFile(filePath, 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+}
+
+function compareRuns(currentRuns, baselineRuns) {
+  const baselineMap = new Map(baselineRuns.map((run) => [run.comboId, run]));
+  const currentMap = new Map(currentRuns.map((run) => [run.comboId, run]));
+  const onlyInCurrent = [...currentMap.keys()].filter((comboId) => !baselineMap.has(comboId));
+  const missingFromCurrent = [...baselineMap.keys()].filter((comboId) => !currentMap.has(comboId));
+
+  const hashChanged = [];
+  const structuralRegressions = [];
+  const overflowRegressions = [];
+
+  for (const [comboId, current] of currentMap.entries()) {
+    const baseline = baselineMap.get(comboId);
+    if (!baseline) continue;
+    if ((current.screenshotSha256 ?? null) !== (baseline.screenshotSha256 ?? null)) {
+      hashChanged.push(comboId);
+    }
+    const currentStructural = structuralRiskCount(current.findings);
+    const baselineStructural = structuralRiskCount(baseline.findings);
+    if (currentStructural > baselineStructural) {
+      structuralRegressions.push({
+        comboId,
+        baselineStructural,
+        currentStructural,
+      });
+    }
+    const currentOverflow = overflowCount(current.findings);
+    const baselineOverflow = overflowCount(baseline.findings);
+    if (currentOverflow > baselineOverflow + 1) {
+      overflowRegressions.push({
+        comboId,
+        baselineOverflow,
+        currentOverflow,
+      });
+    }
+  }
+
+  return {
+    comparedCombos: currentRuns.length,
+    onlyInCurrent,
+    missingFromCurrent,
+    hashChanged,
+    structuralRegressions,
+    overflowRegressions,
+    strictFail:
+      onlyInCurrent.length > 0 ||
+      missingFromCurrent.length > 0 ||
+      structuralRegressions.length > 0,
+  };
+}
+
 async function run() {
   await ensureDir(outDir);
   const browser = await chromium.launch({ headless: true });
@@ -50,6 +127,10 @@ async function run() {
       baseUrl,
       runId,
       outDir,
+      baselineDir,
+      captureBaseline,
+      compareBaseline,
+      strictCompare,
       generatedAtUtc: new Date().toISOString(),
     },
     runs: [],
@@ -235,6 +316,7 @@ async function run() {
         });
 
         await context.close();
+        const screenshotSha256 = await fileSha256(screenshotPath);
 
         const runRecord = {
           comboId,
@@ -244,6 +326,7 @@ async function run() {
           mode: modeConfig.id,
           viewport: viewportConfig.id,
           screenshotPath,
+          screenshotSha256,
           findings: metrics,
         };
         results.runs.push(runRecord);
@@ -277,10 +360,41 @@ async function run() {
         (desktopHomePro?.findings?.homeModeMetrics?.heroPaddingLeft ?? null),
   };
 
+  let strictFailure = false;
+  if (compareBaseline) {
+    const baselineReportPath = path.join(baselineDir, 'report.json');
+    const baselineReport = await loadJsonIfExists(baselineReportPath);
+    if (!baselineReport) {
+      results.comparison = {
+        baselineReportPath,
+        error: 'Baseline report not found.',
+      };
+      strictFailure = strictCompare;
+    } else {
+      const comparison = compareRuns(results.runs, baselineReport.runs ?? []);
+      results.comparison = {
+        baselineReportPath,
+        ...comparison,
+      };
+      strictFailure = strictCompare && comparison.strictFail;
+    }
+  }
+
   const reportPath = path.join(outDir, 'report.json');
   await fs.writeFile(reportPath, `${JSON.stringify(results, null, 2)}\n`, 'utf8');
+  if (results.comparison) {
+    const comparisonPath = path.join(outDir, 'comparison.json');
+    await fs.writeFile(comparisonPath, `${JSON.stringify(results.comparison, null, 2)}\n`, 'utf8');
+  }
+  if (captureBaseline) {
+    await fs.rm(baselineDir, { recursive: true, force: true });
+    await fs.cp(outDir, baselineDir, { recursive: true });
+  }
   console.log(reportPath);
   await browser.close();
+  if (strictFailure) {
+    process.exitCode = 2;
+  }
 }
 
 run().catch((err) => {
