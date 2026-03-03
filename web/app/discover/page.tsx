@@ -251,12 +251,12 @@ function DiscoverRidgeline({
       </section>
     );
   }
-  const width = 820;
-  const rowH = 19;
-  const chartLeft = 88;
-  const chartRight = 20;
+  const width = 860;
+  const rowH = 17;
+  const chartLeft = 64;
+  const chartRight = 10;
   const chartWidth = width - chartLeft - chartRight;
-  const height = 6 + valid.length * rowH + 9;
+  const height = 4 + valid.length * rowH + 7;
   const bins = 16;
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);
@@ -270,7 +270,7 @@ function DiscoverRidgeline({
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {valid.map((row, idx) => {
             const tone = ridgelinePalette[idx % ridgelinePalette.length];
-            const yBase = 5 + idx * rowH + 10;
+            const yBase = 4 + idx * rowH + 9;
             const counts = new Array<number>(bins).fill(0);
             for (const value of row.values) {
               const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
@@ -280,7 +280,7 @@ function DiscoverRidgeline({
             const pathTop = counts
               .map((count, bIdx) => {
                 const x = chartLeft + (bIdx / (bins - 1)) * chartWidth;
-                const y = yBase - (count / maxCount) * 6.1;
+                const y = yBase - (count / maxCount) * 5.8;
                 return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
               })
               .join(" ");
@@ -937,7 +937,7 @@ function DiscoverPageContent() {
               emptyText="Need at least two venues per token to compute APY spread."
             />
           </div>
-          <div className="discover-chain-heatmap">
+          <div className="discover-chain-heatmap analyst-only">
             <HeatGrid
               title="Chain Momentum Heatmap"
               items={chainMomentumHeat}
@@ -971,7 +971,7 @@ function DiscoverPageContent() {
               }
             />
           </div>
-          <div className="discover-ridgeline">
+          <div className="discover-ridgeline analyst-only">
             <DiscoverRidgeline title="APY Distribution Ridgelines (Top Chains by TVL)" series={chainRidgelineSeries} />
           </div>
         </div>

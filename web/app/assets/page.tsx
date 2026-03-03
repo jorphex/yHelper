@@ -637,15 +637,17 @@ function AssetsPageContent() {
               { label: "APY Spread", value: formatPct(detail?.summary.spread_safe_apy_30d) },
             ]}
           />
-          <BarList
-            title="Regime Count (Selected Token)"
-            items={(detail?.summary.regime_counts ?? []).map((row) => ({
-              id: row.regime,
-              label: compactRegimeLabel(row.regime),
-              value: row.vaults,
-            }))}
-            valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
-          />
+          <div className="analyst-only">
+            <BarList
+              title="Regime Count (Selected Token)"
+              items={(detail?.summary.regime_counts ?? []).map((row) => ({
+                id: row.regime,
+                label: compactRegimeLabel(row.regime),
+                value: row.vaults,
+              }))}
+              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+            />
+          </div>
         </div>
 
         <div className="table-wrap">

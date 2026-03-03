@@ -79,8 +79,8 @@ function TvlTreemap({
   tokens: BreakdownRow[];
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
-  const width = 760;
-  const height = 78;
+  const width = 900;
+  const height = 84;
   const topChains = [...chains]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
@@ -107,7 +107,7 @@ function TvlTreemap({
       </section>
     );
   }
-  const laneGap = 3;
+  const laneGap = 4;
   const laneHeight = (height - 8 - (validGroups.length - 1) * laneGap) / validGroups.length;
 
   return (
@@ -118,8 +118,8 @@ function TvlTreemap({
           {validGroups.map((group, groupIndex) => {
             const y = 4 + groupIndex * (laneHeight + laneGap);
             const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
-            const labelOffset = 44;
-            const laneWidth = width - labelOffset - 4;
+            const labelOffset = 36;
+            const laneWidth = width - labelOffset - 2;
             const scaledWidths = group.rows.map((row) => {
               const value = Number(row.tvl_usd ?? 0);
               return total > 0 ? (value / total) * laneWidth : 0;
@@ -151,7 +151,7 @@ function TvlTreemap({
                         className="treemap-cell-rect"
                         style={{ "--treemap-delay": `${Math.min(rowIndex, 10) * 0.02}s` } as CSSProperties}
                       />
-                      {w >= 50 && compactName ? (
+                      {w >= 44 && compactName ? (
                         <text x={rectX + 4} y={y + Math.min(12, laneHeight - 4)} className="treemap-cell-label">
                           {compactName}
                         </text>
@@ -701,7 +701,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card analyst-only">
         <h2>Top Tokens by TVL</h2>
         <div className="table-wrap">
           <table className="composition-summary-table">
@@ -920,7 +920,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card analyst-only">
         <h2>Least Crowded</h2>
         <p className="muted">Lower TVL relative to APY versus peers in the same filtered universe.</p>
         <div className="table-wrap">

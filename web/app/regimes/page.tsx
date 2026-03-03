@@ -143,12 +143,12 @@ function RegimeFlowSankey({
       </section>
     );
   }
-  const width = 760;
-  const height = 178;
-  const xLeft = 124;
-  const xRight = width - 124;
-  const laneTop = 30;
-  const laneBottom = height - 18;
+  const width = 840;
+  const height = 190;
+  const xLeft = 116;
+  const xRight = width - 116;
+  const laneTop = 38;
+  const laneBottom = height - 22;
   const laneHeight = laneBottom - laneTop;
   const laneStep = regimes.length > 1 ? laneHeight / (regimes.length - 1) : laneHeight / 2;
   const yPos = new Map(regimes.map((key, index) => [key, laneTop + index * laneStep]));
@@ -206,17 +206,17 @@ function RegimeFlowSankey({
             const stroke = `rgba(${Math.min(255, r + 36)}, ${Math.min(255, g + 36)}, ${Math.min(255, b + 36)}, 0.78)`;
             return (
               <g key={`left-${regime}`}>
-                <rect x={8} y={y - 12} width={102} height={26} rx={6} fill={fill} stroke={stroke} />
-                <text x={13} y={y + 5} className="sankey-label">{compactRegimeLabel(regime)}</text>
-                <text x={104} y={y + 10} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
-                <rect x={width - 110} y={y - 12} width={102} height={26} rx={6} fill={fill} stroke={stroke} />
-                <text x={width - 105} y={y + 5} className="sankey-label">{compactRegimeLabel(regime)}</text>
-                <text x={width - 13} y={y + 10} className="sankey-value" textAnchor="end">{formatUsdCompact(inValue)}</text>
+                <rect x={8} y={y - 11} width={102} height={24} rx={6} fill={fill} stroke={stroke} />
+                <text x={13} y={y + 3} className="sankey-label">{compactRegimeLabel(regime)}</text>
+                <text x={104} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
+                <rect x={width - 110} y={y - 11} width={102} height={24} rx={6} fill={fill} stroke={stroke} />
+                <text x={width - 105} y={y + 3} className="sankey-label">{compactRegimeLabel(regime)}</text>
+                <text x={width - 13} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(inValue)}</text>
               </g>
             );
           })}
-          <text x={8} y={9} className="sankey-axis-label">Previous Regime</text>
-          <text x={width - 8} y={9} className="sankey-axis-label" textAnchor="end">Current Regime</text>
+          <text x={8} y={11} className="sankey-axis-label">Previous Regime</text>
+          <text x={width - 8} y={11} className="sankey-axis-label" textAnchor="end">Current Regime</text>
         </svg>
       </div>
       <p className="muted viz-legend">Stroke width scales by transitioned TVL; labels show total outgoing vs incoming TVL per regime.</p>
@@ -865,7 +865,7 @@ function RegimesPageContent() {
                     Chain <span className="th-indicator">{sortIndicator(moverSort, "chain")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide col-token">
+                <th className="tablet-hide analyst-only col-token">
                   <button
                     className={`th-button ${moverSort.key === "token" ? "is-active" : ""}`}
                     onClick={() => {
@@ -913,7 +913,7 @@ function RegimesPageContent() {
                     Momentum <span className="th-indicator">{sortIndicator(moverSort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide is-numeric col-regime">
+                <th className="tablet-hide is-numeric analyst-only col-regime">
                   <button
                     className={`th-button ${moverSort.key === "regime" ? "is-active" : ""}`}
                     onClick={() => {
@@ -938,7 +938,7 @@ function RegimesPageContent() {
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
-                  <td className="tablet-hide col-token">
+                  <td className="tablet-hide analyst-only col-token">
                     {row.token_symbol ? (
                       <Link
                         href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
@@ -952,7 +952,7 @@ function RegimesPageContent() {
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="tablet-hide is-numeric col-regime">{compactRegimeLabel(row.regime)}</td>
+                  <td className="tablet-hide is-numeric analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>

@@ -871,7 +871,7 @@ function ChangesPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card analyst-only">
         <h2>Grouped Momentum Snapshot (Latest Day)</h2>
         <p className="muted card-intro">
           TVL-weighted momentum by chain/category (7d APY minus 30d APY). Positive values indicate short-term strengthening.
@@ -988,7 +988,7 @@ function ChangesPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card analyst-only">
         <h2>Freshness by Category</h2>
         <div className="table-wrap">
           <table className="changes-stale-table">
@@ -1098,20 +1098,24 @@ function ChangesPageContent() {
         minTvl={query.minTvl}
         minPoints={query.minPoints}
       />
-      <MoverTable
-        title="Largest Absolute Changes"
-        rows={data?.movers.largest_abs_delta ?? []}
-        universe={query.universe}
-        minTvl={query.minTvl}
-        minPoints={query.minPoints}
-      />
-      <MoverTable
-        title="Stalest Series"
-        rows={data?.stale ?? []}
-        universe={query.universe}
-        minTvl={query.minTvl}
-        minPoints={query.minPoints}
-      />
+      <div className="analyst-only">
+        <MoverTable
+          title="Largest Absolute Changes"
+          rows={data?.movers.largest_abs_delta ?? []}
+          universe={query.universe}
+          minTvl={query.minTvl}
+          minPoints={query.minPoints}
+        />
+      </div>
+      <div className="analyst-only">
+        <MoverTable
+          title="Stalest Series"
+          rows={data?.stale ?? []}
+          universe={query.universe}
+          minTvl={query.minTvl}
+          minPoints={query.minPoints}
+        />
+      </div>
     </main>
   );
 }

@@ -228,7 +228,7 @@ function ChainsPageContent() {
                     Active Vaults <span className="th-indicator">{sortIndicator(sort, "active")}</span>
                   </button>
                 </th>
-                <th className="is-numeric tablet-hide col-metrics">
+                <th className="is-numeric tablet-hide analyst-only col-metrics">
                   <button
                     className={`th-button ${sort.key === "metrics" ? "is-active" : ""}`}
                     onClick={() => {
@@ -276,7 +276,7 @@ function ChainsPageContent() {
                     Avg Momentum <span className="th-indicator">{sortIndicator(sort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="is-numeric tablet-hide col-consistency">
+                <th className="is-numeric tablet-hide analyst-only col-consistency">
                   <button
                     className={`th-button ${sort.key === "consistency" ? "is-active" : ""}`}
                     onClick={() => {
@@ -299,11 +299,11 @@ function ChainsPageContent() {
                     </Link>
                   </td>
                   <td className="is-numeric col-active">{row.active_vaults}</td>
-                  <td className="is-numeric tablet-hide col-metrics">{row.with_metrics}</td>
+                  <td className="is-numeric tablet-hide analyst-only col-metrics">{row.with_metrics}</td>
                   <td className="is-numeric col-tvl">{formatUsd(row.total_tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.weighted_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.avg_momentum_7d_30d)}</td>
-                  <td className="is-numeric tablet-hide col-consistency">{formatPct(row.avg_consistency)}</td>
+                  <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.avg_consistency)}</td>
                 </tr>
               ))}
             </tbody>

@@ -206,7 +206,7 @@ body::after {
 .site-nav {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0.95rem 1rem 0.88rem;
+  padding: 0.96rem 1rem 0.9rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -227,8 +227,8 @@ body::after {
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
-  align-items: flex-start;
-  padding: 0.04rem 0 0.06rem;
+  align-items: center;
+  padding: 0.06rem 0 0.08rem;
 }
 
 .site-nav-links::before {
@@ -397,39 +397,6 @@ body::after {
 :root[data-audience="analyst"] .kpi-hint,
 :root[data-audience="analyst"] .bar-note {
   display: none;
-}
-
-:root[data-audience="analyst"] .container {
-  gap: 0.7rem;
-}
-
-:root[data-audience="analyst"] .card {
-  padding: 0.85rem;
-}
-
-:root[data-audience="analyst"] .home-minimal .card.home-minimal-hero {
-  padding: 2.8rem 2.2rem;
-}
-
-:root[data-audience="analyst"] .home-minimal .card.home-minimal-purpose {
-  padding: 1.7rem;
-}
-
-:root[data-audience="analyst"] .home-minimal .card.home-live-strip {
-  padding: 1rem 1.1rem;
-}
-
-:root[data-audience="analyst"] .home-minimal .card.home-minimal-footer {
-  padding: 1.1rem;
-}
-
-:root[data-audience="analyst"] .container.home-minimal {
-  gap: 3.2rem;
-}
-
-:root[data-audience="analyst"] th,
-:root[data-audience="analyst"] td {
-  padding: 0.4rem 0.45rem;
 }
 
 :root[data-audience="guide"] .analyst-only {
@@ -1211,7 +1178,7 @@ input[type="text"] {
 }
 
 .discover-table {
-  min-width: 860px;
+  min-width: 800px;
   table-layout: fixed;
 }
 
@@ -1234,24 +1201,24 @@ input[type="text"] {
 
 .discover-table th.col-vault,
 .discover-table td.col-vault {
-  width: 6.4rem;
+  width: 5.8rem;
 }
 
 .discover-table th.col-chain,
 .discover-table td.col-chain {
-  width: 4.2rem;
+  width: 4rem;
   white-space: nowrap;
 }
 
 .discover-table th.col-token,
 .discover-table td.col-token {
-  width: 4.3rem;
+  width: 4.1rem;
   white-space: nowrap;
 }
 
 .discover-table th.col-category,
 .discover-table td.col-category {
-  width: 4.4rem;
+  width: 4.2rem;
   white-space: nowrap;
 }
 
@@ -1268,27 +1235,27 @@ input[type="text"] {
 .discover-table td.col-momentum,
 .discover-table th.col-consistency,
 .discover-table td.col-consistency {
-  width: 4.9rem;
+  width: 4.7rem;
 }
 
 .discover-table th.col-momentum,
 .discover-table td.col-momentum {
-  width: 5.2rem;
+  width: 5rem;
 }
 
 .discover-table th.col-consistency,
 .discover-table td.col-consistency {
-  width: 5.4rem;
+  width: 5.1rem;
 }
 
 .discover-table th.col-risk,
 .discover-table td.col-risk {
-  width: 7rem;
+  width: 6.4rem;
 }
 
 .discover-table th.col-regime,
 .discover-table td.col-regime {
-  width: 4.8rem;
+  width: 4.4rem;
   white-space: nowrap;
   text-align: right;
 }
@@ -1319,7 +1286,7 @@ input[type="text"] {
 }
 
 .discover-table td.col-vault .vault-link {
-  max-width: 6.2rem;
+  max-width: 5.6rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1349,29 +1316,29 @@ input[type="text"] {
 }
 
 .discover-ridgeline-panel .scatter-wrap svg {
-  min-height: 96px !important;
+  min-height: 84px !important;
   max-width: none;
   margin: 0 auto;
 }
 
 .discover-ridgeline-panel {
-  padding: 0.66rem;
+  padding: 0.6rem;
 }
 
 .ridgeline-label {
   fill: var(--ink-soft);
-  font-size: 8.8px;
+  font-size: 8.2px;
   font-weight: 600;
 }
 
 .ridgeline-note {
   fill: #a9c4ea;
-  font-size: 8.2px;
+  font-size: 7.6px;
 }
 
 .ridgeline-axis {
   fill: #bed6f6;
-  font-size: 8.1px;
+  font-size: 7.5px;
 }
 
 .discover-ridgeline-panel .viz-legend {
@@ -1388,7 +1355,7 @@ input[type="text"] {
 }
 
 .changes-mover-table {
-  min-width: 0;
+  min-width: 740px;
   width: 100%;
   table-layout: fixed;
 }
@@ -1402,24 +1369,24 @@ input[type="text"] {
 
 .changes-mover-table th.col-vault,
 .changes-mover-table td.col-vault {
-  width: 6rem;
+  width: 5.2rem;
 }
 
 .changes-mover-table th.col-chain,
 .changes-mover-table td.col-chain {
-  width: 4.2rem;
+  width: 3.8rem;
   white-space: nowrap;
 }
 
 .changes-mover-table th.col-token,
 .changes-mover-table td.col-token {
-  width: 4.1rem;
+  width: 3.9rem;
   white-space: nowrap;
 }
 
 .changes-mover-table th.col-category,
 .changes-mover-table td.col-category {
-  width: 4.8rem;
+  width: 4.4rem;
   white-space: nowrap;
 }
 
@@ -1431,12 +1398,12 @@ input[type="text"] {
 .changes-mover-table td.col-previous,
 .changes-mover-table th.col-delta,
 .changes-mover-table td.col-delta {
-  width: 5.35rem;
+  width: 4.8rem;
 }
 
 .changes-mover-table th.col-age,
 .changes-mover-table td.col-age {
-  width: 4.6rem;
+  width: 4.2rem;
 }
 
 .changes-mover-table td.col-vault {
@@ -1444,7 +1411,7 @@ input[type="text"] {
 }
 
 .changes-mover-table td.col-vault .vault-link {
-  max-width: 5.8rem;
+  max-width: 5rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1464,66 +1431,66 @@ input[type="text"] {
 }
 
 .changes-stale-table {
-  min-width: 620px;
+  min-width: 580px;
   table-layout: fixed;
 }
 
 .changes-stale-table th:first-child,
 .changes-stale-table td:first-child {
-  width: 12%;
+  width: 14%;
   white-space: nowrap;
 }
 
 .changes-stale-table th:nth-child(2),
 .changes-stale-table td:nth-child(2) {
-  width: 10%;
+  width: 12%;
 }
 
 .changes-stale-table th:nth-child(3),
 .changes-stale-table td:nth-child(3) {
-  width: 10%;
+  width: 12%;
 }
 
 .changes-stale-table th:nth-child(4),
 .changes-stale-table td:nth-child(4) {
-  width: 10%;
+  width: 12%;
 }
 
 .changes-stale-table th:nth-child(5),
 .changes-stale-table td:nth-child(5) {
-  width: 13%;
+  width: 15%;
 }
 
 .changes-stale-table th:nth-child(6),
 .changes-stale-table td:nth-child(6) {
-  width: 13%;
+  width: 15%;
 }
 
 .composition-crowding-table {
-  min-width: 900px;
+  min-width: 780px;
   table-layout: fixed;
 }
 
 .composition-crowding-table th.col-vault,
 .composition-crowding-table td.col-vault {
-  width: 12%;
+  width: 10%;
 }
 
 .composition-crowding-table th.col-chain,
 .composition-crowding-table td.col-chain {
-  width: 8%;
+  width: 7%;
   white-space: nowrap;
 }
 
 .composition-crowding-table th.col-token,
 .composition-crowding-table td.col-token {
-  width: 8%;
+  width: 7%;
   white-space: nowrap;
 }
 
 .composition-crowding-table th.col-category,
 .composition-crowding-table td.col-category {
-  width: 10%;
+  width: 9%;
   white-space: nowrap;
 }
 
@@ -1533,7 +1500,7 @@ input[type="text"] {
 .composition-crowding-table td.col-apy,
 .composition-crowding-table th.col-crowding,
 .composition-crowding-table td.col-crowding {
-  width: 20.66%;
+  width: 22.33%;
 }
 
 .composition-crowding-table td.col-vault {
@@ -1549,18 +1516,18 @@ input[type="text"] {
 }
 
 .assets-venues-table {
-  min-width: 760px;
+  min-width: 700px;
   table-layout: fixed;
 }
 
 .assets-venues-table th.col-vault,
 .assets-venues-table td.col-vault {
-  width: 5.2rem;
+  width: 4.8rem;
 }
 
 .assets-venues-table th.col-chain,
 .assets-venues-table td.col-chain {
-  width: 4.1rem;
+  width: 3.7rem;
   white-space: nowrap;
 }
 
@@ -1568,7 +1535,7 @@ input[type="text"] {
 .assets-venues-table td.col-category,
 .assets-venues-table th.col-regime,
 .assets-venues-table td.col-regime {
-  width: 4.6rem;
+  width: 4.2rem;
   white-space: nowrap;
 }
 
@@ -1580,7 +1547,7 @@ input[type="text"] {
 .assets-venues-table td.col-momentum,
 .assets-venues-table th.col-consistency,
 .assets-venues-table td.col-consistency {
-  width: 5rem;
+  width: 4.6rem;
 }
 
 .assets-venues-table td.col-vault {
@@ -1588,7 +1555,7 @@ input[type="text"] {
 }
 
 .assets-venues-table td.col-vault .vault-link {
-  max-width: 4.8rem;
+  max-width: 4.4rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1602,13 +1569,13 @@ input[type="text"] {
 }
 
 .assets-token-table {
-  min-width: 760px;
+  min-width: 700px;
   table-layout: fixed;
 }
 
 .assets-token-table th.col-token,
 .assets-token-table td.col-token {
-  width: 4.6rem;
+  width: 4.1rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1616,7 +1583,7 @@ input[type="text"] {
 
 .assets-token-table th.col-type,
 .assets-token-table td.col-type {
-  width: 5rem;
+  width: 4.5rem;
   white-space: nowrap;
 }
 
@@ -1632,14 +1599,14 @@ input[type="text"] {
 .assets-token-table td.col-weighted,
 .assets-token-table th.col-spread,
 .assets-token-table td.col-spread {
-  width: 4.7rem;
+  width: 4.3rem;
 }
 
 .assets-token-table th.col-venues,
 .assets-token-table td.col-venues {
-  width: 3.6rem;
-  padding-left: 0.52rem;
-  padding-right: 0.52rem;
+  width: 3.1rem;
+  padding-left: 0.38rem;
+  padding-right: 0.38rem;
   text-align: right;
 }
 
@@ -1648,13 +1615,13 @@ input[type="text"] {
 }
 
 .chains-rollup-table {
-  min-width: 820px;
+  min-width: 700px;
   table-layout: fixed;
 }
 
 .chains-rollup-table th.col-chain,
 .chains-rollup-table td.col-chain {
-  width: 5.2rem;
+  width: 4.6rem;
   white-space: nowrap;
 }
 
@@ -1670,34 +1637,34 @@ input[type="text"] {
 .chains-rollup-table td.col-momentum,
 .chains-rollup-table th.col-consistency,
 .chains-rollup-table td.col-consistency {
-  width: 6.1rem;
+  width: 5.4rem;
 }
 
 .regimes-mover-table {
-  min-width: 900px;
+  min-width: 760px;
   table-layout: fixed;
 }
 
 .regimes-mover-table th.col-vault,
 .regimes-mover-table td.col-vault {
-  width: 10%;
+  width: 5.4rem;
 }
 
 .regimes-mover-table th.col-chain,
 .regimes-mover-table td.col-chain {
-  width: 8%;
+  width: 3.7rem;
   white-space: nowrap;
 }
 
 .regimes-mover-table th.col-token,
 .regimes-mover-table td.col-token {
-  width: 8%;
+  width: 3.8rem;
   white-space: nowrap;
 }
 
 .regimes-mover-table th.col-regime,
 .regimes-mover-table td.col-regime {
-  width: 9%;
+  width: 4.2rem;
   white-space: nowrap;
 }
 
@@ -1707,7 +1674,7 @@ input[type="text"] {
 .regimes-mover-table td.col-apy,
 .regimes-mover-table th.col-momentum,
 .regimes-mover-table td.col-momentum {
-  width: 9.5%;
+  width: 4.8rem;
 }
 
 .regimes-mover-table td.col-vault {
@@ -1846,24 +1813,24 @@ input[type="text"] {
 }
 
 .composition-treemap-panel {
-  margin-top: 0.28rem;
+  margin-top: 0.2rem;
 }
 
 .composition-treemap-viz .scatter-wrap svg {
-  min-height: 72px !important;
+  min-height: 86px !important;
   max-width: none;
   margin: 0 auto;
 }
 
 .treemap-group-label {
   fill: var(--ink-soft);
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 0.01em;
 }
 
 .treemap-cell-label {
   fill: var(--ink);
-  font-size: 9px;
+  font-size: 8.4px;
   pointer-events: none;
 }
 
@@ -1951,7 +1918,7 @@ input[type="text"] {
 }
 
 .composition-main-scatter .scatter-wrap svg {
-  min-height: 170px;
+  min-height: 156px;
 }
 
 .composition-main-scatter {
@@ -2046,7 +2013,7 @@ input[type="text"] {
   gap: 0.72rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  margin-top: 0.62rem;
+  margin-top: 0.74rem;
   grid-template-areas:
     "scatter distribution"
     "scatter category"
@@ -2076,7 +2043,7 @@ input[type="text"] {
 }
 
 .changes-stale-chain-slot {
-  margin-top: 0.3rem;
+  margin-top: 0.12rem;
 }
 
 .changes-main-scatter-slot {
@@ -2141,22 +2108,22 @@ input[type="text"] {
 
 .regimes-mover-table th.col-vault,
 .regimes-mover-table td.col-vault {
-  width: 10%;
+  width: 5.4rem;
 }
 
 .regimes-mover-table th.col-chain,
 .regimes-mover-table td.col-chain {
-  width: 8%;
+  width: 3.7rem;
 }
 
 .regimes-mover-table th.col-token,
 .regimes-mover-table td.col-token {
-  width: 8%;
+  width: 3.8rem;
 }
 
 .regimes-mover-table th.col-regime,
 .regimes-mover-table td.col-regime {
-  width: 9%;
+  width: 4.2rem;
 }
 
 .regimes-mover-table th.col-tvl,
@@ -2165,7 +2132,7 @@ input[type="text"] {
 .regimes-mover-table td.col-apy,
 .regimes-mover-table th.col-momentum,
 .regimes-mover-table td.col-momentum {
-  width: 9.5%;
+  width: 4.8rem;
 }
 
 .chains-rollup-table th.col-active .th-button {
@@ -2173,7 +2140,7 @@ input[type="text"] {
 }
 
 .regime-sankey-panel .scatter-wrap svg {
-  min-height: 126px !important;
+  min-height: 142px !important;
   max-width: none;
   margin: 0 auto;
 }
@@ -2195,18 +2162,18 @@ input[type="text"] {
 
 .sankey-label {
   fill: var(--ink-soft);
-  font-size: 8.8px;
+  font-size: 8.2px;
 }
 
 .sankey-value {
   fill: #c8dcfa;
-  font-size: 8.8px;
+  font-size: 8.2px;
   font-family: var(--font-mono);
 }
 
 .sankey-axis-label {
   fill: #bad3f5;
-  font-size: 9.2px;
+  font-size: 8.8px;
 }
 
 .ridgeline-curve {
@@ -2424,7 +2391,7 @@ input[type="text"] {
 
 .scatter-wrap {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }
@@ -2783,7 +2750,7 @@ input:focus-visible {
   }
 
   .site-nav {
-    padding-top: 0.75rem;
+    padding-top: 0.78rem;
     align-items: flex-start;
     flex-direction: column;
     width: 100%;
@@ -2949,27 +2916,27 @@ input:focus-visible {
   }
 
   .discover-table {
-    min-width: 700px;
+    min-width: 640px;
   }
 
   .discover-table th.col-vault,
   .discover-table td.col-vault {
-    width: 4.1rem;
+    width: 3.6rem;
   }
 
   .discover-table th.col-chain,
   .discover-table td.col-chain {
-    width: 3.4rem;
+    width: 3.1rem;
   }
 
   .discover-table th.col-token,
   .discover-table td.col-token {
-    width: 3.5rem;
+    width: 3.2rem;
   }
 
   .discover-table th.col-category,
   .discover-table td.col-category {
-    width: 3.7rem;
+    width: 3.4rem;
   }
 
   .discover-table th.col-tvl,
@@ -2980,42 +2947,42 @@ input:focus-visible {
   .discover-table td.col-momentum,
   .discover-table th.col-consistency,
   .discover-table td.col-consistency {
-    width: 4.5rem;
+    width: 4.15rem;
   }
 
   .discover-table th.col-momentum,
   .discover-table td.col-momentum {
-    width: 4.6rem;
+    width: 4.2rem;
   }
 
   .discover-table th.col-consistency,
   .discover-table td.col-consistency {
-    width: 4.7rem;
+    width: 4.3rem;
   }
 
   .discover-table th.col-risk,
   .discover-table td.col-risk {
-    width: 5.4rem;
+    width: 4.8rem;
   }
 
   .discover-table th.col-regime,
   .discover-table td.col-regime {
-    width: 4.1rem;
+    width: 3.7rem;
   }
 
   .changes-mover-table {
-    min-width: 820px;
-    table-layout: auto;
+    min-width: 690px;
+    table-layout: fixed;
   }
 
   .changes-mover-table th.col-vault,
   .changes-mover-table td.col-vault {
-    width: 3.7rem;
+    width: 3.3rem;
   }
 
   .changes-mover-table th.col-chain,
   .changes-mover-table td.col-chain {
-    width: 3.3rem;
+    width: 3rem;
   }
 
   .changes-mover-table th.col-tvl,
@@ -3028,12 +2995,12 @@ input:focus-visible {
   .changes-mover-table td.col-delta,
   .changes-mover-table th.col-age,
   .changes-mover-table td.col-age {
-    width: 4.95rem;
+    width: 4.3rem;
   }
 
   .changes-stale-table th:first-child,
   .changes-stale-table td:first-child {
-    width: 10%;
+    width: 12%;
   }
 
   .changes-stale-table th:nth-child(2),
@@ -3042,17 +3009,17 @@ input:focus-visible {
   .changes-stale-table td:nth-child(3),
   .changes-stale-table th:nth-child(4),
   .changes-stale-table td:nth-child(4) {
-    width: 12%;
+    width: 13%;
   }
 
   .changes-stale-table th:nth-child(5),
   .changes-stale-table td:nth-child(5) {
-    width: 16%;
+    width: 14%;
   }
 
   .changes-stale-table th:nth-child(6),
   .changes-stale-table td:nth-child(6) {
-    width: 18%;
+    width: 14%;
   }
 
   .changes-stale-table th:nth-child(2),
@@ -3074,28 +3041,28 @@ input:focus-visible {
 
   .changes-mover-table td.col-vault .vault-link,
   .regimes-mover-table td.col-vault .vault-link {
-    max-width: 3.7rem;
+    max-width: 3.3rem;
   }
 
   .composition-crowding-table {
-    min-width: 680px;
+    min-width: 620px;
   }
 
   .composition-crowding-table th.col-vault,
   .composition-crowding-table td.col-vault {
-    width: 4.2rem;
+    width: 3.6rem;
   }
 
   .composition-crowding-table th.col-chain,
   .composition-crowding-table td.col-chain,
   .composition-crowding-table th.col-token,
   .composition-crowding-table td.col-token {
-    width: 3.4rem;
+    width: 3rem;
   }
 
   .composition-crowding-table th.col-category,
   .composition-crowding-table td.col-category {
-    width: 3.9rem;
+    width: 3.4rem;
   }
 
   .composition-crowding-table th.col-tvl,
@@ -3104,21 +3071,21 @@ input:focus-visible {
   .composition-crowding-table td.col-apy,
   .composition-crowding-table th.col-crowding,
   .composition-crowding-table td.col-crowding {
-    width: 4.35rem;
+    width: 3.95rem;
   }
 
   .assets-venues-table {
-    min-width: 660px;
+    min-width: 600px;
   }
 
   .assets-venues-table th.col-vault,
   .assets-venues-table td.col-vault {
-    width: 4.1rem;
+    width: 3.5rem;
   }
 
   .assets-venues-table th.col-chain,
   .assets-venues-table td.col-chain {
-    width: 3.3rem;
+    width: 3rem;
   }
 
   .assets-venues-table th.col-tvl,
@@ -3129,27 +3096,27 @@ input:focus-visible {
   .assets-venues-table td.col-momentum,
   .assets-venues-table th.col-consistency,
   .assets-venues-table td.col-consistency {
-    width: 4.25rem;
+    width: 3.9rem;
   }
 
   .assets-venues-table th.col-regime,
   .assets-venues-table td.col-regime {
-    width: 3.7rem;
+    width: 3.3rem;
   }
 
   .regimes-mover-table {
-    min-width: 820px;
-    table-layout: auto;
+    min-width: 680px;
+    table-layout: fixed;
   }
 
   .regimes-mover-table th.col-vault,
   .regimes-mover-table td.col-vault {
-    width: 3.8rem;
+    width: 3.3rem;
   }
 
   .regimes-mover-table th.col-chain,
   .regimes-mover-table td.col-chain {
-    width: 3.3rem;
+    width: 3rem;
   }
 
   .regimes-mover-table th.col-tvl,
@@ -3158,42 +3125,42 @@ input:focus-visible {
   .regimes-mover-table td.col-apy,
   .regimes-mover-table th.col-momentum,
   .regimes-mover-table td.col-momentum {
-    width: 4.9rem;
+    width: 4.2rem;
   }
 
   .regimes-mover-table th.col-regime,
   .regimes-mover-table td.col-regime {
-    width: 3.9rem;
+    width: 3.4rem;
   }
 
   .chains-rollup-table th.col-chain,
   .chains-rollup-table td.col-chain {
-    width: 4rem;
+    width: 3.4rem;
   }
 
   .chains-rollup-table th.col-active,
   .chains-rollup-table td.col-active {
-    width: 5.1rem;
+    width: 4.5rem;
   }
 
   .chains-rollup-table th.col-tvl,
   .chains-rollup-table td.col-tvl,
   .chains-rollup-table th.col-apy,
   .chains-rollup-table td.col-apy {
-    width: 5.7rem;
+    width: 4.8rem;
   }
 
   .chains-rollup-table {
-    min-width: 620px;
+    min-width: 560px;
   }
 
   .assets-token-table {
-    min-width: 660px;
+    min-width: 600px;
   }
 
   .assets-token-table th.col-token,
   .assets-token-table td.col-token {
-    width: 3.8rem;
+    width: 3.4rem;
   }
 
   .assets-token-table th.col-type,
@@ -3210,14 +3177,14 @@ input:focus-visible {
   .assets-token-table td.col-weighted,
   .assets-token-table th.col-spread,
   .assets-token-table td.col-spread {
-    width: 4.25rem;
+    width: 3.9rem;
   }
 
   .assets-token-table th.col-venues,
   .assets-token-table td.col-venues {
-    width: 3.2rem;
-    padding-left: 0.32rem;
-    padding-right: 0.32rem;
+    width: 2.9rem;
+    padding-left: 0.28rem;
+    padding-right: 0.28rem;
     text-align: right;
   }
 
@@ -3226,21 +3193,21 @@ input:focus-visible {
   }
 
   .composition-summary-table {
-    min-width: 600px;
+    min-width: 560px;
   }
 
   .composition-summary-table th:nth-child(4),
   .composition-summary-table td:nth-child(4),
   .composition-summary-table th:nth-child(5),
   .composition-summary-table td:nth-child(5) {
-    width: 5.2rem;
+    width: 4.5rem;
     padding-left: 0.42rem;
     padding-right: 0.42rem;
   }
 
   .changes-stale-table,
   .regimes-split-table {
-    min-width: 600px;
+    min-width: 560px;
   }
 
   .assets-universe-card .kpi-grid,
@@ -3275,11 +3242,11 @@ input:focus-visible {
   }
 
   .discover-ridgeline-panel .scatter-wrap svg {
-    min-height: 88px !important;
+    min-height: 78px !important;
   }
 
   .composition-treemap-viz .scatter-wrap svg {
-    min-height: 80px !important;
+    min-height: 92px !important;
   }
 
   .regime-sankey-panel .scatter-wrap svg {
@@ -3944,26 +3911,6 @@ input:focus-visible {
 }
 
 @media (max-width: 1100px) {
-  :root[data-audience="analyst"] .container.home-minimal {
-    gap: 1.7rem;
-  }
-
-  :root[data-audience="analyst"] .home-minimal .card.home-minimal-hero {
-    padding: 1.4rem 1.08rem;
-  }
-
-  :root[data-audience="analyst"] .home-minimal .card.home-minimal-purpose {
-    padding: 1.7rem;
-  }
-
-  :root[data-audience="analyst"] .home-minimal .card.home-live-strip {
-    padding: 1rem 1.1rem;
-  }
-
-  :root[data-audience="analyst"] .home-minimal .card.home-minimal-footer {
-    padding: 1.1rem;
-  }
-
   .home-minimal {
     gap: 1.7rem;
   }
@@ -4017,18 +3964,6 @@ input:focus-visible {
 }
 
 @media (max-width: 700px) {
-  :root[data-audience="analyst"] .home-minimal .card.home-minimal-hero {
-    padding: 1.18rem 0.95rem;
-  }
-
-  :root[data-audience="analyst"] .home-minimal .card.home-minimal-purpose {
-    padding: 1.05rem;
-  }
-
-  :root[data-audience="analyst"] .home-minimal .card.home-live-strip {
-    padding: 0.92rem;
-  }
-
   .home-minimal-hero {
     padding: 1.18rem 0.95rem;
   }
