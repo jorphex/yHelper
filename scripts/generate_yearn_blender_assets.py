@@ -20,6 +20,95 @@ SCENE_OUTPUTS: dict[str, tuple[str, tuple[int, int]]] = {
     "divider": ("divider-yearn-blender-coins.png", (1600, 220)),
 }
 
+CoinColor = tuple[float, float, float, float]
+TokenPose = tuple[tuple[float, float, float], tuple[float, float, float], float, CoinColor]
+
+C0: CoinColor = (0.006, 0.12, 0.62, 1.0)
+C1: CoinColor = (0.005, 0.095, 0.5, 1.0)
+C2: CoinColor = (0.003, 0.07, 0.38, 1.0)
+C3: CoinColor = (0.01, 0.14, 0.7, 1.0)
+C4: CoinColor = (0.008, 0.11, 0.56, 1.0)
+C5: CoinColor = (0.0025, 0.06, 0.33, 1.0)
+C6: CoinColor = (0.011, 0.16, 0.76, 1.0)
+
+HERO_LAYOUTS: dict[str, list[TokenPose]] = {
+    "default": [
+        ((0.34, -0.02, 0.62), (16, -30, 6), 0.98, C0),
+        ((1.22, 0.8, 0.14), (14, 18, -10), 0.78, C1),
+        ((-0.46, 1.0, 0.02), (12, 34, 14), 0.66, C2),
+    ],
+    "arc4": [
+        ((0.18, -0.1, 0.68), (15, -28, 4), 1.02, C0),
+        ((0.78, 0.34, 0.38), (15, -4, -10), 0.86, C4),
+        ((1.26, 0.96, 0.02), (18, 24, -12), 0.62, C1),
+        ((-0.96, 1.06, -0.2), (11, 40, 20), 0.5, C5),
+    ],
+    "stack5": [
+        ((0.06, -0.22, 0.82), (18, -22, 2), 1.08, C3),
+        ((0.72, 0.24, 0.48), (14, -6, -8), 0.9, C0),
+        ((1.18, 0.9, 0.16), (14, 20, -14), 0.7, C1),
+        ((-0.64, 0.86, -0.02), (11, 34, 14), 0.6, C2),
+        ((-1.02, 0.18, -0.32), (10, 44, 24), 0.48, C5),
+    ],
+    "spread6": [
+        ((-0.06, -0.14, 0.76), (16, -24, 4), 1.0, C0),
+        ((0.72, 0.18, 0.52), (15, -12, -8), 0.86, C4),
+        ((1.24, 0.68, 0.24), (15, 12, -10), 0.72, C1),
+        ((-0.56, 1.18, -0.04), (12, 32, 14), 0.54, C2),
+        ((-1.18, 0.66, -0.22), (10, 42, 24), 0.42, C6),
+        ((1.56, 1.24, -0.16), (13, 30, -16), 0.4, C5),
+    ],
+    "field7": [
+        ((0.02, -0.16, 0.84), (17, -24, 4), 1.06, C0),
+        ((0.82, 0.08, 0.58), (14, -10, -8), 0.84, C3),
+        ((1.3, 0.58, 0.32), (14, 8, -10), 0.72, C1),
+        ((1.58, 1.08, 0.04), (14, 24, -14), 0.54, C2),
+        ((-0.62, 0.82, 0.08), (11, 34, 16), 0.54, C5),
+        ((-1.28, 0.52, -0.2), (10, 44, 22), 0.42, C6),
+        ((-0.2, 1.38, -0.28), (11, 30, 12), 0.38, C4),
+    ],
+}
+
+PURPOSE_LAYOUTS: dict[str, list[TokenPose]] = {
+    "default": [
+        ((-0.88, -0.06, 0.34), (16, -26, 2), 0.7, C0),
+        ((0.44, 0.5, 0.12), (13, 14, -10), 0.68, C1),
+        ((-0.94, 0.8, 0.04), (14, 26, 12), 0.6, C2),
+    ],
+    "arc4": [
+        ((-0.9, -0.08, 0.38), (16, -26, 2), 0.74, C0),
+        ((-0.22, 0.08, 0.3), (14, -8, -4), 0.62, C4),
+        ((0.5, 0.48, 0.12), (13, 14, -10), 0.58, C1),
+        ((-0.92, 0.96, -0.12), (15, 32, 16), 0.46, C5),
+    ],
+    "stack5": [
+        ((-0.98, -0.08, 0.4), (18, -24, 0), 0.8, C3),
+        ((-0.42, 0.02, 0.32), (15, -10, -4), 0.7, C0),
+        ((0.14, 0.28, 0.2), (13, 0, -8), 0.62, C4),
+        ((0.62, 0.56, 0.08), (12, 16, -12), 0.56, C1),
+        ((-1.16, 0.98, -0.08), (14, 32, 16), 0.44, C2),
+    ],
+    "spread6": [
+        ((-1.0, -0.08, 0.4), (17, -24, 2), 0.74, C0),
+        ((-0.42, -0.02, 0.34), (15, -14, -2), 0.66, C3),
+        ((0.12, 0.14, 0.26), (14, -4, -8), 0.56, C4),
+        ((0.56, 0.42, 0.14), (13, 12, -10), 0.5, C1),
+        ((-0.86, 0.96, -0.08), (14, 30, 14), 0.44, C2),
+        ((0.94, 0.92, -0.16), (13, 24, -16), 0.38, C5),
+    ],
+    "field7": [
+        ((-1.06, -0.1, 0.42), (17, -24, 2), 0.76, C0),
+        ((-0.56, -0.02, 0.36), (16, -14, -2), 0.68, C6),
+        ((-0.08, 0.1, 0.28), (14, -4, -8), 0.6, C4),
+        ((0.36, 0.28, 0.18), (13, 8, -10), 0.52, C1),
+        ((0.76, 0.58, 0.04), (12, 20, -14), 0.46, C2),
+        ((-0.86, 1.04, -0.1), (14, 34, 16), 0.4, C5),
+        ((1.02, 0.98, -0.2), (12, 28, -18), 0.32, C3),
+    ],
+}
+
+LAYOUT_NAMES = sorted(set(HERO_LAYOUTS) & set(PURPOSE_LAYOUTS))
+
 
 def parse_args() -> argparse.Namespace:
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
@@ -43,6 +132,12 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="hero,purpose,divider",
         help="Comma-separated scene list from: hero,purpose,divider.",
+    )
+    parser.add_argument(
+        "--layout",
+        type=str,
+        default="default",
+        help=f"Coin layout for hero/purpose scenes from: {', '.join(LAYOUT_NAMES)}.",
     )
     return parser.parse_args(argv)
 
@@ -77,6 +172,13 @@ def normalize_scene_selection(raw: str) -> list[str]:
         if item not in ordered_unique:
             ordered_unique.append(item)
     return ordered_unique
+
+
+def normalize_layout(raw: str) -> str:
+    choice = raw.strip().lower()
+    if choice not in LAYOUT_NAMES:
+        raise ValueError(f"Unknown layout '{raw}'. Choose from: {', '.join(LAYOUT_NAMES)}")
+    return choice
 
 
 def clear_scene() -> None:
@@ -584,64 +686,28 @@ def render(path: Path, width: int, height: int) -> None:
     bpy.ops.render.render(write_still=True)
 
 
-def hero_scene(prefab: bpy.types.Object) -> None:
+def apply_token_layout(prefab: bpy.types.Object, prefix: str, poses: list[TokenPose]) -> None:
+    for idx, (location, rotation_deg, scale, color) in enumerate(poses):
+        instance_token(
+            prefab=prefab,
+            name=f"{prefix}{idx + 1}",
+            location=location,
+            rotation_deg=rotation_deg,
+            scale=scale,
+            color=color,
+        )
+
+
+def hero_scene(prefab: bpy.types.Object, layout: str) -> None:
     add_lights()
     set_camera((0.0, -7.2, 2.1), (77, 0, 0), 72)
-
-    instance_token(
-        prefab=prefab,
-        name="HeroA",
-        location=(0.34, -0.02, 0.62),
-        rotation_deg=(16, -30, 6),
-        scale=0.98,
-        color=(0.006, 0.12, 0.62, 1.0),
-    )
-    instance_token(
-        prefab=prefab,
-        name="HeroB",
-        location=(1.22, 0.8, 0.14),
-        rotation_deg=(14, 18, -10),
-        scale=0.78,
-        color=(0.005, 0.095, 0.5, 1.0),
-    )
-    instance_token(
-        prefab=prefab,
-        name="HeroC",
-        location=(-0.46, 1.0, 0.02),
-        rotation_deg=(12, 34, 14),
-        scale=0.66,
-        color=(0.003, 0.07, 0.38, 1.0),
-    )
+    apply_token_layout(prefab, "Hero", HERO_LAYOUTS[layout])
 
 
-def purpose_scene(prefab: bpy.types.Object) -> None:
+def purpose_scene(prefab: bpy.types.Object, layout: str) -> None:
     add_lights()
     set_camera((0.0, -6.1, 1.82), (76, 0, 0), 70)
-
-    instance_token(
-        prefab=prefab,
-        name="PurposeA",
-        location=(-0.88, -0.06, 0.34),
-        rotation_deg=(16, -26, 2),
-        scale=0.7,
-        color=(0.006, 0.12, 0.62, 1.0),
-    )
-    instance_token(
-        prefab=prefab,
-        name="PurposeB",
-        location=(0.44, 0.5, 0.12),
-        rotation_deg=(13, 14, -10),
-        scale=0.68,
-        color=(0.005, 0.095, 0.5, 1.0),
-    )
-    instance_token(
-        prefab=prefab,
-        name="PurposeC",
-        location=(-0.94, 0.8, 0.04),
-        rotation_deg=(14, 26, 12),
-        scale=0.6,
-        color=(0.003, 0.07, 0.38, 1.0),
-    )
+    apply_token_layout(prefab, "Purpose", PURPOSE_LAYOUTS[layout])
 
 
 def divider_scene(prefab: bpy.types.Object) -> None:
@@ -676,16 +742,16 @@ def divider_scene(prefab: bpy.types.Object) -> None:
     )
 
 
-def render_scene(kind: str, out_dir: Path, logo_png: Path) -> None:
+def render_scene(kind: str, out_dir: Path, logo_png: Path, layout: str) -> None:
     out_name, size = SCENE_OUTPUTS[kind]
     clear_scene()
     logo_template = build_logo_plane_template(logo_png)
     prefab = build_token_prefab(logo_template)
 
     if kind == "hero":
-        hero_scene(prefab)
+        hero_scene(prefab, layout=layout)
     elif kind == "purpose":
-        purpose_scene(prefab)
+        purpose_scene(prefab, layout=layout)
     elif kind == "divider":
         divider_scene(prefab)
     else:
@@ -702,13 +768,15 @@ def main() -> None:
     output_dir: Path = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     scenes = normalize_scene_selection(args.scenes)
+    layout = normalize_layout(args.layout)
 
     print(f"Output dir: {output_dir}")
     print(f"Logo PNG:   {logo_png}")
     print(f"Scenes:     {', '.join(scenes)}")
+    print(f"Layout:     {layout}")
 
     for scene_name in scenes:
-        render_scene(scene_name, out_dir=output_dir, logo_png=logo_png)
+        render_scene(scene_name, out_dir=output_dir, logo_png=logo_png, layout=layout)
 
     print("Render complete.")
 

@@ -3662,6 +3662,25 @@ input:focus-visible {
   opacity: 0.95;
 }
 
+@media (min-width: 1200px) {
+  .home-minimal-hero {
+    min-height: 520px;
+    padding: 3rem 2.55rem;
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 1.18fr);
+  }
+
+  .home-minimal-hero-art {
+    min-height: 436px;
+    margin-right: -2.6rem;
+    overflow: visible;
+  }
+
+  .prism-hero-image {
+    object-position: 71% 57%;
+    transform: scale(1.32);
+  }
+}
+
 .home-minimal-break {
   position: relative;
   height: 84px;
@@ -3991,8 +4010,8 @@ input:focus-visible {
   }
 
   .prism-purpose-image {
-    object-position: 53% 50%;
-    transform: scale(1.1);
+    object-position: 46% 50%;
+    transform: scale(1.12);
   }
 
   .home-minimal-signals,
@@ -4008,11 +4027,21 @@ input:focus-visible {
 
 @media (max-width: 700px) {
   .home-minimal-hero {
-    padding: 1.18rem 0.95rem;
+    position: relative;
+    min-height: 372px;
+    padding: 1.38rem 0.95rem 0.92rem;
+    align-items: flex-start;
+  }
+
+  .home-minimal-hero-copy {
+    position: relative;
+    z-index: 2;
+    max-width: 76%;
+    margin-top: 0.34rem;
   }
 
   .home-minimal-hero-copy p {
-    max-width: 38ch;
+    max-width: 27ch;
   }
 
   .home-minimal-break {
@@ -4020,12 +4049,17 @@ input:focus-visible {
   }
 
   .home-minimal-hero-art {
-    min-height: 186px;
+    position: absolute;
+    inset: 4.15rem -1.9rem -1.1rem 34%;
+    z-index: 1;
+    min-height: 0;
+    margin-right: 0;
+    overflow: visible;
   }
 
   .prism-hero-image {
-    object-position: 48% 50%;
-    transform: scale(1.07);
+    object-position: 58% 50%;
+    transform: scale(1.35);
   }
 
   .home-minimal-purpose {
@@ -4037,8 +4071,8 @@ input:focus-visible {
   }
 
   .prism-purpose-image {
-    object-position: 52% 50%;
-    transform: scale(1.12);
+    object-position: 38% 50%;
+    transform: translateX(-4%) scale(1.2);
   }
 
   .home-route-clickable {
@@ -4053,6 +4087,3 @@ input:focus-visible {
     font-size: 0.9rem;
   }
 }
-  .home-minimal-break {
-    height: 72px;
-  }
