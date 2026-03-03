@@ -143,12 +143,12 @@ function RegimeFlowSankey({
       </section>
     );
   }
-  const width = 840;
-  const height = 190;
-  const xLeft = 116;
-  const xRight = width - 116;
-  const laneTop = 38;
-  const laneBottom = height - 22;
+  const width = 700;
+  const height = 224;
+  const xLeft = 90;
+  const xRight = width - 90;
+  const laneTop = 46;
+  const laneBottom = height - 28;
   const laneHeight = laneBottom - laneTop;
   const laneStep = regimes.length > 1 ? laneHeight / (regimes.length - 1) : laneHeight / 2;
   const yPos = new Map(regimes.map((key, index) => [key, laneTop + index * laneStep]));

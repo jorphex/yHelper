@@ -251,12 +251,12 @@ function DiscoverRidgeline({
       </section>
     );
   }
-  const width = 860;
-  const rowH = 17;
-  const chartLeft = 64;
-  const chartRight = 10;
+  const width = 620;
+  const rowH = 26;
+  const chartLeft = 52;
+  const chartRight = 8;
   const chartWidth = width - chartLeft - chartRight;
-  const height = 4 + valid.length * rowH + 7;
+  const height = 8 + valid.length * rowH + 8;
   const bins = 16;
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);
@@ -270,7 +270,7 @@ function DiscoverRidgeline({
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {valid.map((row, idx) => {
             const tone = ridgelinePalette[idx % ridgelinePalette.length];
-            const yBase = 4 + idx * rowH + 9;
+            const yBase = 6 + idx * rowH + 13;
             const counts = new Array<number>(bins).fill(0);
             for (const value of row.values) {
               const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
@@ -280,7 +280,7 @@ function DiscoverRidgeline({
             const pathTop = counts
               .map((count, bIdx) => {
                 const x = chartLeft + (bIdx / (bins - 1)) * chartWidth;
-                const y = yBase - (count / maxCount) * 5.8;
+                const y = yBase - (count / maxCount) * 8;
                 return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
               })
               .join(" ");

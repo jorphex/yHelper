@@ -591,25 +591,25 @@ def hero_scene(prefab: bpy.types.Object) -> None:
     instance_token(
         prefab=prefab,
         name="HeroA",
-        location=(0.7, -0.08, 0.42),
+        location=(0.34, -0.02, 0.62),
         rotation_deg=(16, -30, 6),
-        scale=1.02,
+        scale=0.98,
         color=(0.006, 0.12, 0.62, 1.0),
     )
     instance_token(
         prefab=prefab,
         name="HeroB",
-        location=(1.95, 0.8, -0.2),
+        location=(1.22, 0.8, 0.14),
         rotation_deg=(14, 18, -10),
-        scale=0.82,
+        scale=0.78,
         color=(0.005, 0.095, 0.5, 1.0),
     )
     instance_token(
         prefab=prefab,
         name="HeroC",
-        location=(-0.12, 1.0, -0.4),
+        location=(-0.46, 1.0, 0.02),
         rotation_deg=(12, 34, 14),
-        scale=0.7,
+        scale=0.66,
         color=(0.003, 0.07, 0.38, 1.0),
     )
 
@@ -621,15 +621,15 @@ def purpose_scene(prefab: bpy.types.Object) -> None:
     instance_token(
         prefab=prefab,
         name="PurposeA",
-        location=(-0.94, -0.14, 0.24),
+        location=(-0.88, -0.06, 0.34),
         rotation_deg=(16, -26, 2),
-        scale=0.68,
+        scale=0.7,
         color=(0.006, 0.12, 0.62, 1.0),
     )
     instance_token(
         prefab=prefab,
         name="PurposeB",
-        location=(0.56, 0.56, -0.12),
+        location=(0.44, 0.5, 0.12),
         rotation_deg=(13, 14, -10),
         scale=0.68,
         color=(0.005, 0.095, 0.5, 1.0),
@@ -637,9 +637,9 @@ def purpose_scene(prefab: bpy.types.Object) -> None:
     instance_token(
         prefab=prefab,
         name="PurposeC",
-        location=(-0.98, 0.86, -0.34),
+        location=(-0.94, 0.8, 0.04),
         rotation_deg=(14, 26, 12),
-        scale=0.62,
+        scale=0.6,
         color=(0.003, 0.07, 0.38, 1.0),
     )
 
@@ -648,30 +648,30 @@ def divider_scene(prefab: bpy.types.Object) -> None:
     add_lights()
     cam = set_camera((0.0, -6.8, 2.2), (72, 0, 0), 70)
     cam.data.type = "ORTHO"
-    cam.data.ortho_scale = 7.2
+    cam.data.ortho_scale = 7.8
 
     instance_token(
         prefab=prefab,
         name="DividerA",
-        location=(-2.4, 0.0, -0.22),
+        location=(-2.4, 0.0, -0.08),
         rotation_deg=(22, -14, -14),
-        scale=0.42,
+        scale=0.37,
         color=(0.005, 0.095, 0.5, 1.0),
     )
     instance_token(
         prefab=prefab,
         name="DividerB",
-        location=(0.0, 0.02, -0.24),
+        location=(0.0, 0.02, -0.08),
         rotation_deg=(16, 10, 0),
-        scale=0.43,
+        scale=0.38,
         color=(0.0055, 0.102, 0.53, 1.0),
     )
     instance_token(
         prefab=prefab,
         name="DividerC",
-        location=(2.4, 0.0, -0.22),
+        location=(2.4, 0.0, -0.08),
         rotation_deg=(22, 14, 14),
-        scale=0.42,
+        scale=0.37,
         color=(0.005, 0.095, 0.5, 1.0),
     )
 

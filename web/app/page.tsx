@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatHours, formatPct, formatUsd } from "./lib/format";
@@ -156,14 +157,40 @@ export default function HomePage() {
           </div>
         </div>
         <div className="home-minimal-hero-art" aria-hidden="true">
-          <span className="prism-hero-scene" />
+          <Image
+            src="/home-assets-yearn-blender/hero-yearn-blender-coins.png"
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 1100px) 100vw, 46vw"
+            className="home-art-image prism-hero-image"
+            draggable={false}
+          />
         </div>
       </section>
 
-      <div className="home-minimal-break prism-divider" aria-hidden="true" />
+      <div className="home-minimal-break prism-divider" aria-hidden="true">
+        <Image
+          src="/home-assets-yearn-blender/divider-yearn-blender-coins.png"
+          alt=""
+          fill
+          sizes="100vw"
+          className="home-divider-image"
+          draggable={false}
+        />
+      </div>
 
       <section className="card home-minimal-purpose home-reveal">
-        <div className="home-minimal-purpose-art prism-purpose-art" aria-hidden="true" />
+        <div className="home-minimal-purpose-art prism-purpose-art" aria-hidden="true">
+          <Image
+            src="/home-assets-yearn-blender/purpose-yearn-blender-coins.png"
+            alt=""
+            fill
+            sizes="(max-width: 1100px) 100vw, 32vw"
+            className="home-art-image prism-purpose-image"
+            draggable={false}
+          />
+        </div>
         <div className="home-minimal-purpose-content">
           <article className="home-minimal-step step-a">
             <p className="home-minimal-step-index">01</p>
@@ -177,13 +204,22 @@ export default function HomePage() {
           </article>
           <article className="home-minimal-step step-c">
             <p className="home-minimal-step-index">03</p>
-            <h2>How To Use It</h2>
+            <h2>How To Use</h2>
             <p className="muted">Discover for scan. Changes for timing. Composition and Regimes for context.</p>
           </article>
         </div>
       </section>
 
-      <div className="home-minimal-break home-minimal-break-soft prism-divider prism-divider-alt" aria-hidden="true" />
+      <div className="home-minimal-break home-minimal-break-soft prism-divider prism-divider-alt" aria-hidden="true">
+        <Image
+          src="/home-assets-yearn-blender/divider-yearn-blender-coins.png"
+          alt=""
+          fill
+          sizes="100vw"
+          className="home-divider-image"
+          draggable={false}
+        />
+      </div>
 
       <section className="home-minimal-signals">
         <article className="card home-sparse-signal-card home-reveal">
