@@ -25,7 +25,9 @@ export function NavLinks() {
       const active = container.querySelector<HTMLAnchorElement>("a.is-active");
       if (!active) return;
       container.style.setProperty("--nav-active-x", `${active.offsetLeft}px`);
+      container.style.setProperty("--nav-active-y", `${active.offsetTop}px`);
       container.style.setProperty("--nav-active-w", `${active.offsetWidth}px`);
+      container.style.setProperty("--nav-active-h", `${active.offsetHeight}px`);
       container.dataset.ready = "true";
     };
     updateIndicator();

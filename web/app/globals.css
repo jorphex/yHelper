@@ -206,7 +206,7 @@ body::after {
 .site-nav {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0.95rem 1rem 0.8rem;
+  padding: 0.95rem 1rem 0.88rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -227,14 +227,16 @@ body::after {
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
+  align-items: flex-start;
+  padding: 0.04rem 0 0.06rem;
 }
 
 .site-nav-links::before {
   content: "";
   position: absolute;
-  top: 0;
+  top: var(--nav-active-y, 0px);
   left: 0;
-  height: 100%;
+  height: var(--nav-active-h, 0px);
   width: var(--nav-active-w, 0px);
   transform: translateX(var(--nav-active-x, 0px)) scale(1);
   border: 1px solid var(--accent-2);
@@ -3607,9 +3609,10 @@ input:focus-visible {
   min-height: 430px;
   padding: 2.8rem 2.2rem;
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(220px, 0.92fr);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 1fr);
   gap: 1.8rem;
   align-items: center;
+  overflow: clip;
 }
 
 .home-minimal-hero-copy {
@@ -3642,12 +3645,13 @@ input:focus-visible {
 .home-minimal-hero-art {
   position: relative;
   min-height: 260px;
+  margin-right: -0.38rem;
 }
 
 .prism-hero-scene {
   position: absolute;
-  inset: 0;
-  background: url("/home-assets-yearn-blender/hero-yearn-blender-coins.png") right center / contain no-repeat;
+  inset: -6% -11% -5% 0;
+  background: url("/home-assets-yearn-blender/hero-yearn-blender-coins.png") right 52% / 116% auto no-repeat;
   opacity: 0.95;
 }
 
@@ -3674,7 +3678,13 @@ input:focus-visible {
 }
 
 .prism-divider {
-  background: url("/home-assets-yearn-blender/divider-yearn-blender-coins.png") center / contain no-repeat;
+  background: url("/home-assets-yearn-blender/divider-yearn-blender-coins.png") center / 132% 100% no-repeat;
+}
+
+.prism-divider-alt {
+  background-position: 56% center;
+  background-size: 148% 100%;
+  transform: scaleX(-1);
 }
 
 .home-minimal-purpose {
@@ -3700,8 +3710,8 @@ input:focus-visible {
   background: rgba(11, 27, 62, 0.42);
   background-image: url("/home-assets-yearn-blender/purpose-yearn-blender-coins.png");
   background-repeat: no-repeat;
-  background-size: contain;
-  background-position: center;
+  background-size: 108% auto;
+  background-position: 59% 52%;
   min-height: 210px;
 }
 
@@ -3938,6 +3948,22 @@ input:focus-visible {
     gap: 1.7rem;
   }
 
+  :root[data-audience="analyst"] .home-minimal .card.home-minimal-hero {
+    padding: 1.4rem 1.08rem;
+  }
+
+  :root[data-audience="analyst"] .home-minimal .card.home-minimal-purpose {
+    padding: 1.7rem;
+  }
+
+  :root[data-audience="analyst"] .home-minimal .card.home-live-strip {
+    padding: 1rem 1.1rem;
+  }
+
+  :root[data-audience="analyst"] .home-minimal .card.home-minimal-footer {
+    padding: 1.1rem;
+  }
+
   .home-minimal {
     gap: 1.7rem;
   }
@@ -3955,11 +3981,13 @@ input:focus-visible {
 
   .home-minimal-hero-art {
     min-height: 150px;
+    margin-right: 0;
   }
 
   .prism-hero-scene {
-    background-size: contain;
-    background-position: right center;
+    inset: -6% -7% -3% 0;
+    background-size: 109% auto;
+    background-position: right 56%;
   }
 
   .home-minimal-purpose {
@@ -3972,7 +4000,9 @@ input:focus-visible {
   }
 
   .home-minimal-purpose-art.prism-purpose-art {
-    min-height: 180px;
+    min-height: 182px;
+    background-size: 104% auto;
+    background-position: 57% 52%;
   }
 
   .home-minimal-signals,
@@ -3987,6 +4017,18 @@ input:focus-visible {
 }
 
 @media (max-width: 700px) {
+  :root[data-audience="analyst"] .home-minimal .card.home-minimal-hero {
+    padding: 1.18rem 0.95rem;
+  }
+
+  :root[data-audience="analyst"] .home-minimal .card.home-minimal-purpose {
+    padding: 1.05rem;
+  }
+
+  :root[data-audience="analyst"] .home-minimal .card.home-live-strip {
+    padding: 0.92rem;
+  }
+
   .home-minimal-hero {
     padding: 1.18rem 0.95rem;
   }
@@ -4004,7 +4046,9 @@ input:focus-visible {
   }
 
   .home-minimal-purpose-art.prism-purpose-art {
-    min-height: 150px;
+    min-height: 154px;
+    background-size: 104% auto;
+    background-position: 57% 50%;
   }
 
   .home-route-clickable {

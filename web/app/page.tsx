@@ -59,22 +59,22 @@ function liveSummary(
 ): string {
   const parts: string[] = [];
   if (topRiser) {
-    const moverParts: string[] = [`Top mover ${moverTitle(topRiser)}`];
+    const moverParts: string[] = [`Top 24h delta vault ${moverTitle(topRiser)}:`];
     if (Number.isFinite(topRiser.safe_apy_30d ?? null)) {
-      moverParts.push(`APY 30d ${formatPct(topRiser.safe_apy_30d ?? null, 2)}`);
+      moverParts.push(`APY 30d ${formatPct(topRiser.safe_apy_30d ?? null, 2)},`);
     }
     if (Number.isFinite(topRiser.delta_apy ?? null)) {
       moverParts.push(`24h delta ${pctDelta(topRiser.delta_apy, 2)}`);
     }
     parts.push(moverParts.join(" "));
   } else {
-    parts.push("Top mover syncing");
+    parts.push("Top 24h delta vault syncing");
   }
   if (Number.isFinite(avgDeltaApy ?? null)) {
-    parts.push(`Avg 24h delta ${pctDelta(avgDeltaApy, 2)}`);
+    parts.push(`Universe avg 24h delta ${pctDelta(avgDeltaApy, 2)}`);
   }
   if (Number.isFinite(eligibleVaults ?? null)) {
-    parts.push(`${eligibleVaults} vaults tracked`);
+    parts.push(`${eligibleVaults} vaults in universe`);
   }
   return parts.join(" | ");
 }
@@ -183,7 +183,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="home-minimal-break home-minimal-break-soft prism-divider" aria-hidden="true" />
+      <div className="home-minimal-break home-minimal-break-soft prism-divider prism-divider-alt" aria-hidden="true" />
 
       <section className="home-minimal-signals">
         <article className="card home-sparse-signal-card home-reveal">
