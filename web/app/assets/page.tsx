@@ -444,18 +444,20 @@ function AssetsPageContent() {
               },
             ]}
           />
-          <BarList
-            title="Top Tokens by TVL"
-            items={topTokenByTvl.map((row) => ({
-              id: row.token_symbol,
-              label: row.token_symbol,
-              value: row.total_tvl_usd,
-              note: `Spread ${formatPct(row.spread_safe_apy_30d)}`,
-            }))}
-            valueFormatter={(value) => formatUsd(value)}
-          />
+          <div className="analyst-only">
+            <BarList
+              title="Top Tokens by TVL"
+              items={topTokenByTvl.map((row) => ({
+                id: row.token_symbol,
+                label: row.token_symbol,
+                value: row.total_tvl_usd,
+                note: `Spread ${formatPct(row.spread_safe_apy_30d)}`,
+              }))}
+              valueFormatter={(value) => formatUsd(value)}
+            />
+          </div>
         </div>
-        <section className="assets-spread-cards">
+        <section className="assets-spread-cards analyst-only">
           <h3>Token Spread Cards</h3>
           <div className="assets-spread-card-grid">
             {tokenSpreadCards.map((row) => {

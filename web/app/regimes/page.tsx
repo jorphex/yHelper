@@ -143,12 +143,12 @@ function RegimeFlowSankey({
       </section>
     );
   }
-  const width = 700;
-  const height = 224;
-  const xLeft = 90;
-  const xRight = width - 90;
-  const laneTop = 46;
-  const laneBottom = height - 28;
+  const width = 780;
+  const height = 244;
+  const xLeft = 124;
+  const xRight = width - 124;
+  const laneTop = 56;
+  const laneBottom = height - 34;
   const laneHeight = laneBottom - laneTop;
   const laneStep = regimes.length > 1 ? laneHeight / (regimes.length - 1) : laneHeight / 2;
   const yPos = new Map(regimes.map((key, index) => [key, laneTop + index * laneStep]));
@@ -206,17 +206,17 @@ function RegimeFlowSankey({
             const stroke = `rgba(${Math.min(255, r + 36)}, ${Math.min(255, g + 36)}, ${Math.min(255, b + 36)}, 0.78)`;
             return (
               <g key={`left-${regime}`}>
-                <rect x={8} y={y - 11} width={102} height={24} rx={6} fill={fill} stroke={stroke} />
-                <text x={13} y={y + 3} className="sankey-label">{compactRegimeLabel(regime)}</text>
-                <text x={104} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(outValue)}</text>
-                <rect x={width - 110} y={y - 11} width={102} height={24} rx={6} fill={fill} stroke={stroke} />
-                <text x={width - 105} y={y + 3} className="sankey-label">{compactRegimeLabel(regime)}</text>
-                <text x={width - 13} y={y + 8} className="sankey-value" textAnchor="end">{formatUsdCompact(inValue)}</text>
+                <rect x={8} y={y - 13} width={114} height={26} rx={6} fill={fill} stroke={stroke} />
+                <text x={14} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
+                <text x={116} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(outValue)}</text>
+                <rect x={width - 122} y={y - 13} width={114} height={26} rx={6} fill={fill} stroke={stroke} />
+                <text x={width - 116} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
+                <text x={width - 14} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(inValue)}</text>
               </g>
             );
           })}
-          <text x={8} y={11} className="sankey-axis-label">Previous Regime</text>
-          <text x={width - 8} y={11} className="sankey-axis-label" textAnchor="end">Current Regime</text>
+          <text x={8} y={18} className="sankey-axis-label">Previous Regime</text>
+          <text x={width - 8} y={18} className="sankey-axis-label" textAnchor="end">Current Regime</text>
         </svg>
       </div>
       <p className="muted viz-legend">Stroke width scales by transitioned TVL; labels show total outgoing vs incoming TVL per regime.</p>
@@ -738,7 +738,7 @@ function RegimesPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card analyst-only">
         <h2>{`Regime Transition Trend (Last ${query.transitionDays} Days)`}</h2>
         <p className="muted card-intro">
           Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.

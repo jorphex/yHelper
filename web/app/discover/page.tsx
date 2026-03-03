@@ -251,12 +251,14 @@ function DiscoverRidgeline({
       </section>
     );
   }
-  const width = 620;
-  const rowH = 26;
-  const chartLeft = 52;
-  const chartRight = 8;
-  const chartWidth = width - chartLeft - chartRight;
-  const height = 8 + valid.length * rowH + 8;
+  const width = 760;
+  const rowH = 30;
+  const maxLabelChars = valid.reduce((acc, row) => Math.max(acc, row.label.length), 0);
+  const maxNoteChars = valid.reduce((acc, row) => Math.max(acc, row.note.length), 0);
+  const chartLeft = Math.max(96, Math.min(184, 18 + maxLabelChars * 7.2));
+  const chartRight = Math.max(110, Math.min(214, 20 + maxNoteChars * 7.2));
+  const chartWidth = Math.max(220, width - chartLeft - chartRight);
+  const height = 10 + valid.length * rowH + 18;
   const bins = 16;
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);
@@ -270,7 +272,7 @@ function DiscoverRidgeline({
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {valid.map((row, idx) => {
             const tone = ridgelinePalette[idx % ridgelinePalette.length];
-            const yBase = 6 + idx * rowH + 13;
+            const yBase = 10 + idx * rowH + 14;
             const counts = new Array<number>(bins).fill(0);
             for (const value of row.values) {
               const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
@@ -280,7 +282,7 @@ function DiscoverRidgeline({
             const pathTop = counts
               .map((count, bIdx) => {
                 const x = chartLeft + (bIdx / (bins - 1)) * chartWidth;
-                const y = yBase - (count / maxCount) * 8;
+                const y = yBase - (count / maxCount) * 10;
                 return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
               })
               .join(" ");
@@ -295,14 +297,14 @@ function DiscoverRidgeline({
               <g key={row.id}>
                 <title>{`${row.label}\n${row.note}\nAPY range ${formatPct(min, 1)} to ${formatPct(max, 1)}`}</title>
                 <path d={`${pathTop} ${pathBottom} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth={0.9} className="ridgeline-curve" />
-                <text x={4} y={yBase - 1} className="ridgeline-label" dominantBaseline="central">{row.label}</text>
-                <text x={width - 4} y={yBase - 1} className="ridgeline-note" textAnchor="end" dominantBaseline="central">{row.note}</text>
+                <text x={8} y={yBase - 0.5} className="ridgeline-label" dominantBaseline="central">{row.label}</text>
+                <text x={width - 8} y={yBase - 0.5} className="ridgeline-note" textAnchor="end" dominantBaseline="central">{row.note}</text>
               </g>
             );
           })}
-          <line x1={chartLeft} x2={width - chartRight} y1={height - 8} y2={height - 8} className="viz-axis" />
-          <text x={chartLeft} y={height - 1} className="ridgeline-axis">{formatPct(min, 1)}</text>
-          <text x={width - chartRight} y={height - 1} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
+          <line x1={chartLeft} x2={width - chartRight} y1={height - 12} y2={height - 12} className="viz-axis" />
+          <text x={chartLeft} y={height - 2} className="ridgeline-axis">{formatPct(min, 1)}</text>
+          <text x={width - chartRight} y={height - 2} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
         </svg>
       </div>
       <p className="muted viz-legend">Ridgelines show APY shape by chain. Taller peaks mean more vaults at that APY zone.</p>
@@ -866,7 +868,7 @@ function DiscoverPageContent() {
             ]}
           />
           </div>
-          <div className="discover-mix-grid">
+          <div className="discover-mix-grid analyst-only">
             <BarList
               title="APY Bucket Count"
               items={[
@@ -945,7 +947,7 @@ function DiscoverPageContent() {
               emptyText="No chain momentum values for this filter yet."
             />
           </div>
-          <div className="discover-trend-card">
+          <div className="discover-trend-card analyst-only">
             <TrendStrips
               title="APY Bucket Drift (Last 60 Days)"
               items={apyBucketTrendItems}
@@ -954,7 +956,7 @@ function DiscoverPageContent() {
               emptyText="Trend rows unavailable for this filter."
             />
           </div>
-          <div className="discover-trend-card">
+          <div className="discover-trend-card analyst-only">
             <TrendStrips
               title={
                 query.trendGroup === "none"
@@ -1033,9 +1035,9 @@ function DiscoverPageContent() {
                   <td className="tablet-hide analyst-only col-risk">
                     {riskLevelLabel(row.risk_level)}
                     {row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}
-                    {row.migration_available ? " · Migration" : ""}
-                    {row.is_highlighted ? " · Highlighted" : ""}
-                    {row.is_retired ? " · Retired" : ""}
+                    {row.migration_available ? " · Migr" : ""}
+                    {row.is_highlighted ? " · High" : ""}
+                    {row.is_retired ? " · Ret" : ""}
                   </td>
                   <td className="analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
                 </tr>

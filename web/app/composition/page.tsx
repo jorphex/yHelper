@@ -79,8 +79,8 @@ function TvlTreemap({
   tokens: BreakdownRow[];
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
-  const width = 900;
-  const height = 84;
+  const width = 980;
+  const height = 126;
   const topChains = [...chains]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
@@ -107,8 +107,8 @@ function TvlTreemap({
       </section>
     );
   }
-  const laneGap = 4;
-  const laneHeight = (height - 8 - (validGroups.length - 1) * laneGap) / validGroups.length;
+  const laneGap = 7;
+  const laneHeight = (height - 12 - (validGroups.length - 1) * laneGap) / validGroups.length;
 
   return (
     <section ref={ref} className={`viz-panel composition-treemap-viz ${isInView ? "is-in-view" : ""}`.trim()}>
@@ -116,10 +116,10 @@ function TvlTreemap({
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {validGroups.map((group, groupIndex) => {
-            const y = 4 + groupIndex * (laneHeight + laneGap);
+            const y = 6 + groupIndex * (laneHeight + laneGap);
             const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
-            const labelOffset = 36;
-            const laneWidth = width - labelOffset - 2;
+            const labelOffset = 72;
+            const laneWidth = width - labelOffset - 8;
             const scaledWidths = group.rows.map((row) => {
               const value = Number(row.tvl_usd ?? 0);
               return total > 0 ? (value / total) * laneWidth : 0;
@@ -127,7 +127,7 @@ function TvlTreemap({
             let x = 0;
             return (
               <g key={group.key} className={`treemap-group treemap-group-${group.key}`}>
-                <text x={0} y={y + laneHeight / 2 + 0.5} className="treemap-group-label" dominantBaseline="central">
+                <text x={2} y={y + laneHeight / 2 + 0.5} className="treemap-group-label" dominantBaseline="central">
                   {group.label}
                 </text>
                 {group.rows.map((row, rowIndex) => {
@@ -136,7 +136,7 @@ function TvlTreemap({
                   const rectX = labelOffset + x;
                   x += w;
                   const name = group.text(row);
-                  const maxChars = Math.max(0, Math.floor((w - 8) / 5.3));
+                  const maxChars = Math.max(0, Math.floor((w - 10) / 6.2));
                   const compactName = maxChars > 0 ? (name.length > maxChars ? `${name.slice(0, Math.max(2, maxChars - 1))}…` : name) : "";
                   return (
                     <g key={`${group.key}-${name}`} className="treemap-cell">
@@ -151,8 +151,8 @@ function TvlTreemap({
                         className="treemap-cell-rect"
                         style={{ "--treemap-delay": `${Math.min(rowIndex, 10) * 0.02}s` } as CSSProperties}
                       />
-                      {w >= 44 && compactName ? (
-                        <text x={rectX + 4} y={y + Math.min(12, laneHeight - 4)} className="treemap-cell-label">
+                      {w >= 58 && compactName ? (
+                        <text x={rectX + 5} y={y + Math.min(16, laneHeight - 6)} className="treemap-cell-label">
                           {compactName}
                         </text>
                       ) : null}
@@ -476,7 +476,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card analyst-only">
         <h2>Crowding Visuals</h2>
         <p className="muted card-intro">
           Scatter highlights APY versus size, while the heatmap shows where TVL share is concentrated in this filtered universe.

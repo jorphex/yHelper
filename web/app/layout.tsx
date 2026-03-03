@@ -44,7 +44,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-audience="guide">
       <body>
         <ChunkRecovery />
         <a className="skip-link" href="#main-content">

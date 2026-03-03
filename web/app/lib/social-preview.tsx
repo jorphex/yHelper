@@ -184,15 +184,15 @@ export async function renderSocialPreviewImage({
   const topCards = [
     {
       key: "tracked-tvl",
-      label: "Tracked TVL (Active)",
+      label: "Tracked TVL",
       value: formatUsdCompact(stats.trackedTvlActiveUsd),
     },
     {
       key: "highest-apy",
-      label: "Highest APY Vault (30d)",
+      label: "Highest APY Vault",
       value: shortLabel(stats.highestApyVault?.name ?? null, 24),
       note: stats.highestApyVault
-        ? `${chainLabel(stats.highestApyVault.chainId)} • TVL ${formatUsdCompact(stats.highestApyVault.tvlUsd)} • APY ${formatPctCompact(stats.highestApyVault.apy30d, 1)}`
+        ? `${chainLabel(stats.highestApyVault.chainId)} • APY ${formatPctCompact(stats.highestApyVault.apy30d, 1)} • TVL ${formatUsdCompact(stats.highestApyVault.tvlUsd)}`
         : "No active vault with APY metrics.",
     },
   ];

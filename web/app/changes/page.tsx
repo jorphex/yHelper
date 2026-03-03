@@ -802,7 +802,7 @@ function ChangesPageContent() {
         />
       </section>
 
-      <section className="card changes-visuals-card">
+      <section className="card changes-visuals-card analyst-only">
         <h2>Delta Visuals and Freshness Heatmaps</h2>
         <p className="muted card-intro">
           Delta bands use percentage points (for example, +2.0 means APY rose by two points versus the previous window).

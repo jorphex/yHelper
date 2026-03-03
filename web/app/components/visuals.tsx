@@ -445,20 +445,6 @@ export function ScatterPlot({
           />
           <line x1={paddingLeft} x2={width - paddingRight} y1={height - paddingBottom} y2={height - paddingBottom} className="viz-axis" />
           <line x1={paddingLeft} x2={paddingLeft} y1={paddingTop} y2={height - paddingBottom} className="viz-axis" />
-          <line
-            x1={paddingLeft}
-            x2={width - paddingRight}
-            y1={paddingTop + (1 - normalize(yMid, yMin, yMax)) * innerHeight}
-            y2={paddingTop + (1 - normalize(yMid, yMin, yMax)) * innerHeight}
-            className="viz-axis viz-axis-mid"
-          />
-          <line
-            x1={paddingLeft + normalize(xMid, xMin, xMax) * innerWidth}
-            x2={paddingLeft + normalize(xMid, xMin, xMax) * innerWidth}
-            y1={paddingTop}
-            y2={height - paddingBottom}
-            className="viz-axis viz-axis-mid"
-          />
           {valid.map((point, index) => {
             const x = Number(point.x);
             const y = Number(point.y);

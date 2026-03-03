@@ -204,7 +204,7 @@ export default function HomePage() {
           </article>
           <article className="home-minimal-step step-c">
             <p className="home-minimal-step-index">03</p>
-            <h2>How To Use</h2>
+            <h2>How to use</h2>
             <p className="muted">Discover for scan. Changes for timing. Composition and Regimes for context.</p>
           </article>
         </div>
