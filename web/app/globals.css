@@ -1707,6 +1707,55 @@ input[type="text"] {
   width: 30%;
 }
 
+:root[data-audience="guide"] .discover-table th.col-token,
+:root[data-audience="guide"] .discover-table td.col-token,
+:root[data-audience="guide"] .discover-table th.col-chain,
+:root[data-audience="guide"] .discover-table td.col-chain,
+:root[data-audience="guide"] .discover-table th.col-momentum,
+:root[data-audience="guide"] .discover-table td.col-momentum,
+:root[data-audience="guide"] .assets-token-table th.col-type,
+:root[data-audience="guide"] .assets-token-table td.col-type,
+:root[data-audience="guide"] .assets-token-table th.col-spread,
+:root[data-audience="guide"] .assets-token-table td.col-spread,
+:root[data-audience="guide"] .assets-venues-table th.col-momentum,
+:root[data-audience="guide"] .assets-venues-table td.col-momentum,
+:root[data-audience="guide"] .composition-crowding-table th.col-token,
+:root[data-audience="guide"] .composition-crowding-table td.col-token,
+:root[data-audience="guide"] .composition-crowding-table th.col-category,
+:root[data-audience="guide"] .composition-crowding-table td.col-category,
+:root[data-audience="guide"] .changes-mover-table th.col-chain,
+:root[data-audience="guide"] .changes-mover-table td.col-chain,
+:root[data-audience="guide"] .changes-mover-table th.col-age,
+:root[data-audience="guide"] .changes-mover-table td.col-age,
+:root[data-audience="guide"] .regimes-mover-table th.col-chain,
+:root[data-audience="guide"] .regimes-mover-table td.col-chain,
+:root[data-audience="guide"] .chains-rollup-table th.col-active,
+:root[data-audience="guide"] .chains-rollup-table td.col-active,
+:root[data-audience="guide"] .chains-rollup-table th.col-momentum,
+:root[data-audience="guide"] .chains-rollup-table td.col-momentum {
+  display: none;
+}
+
+:root[data-audience="guide"] .composition-summary-table th:nth-child(5),
+:root[data-audience="guide"] .composition-summary-table td:nth-child(5),
+:root[data-audience="guide"] .changes-stale-table th:nth-child(3),
+:root[data-audience="guide"] .changes-stale-table td:nth-child(3) {
+  display: none;
+}
+
+:root[data-audience="guide"] .discover-table,
+:root[data-audience="guide"] .assets-token-table,
+:root[data-audience="guide"] .assets-venues-table,
+:root[data-audience="guide"] .composition-summary-table,
+:root[data-audience="guide"] .composition-crowding-table,
+:root[data-audience="guide"] .changes-mover-table,
+:root[data-audience="guide"] .changes-stale-table,
+:root[data-audience="guide"] .regimes-mover-table,
+:root[data-audience="guide"] .chains-rollup-table {
+  width: 100%;
+  min-width: 100%;
+}
+
 .assets-universe-card .kpi-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -2972,11 +3021,6 @@ input:focus-visible {
   .discover-table th.col-regime,
   .discover-table td.col-regime {
     width: 3.1rem;
-  }
-
-  :root[data-audience="guide"] .discover-table th.col-token,
-  :root[data-audience="guide"] .discover-table td.col-token {
-    display: none;
   }
 
   .changes-mover-table {

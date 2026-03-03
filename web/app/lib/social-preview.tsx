@@ -292,7 +292,7 @@ export async function renderSocialPreviewImage({
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
               <div style={{ fontSize: 27, color: "#d5e6ff", maxWidth: 960 }}>
-                Track vault opportunities, yield shifts, and protocol structure in one dashboard.
+                Track yield shifts, spot vault trends, and find your next move.
               </div>
             </div>
           </div>
@@ -316,7 +316,14 @@ export async function renderSocialPreviewImage({
         </div>
       </div>
     ),
-    { width, height, fonts },
+    {
+      width,
+      height,
+      fonts,
+      headers: {
+        "cache-control": "no-store, max-age=0, must-revalidate",
+      },
+    },
   );
 }
 

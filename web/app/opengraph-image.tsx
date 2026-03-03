@@ -2,14 +2,14 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { renderSocialPreviewImage } from "./lib/social-preview";
 
-const IMAGE_VERSION = "20260301w";
+const IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260303b";
 export const alt = `yHelper dashboard preview ${IMAGE_VERSION}`;
 export const size = {
   width: 1200,
   height: 630,
 };
 export const contentType = "image/png";
-export const revalidate = 300;
+export const revalidate = 0;
 
 export default async function OpenGraphImage() {
   const [aeonikRegular, aeonikBold] = await Promise.all([

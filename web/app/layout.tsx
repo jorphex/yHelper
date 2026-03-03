@@ -8,6 +8,7 @@ import { NavLinks } from "./components/nav-links";
 
 const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
 const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
+const SOCIAL_IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260303b";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -21,10 +22,10 @@ export const metadata: Metadata = {
     description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
     images: [
       {
-        url: "/opengraph-image",
+        url: `/opengraph-image?v=${SOCIAL_IMAGE_VERSION}`,
         width: 1200,
         height: 630,
-        alt: "yHelper dashboard preview",
+        alt: `yHelper dashboard preview ${SOCIAL_IMAGE_VERSION}`,
       },
     ],
   },
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "yHelper",
     description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
-    images: ["/twitter-image"],
+    images: [`/twitter-image?v=${SOCIAL_IMAGE_VERSION}`],
   },
 };
 

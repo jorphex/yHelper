@@ -58,26 +58,12 @@ function liveSummary(
   avgDeltaApy: number | null | undefined,
   eligibleVaults: number | undefined,
 ): string {
-  const parts: string[] = [];
-  if (topRiser) {
-    const moverParts: string[] = [`Top 24h delta vault ${moverTitle(topRiser)}:`];
-    if (Number.isFinite(topRiser.safe_apy_30d ?? null)) {
-      moverParts.push(`APY 30d ${formatPct(topRiser.safe_apy_30d ?? null, 2)},`);
-    }
-    if (Number.isFinite(topRiser.delta_apy ?? null)) {
-      moverParts.push(`24h delta ${pctDelta(topRiser.delta_apy, 2)}`);
-    }
-    parts.push(moverParts.join(" "));
-  } else {
-    parts.push("Top 24h delta vault syncing");
-  }
-  if (Number.isFinite(avgDeltaApy ?? null)) {
-    parts.push(`Universe avg 24h delta ${pctDelta(avgDeltaApy, 2)}`);
-  }
-  if (Number.isFinite(eligibleVaults ?? null)) {
-    parts.push(`${eligibleVaults} vaults in universe`);
-  }
-  return parts.join(" | ");
+  const topMoverName = topRiser ? moverTitle(topRiser) : "syncing";
+  const topMoverApy = Number.isFinite(topRiser?.safe_apy_30d ?? null) ? formatPct(topRiser?.safe_apy_30d ?? null, 2) : "n/a";
+  const topMoverDelta = Number.isFinite(topRiser?.delta_apy ?? null) ? pctDelta(topRiser?.delta_apy, 2) : "n/a";
+  const universeDelta = Number.isFinite(avgDeltaApy ?? null) ? pctDelta(avgDeltaApy, 2) : "n/a";
+  const universeCoverage = Number.isFinite(eligibleVaults ?? null) ? `${eligibleVaults} vaults tracked` : "vault count syncing";
+  return `Top mover ${topMoverName} · APY 30d ${topMoverApy} · 24h change ${topMoverDelta} | Universe avg 24h change ${universeDelta} | ${universeCoverage}`;
 }
 
 function freshnessSummary(ageSeconds: number | null | undefined): string {
@@ -148,9 +134,7 @@ export default function HomePage() {
       <section className="card home-minimal-hero home-reveal">
         <div className="home-minimal-hero-copy">
           <h1>Clear signals for faster vault decisions</h1>
-          <p>
-            See where yield moves, what is crowded, and whether data is fresh enough to trust.
-          </p>
+          <p>Track yield shifts, spot vault trends, and find your next move.</p>
           <div className="home-minimal-cta-row">
             <Link href="/discover" className="home-lite-cta primary">Start in Discover</Link>
             <Link href="/changes" className="home-lite-cta">See recent changes</Link>
@@ -263,7 +247,7 @@ export default function HomePage() {
       <section className="card home-live-strip home-reveal" aria-live="polite">
         <span className="home-live-dot" aria-hidden="true" />
         <div className="home-live-copy">
-          <p className="home-live-label">Live now (core universe)</p>
+          <p className="home-live-label">Live now</p>
           <p className="home-live-text">{liveNowLine}</p>
           <p className="home-live-meta">{liveFreshnessLine}</p>
         </div>
