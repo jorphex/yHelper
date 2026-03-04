@@ -120,8 +120,7 @@ function ChainsPageContent() {
       <section className="hero">
         <h1>Chains</h1>
         <p className="muted">
-          Compare chain-level scale, yield, and data coverage. Metrics are based on filtered vaults that meet minimum TVL and data
-          depth.
+          Compare chain scale, weighted yield, and coverage quality from the same filtered universe.
         </p>
       </section>
 

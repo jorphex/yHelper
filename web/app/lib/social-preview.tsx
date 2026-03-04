@@ -356,7 +356,7 @@ function StatCard({
     >
       <div
         style={{
-          fontSize: featured ? 31 : 27,
+          fontSize: featured ? 29 : 24,
           color: featured ? "#dcecff" : "#b9d4fb",
           textTransform: "none",
           letterSpacing: "0.01em",
@@ -366,7 +366,7 @@ function StatCard({
       </div>
       <div
         style={{
-          fontSize: featured ? 62 : 46,
+          fontSize: featured ? 58 : 40,
           fontWeight: 700,
           letterSpacing: "-0.01em",
           lineHeight: 1,
@@ -378,10 +378,10 @@ function StatCard({
       {note ? (
         <div
           style={{
-            fontSize: featured ? 28 : 27,
+            fontSize: featured ? 24 : 22,
             color: featured ? "#deebff" : "#cfe0ff",
             letterSpacing: "0.01em",
-            lineHeight: 1.08,
+            lineHeight: 1.1,
           }}
         >
           {note}

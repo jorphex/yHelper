@@ -372,7 +372,7 @@ function CompositionPageContent() {
     <main className="container">
       <section className="hero">
         <h1>Composition</h1>
-        <p className="muted">See where Yearn TVL is concentrated and which vaults look crowded versus under-owned.</p>
+        <p className="muted">Map where TVL concentrates and which vaults look crowded or under-owned.</p>
       </section>
 
       <section className="card explain-card">

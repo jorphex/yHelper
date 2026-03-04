@@ -451,10 +451,15 @@ body::after {
   letter-spacing: 0.01em;
 }
 
+.hero {
+  display: grid;
+  gap: 0.42rem;
+}
+
 .hero p {
-  margin-top: 0.5rem;
-  color: var(--muted);
-  max-width: 68ch;
+  margin-top: 0;
+  color: var(--ink-soft);
+  max-width: 66ch;
   line-height: 1.56;
 }
 
@@ -835,10 +840,18 @@ body::after {
   min-width: 0;
   overflow: clip;
   box-shadow: 0 12px 30px var(--shadow);
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
+}
+
+.card:hover {
+  border-color: rgba(134, 173, 255, 0.46);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
 }
 
 .card h2 {
-  margin-top: 0;
+  margin: 0 0 0.48rem;
   font-size: 1.08rem;
   font-weight: 700;
   color: var(--ink);
@@ -1101,7 +1114,8 @@ input[type="text"] {
 
 .card-intro {
   margin: 0 0 0.7rem;
-  max-width: 80ch;
+  max-width: 72ch;
+  color: var(--ink-soft);
   line-height: 1.52;
 }
 
@@ -1740,6 +1754,14 @@ input[type="text"] {
 :root[data-audience="guide"] .composition-summary-table td:nth-child(5),
 :root[data-audience="guide"] .changes-stale-table th:nth-child(3),
 :root[data-audience="guide"] .changes-stale-table td:nth-child(3) {
+  display: none;
+}
+
+:root[data-audience="guide"] .home-minimal-signals {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+:root[data-audience="guide"] .home-minimal-signals .home-sparse-signal-card:nth-child(2) {
   display: none;
 }
 
@@ -2882,6 +2904,40 @@ input:focus-visible {
     display: none;
   }
 
+  :root[data-audience="analyst"] .discover-table th.col-chain,
+  :root[data-audience="analyst"] .discover-table td.col-chain,
+  :root[data-audience="analyst"] .discover-table th.col-category,
+  :root[data-audience="analyst"] .discover-table td.col-category,
+  :root[data-audience="analyst"] .discover-table th.col-regime,
+  :root[data-audience="analyst"] .discover-table td.col-regime,
+  :root[data-audience="analyst"] .assets-token-table th.col-spread,
+  :root[data-audience="analyst"] .assets-token-table td.col-spread,
+  :root[data-audience="analyst"] .assets-venues-table th.col-consistency,
+  :root[data-audience="analyst"] .assets-venues-table td.col-consistency,
+  :root[data-audience="analyst"] .assets-venues-table th.col-regime,
+  :root[data-audience="analyst"] .assets-venues-table td.col-regime,
+  :root[data-audience="analyst"] .composition-crowding-table th.col-chain,
+  :root[data-audience="analyst"] .composition-crowding-table td.col-chain,
+  :root[data-audience="analyst"] .composition-crowding-table th.col-token,
+  :root[data-audience="analyst"] .composition-crowding-table td.col-token,
+  :root[data-audience="analyst"] .changes-mover-table th.col-chain,
+  :root[data-audience="analyst"] .changes-mover-table td.col-chain,
+  :root[data-audience="analyst"] .changes-mover-table th.col-age,
+  :root[data-audience="analyst"] .changes-mover-table td.col-age,
+  :root[data-audience="analyst"] .regimes-mover-table th.col-chain,
+  :root[data-audience="analyst"] .regimes-mover-table td.col-chain,
+  :root[data-audience="analyst"] .chains-rollup-table th.col-momentum,
+  :root[data-audience="analyst"] .chains-rollup-table td.col-momentum {
+    display: none;
+  }
+
+  :root[data-audience="analyst"] .composition-summary-table th:nth-child(4),
+  :root[data-audience="analyst"] .composition-summary-table td:nth-child(4),
+  :root[data-audience="analyst"] .changes-stale-table th:nth-child(3),
+  :root[data-audience="analyst"] .changes-stale-table td:nth-child(3) {
+    display: none;
+  }
+
   .vault-link {
     max-width: 4.3rem;
   }
@@ -2972,6 +3028,10 @@ input:focus-visible {
     table-layout: auto;
   }
 
+  :root[data-audience="analyst"] .discover-table {
+    min-width: 540px;
+  }
+
   .discover-table th.col-vault,
   .discover-table td.col-vault {
     width: 3.1rem;
@@ -3026,6 +3086,10 @@ input:focus-visible {
   .changes-mover-table {
     min-width: 650px;
     table-layout: fixed;
+  }
+
+  :root[data-audience="analyst"] .changes-mover-table {
+    min-width: 520px;
   }
 
   .changes-mover-table th.col-vault,
@@ -3101,6 +3165,10 @@ input:focus-visible {
     min-width: 590px;
   }
 
+  :root[data-audience="analyst"] .composition-crowding-table {
+    min-width: 540px;
+  }
+
   .composition-crowding-table th.col-vault,
   .composition-crowding-table td.col-vault {
     width: 3.1rem;
@@ -3129,6 +3197,10 @@ input:focus-visible {
 
   .assets-venues-table {
     min-width: 570px;
+  }
+
+  :root[data-audience="analyst"] .assets-venues-table {
+    min-width: 520px;
   }
 
   .assets-venues-table th.col-vault,
@@ -3160,6 +3232,10 @@ input:focus-visible {
   .regimes-mover-table {
     min-width: 540px;
     table-layout: fixed;
+  }
+
+  :root[data-audience="analyst"] .regimes-mover-table {
+    min-width: 500px;
   }
 
   .regimes-mover-table th.col-vault,
@@ -3229,6 +3305,10 @@ input:focus-visible {
     table-layout: auto;
   }
 
+  :root[data-audience="analyst"] .chains-rollup-table {
+    min-width: 520px;
+  }
+
   .chains-rollup-table th,
   .chains-rollup-table td {
     white-space: nowrap;
@@ -3236,6 +3316,10 @@ input:focus-visible {
 
   .assets-token-table {
     min-width: 570px;
+  }
+
+  :root[data-audience="analyst"] .assets-token-table {
+    min-width: 520px;
   }
 
   .assets-token-table th.col-token,
@@ -3276,6 +3360,10 @@ input:focus-visible {
     min-width: 560px;
   }
 
+  :root[data-audience="analyst"] .composition-summary-table {
+    min-width: 500px;
+  }
+
   .composition-summary-table th:nth-child(4),
   .composition-summary-table td:nth-child(4),
   .composition-summary-table th:nth-child(5),
@@ -3288,6 +3376,10 @@ input:focus-visible {
   .changes-stale-table,
   .regimes-split-table {
     min-width: 560px;
+  }
+
+  :root[data-audience="analyst"] .changes-stale-table {
+    min-width: 500px;
   }
 
   .assets-universe-card .kpi-grid,

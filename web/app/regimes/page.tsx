@@ -501,7 +501,7 @@ function RegimesPageContent() {
       <section className="hero">
         <h1>Regimes</h1>
         <p className="muted">
-          Track whether vaults are improving, weakening, stable, or volatile using transparent rule thresholds.
+          Follow rising, stable, falling, and choppy states with transparent rule-based labels.
         </p>
       </section>
 

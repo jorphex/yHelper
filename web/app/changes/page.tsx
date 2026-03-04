@@ -671,7 +671,7 @@ function ChangesPageContent() {
       <section className="hero">
         <h1>Changes</h1>
         <p className="muted">
-          Compare APY shifts across consecutive windows (24h, 7d, 30d), with freshness diagnostics beside each signal.
+          Track APY window-to-window shifts with freshness diagnostics beside each signal.
         </p>
       </section>
 

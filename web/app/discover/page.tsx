@@ -675,8 +675,7 @@ function DiscoverPageContent() {
       <section className="hero">
         <h1>Discover</h1>
         <p className="muted">
-          Vault scanner for yield, trend, and stability. This view is filtered to reduce tiny-vault noise and includes summary
-          context so noobs and power users can read the same table quickly.
+          Scan yield opportunities with filters for size, data quality, and trend direction.
         </p>
       </section>
 

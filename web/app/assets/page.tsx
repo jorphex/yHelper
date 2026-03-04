@@ -278,7 +278,7 @@ function AssetsPageContent() {
       <section className="hero">
         <h1>Assets</h1>
         <p className="muted">
-          Compare Yearn venues for the same underlying token, then inspect spread, momentum, and consistency in one place.
+          Compare vault venues for the same token to spot meaningful APY dispersion and momentum gaps.
         </p>
       </section>
 
