@@ -8,7 +8,9 @@ import { NavLinks } from "./components/nav-links";
 
 const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
 const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
-const SOCIAL_IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260303b";
+const SOCIAL_IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260304bg11";
+const BG_TEXTURE_VERSION = process.env.NEXT_PUBLIC_BG_TEXTURE_VERSION || "20260304bg12";
+const BG_TEXTURE_SRC = `/bg/grit-abstract-v1.webp?v=${BG_TEXTURE_VERSION}`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -46,6 +48,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" data-audience="guide">
+      <head>
+        <link rel="preload" as="image" href={BG_TEXTURE_SRC} />
+      </head>
       <body>
         <ChunkRecovery />
         <a className="skip-link" href="#main-content">

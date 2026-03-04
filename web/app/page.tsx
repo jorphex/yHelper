@@ -153,7 +153,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="home-minimal-break prism-divider" aria-hidden="true">
+      <div className="home-minimal-break prism-divider home-reveal" aria-hidden="true">
         <Image
           src="/home-assets-yearn-blender/divider-yearn-blender-coins.png"
           alt=""
@@ -194,7 +194,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="home-minimal-break home-minimal-break-soft prism-divider prism-divider-alt" aria-hidden="true">
+      <div className="home-minimal-break home-minimal-break-soft prism-divider prism-divider-alt home-reveal" aria-hidden="true">
         <Image
           src="/home-assets-yearn-blender/divider-yearn-blender-coins.png"
           alt=""

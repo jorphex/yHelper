@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 /* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
 import { chainLabel, formatPct } from "./format";
@@ -48,6 +49,33 @@ type PreviewFont = {
 
 const YEARN_LOGO_DATA_URI =
   "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI2LjQuMCwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCA5MjkuNyAyNTYuMSIgc3R5bGU9ImVuYWJsZS1iYWNrZ3JvdW5kOm5ldyAwIDAgOTI5LjcgMjU2LjE7IiB4bWw6c3BhY2U9InByZXNlcnZlIj4KPHN0eWxlIHR5cGU9InRleHQvY3NzIj4KCS5zdDB7ZmlsbDojRkZGRkZGO30KPC9zdHlsZT4KPGc+Cgk8cGF0aCBjbGFzcz0ic3QwIiBkPSJNODc2LjgsNDEuMWMtOS4zLDAtMTcuMSwxLjUtMjMuNCw0LjZjLTYuMywzLjEtMTEuNyw3LjQtMTYuMiwxMi44bC0zLjItMTZoLTMwLjd2MTI4LjJoMzUuMnYtNjUuNgoJCWMwLTExLjEsMi41LTE5LjgsNy41LTI1LjljNS02LjEsMTIuMS05LjIsMjEuMi05LjJjMTcuMywwLDI1LjksMTEuMSwyNS45LDMzLjJ2NjcuNmgzNS4ydi02OS42YzAtMjEuNC00LjgtMzYuOC0xNC41LTQ2LjEKCQlDOTA0LjEsNDUuOCw4OTEuNyw0MS4xLDg3Ni44LDQxLjEgTTc4My42LDQyLjZjLTkuNSwwLTE3LDEuNi0yMi43LDQuOWMtNS43LDMuMi0xMC40LDgtMTQuMiwxNC4zbC0zLjItMTkuMmgtMzEuOXYxMjguMmgzNS4yVjEwOAoJCWMwLTEwLjMsMi4zLTE4LjUsNy0yNC40YzQuNy02LDEyLTksMjEuOS05aDE0VjQyLjZINzgzLjZ6IE02MzAuOCwxNDYuOWMtNS44LDAtMTAuNC0xLjMtMTMuOC00Yy0zLjQtMi43LTUuMS02LjItNS4xLTEwLjcKCQljMC01LjMsMi05LjQsNi4xLTEyLjNjNC4xLTIuOSw5LjgtNC40LDE3LjEtNC40aDI1Ljd2Mi41Yy0wLjIsOC44LTIuOSwxNS44LTguMiwyMS4xQzY0Ny4yLDE0NC4zLDY0MCwxNDYuOSw2MzAuOCwxNDYuOQoJCSBNNjM4LjYsNDEuMWMtMTcuMywwLTMxLjIsMy42LTQxLjYsMTAuOGMtMTAuNSw3LjItMTYuMywxNy40LTE3LjUsMzAuNWgzMy45YzAuOC00LjgsMy40LTguNiw3LjYtMTEuNWM0LjItMi44LDkuNy00LjIsMTYuMy00LjIKCQljNy4xLDAsMTIuOCwxLjcsMTcuMSw1YzQuMiwzLjMsNi40LDcuOSw2LjQsMTMuN1Y5MmgtMjUuMmMtMTkuMywwLTM0LDMuNy00NCwxMWMtMTAuMSw3LjMtMTUuMSwxNy44LTE1LjEsMzEuNAoJCWMwLDEyLDQuMiwyMS4zLDEyLjYsMjcuOWM4LjQsNi43LDE5LjcsMTAsMzMuOCwxMGM4LjYsMCwxNi4xLTEuNSwyMi4zLTQuNWM2LjItMywxMS44LTcuNCwxNi42LTEzLjJsMi43LDE2LjJoMzAuOVY4Ny41CgkJYzAtMTUuMS00LjktMjYuNi0xNC44LTM0LjVDNjcwLjcsNDUuMSw2NTYuNyw0MS4xLDYzOC42LDQxLjEgTTQ3Miw5MS44YzEtNy41LDQuMS0xMy40LDkuNC0xNy44YzUuMi00LjQsMTEuNy02LjYsMTkuMy02LjYKCQljOCwwLDE0LjYsMi4xLDE5LjgsNi40YzUuMiw0LjIsOC40LDEwLjMsOS42LDE4LjFINDcyeiBNNDM0LjYsMTA3YzAsMTMuMSwyLjgsMjQuNiw4LjQsMzQuNWM1LjYsOS45LDEzLjUsMTcuNSwyMy45LDIyLjgKCQljMTAuNCw1LjMsMjIuNyw4LDM3LDhjMTEsMCwyMC43LTIsMjkuMi01LjljOC41LTMuOSwxNS4zLTkuMywyMC40LTE2LjFjNS4yLTYuOCw4LjQtMTQuNSw5LjctMjIuOWgtMzQuN2MtMS41LDYtNC42LDEwLjUtOS40LDEzLjYKCQljLTQuNywzLjEtMTAuNyw0LjYtMTcuOCw0LjZjLTksMC0xNi0yLjctMjEuMi04Yy01LjItNS4zLTguMS0xMi42LTktMjEuOXYtMWg5M2MwLjctMy41LDEtNy41LDEtMTJjLTAuMi0xMi41LTMtMjMuMy04LjYtMzIuNQoJCWMtNS42LTkuMi0xMy4zLTE2LjQtMjMuMi0yMS40Yy05LjktNS4xLTIxLjMtNy42LTM0LjMtNy42Yy0xMi44LDAtMjQuMSwyLjctMzMuOCw4LjFjLTkuNyw1LjQtMTcuMywxMy4xLTIyLjcsMjIuOQoJCUM0MzcuMyw4Mi4xLDQzNC42LDkzLjcsNDM0LjYsMTA3IE0zMDAuMiw0Mi42bDQ5LjQsMTI4LjlsLTMuMiw4LjVjLTEuOCw0LjMtMy43LDcuMi01LjcsOC43Yy0yLDEuNS01LjIsMi4yLTkuNywyLjJoLTE5LjV2MjkuNwoJCWgzNC4yYzYuNSwwLDExLjgtMS4xLDE1LjgtMy40YzQuMS0yLjIsNy40LTUuNiwxMC4xLTEwYzIuNy00LjQsNS41LTEwLjUsOC41LTE4LjNsNTYuOS0xNDYuNGgtMzcuN2wtMzAuNCw5MmwtMzEuMi05MkgzMDAuMnoiLz4KPC9nPgo8Zz4KCTxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0yMDEuOSw5OC41bC0zMi40LDMyLjRjMS44LDUuOSwyLjcsMTIuMiwyLjcsMTguNWMwLDE3LjEtNi43LDMzLjItMTguNyw0NS4zYy0xMi4xLDEyLjEtMjguMiwxOC43LTQ1LjMsMTguNwoJCXMtMzMuMi02LjctNDUuMy0xOC43Yy0xMi4xLTEyLjEtMTguNy0yOC4yLTE4LjctNDUuM2MwLTYuNCwwLjktMTIuNiwyLjctMTguNUwxNC40LDk4LjVjLTguMiwxNS4xLTEyLjksMzIuNS0xMi45LDUxCgkJYzAsNTguOSw0Ny44LDEwNi43LDEwNi43LDEwNi43czEwNi43LTQ3LjgsMTA2LjctMTA2LjdDMjE0LjksMTMxLDIxMC4yLDExMy42LDIwMS45LDk4LjV6Ii8+Cgk8cG9seWdvbiBjbGFzcz0ic3QwIiBwb2ludHM9Ijg2LjgsMTcwLjcgMTI5LjUsMTcwLjcgMTI5LjUsMTAyLjkgMjAyLjIsMzAuMiAxNzIsMCAxMDguMiw2My44IDQ0LjQsMCAxNC4yLDMwLjIgODYuOCwxMDIuOCAJIi8+CjwvZz4KPC9zdmc+Cg==";
+
+function buildPreviewGrainDataUri(): string {
+  const svg = `
+    <svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'>
+      <filter id='grain' x='0' y='0' width='100%' height='100%'>
+        <feTurbulence
+          type='fractalNoise'
+          baseFrequency='1.85'
+          numOctaves='2'
+          seed='23'
+          stitchTiles='stitch'
+          result='noise'
+        />
+        <feColorMatrix in='noise' type='saturate' values='0' result='mono'/>
+        <feComponentTransfer in='mono' result='leveled'>
+          <feFuncR type='table' tableValues='0.38 0.62'/>
+          <feFuncG type='table' tableValues='0.38 0.62'/>
+          <feFuncB type='table' tableValues='0.38 0.62'/>
+        </feComponentTransfer>
+      </filter>
+      <rect width='1200' height='630' filter='url(#grain)' />
+    </svg>
+  `;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+const PREVIEW_GRAIN_DATA_URI = buildPreviewGrainDataUri();
 function normalizeSiteUrl(raw: string): string {
   if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/+$/, "");
   return `https://${raw.replace(/\/+$/, "")}`;
@@ -166,10 +194,12 @@ export async function renderSocialPreviewImage({
   width,
   height,
   fonts,
+  backgroundTextureSrc,
 }: {
   width: number;
   height: number;
   fonts?: PreviewFont[];
+  backgroundTextureSrc?: string;
 }) {
   const yearnLogoSrc = YEARN_LOGO_DATA_URI;
   const stats = await fetchPreviewStats();
@@ -206,65 +236,65 @@ export async function renderSocialPreviewImage({
           position: "relative",
           color: "#f4f8ff",
           fontFamily: "Aeonik, Inter, system-ui, sans-serif",
-          background:
-            "linear-gradient(150deg, #060c1f 0%, #10285a 30%, #281081 56%, #102a72 77%, #09235a 100%)",
+          background: "#060c1f",
           overflow: "hidden",
         }}
       >
-        <div
+        {backgroundTextureSrc ? (
+          <img
+            src={backgroundTextureSrc}
+            alt=""
+            width={width}
+            height={height}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              opacity: 0.98,
+            }}
+          />
+        ) : null}
+        <img
+          src={PREVIEW_GRAIN_DATA_URI}
+          alt=""
+          width={width}
+          height={height}
           style={{
             position: "absolute",
-            inset: "-120px auto auto -180px",
-            width: 760,
-            height: 620,
-            opacity: 0.44,
-            background:
-              "radial-gradient(closest-side, rgba(80,95,255,0.62) 0%, rgba(80,95,255,0.12) 48%, rgba(80,95,255,0) 76%)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: "auto -220px -120px auto",
-            width: 700,
-            height: 500,
-            opacity: 0.34,
-            background:
-              "radial-gradient(closest-side, rgba(58,174,195,0.52) 0%, rgba(58,174,195,0.1) 42%, rgba(58,174,195,0) 74%)",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: 0.22,
           }}
         />
         <div
           style={{
             position: "absolute",
             inset: 0,
-            opacity: 0.12,
+            opacity: 0.22,
             background:
-              "radial-gradient(100% 85% at 68% 22%, rgba(78,114,255,0.24) 0%, rgba(78,114,255,0.06) 42%, rgba(78,114,255,0) 74%), radial-gradient(75% 80% at 84% 54%, rgba(61,153,189,0.2) 0%, rgba(61,153,189,0.05) 38%, rgba(61,153,189,0) 71%)",
+              "radial-gradient(118% 88% at 22% 18%, rgba(84, 125, 255, 0.2) 0%, rgba(84, 125, 255, 0) 58%), radial-gradient(130% 95% at 82% 72%, rgba(58, 166, 184, 0.18) 0%, rgba(58, 166, 184, 0) 62%)",
           }}
         />
         <div
           style={{
             position: "absolute",
             inset: 0,
-            background: "rgba(0,0,0,0.2)",
+            opacity: 0.2,
+            background:
+              "linear-gradient(180deg, rgba(4, 10, 24, 0.18) 0%, rgba(5, 12, 30, 0.62) 100%)",
           }}
         />
         <div
           style={{
             position: "absolute",
             inset: 0,
-            opacity: 0.1,
+            opacity: 0.09,
             background:
-              "radial-gradient(120% 100% at 18% 22%, rgba(95,130,255,0.18) 0%, rgba(95,130,255,0) 58%), radial-gradient(95% 85% at 84% 46%, rgba(89,80,246,0.2) 0%, rgba(89,80,246,0) 61%)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            opacity: 0.12,
-            background:
-              "radial-gradient(120% 95% at 50% 48%, rgba(0,0,0,0) 56%, rgba(0,0,0,0.48) 100%), linear-gradient(17deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 9%, rgba(0,0,0,0) 34%, rgba(255,255,255,0.03) 55%, rgba(0,0,0,0) 76%, rgba(255,255,255,0.02) 100%)",
+              "radial-gradient(120% 95% at 48% 52%, rgba(0, 0, 0, 0) 56%, rgba(0, 0, 0, 0.56) 100%), linear-gradient(16deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 9%, rgba(0, 0, 0, 0) 30%, rgba(255, 255, 255, 0.03) 51%, rgba(0, 0, 0, 0) 76%, rgba(255, 255, 255, 0.015) 100%)",
           }}
         />
         <div

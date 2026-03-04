@@ -118,6 +118,7 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-reveal: cubic-bezier(0.2, 0.85, 0.35, 1);
+  --bg-texture-url: url("/bg/grit-abstract-v1.webp?v=20260304bg12");
   --font-sans: "Aeonik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Aeonik Mono", "Source Code Pro", Consolas, "Courier New", monospace;
   --font-fono: "Aeonik Fono", "Aeonik Mono", "Source Code Pro", Consolas, "Courier New", monospace;
@@ -153,10 +154,16 @@ body::before {
   pointer-events: none;
   z-index: -2;
   background:
-    radial-gradient(circle at 8% 0%, rgba(80, 115, 255, 0.34) 0%, transparent 38%),
-    radial-gradient(circle at 94% 2%, rgba(45, 184, 195, 0.2) 0%, transparent 34%),
-    radial-gradient(circle at 54% -20%, rgba(40, 16, 129, 0.44) 0%, transparent 46%),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    var(--bg-texture-url),
+    radial-gradient(62% 44% at 16% 24%, rgba(62, 118, 228, 0.2) 0 36%, rgba(62, 118, 228, 0) 54%),
+    radial-gradient(56% 40% at 78% 20%, rgba(54, 165, 171, 0.18) 0 34%, rgba(54, 165, 171, 0) 52%),
+    radial-gradient(54% 38% at 46% 70%, rgba(113, 90, 194, 0.16) 0 30%, rgba(113, 90, 194, 0) 48%),
+    radial-gradient(52% 36% at 84% 74%, rgba(64, 135, 95, 0.14) 0 28%, rgba(64, 135, 95, 0) 46%),
+    radial-gradient(138% 92% at 50% -8%, rgba(4, 9, 24, 0.03) 0%, rgba(4, 9, 24, 0.16) 74%, rgba(4, 9, 24, 0.32) 100%),
+    linear-gradient(180deg, rgba(4, 9, 24, 0.06) 0%, rgba(5, 11, 28, 0.22) 100%);
+  background-position: center, center, center, center, center, center, center;
+  background-size: cover, cover, cover, cover, cover, cover, cover;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
 }
 
 body::after {
@@ -165,9 +172,16 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  opacity: 0.11;
-  background-image: radial-gradient(rgba(205, 224, 255, 0.44) 0.6px, transparent 0.6px);
-  background-size: 2.6px 2.6px;
+  opacity: 0.22;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.28' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='512' height='512' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"),
+    radial-gradient(115% 90% at 18% 14%, rgba(176, 213, 255, 0.16) 0%, rgba(176, 213, 255, 0) 60%),
+    radial-gradient(128% 94% at 86% 78%, rgba(89, 186, 194, 0.13) 0%, rgba(89, 186, 194, 0) 63%),
+    radial-gradient(120% 92% at 52% 46%, rgba(100, 121, 219, 0.09) 0%, rgba(100, 121, 219, 0) 72%);
+  background-position: center, center, center, center;
+  background-size: 500px 500px, cover, cover, cover;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  filter: contrast(2.0) saturate(1.16) brightness(0.97);
   mix-blend-mode: soft-light;
 }
 
@@ -3696,7 +3710,7 @@ input:focus-visible {
 }
 
 .home-minimal {
-  gap: 3.2rem;
+  gap: 2.5rem;
 }
 
 .home-reveal {
@@ -3822,15 +3836,16 @@ input:focus-visible {
 
 .home-minimal-break {
   position: relative;
-  height: 84px;
-  opacity: 0.5;
+  height: 94px;
+  margin: -1rem 0 -1.1rem;
+  opacity: 1;
   overflow: hidden;
 }
 
 .home-divider-image {
-  object-fit: cover;
-  object-position: center 50%;
-  opacity: 0.95;
+  object-fit: contain;
+  object-position: center center;
+  opacity: 1;
 }
 
 .home-minimal-break path {
@@ -3840,9 +3855,9 @@ input:focus-visible {
 }
 
 .home-minimal-break-soft {
-  margin-top: -0.6rem;
-  margin-bottom: -0.4rem;
-  opacity: 0.4;
+  margin-top: -1.25rem;
+  margin-bottom: -1.2rem;
+  opacity: 1;
 }
 
 .prism-divider-alt .home-divider-image {
@@ -4111,7 +4126,7 @@ input:focus-visible {
 
 @media (max-width: 1100px) {
   .home-minimal {
-    gap: 1.7rem;
+    gap: 1.35rem;
   }
 
   .home-minimal-hero {
@@ -4184,7 +4199,8 @@ input:focus-visible {
   }
 
   .home-minimal-break {
-    height: 64px;
+    height: 72px;
+    margin: -0.7rem 0 -0.75rem;
   }
 
   .home-minimal-hero-art {
