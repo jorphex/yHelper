@@ -46,10 +46,10 @@
   --ink-soft: #d5e6ff;
   --ink-dim: #b9d4fb;
   --muted: #aec7ef;
-  --card: #0f1d40;
-  --surface-1: #101d40;
-  --surface-2: #0d1836;
-  --surface-3: #0a122b;
+  --card: #142d5f;
+  --surface-1: #142d5f;
+  --surface-2: #112247;
+  --surface-3: #0d1936;
   --surface-4: #122c62;
   --line: #2a4e8c;
   --line-2: #214376;
@@ -63,10 +63,10 @@
   --accent-purple-rgb: 40, 16, 129;
   --accent-teal: #2db8c3;
   --accent-teal-rgb: 45, 184, 195;
-  --panel-top: #112650;
-  --panel-bottom: #0b1733;
-  --panel-top-strong: #153061;
-  --panel-bottom-strong: #0d1c3f;
+  --panel-top: #18376c;
+  --panel-bottom: #0f2046;
+  --panel-top-strong: #1d447f;
+  --panel-bottom-strong: #132752;
   --surface-hover-top: #1b3f7f;
   --surface-hover-bottom: #133162;
   --surface-active-top: #2b56a8;
@@ -119,10 +119,10 @@
   --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-reveal: cubic-bezier(0.2, 0.85, 0.35, 1);
   --header-bg: rgba(8, 18, 41, 0.86);
-  --shell-overlay-top: rgba(3, 8, 21, 0.06);
-  --shell-overlay-bottom: rgba(4, 10, 25, 0.12);
-  --shell-shade-top: rgba(4, 9, 24, 0.1);
-  --shell-shade-bottom: rgba(5, 11, 28, 0.28);
+  --shell-overlay-top: rgba(3, 8, 21, 0.14);
+  --shell-overlay-bottom: rgba(4, 10, 25, 0.22);
+  --shell-shade-top: rgba(4, 9, 24, 0.16);
+  --shell-shade-bottom: rgba(5, 11, 28, 0.36);
   --bg-texture-url: url("/bg/grit-abstract-v1.webp?v=20260304bg12");
   --font-sans: "Aeonik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Aeonik Mono", "Source Code Pro", Consolas, "Courier New", monospace;
@@ -160,16 +160,18 @@ body::before {
   z-index: -2;
   background:
     linear-gradient(180deg, var(--shell-overlay-top) 0%, var(--shell-overlay-bottom) 100%),
+    linear-gradient(90deg, rgba(4, 9, 24, 0.5) 0%, rgba(4, 9, 24, 0.22) 10%, rgba(4, 9, 24, 0) 24%, rgba(4, 9, 24, 0) 76%, rgba(4, 9, 24, 0.22) 90%, rgba(4, 9, 24, 0.5) 100%),
+    radial-gradient(138% 92% at 50% -8%, rgba(4, 9, 24, 0.08) 0%, rgba(4, 9, 24, 0.22) 74%, rgba(4, 9, 24, 0.42) 100%),
+    radial-gradient(128% 102% at 50% 50%, rgba(4, 9, 24, 0) 52%, rgba(4, 9, 24, 0.22) 100%),
     var(--bg-texture-url),
-    radial-gradient(62% 44% at 16% 24%, rgba(62, 118, 228, 0.2) 0 36%, rgba(62, 118, 228, 0) 54%),
-    radial-gradient(56% 40% at 78% 20%, rgba(54, 165, 171, 0.18) 0 34%, rgba(54, 165, 171, 0) 52%),
-    radial-gradient(54% 38% at 46% 70%, rgba(113, 90, 194, 0.16) 0 30%, rgba(113, 90, 194, 0) 48%),
-    radial-gradient(52% 36% at 84% 74%, rgba(64, 135, 95, 0.14) 0 28%, rgba(64, 135, 95, 0) 46%),
-    radial-gradient(138% 92% at 50% -8%, rgba(4, 9, 24, 0.03) 0%, rgba(4, 9, 24, 0.16) 74%, rgba(4, 9, 24, 0.32) 100%),
+    radial-gradient(56% 40% at 24% 24%, rgba(62, 118, 228, 0.1) 0 34%, rgba(62, 118, 228, 0) 52%),
+    radial-gradient(50% 36% at 74% 22%, rgba(54, 165, 171, 0.09) 0 32%, rgba(54, 165, 171, 0) 50%),
+    radial-gradient(52% 36% at 46% 68%, rgba(113, 90, 194, 0.08) 0 28%, rgba(113, 90, 194, 0) 46%),
+    radial-gradient(48% 34% at 78% 72%, rgba(64, 135, 95, 0.07) 0 26%, rgba(64, 135, 95, 0) 44%),
     linear-gradient(180deg, var(--shell-shade-top) 0%, var(--shell-shade-bottom) 100%);
-  background-position: center, center, center, center, center, center, center, center;
-  background-size: cover, cover, cover, cover, cover, cover, cover, cover;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-position: center, center, center, center, center, center, center, center, center, center;
+  background-size: cover, cover, cover, cover, cover, cover, cover, cover, cover, cover;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
 }
 
 body::after {
@@ -178,7 +180,7 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  opacity: 0.2;
+  opacity: 0.12;
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.28' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='512' height='512' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"),
     radial-gradient(115% 90% at 18% 14%, rgba(176, 213, 255, 0.16) 0%, rgba(176, 213, 255, 0) 60%),
@@ -187,7 +189,7 @@ body::after {
   background-position: center, center, center, center;
   background-size: 500px 500px, cover, cover, cover;
   background-repeat: repeat, no-repeat, no-repeat, no-repeat;
-  filter: contrast(1.95) saturate(1.14) brightness(0.94);
+  filter: contrast(1.9) saturate(1.12) brightness(0.88);
   mix-blend-mode: soft-light;
 }
 

@@ -9,7 +9,7 @@ import { SHELL_THEME_STYLE } from "./lib/shell-theme";
 
 const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
 const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
-const SOCIAL_IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260307pal9";
+const SOCIAL_IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260307pal10";
 const BG_TEXTURE_VERSION = process.env.NEXT_PUBLIC_BG_TEXTURE_VERSION || "20260304bg12";
 const BG_TEXTURE_SRC = `/bg/grit-abstract-v1.webp?v=${BG_TEXTURE_VERSION}`;
 const AUDIENCE_BOOTSTRAP = `(function(){try{var raw=window.localStorage.getItem("yhelper:audience-mode");var mode=raw==="analyst"?"analyst":"guide";document.documentElement.dataset.audience=mode;}catch(_e){document.documentElement.dataset.audience="guide";}})();`;
