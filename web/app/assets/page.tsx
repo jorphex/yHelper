@@ -468,10 +468,12 @@ function AssetsPageContent() {
               const spread = row.spread_safe_apy_30d ?? 0;
               const worst = best - spread;
               const maxAbs = Math.max(0.08, Math.abs(best), Math.abs(weighted), Math.abs(worst));
-              const toY = (value: number) => 48 - ((value + maxAbs) / (2 * maxAbs)) * 41;
-              const sparkLeft = 0;
-              const sparkMid = 52;
-              const sparkRight = 104;
+              const sparkHeight = 58;
+              const sparkBaseline = 54;
+              const toY = (value: number) => sparkBaseline - ((value + maxAbs) / (2 * maxAbs)) * 47;
+              const sparkLeft = 2;
+              const sparkMid = 66;
+              const sparkRight = 130;
               const spark = `M${sparkLeft},${toY(worst).toFixed(2)} L${sparkMid},${toY(weighted).toFixed(2)} L${sparkRight},${toY(best).toFixed(2)}`;
               const nearFlat = spread < 0.15;
               return (
@@ -482,8 +484,8 @@ function AssetsPageContent() {
                   onClick={() => updateQuery({ token: row.token_symbol })}
                 >
                   <p className="assets-spread-token">{row.token_symbol}</p>
-                  <svg viewBox="0 0 104 52" aria-label={`${row.token_symbol} APY spread shape`}>
-                    <line x1={sparkLeft} y1={48} x2={sparkRight} y2={48} className="assets-spread-baseline" />
+                  <svg viewBox={`0 0 132 ${sparkHeight}`} aria-label={`${row.token_symbol} APY spread shape`}>
+                    <line x1={sparkLeft} y1={sparkBaseline} x2={sparkRight} y2={sparkBaseline} className="assets-spread-baseline" />
                     <path d={spark} className="assets-spread-line" />
                     <circle cx={sparkLeft} cy={toY(worst)} r={2.25} className="assets-spread-point" />
                     <circle cx={sparkMid} cy={toY(weighted)} r={2.25} className="assets-spread-point" />

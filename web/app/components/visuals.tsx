@@ -267,9 +267,9 @@ export function TrendStrips({
           const min = Math.min(...finite);
           const max = Math.max(...finite);
           const width = 480;
-          const height = 34;
+          const height = 38;
           const innerW = width - 8;
-          const innerH = height - 8;
+          const innerH = height - 10;
           const zeroNorm = Math.max(0, Math.min(1, normalize(0, min, max)));
           const zeroY = 4 + (1 - zeroNorm) * innerH;
           const path = finite
@@ -352,7 +352,7 @@ export function ScatterPlot({
   }
 
   const width = 520;
-  const height = 268;
+  const height = 252;
   const xValues = finiteValues(valid.map((point) => point.x));
   const yValues = finiteValues(valid.map((point) => point.y));
   const sizeValues = finiteValues(valid.map((point) => point.size));
@@ -366,10 +366,10 @@ export function ScatterPlot({
   const yMid = (yMin + yMax) / 2;
   const yTickLabels = [yFormatter(yMin), yFormatter(yMid), yFormatter(yMax)];
   const widestYTick = yTickLabels.reduce((max, label) => Math.max(max, label.length), 0);
-  const paddingLeft = Math.min(84, Math.max(50, 16 + widestYTick * 6.4));
-  const paddingRight = 16;
-  const paddingTop = 18;
-  const paddingBottom = 54;
+  const paddingLeft = Math.min(78, Math.max(48, 14 + widestYTick * 6));
+  const paddingRight = 12;
+  const paddingTop = 16;
+  const paddingBottom = 48;
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
   const densityBins = new Map<string, number>();

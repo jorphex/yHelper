@@ -941,7 +941,7 @@ a:hover {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.87rem;
+  font-size: 0.86rem;
   min-width: 0;
   table-layout: auto;
 }
@@ -949,7 +949,7 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.48rem 0.46rem;
+  padding: 0.42rem 0.4rem;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
   line-height: 1.33;
@@ -1434,7 +1434,7 @@ input[type="text"] {
 }
 
 .discover-ridgeline-panel .scatter-wrap svg {
-  min-height: 176px !important;
+  min-height: 168px !important;
   max-width: none;
   margin: 0 auto;
 }
@@ -1445,18 +1445,18 @@ input[type="text"] {
 
 .ridgeline-label {
   fill: var(--ink-soft);
-  font-size: 10.4px;
+  font-size: 9.9px;
   font-weight: 600;
 }
 
 .ridgeline-note {
   fill: #a9c4ea;
-  font-size: 9.2px;
+  font-size: 8.8px;
 }
 
 .ridgeline-axis {
   fill: #bed6f6;
-  font-size: 8.8px;
+  font-size: 8.4px;
 }
 
 .discover-ridgeline-panel .viz-legend {
@@ -1473,7 +1473,7 @@ input[type="text"] {
 }
 
 .changes-mover-table {
-  min-width: 700px;
+  min-width: 660px;
   width: 100%;
   table-layout: fixed;
 }
@@ -1487,24 +1487,24 @@ input[type="text"] {
 
 .changes-mover-table th.col-vault,
 .changes-mover-table td.col-vault {
-  width: 4.2rem;
+  width: 3.7rem;
 }
 
 .changes-mover-table th.col-chain,
 .changes-mover-table td.col-chain {
-  width: 3.2rem;
+  width: 2.9rem;
   white-space: nowrap;
 }
 
 .changes-mover-table th.col-token,
 .changes-mover-table td.col-token {
-  width: 3.2rem;
+  width: 2.9rem;
   white-space: nowrap;
 }
 
 .changes-mover-table th.col-category,
 .changes-mover-table td.col-category {
-  width: 3.8rem;
+  width: 3.4rem;
   white-space: nowrap;
 }
 
@@ -1516,12 +1516,12 @@ input[type="text"] {
 .changes-mover-table td.col-previous,
 .changes-mover-table th.col-delta,
 .changes-mover-table td.col-delta {
-  width: 4.3rem;
+  width: 3.95rem;
 }
 
 .changes-mover-table th.col-age,
 .changes-mover-table td.col-age {
-  width: 3.9rem;
+  width: 3.5rem;
 }
 
 .changes-mover-table td.col-vault {
@@ -1529,7 +1529,7 @@ input[type="text"] {
 }
 
 .changes-mover-table td.col-vault .vault-link {
-  max-width: 4.1rem;
+  max-width: 3.7rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1549,7 +1549,7 @@ input[type="text"] {
 }
 
 .changes-stale-table {
-  min-width: 560px;
+  min-width: 540px;
   table-layout: fixed;
 }
 
@@ -1585,30 +1585,30 @@ input[type="text"] {
 }
 
 .composition-crowding-table {
-  min-width: 720px;
+  min-width: 680px;
   table-layout: fixed;
 }
 
 .composition-crowding-table th.col-vault,
 .composition-crowding-table td.col-vault {
-  width: 8%;
+  width: 7%;
 }
 
 .composition-crowding-table th.col-chain,
 .composition-crowding-table td.col-chain {
-  width: 6.5%;
+  width: 6%;
   white-space: nowrap;
 }
 
 .composition-crowding-table th.col-token,
 .composition-crowding-table td.col-token {
-  width: 6.5%;
+  width: 6%;
   white-space: nowrap;
 }
 
 .composition-crowding-table th.col-category,
 .composition-crowding-table td.col-category {
-  width: 8%;
+  width: 7%;
   white-space: nowrap;
 }
 
@@ -1618,7 +1618,7 @@ input[type="text"] {
 .composition-crowding-table td.col-apy,
 .composition-crowding-table th.col-crowding,
 .composition-crowding-table td.col-crowding {
-  width: 23.67%;
+  width: 24.67%;
 }
 
 .composition-crowding-table td.col-vault {
@@ -1626,7 +1626,7 @@ input[type="text"] {
 }
 
 .composition-crowding-table td.col-vault .vault-link {
-  max-width: 8.8rem;
+  max-width: 7.8rem;
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1634,18 +1634,18 @@ input[type="text"] {
 }
 
 .assets-venues-table {
-  min-width: 660px;
+  min-width: 620px;
   table-layout: fixed;
 }
 
 .assets-venues-table th.col-vault,
 .assets-venues-table td.col-vault {
-  width: 4.1rem;
+  width: 3.6rem;
 }
 
 .assets-venues-table th.col-chain,
 .assets-venues-table td.col-chain {
-  width: 3.1rem;
+  width: 2.8rem;
   white-space: nowrap;
 }
 
@@ -1653,7 +1653,7 @@ input[type="text"] {
 .assets-venues-table td.col-category,
 .assets-venues-table th.col-regime,
 .assets-venues-table td.col-regime {
-  width: 3.5rem;
+  width: 3.1rem;
   white-space: nowrap;
 }
 
@@ -1665,7 +1665,7 @@ input[type="text"] {
 .assets-venues-table td.col-momentum,
 .assets-venues-table th.col-consistency,
 .assets-venues-table td.col-consistency {
-  width: 4.1rem;
+  width: 3.8rem;
 }
 
 .assets-venues-table td.col-vault {
@@ -1673,7 +1673,7 @@ input[type="text"] {
 }
 
 .assets-venues-table td.col-vault .vault-link {
-  max-width: 3.8rem;
+  max-width: 3.4rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1687,13 +1687,13 @@ input[type="text"] {
 }
 
 .assets-token-table {
-  min-width: 640px;
+  min-width: 600px;
   table-layout: fixed;
 }
 
 .assets-token-table th.col-token,
 .assets-token-table td.col-token {
-  width: 3.1rem;
+  width: 2.7rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1701,7 +1701,7 @@ input[type="text"] {
 
 .assets-token-table th.col-type,
 .assets-token-table td.col-type {
-  width: 3.8rem;
+  width: 3.4rem;
   white-space: nowrap;
 }
 
@@ -1717,14 +1717,14 @@ input[type="text"] {
 .assets-token-table td.col-weighted,
 .assets-token-table th.col-spread,
 .assets-token-table td.col-spread {
-  width: 3.8rem;
+  width: 3.55rem;
 }
 
 .assets-token-table th.col-venues,
 .assets-token-table td.col-venues {
-  width: 2.7rem;
-  padding-left: 0.3rem;
-  padding-right: 0.22rem;
+  width: 2.35rem;
+  padding-left: 0.18rem;
+  padding-right: 0.16rem;
   text-align: left !important;
 }
 
@@ -1733,13 +1733,13 @@ input[type="text"] {
 }
 
 .chains-rollup-table {
-  min-width: 680px;
+  min-width: 640px;
   table-layout: auto;
 }
 
 .chains-rollup-table th.col-chain,
 .chains-rollup-table td.col-chain {
-  width: 3.8rem;
+  width: 3.4rem;
   white-space: nowrap;
 }
 
@@ -1755,34 +1755,34 @@ input[type="text"] {
 .chains-rollup-table td.col-momentum,
 .chains-rollup-table th.col-consistency,
 .chains-rollup-table td.col-consistency {
-  width: 4.8rem;
+  width: 4.35rem;
 }
 
 .regimes-mover-table {
-  min-width: 620px;
+  min-width: 580px;
   table-layout: fixed;
 }
 
 .regimes-mover-table th.col-vault,
 .regimes-mover-table td.col-vault {
-  width: 3.5rem;
+  width: 3.2rem;
 }
 
 .regimes-mover-table th.col-chain,
 .regimes-mover-table td.col-chain {
-  width: 2.8rem;
+  width: 2.6rem;
   white-space: nowrap;
 }
 
 .regimes-mover-table th.col-token,
 .regimes-mover-table td.col-token {
-  width: 2.9rem;
+  width: 2.7rem;
   white-space: nowrap;
 }
 
 .regimes-mover-table th.col-regime,
 .regimes-mover-table td.col-regime {
-  width: 3.1rem;
+  width: 2.9rem;
   white-space: nowrap;
 }
 
@@ -1792,7 +1792,7 @@ input[type="text"] {
 .regimes-mover-table td.col-apy,
 .regimes-mover-table th.col-momentum,
 .regimes-mover-table td.col-momentum {
-  width: 3.5rem;
+  width: 3.3rem;
 }
 
 .regimes-mover-table td.col-vault {
@@ -1800,7 +1800,7 @@ input[type="text"] {
 }
 
 .regimes-mover-table td.col-vault .vault-link {
-  max-width: 3.5rem;
+  max-width: 3.2rem;
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1905,11 +1905,13 @@ input[type="text"] {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: linear-gradient(180deg, var(--panel-top) 0%, var(--panel-bottom) 100%);
-  padding: 0.34rem 0.12rem;
+  padding: 0.4rem 0.28rem 0.46rem;
   cursor: pointer;
   text-align: left;
   width: 100%;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
 }
 
 .assets-spread-token {
@@ -1919,9 +1921,9 @@ input[type="text"] {
 }
 
 .assets-spread-card svg {
-  width: 100%;
-  height: 52px;
-  margin-top: 0;
+  width: calc(100% + 0.16rem);
+  height: 60px;
+  margin: 0.04rem -0.08rem 0;
 }
 
 .assets-spread-baseline {
@@ -1992,21 +1994,21 @@ input[type="text"] {
 }
 
 .composition-treemap-viz .scatter-wrap svg {
-  min-height: 124px !important;
+  min-height: 118px !important;
   max-width: none;
   margin: 0 auto;
 }
 
 .treemap-group-label {
   fill: var(--ink-soft);
-  font-size: 10.4px;
+  font-size: 9.8px;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
 
 .treemap-cell-label {
   fill: var(--ink);
-  font-size: 9.2px;
+  font-size: 8.8px;
   pointer-events: none;
 }
 
@@ -2028,7 +2030,7 @@ input[type="text"] {
 }
 
 .composition-visuals-card .scatter-wrap svg {
-  min-height: 176px;
+  min-height: 168px;
 }
 
 .composition-crowding-grid {
@@ -2094,7 +2096,7 @@ input[type="text"] {
 }
 
 .composition-main-scatter .scatter-wrap svg {
-  min-height: 156px;
+  min-height: 148px;
 }
 
 .composition-main-scatter {
@@ -2197,7 +2199,7 @@ input[type="text"] {
 }
 
 .changes-main-scatter .scatter-wrap svg {
-  min-height: 208px;
+  min-height: 196px;
 }
 
 .changes-delta-panels > .viz-panel,
@@ -2279,36 +2281,7 @@ input[type="text"] {
 }
 
 .regimes-mover-table td.col-regime {
-  text-align: right;
-}
-
-.regimes-mover-table th.col-vault,
-.regimes-mover-table td.col-vault {
-  width: 4.2rem;
-}
-
-.regimes-mover-table th.col-chain,
-.regimes-mover-table td.col-chain {
-  width: 3rem;
-}
-
-.regimes-mover-table th.col-token,
-.regimes-mover-table td.col-token {
-  width: 3.1rem;
-}
-
-.regimes-mover-table th.col-regime,
-.regimes-mover-table td.col-regime {
-  width: 3.4rem;
-}
-
-.regimes-mover-table th.col-tvl,
-.regimes-mover-table td.col-tvl,
-.regimes-mover-table th.col-apy,
-.regimes-mover-table td.col-apy,
-.regimes-mover-table th.col-momentum,
-.regimes-mover-table td.col-momentum {
-  width: 3.9rem;
+  text-align: left;
 }
 
 .chains-rollup-table th.col-active .th-button {
@@ -2575,7 +2548,7 @@ input[type="text"] {
 .scatter-wrap svg {
   width: 100%;
   height: auto;
-  min-height: 248px;
+  min-height: 236px;
   display: block;
 }
 
@@ -2693,7 +2666,7 @@ input[type="text"] {
 
 .trend-strip svg {
   width: 100%;
-  height: 34px;
+  height: 38px;
   display: block;
   margin-top: 0.2rem;
 }
@@ -3176,18 +3149,18 @@ input:focus-visible {
   }
 
   .changes-mover-table {
-    min-width: 650px;
+    min-width: 610px;
     table-layout: fixed;
   }
 
   .changes-mover-table th.col-vault,
   .changes-mover-table td.col-vault {
-    width: 2.8rem;
+    width: 2.5rem;
   }
 
   .changes-mover-table th.col-chain,
   .changes-mover-table td.col-chain {
-    width: 2.7rem;
+    width: 2.45rem;
   }
 
   .changes-mover-table th.col-tvl,
@@ -3200,7 +3173,7 @@ input:focus-visible {
   .changes-mover-table td.col-delta,
   .changes-mover-table th.col-age,
   .changes-mover-table td.col-age {
-    width: 3.9rem;
+    width: 3.45rem;
   }
 
   .changes-stale-table th:first-child,
@@ -3246,28 +3219,28 @@ input:focus-visible {
 
   .changes-mover-table td.col-vault .vault-link,
   .regimes-mover-table td.col-vault .vault-link {
-    max-width: 3.3rem;
+    max-width: 2.9rem;
   }
 
   .composition-crowding-table {
-    min-width: 590px;
+    min-width: 550px;
   }
 
   .composition-crowding-table th.col-vault,
   .composition-crowding-table td.col-vault {
-    width: 3.1rem;
+    width: 2.8rem;
   }
 
   .composition-crowding-table th.col-chain,
   .composition-crowding-table td.col-chain,
   .composition-crowding-table th.col-token,
   .composition-crowding-table td.col-token {
-    width: 2.7rem;
+    width: 2.45rem;
   }
 
   .composition-crowding-table th.col-category,
   .composition-crowding-table td.col-category {
-    width: 3rem;
+    width: 2.8rem;
   }
 
   .composition-crowding-table th.col-tvl,
@@ -3276,21 +3249,21 @@ input:focus-visible {
   .composition-crowding-table td.col-apy,
   .composition-crowding-table th.col-crowding,
   .composition-crowding-table td.col-crowding {
-    width: 3.7rem;
+    width: 3.45rem;
   }
 
   .assets-venues-table {
-    min-width: 570px;
+    min-width: 530px;
   }
 
   .assets-venues-table th.col-vault,
   .assets-venues-table td.col-vault {
-    width: 3rem;
+    width: 2.7rem;
   }
 
   .assets-venues-table th.col-chain,
   .assets-venues-table td.col-chain {
-    width: 2.6rem;
+    width: 2.35rem;
   }
 
   .assets-venues-table th.col-tvl,
@@ -3301,32 +3274,32 @@ input:focus-visible {
   .assets-venues-table td.col-momentum,
   .assets-venues-table th.col-consistency,
   .assets-venues-table td.col-consistency {
-    width: 3.6rem;
+    width: 3.3rem;
   }
 
   .assets-venues-table th.col-regime,
   .assets-venues-table td.col-regime {
-    width: 3rem;
+    width: 2.7rem;
   }
 
   .regimes-mover-table {
-    min-width: 540px;
+    min-width: 510px;
     table-layout: fixed;
   }
 
   .regimes-mover-table th.col-vault,
   .regimes-mover-table td.col-vault {
-    width: 2.4rem;
+    width: 2.2rem;
   }
 
   .regimes-mover-table th.col-chain,
   .regimes-mover-table td.col-chain {
-    width: 2.2rem;
+    width: 2.05rem;
   }
 
   .regimes-mover-table th.col-token,
   .regimes-mover-table td.col-token {
-    width: 2.3rem;
+    width: 2.1rem;
   }
 
   .regimes-mover-table th.col-tvl,
@@ -3335,12 +3308,12 @@ input:focus-visible {
   .regimes-mover-table td.col-apy,
   .regimes-mover-table th.col-momentum,
   .regimes-mover-table td.col-momentum {
-    width: 3rem;
+    width: 2.8rem;
   }
 
   .regimes-mover-table th.col-regime,
   .regimes-mover-table td.col-regime {
-    width: 2.6rem;
+    width: 2.35rem;
   }
 
   .regimes-mover-table th,
@@ -3354,30 +3327,30 @@ input:focus-visible {
   }
 
   .regimes-mover-table td.col-vault .vault-link {
-    max-width: 2.5rem;
+    max-width: 2.2rem;
     white-space: nowrap;
     flex-wrap: nowrap;
   }
 
   .chains-rollup-table th.col-chain,
   .chains-rollup-table td.col-chain {
-    width: 3.4rem;
+    width: 3rem;
   }
 
   .chains-rollup-table th.col-active,
   .chains-rollup-table td.col-active {
-    width: 4.2rem;
+    width: 3.7rem;
   }
 
   .chains-rollup-table th.col-tvl,
   .chains-rollup-table td.col-tvl,
   .chains-rollup-table th.col-apy,
   .chains-rollup-table td.col-apy {
-    width: 4.8rem;
+    width: 4.2rem;
   }
 
   .chains-rollup-table {
-    min-width: 610px;
+    min-width: 570px;
     table-layout: auto;
   }
 
@@ -3387,12 +3360,12 @@ input:focus-visible {
   }
 
   .assets-token-table {
-    min-width: 570px;
+    min-width: 530px;
   }
 
   .assets-token-table th.col-token,
   .assets-token-table td.col-token {
-    width: 2.8rem;
+    width: 2.45rem;
   }
 
   .assets-token-table th.col-type,
@@ -3409,14 +3382,14 @@ input:focus-visible {
   .assets-token-table td.col-weighted,
   .assets-token-table th.col-spread,
   .assets-token-table td.col-spread {
-    width: 3.6rem;
+    width: 3.25rem;
   }
 
   .assets-token-table th.col-venues,
   .assets-token-table td.col-venues {
-    width: 2.3rem;
-    padding-left: 0.28rem;
-    padding-right: 0.22rem;
+    width: 2.05rem;
+    padding-left: 0.18rem;
+    padding-right: 0.16rem;
     text-align: left !important;
   }
 
@@ -3468,21 +3441,21 @@ input:focus-visible {
   }
 
   .scatter-wrap svg {
-    min-height: 196px;
+    min-height: 188px;
     min-width: 0;
     width: 100%;
   }
 
   .discover-ridgeline-panel .scatter-wrap svg {
-    min-height: 152px !important;
+    min-height: 146px !important;
   }
 
   .composition-treemap-viz .scatter-wrap svg {
-    min-height: 116px !important;
+    min-height: 108px !important;
   }
 
   .regime-sankey-panel .scatter-wrap svg {
-    min-height: 208px !important;
+    min-height: 196px !important;
   }
 
   .regime-transition-heat .heat-grid {

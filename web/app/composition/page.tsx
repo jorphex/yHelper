@@ -80,8 +80,8 @@ function TvlTreemap({
   tokens: BreakdownRow[];
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
-  const width = 980;
-  const height = 126;
+  const width = 1100;
+  const height = 120;
   const topChains = [...chains]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
@@ -108,8 +108,8 @@ function TvlTreemap({
       </section>
     );
   }
-  const laneGap = 7;
-  const laneHeight = (height - 12 - (validGroups.length - 1) * laneGap) / validGroups.length;
+  const laneGap = 6;
+  const laneHeight = (height - 10 - (validGroups.length - 1) * laneGap) / validGroups.length;
 
   return (
     <section ref={ref} className={`viz-panel composition-treemap-viz ${isInView ? "is-in-view" : ""}`.trim()}>
@@ -117,9 +117,9 @@ function TvlTreemap({
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {validGroups.map((group, groupIndex) => {
-            const y = 6 + groupIndex * (laneHeight + laneGap);
+            const y = 5 + groupIndex * (laneHeight + laneGap);
             const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
-            const labelOffset = 72;
+            const labelOffset = 60;
             const laneWidth = width - labelOffset - 8;
             const scaledWidths = group.rows.map((row) => {
               const value = Number(row.tvl_usd ?? 0);

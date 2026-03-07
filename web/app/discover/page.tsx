@@ -252,14 +252,14 @@ function DiscoverRidgeline({
       </section>
     );
   }
-  const width = 760;
-  const rowH = 30;
+  const width = 820;
+  const rowH = 28;
   const maxLabelChars = valid.reduce((acc, row) => Math.max(acc, row.label.length), 0);
   const maxNoteChars = valid.reduce((acc, row) => Math.max(acc, row.note.length), 0);
-  const chartLeft = Math.max(96, Math.min(184, 18 + maxLabelChars * 7.2));
-  const chartRight = Math.max(110, Math.min(214, 20 + maxNoteChars * 7.2));
+  const chartLeft = Math.max(88, Math.min(160, 18 + maxLabelChars * 6.4));
+  const chartRight = Math.max(98, Math.min(184, 18 + maxNoteChars * 6.4));
   const chartWidth = Math.max(220, width - chartLeft - chartRight);
-  const height = 10 + valid.length * rowH + 18;
+  const height = 8 + valid.length * rowH + 18;
   const bins = 16;
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);

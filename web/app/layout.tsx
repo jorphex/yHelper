@@ -18,6 +18,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "yHelper",
   description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: ["/icon.svg"],
+  },
   openGraph: {
     type: "website",
     url: siteUrl,
