@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { renderSocialPreviewImage } from "./lib/social-preview";
 
-const IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260304bg11";
+const IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260307pal9";
 export const alt = `yHelper dashboard preview ${IMAGE_VERSION}`;
 export const size = {
   width: 1200,

@@ -40,20 +40,20 @@
 
 :root {
   color-scheme: dark;
-  --bg: #060c1f;
-  --bg-2: #091633;
+  --bg: #040a1a;
+  --bg-2: #07122c;
   --ink: #f4f8ff;
   --ink-soft: #d5e6ff;
   --ink-dim: #b9d4fb;
   --muted: #aec7ef;
-  --card: #0d1734;
-  --surface-1: #0d1734;
-  --surface-2: #0a1430;
-  --surface-3: #081026;
+  --card: #0f1d40;
+  --surface-1: #101d40;
+  --surface-2: #0d1836;
+  --surface-3: #0a122b;
   --surface-4: #122c62;
-  --line: #24457f;
-  --line-2: #1b396f;
-  --line-3: #355ea9;
+  --line: #2a4e8c;
+  --line-2: #214376;
+  --line-3: #3d6ab6;
   --accent: #5073ff;
   --accent-2: #86adff;
   --accent-rgb: 80, 115, 255;
@@ -63,21 +63,21 @@
   --accent-purple-rgb: 40, 16, 129;
   --accent-teal: #2db8c3;
   --accent-teal-rgb: 45, 184, 195;
-  --panel-top: #0d1f45;
-  --panel-bottom: #08122a;
-  --panel-top-strong: #102651;
-  --panel-bottom-strong: #0a1735;
-  --surface-hover-top: #17376f;
-  --surface-hover-bottom: #102753;
-  --surface-active-top: #234a95;
-  --surface-active-bottom: #15356f;
-  --control-top: #0f2149;
-  --control-bottom: #0a1733;
-  --control-top-strong: #10264f;
-  --control-bottom-strong: #0a1733;
-  --control-surface: #0c1b3d;
-  --row-hover: #143163;
-  --row-selected: #1a3d7c;
+  --panel-top: #112650;
+  --panel-bottom: #0b1733;
+  --panel-top-strong: #153061;
+  --panel-bottom-strong: #0d1c3f;
+  --surface-hover-top: #1b3f7f;
+  --surface-hover-bottom: #133162;
+  --surface-active-top: #2b56a8;
+  --surface-active-bottom: #1a4284;
+  --control-top: #102347;
+  --control-bottom: #09142d;
+  --control-top-strong: #122b56;
+  --control-bottom-strong: #0a1632;
+  --control-surface: #0c1a3c;
+  --row-hover: #17396e;
+  --row-selected: #1e4888;
   --positive: #43bec8;
   --negative: #d46b86;
   --warn: #ffc56a;
@@ -109,7 +109,7 @@
   --bar-fill-end: #7f90e2;
   --heat-border: #214579;
   --heat-label: #c7dcfa;
-  --shadow: rgba(0, 0, 0, 0.4);
+  --shadow: rgba(0, 0, 0, 0.34);
   --motion-fast: 120ms;
   --motion-base: 180ms;
   --motion-slow: 240ms;
@@ -118,11 +118,11 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-reveal: cubic-bezier(0.2, 0.85, 0.35, 1);
-  --header-bg: rgba(6, 12, 31, 0.84);
-  --shell-overlay-top: rgba(0, 0, 0, 0);
-  --shell-overlay-bottom: rgba(0, 0, 0, 0);
-  --shell-shade-top: rgba(4, 9, 24, 0.06);
-  --shell-shade-bottom: rgba(5, 11, 28, 0.22);
+  --header-bg: rgba(8, 18, 41, 0.86);
+  --shell-overlay-top: rgba(3, 8, 21, 0.06);
+  --shell-overlay-bottom: rgba(4, 10, 25, 0.12);
+  --shell-shade-top: rgba(4, 9, 24, 0.1);
+  --shell-shade-bottom: rgba(5, 11, 28, 0.28);
   --bg-texture-url: url("/bg/grit-abstract-v1.webp?v=20260304bg12");
   --font-sans: "Aeonik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Aeonik Mono", "Source Code Pro", Consolas, "Courier New", monospace;
@@ -178,7 +178,7 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  opacity: 0.22;
+  opacity: 0.2;
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.28' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='512' height='512' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E"),
     radial-gradient(115% 90% at 18% 14%, rgba(176, 213, 255, 0.16) 0%, rgba(176, 213, 255, 0) 60%),
@@ -187,7 +187,7 @@ body::after {
   background-position: center, center, center, center;
   background-size: 500px 500px, cover, cover, cover;
   background-repeat: repeat, no-repeat, no-repeat, no-repeat;
-  filter: contrast(2.0) saturate(1.16) brightness(0.97);
+  filter: contrast(1.95) saturate(1.14) brightness(0.94);
   mix-blend-mode: soft-light;
 }
 
@@ -283,7 +283,8 @@ body::after {
   color: var(--ink);
   text-decoration: none;
   border: 1px solid var(--line-2);
-  background: linear-gradient(180deg, rgba(18, 44, 98, 0.92) 0%, rgba(10, 20, 48, 0.88) 100%);
+  background: linear-gradient(180deg, var(--control-top) 0%, var(--control-bottom) 100%);
+  box-shadow: inset 0 0 0 1px rgba(150, 190, 255, 0.05);
   border-radius: 999px;
   padding: 0.36rem 0.78rem;
   display: inline-flex;
@@ -305,7 +306,7 @@ body::after {
 
 .site-nav-links a.is-active {
   border-color: rgba(134, 173, 255, 0.54);
-  background: linear-gradient(180deg, rgba(22, 50, 106, 0.82) 0%, rgba(12, 27, 58, 0.88) 100%);
+  background: linear-gradient(180deg, var(--surface-active-top) 0%, var(--surface-active-bottom) 100%);
   box-shadow: inset 0 0 0 1px rgba(134, 173, 255, 0.16);
   color: var(--ink);
   transform: none;
@@ -318,6 +319,7 @@ body::after {
   gap: 0.25rem;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, var(--control-top) 0%, var(--control-bottom) 100%);
+  box-shadow: inset 0 0 0 1px rgba(150, 190, 255, 0.06);
   border-radius: 999px;
   padding: 0.2rem;
 }
@@ -361,6 +363,7 @@ body::after {
   font-size: 0.76rem;
   color: var(--ink-soft);
   background: linear-gradient(180deg, var(--control-top) 0%, var(--panel-bottom-strong) 100%);
+  box-shadow: inset 0 0 0 1px rgba(150, 190, 255, 0.05);
   text-decoration: none;
   cursor: default;
   transition:
@@ -908,19 +911,19 @@ a:hover {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   border-radius: 12px;
-  background: var(--surface-3);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-3) 100%);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
 }
 
 .table-wrap tbody tr:nth-child(even) {
-  background: rgba(10, 22, 50, 0.4);
+  background: rgba(14, 29, 63, 0.38);
 }
 
 .table-wrap tbody tr:hover {
-  background: rgba(27, 57, 111, 0.34);
+  background: rgba(32, 68, 130, 0.28);
 }
 
 .table-wrap tbody tr.row-selected {
@@ -955,7 +958,7 @@ td {
 th {
   color: var(--ink-soft);
   font-weight: 600;
-  background: var(--surface-3);
+  background: rgba(15, 31, 68, 0.88);
 }
 
 th.is-numeric,
