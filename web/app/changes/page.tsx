@@ -265,7 +265,7 @@ function MoverTable({
                     )}
                   </td>
                 <td className="mobile-hide analyst-only col-category">
-                  <span className="cell-truncate">{row.category || "unknown"}</span>
+                  <span className="cell-truncate" title={row.category || "unknown"}>{row.category || "unknown"}</span>
                 </td>
                 <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                 <td className="is-numeric col-current">{formatPct(row.safe_apy_window)}</td>

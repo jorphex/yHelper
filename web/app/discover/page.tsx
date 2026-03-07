@@ -252,15 +252,16 @@ function DiscoverRidgeline({
       </section>
     );
   }
-  const width = 820;
-  const rowH = 28;
+  const width = 1000;
+  const rowH = valid.length >= 5 ? 26 : 30;
   const maxLabelChars = valid.reduce((acc, row) => Math.max(acc, row.label.length), 0);
   const maxNoteChars = valid.reduce((acc, row) => Math.max(acc, row.note.length), 0);
-  const chartLeft = Math.max(88, Math.min(160, 18 + maxLabelChars * 6.4));
-  const chartRight = Math.max(98, Math.min(184, 18 + maxNoteChars * 6.4));
+  const chartLeft = Math.round(width * Math.max(0.12, Math.min(0.2, 0.045 + maxLabelChars * 0.008)));
+  const chartRight = Math.round(width * Math.max(0.12, Math.min(0.22, 0.055 + maxNoteChars * 0.0075)));
   const chartWidth = Math.max(220, width - chartLeft - chartRight);
-  const height = 8 + valid.length * rowH + 18;
-  const bins = 16;
+  const peakHeight = Math.max(7, Math.min(10, rowH * 0.36));
+  const height = 8 + valid.length * rowH + 16;
+  const bins = Math.max(14, Math.min(20, Math.round(chartWidth / 48)));
   const allValues = valid.flatMap((row) => row.values);
   const min = Math.min(...allValues);
   const max = Math.max(...allValues);
@@ -273,7 +274,7 @@ function DiscoverRidgeline({
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           {valid.map((row, idx) => {
             const tone = ridgelinePalette[idx % ridgelinePalette.length];
-            const yBase = 10 + idx * rowH + 14;
+            const yBase = 8 + idx * rowH + peakHeight + 3;
             const counts = new Array<number>(bins).fill(0);
             for (const value of row.values) {
               const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
@@ -283,7 +284,7 @@ function DiscoverRidgeline({
             const pathTop = counts
               .map((count, bIdx) => {
                 const x = chartLeft + (bIdx / (bins - 1)) * chartWidth;
-                const y = yBase - (count / maxCount) * 10;
+                const y = yBase - (count / maxCount) * peakHeight;
                 return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
               })
               .join(" ");
@@ -1028,19 +1029,22 @@ function DiscoverPageContent() {
                       "n/a"
                     )}
                   </td>
-                  <td className="analyst-only col-category">{row.category || "n/a"}</td>
+                  <td className="analyst-only col-category" title={row.category || "n/a"}>{row.category || "n/a"}</td>
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
                   <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
-                  <td className="tablet-hide analyst-only col-risk">
+                  <td
+                    className="tablet-hide analyst-only col-risk"
+                    title={`${riskLevelLabel(row.risk_level)}${row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}${row.migration_available ? " · Migr" : ""}${row.is_highlighted ? " · High" : ""}${row.is_retired ? " · Ret" : ""}`}
+                  >
                     {riskLevelLabel(row.risk_level)}
                     {row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}
                     {row.migration_available ? " · Migr" : ""}
                     {row.is_highlighted ? " · High" : ""}
                     {row.is_retired ? " · Ret" : ""}
                   </td>
-                  <td className="analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
+                  <td className="analyst-only col-regime" title={compactRegimeLabel(row.regime)}>{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>

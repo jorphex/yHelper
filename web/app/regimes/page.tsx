@@ -955,7 +955,7 @@ function RegimesPageContent() {
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="tablet-hide is-numeric analyst-only col-regime">{compactRegimeLabel(row.regime)}</td>
+                  <td className="tablet-hide is-numeric analyst-only col-regime" title={compactRegimeLabel(row.regime)}>{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>

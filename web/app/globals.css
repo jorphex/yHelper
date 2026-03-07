@@ -1375,11 +1375,11 @@ input[type="text"] {
 .discover-table td.col-regime {
   width: 3.8rem;
   white-space: nowrap;
-  text-align: right;
+  text-align: left;
 }
 
 .discover-table th.col-regime .th-button {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .discover-table td.col-token,
@@ -3093,28 +3093,33 @@ input:focus-visible {
   }
 
   .discover-table {
-    min-width: 620px;
-    table-layout: auto;
+    min-width: 560px;
+    table-layout: fixed;
   }
 
   .discover-table th.col-vault,
   .discover-table td.col-vault {
-    width: 3.1rem;
+    width: 2.7rem;
   }
 
   .discover-table th.col-chain,
   .discover-table td.col-chain {
-    width: 2.6rem;
+    width: 2.2rem;
   }
 
   .discover-table th.col-token,
   .discover-table td.col-token {
-    width: 2.8rem;
+    width: 2.35rem;
   }
 
   .discover-table th.col-category,
   .discover-table td.col-category {
-    width: 3rem;
+    width: 2.55rem;
+  }
+
+  .discover-table th.is-numeric,
+  .discover-table td.is-numeric {
+    min-width: 0;
   }
 
   .discover-table th.col-tvl,
@@ -3125,42 +3130,42 @@ input:focus-visible {
   .discover-table td.col-momentum,
   .discover-table th.col-consistency,
   .discover-table td.col-consistency {
-    width: 3.7rem;
+    width: 3.25rem;
   }
 
   .discover-table th.col-momentum,
   .discover-table td.col-momentum {
-    width: 3.8rem;
+    width: 3.35rem;
   }
 
   .discover-table th.col-consistency,
   .discover-table td.col-consistency {
-    width: 3.8rem;
+    width: 3.35rem;
   }
 
   .discover-table th.col-risk,
   .discover-table td.col-risk {
-    width: 4.1rem;
+    width: 3.3rem;
   }
 
   .discover-table th.col-regime,
   .discover-table td.col-regime {
-    width: 3.1rem;
+    width: 2.65rem;
   }
 
   .changes-mover-table {
-    min-width: 610px;
+    min-width: 520px;
     table-layout: fixed;
   }
 
   .changes-mover-table th.col-vault,
   .changes-mover-table td.col-vault {
-    width: 2.5rem;
+    width: 2.35rem;
   }
 
   .changes-mover-table th.col-chain,
   .changes-mover-table td.col-chain {
-    width: 2.45rem;
+    width: 2.25rem;
   }
 
   .changes-mover-table th.col-tvl,
@@ -3173,12 +3178,12 @@ input:focus-visible {
   .changes-mover-table td.col-delta,
   .changes-mover-table th.col-age,
   .changes-mover-table td.col-age {
-    width: 3.45rem;
+    width: 3.2rem;
   }
 
   .changes-stale-table th:first-child,
   .changes-stale-table td:first-child {
-    width: 12%;
+    width: 11%;
   }
 
   .changes-stale-table th:nth-child(2),
@@ -3187,17 +3192,17 @@ input:focus-visible {
   .changes-stale-table td:nth-child(3),
   .changes-stale-table th:nth-child(4),
   .changes-stale-table td:nth-child(4) {
-    width: 13%;
+    width: 12%;
   }
 
   .changes-stale-table th:nth-child(5),
   .changes-stale-table td:nth-child(5) {
-    width: 14%;
+    width: 13.5%;
   }
 
   .changes-stale-table th:nth-child(6),
   .changes-stale-table td:nth-child(6) {
-    width: 14%;
+    width: 13.5%;
   }
 
   .changes-stale-table th:nth-child(2),
@@ -3210,10 +3215,8 @@ input:focus-visible {
   }
 
   .discover-table td.col-vault .vault-link,
-  .changes-mover-table td.col-vault .vault-link,
   .composition-crowding-table td.col-vault .vault-link,
-  .assets-venues-table td.col-vault .vault-link,
-  .regimes-mover-table td.col-vault .vault-link {
+  .assets-venues-table td.col-vault .vault-link {
     max-width: 4.3rem;
   }
 
@@ -3222,8 +3225,12 @@ input:focus-visible {
     max-width: 2.9rem;
   }
 
+  .discover-table td.col-vault .vault-link {
+    max-width: 2.85rem;
+  }
+
   .composition-crowding-table {
-    min-width: 550px;
+    min-width: 530px;
   }
 
   .composition-crowding-table th.col-vault,
@@ -3253,7 +3260,7 @@ input:focus-visible {
   }
 
   .assets-venues-table {
-    min-width: 530px;
+    min-width: 510px;
   }
 
   .assets-venues-table th.col-vault,
@@ -3283,7 +3290,7 @@ input:focus-visible {
   }
 
   .regimes-mover-table {
-    min-width: 510px;
+    min-width: 480px;
     table-layout: fixed;
   }
 
@@ -3334,24 +3341,33 @@ input:focus-visible {
 
   .chains-rollup-table th.col-chain,
   .chains-rollup-table td.col-chain {
-    width: 3rem;
+    width: 2.6rem;
   }
 
   .chains-rollup-table th.col-active,
   .chains-rollup-table td.col-active {
-    width: 3.7rem;
+    width: 3rem;
+  }
+
+  .chains-rollup-table th.col-metrics,
+  .chains-rollup-table td.col-metrics,
+  .chains-rollup-table th.col-momentum,
+  .chains-rollup-table td.col-momentum,
+  .chains-rollup-table th.col-consistency,
+  .chains-rollup-table td.col-consistency {
+    width: 3.05rem;
   }
 
   .chains-rollup-table th.col-tvl,
   .chains-rollup-table td.col-tvl,
   .chains-rollup-table th.col-apy,
   .chains-rollup-table td.col-apy {
-    width: 4.2rem;
+    width: 3.55rem;
   }
 
   .chains-rollup-table {
-    min-width: 570px;
-    table-layout: auto;
+    min-width: 500px;
+    table-layout: fixed;
   }
 
   .chains-rollup-table th,
@@ -3360,7 +3376,7 @@ input:focus-visible {
   }
 
   .assets-token-table {
-    min-width: 530px;
+    min-width: 500px;
   }
 
   .assets-token-table th.col-token,
@@ -3398,21 +3414,36 @@ input:focus-visible {
   }
 
   .composition-summary-table {
-    min-width: 560px;
+    min-width: 520px;
+  }
+
+  .composition-summary-table th:nth-child(1),
+  .composition-summary-table td:nth-child(1) {
+    width: 14%;
+  }
+
+  .composition-summary-table th:nth-child(2),
+  .composition-summary-table td:nth-child(2) {
+    width: 9%;
+  }
+
+  .composition-summary-table th:nth-child(3),
+  .composition-summary-table td:nth-child(3) {
+    width: 18%;
   }
 
   .composition-summary-table th:nth-child(4),
   .composition-summary-table td:nth-child(4),
   .composition-summary-table th:nth-child(5),
   .composition-summary-table td:nth-child(5) {
-    width: 4.5rem;
-    padding-left: 0.42rem;
-    padding-right: 0.42rem;
+    width: 3.95rem;
+    padding-left: 0.34rem;
+    padding-right: 0.34rem;
   }
 
   .changes-stale-table,
   .regimes-split-table {
-    min-width: 560px;
+    min-width: 500px;
   }
 
   .assets-universe-card .kpi-grid,
