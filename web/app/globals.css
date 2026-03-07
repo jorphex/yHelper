@@ -1164,12 +1164,57 @@ input[type="text"] {
 }
 
 .page-top-panel .inline-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.4rem, 1fr));
+  gap: 0.55rem;
+  align-items: start;
   margin-bottom: 0;
 }
 
 .page-top-panel .inline-controls > label {
+  display: grid;
+  gap: 0.24rem;
+  align-items: start;
+  align-content: start;
+  min-height: 0;
+  padding: 0.46rem 0.52rem;
+  font-size: 0.77rem;
+  line-height: 1.24;
+  color: var(--ink-soft);
   border-color: var(--line-2);
   background: linear-gradient(180deg, rgba(18, 40, 87, 0.76), rgba(8, 19, 42, 0.9));
+}
+
+.page-top-panel .inline-controls > label > input[type="number"],
+.page-top-panel .inline-controls > label > input[type="text"],
+.page-top-panel .inline-controls > label > select {
+  width: 100%;
+  min-width: 0;
+}
+
+.page-top-panel .inline-controls.controls-tight > label {
+  gap: 0.24rem;
+  padding: 0.42rem 0.48rem;
+}
+
+.page-top-panel .inline-controls.controls-tight > label > input[type="number"],
+.page-top-panel .inline-controls.controls-tight > label > input[type="text"] {
+  min-width: 0;
+  width: 100%;
+  padding: 0.28rem 0.42rem;
+}
+
+.page-top-panel .inline-controls.controls-tight > label.field-compact > input[type="number"] {
+  min-width: 0;
+  width: 100%;
+}
+
+.page-top-panel .inline-controls > label.toggle-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  padding-block: 0.56rem;
 }
 
 .confidence-line {
