@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 const NAV_LINKS: Array<{ href: string; label: string }> = [
   { href: "/", label: "Overview" },
@@ -18,7 +18,7 @@ export function NavLinks() {
   const pathname = usePathname();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const updateIndicator = () => {
@@ -31,6 +31,7 @@ export function NavLinks() {
       container.dataset.ready = "true";
     };
     updateIndicator();
+    const frame = window.requestAnimationFrame(updateIndicator);
     const resizeObserver = new ResizeObserver(() => updateIndicator());
     resizeObserver.observe(container);
     const links = container.querySelectorAll("a");
@@ -38,6 +39,7 @@ export function NavLinks() {
     container.addEventListener("scroll", updateIndicator, { passive: true });
     window.addEventListener("resize", updateIndicator);
     return () => {
+      window.cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       container.removeEventListener("scroll", updateIndicator);
       window.removeEventListener("resize", updateIndicator);

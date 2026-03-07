@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, replaceQuery } from "../lib/url";
+import { PageTopPanel } from "../components/page-top-panel";
 import { BarList, KpiGrid } from "../components/visuals";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -124,41 +125,42 @@ function ChainsPageContent() {
         </p>
       </section>
 
-      <section className="card explain-card">
-        <h2>Read Me First</h2>
-        <p className="muted card-intro">
-          Weighted APY uses TVL weights, so larger vaults have more influence on each chain score.
-        </p>
-        <p className="muted">Coverage ratio means vaults with metrics divided by active vaults.</p>
-      </section>
+      <PageTopPanel
+        intro={
+          <>
+            <p className="muted card-intro">
+              Weighted APY uses TVL weights, so larger vaults have more influence on each chain score.
+            </p>
+            <p className="muted">Coverage ratio means vaults with metrics divided by active vaults.</p>
+          </>
+        }
+        filtersIntro={<p className="muted card-intro">URL-backed controls keep chain views shareable.</p>}
+        filters={
+          <div className="inline-controls controls-tight">
+            <label>
+              Universe:&nbsp;
+              <select value={query.universe} onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null })}>
+                {UNIVERSE_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {universeLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Min TVL (USD):&nbsp;
+              <input
+                type="number"
+                min={0}
+                value={query.minTvl}
+                onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
+              />
+            </label>
+          </div>
+        }
+      />
 
       {error ? <section className="card">{error}</section> : null}
-
-      <section className="card">
-        <h2>Filters</h2>
-        <p className="muted card-intro">URL-backed controls keep chain views shareable.</p>
-        <div className="inline-controls controls-tight">
-          <label>
-            Universe:&nbsp;
-            <select value={query.universe} onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null })}>
-              {UNIVERSE_VALUES.map((value) => (
-                <option key={value} value={value}>
-                  {universeLabel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Min TVL (USD):&nbsp;
-            <input
-              type="number"
-              min={0}
-              value={query.minTvl}
-              onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
-            />
-          </label>
-        </div>
-      </section>
 
       <section className="card">
         <h2>Chain Universe Snapshot</h2>

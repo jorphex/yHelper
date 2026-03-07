@@ -7,6 +7,7 @@ import { chainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, TrendStrips, useInViewOnce } from "../components/visuals";
+import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -505,101 +506,103 @@ function RegimesPageContent() {
         </p>
       </section>
 
-      <section className="card explain-card">
-        <h2>Read Me First</h2>
-        <p className="muted card-intro">
-          Regimes are rule-based: rising if momentum ≥ +1%, falling if momentum ≤ -1%, choppy if 30d volatility ≥ 20%, otherwise
-          stable.
-        </p>
-        <p className="muted">This is descriptive, not predictive. It explains what recently happened in yield behavior.</p>
-      </section>
+      <PageTopPanel
+        intro={
+          <>
+            <p className="muted card-intro">
+              Regimes are rule based: rising if momentum is at least +1%, falling if momentum is at most -1%, choppy if 30d
+              volatility is at least 20%, otherwise stable.
+            </p>
+            <p className="muted">This is descriptive, not predictive. It explains what recently happened in yield behavior.</p>
+          </>
+        }
+        filtersIntro={<p className="muted card-intro">Filters and sort are stored in URL query params for shareable views.</p>}
+        filters={
+          <div className="inline-controls controls-tight">
+            <label>
+              Universe:&nbsp;
+              <select
+                value={query.universe}
+                onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
+              >
+                {UNIVERSE_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {universeLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Chain:&nbsp;
+              <select value={query.chain > 0 ? String(query.chain) : ""} onChange={(event) => updateQuery({ chain: event.target.value || null })}>
+                <option value="">All</option>
+                {availableChains.map((chainId) => (
+                  <option key={chainId} value={chainId}>
+                    {chainLabel(chainId)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Min TVL (USD):&nbsp;
+              <input
+                type="number"
+                min={0}
+                value={query.minTvl}
+                onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label>
+              Min Points:&nbsp;
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={query.minPoints}
+                onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label>
+              Movers Limit:&nbsp;
+              <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+                <option value={80}>80</option>
+              </select>
+            </label>
+            <label>
+              Transition Split:&nbsp;
+              <select value={query.transitionSplit} onChange={(event) => updateQuery({ transition_split: event.target.value })}>
+                <option value="none">Global</option>
+                <option value="chain">By Chain</option>
+                <option value="category">By Category</option>
+              </select>
+            </label>
+            <label>
+              Transition Window:&nbsp;
+              <select value={query.transitionDays} onChange={(event) => updateQuery({ transition_days: event.target.value })}>
+                <option value="60">60d</option>
+                <option value="120">120d</option>
+                <option value="180">180d</option>
+                <option value="365">365d</option>
+              </select>
+            </label>
+            <label>
+              Min Cohort TVL (USD):&nbsp;
+              <input
+                type="number"
+                min={0}
+                value={query.transitionMinCohortTvl}
+                onChange={(event) => updateQuery({ transition_min_cohort_tvl: Number(event.target.value || 0) })}
+              />
+            </label>
+          </div>
+        }
+        className="regime-transition-matrix"
+      />
 
       {error ? <section className="card">{error}</section> : null}
-
-      <section className="card regime-transition-matrix">
-        <h2>Filters</h2>
-        <p className="muted card-intro">Filters and sort are stored in URL query params for shareable views.</p>
-        <div className="inline-controls controls-tight">
-          <label>
-            Universe:&nbsp;
-            <select
-              value={query.universe}
-              onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
-            >
-              {UNIVERSE_VALUES.map((value) => (
-                <option key={value} value={value}>
-                  {universeLabel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Chain:&nbsp;
-            <select value={query.chain > 0 ? String(query.chain) : ""} onChange={(event) => updateQuery({ chain: event.target.value || null })}>
-              <option value="">All</option>
-              {availableChains.map((chainId) => (
-                <option key={chainId} value={chainId}>
-                  {chainLabel(chainId)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Min TVL (USD):&nbsp;
-            <input
-              type="number"
-              min={0}
-              value={query.minTvl}
-              onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label>
-            Min Points:&nbsp;
-            <input
-              type="number"
-              min={0}
-              max={365}
-              value={query.minPoints}
-              onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label>
-            Movers Limit:&nbsp;
-            <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-              <option value={80}>80</option>
-            </select>
-          </label>
-          <label>
-            Transition Split:&nbsp;
-            <select value={query.transitionSplit} onChange={(event) => updateQuery({ transition_split: event.target.value })}>
-              <option value="none">Global</option>
-              <option value="chain">By Chain</option>
-              <option value="category">By Category</option>
-            </select>
-          </label>
-          <label>
-            Transition Window:&nbsp;
-            <select value={query.transitionDays} onChange={(event) => updateQuery({ transition_days: event.target.value })}>
-              <option value="60">60d</option>
-              <option value="120">120d</option>
-              <option value="180">180d</option>
-              <option value="365">365d</option>
-            </select>
-          </label>
-          <label>
-            Min Cohort TVL (USD):&nbsp;
-            <input
-              type="number"
-              min={0}
-              value={query.transitionMinCohortTvl}
-              onChange={(event) => updateQuery({ transition_min_cohort_tvl: Number(event.target.value || 0) })}
-            />
-          </label>
-        </div>
-      </section>
 
       <section className="card regime-summary-card">
         <h2>Regime Summary</h2>

@@ -7,6 +7,7 @@ import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, KpiGrid } from "../components/visuals";
+import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -282,97 +283,98 @@ function AssetsPageContent() {
         </p>
       </section>
 
-      <section className="card explain-card">
-        <h2>Read Me First</h2>
-        <p className="muted card-intro">
-          APY spread = best APY minus worst APY for one token. Weighted APY gives more weight to high-TVL (larger) venues, so it
-          reflects where most capital sits.
-        </p>
-        <p className="muted">Use this page to find large tokens where venue differences are meaningful, not just noise.</p>
-      </section>
+      <PageTopPanel
+        intro={
+          <>
+            <p className="muted card-intro">
+              APY spread is best APY minus worst APY for one token. Weighted APY gives more weight to high-TVL venues, so it
+              reflects where most capital sits.
+            </p>
+            <p className="muted">Use this page to find large tokens where venue differences are meaningful, not just noise.</p>
+          </>
+        }
+        filtersIntro={<p className="muted card-intro">All controls are URL-backed so this comparison view is shareable.</p>}
+        filters={
+          <div className="inline-controls controls-tight">
+            <label>
+              List:&nbsp;
+              <select value={query.tokenScope} onChange={(event) => updateQuery({ token_scope: event.target.value as TokenScope, token: null })}>
+                <option value="featured">Featured (clean list)</option>
+                <option value="canonical">Canonical only</option>
+                <option value="all">All symbols (incl. LP/structured)</option>
+              </select>
+            </label>
+            <label>
+              Universe:&nbsp;
+              <select
+                value={query.universe}
+                onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
+              >
+                {UNIVERSE_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {universeLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field-compact">
+              Min TVL (USD):&nbsp;
+              <input
+                type="number"
+                min={0}
+                value={query.minTvl}
+                onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label className="field-compact">
+              Min Points:&nbsp;
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={query.minPoints}
+                onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label>
+              Rows:&nbsp;
+              <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
+                <option value={60}>60</option>
+                <option value={120}>120</option>
+                <option value={180}>180</option>
+              </select>
+            </label>
+            <label>
+              Sort:&nbsp;
+              <select value={query.apiSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
+                <option value="tvl">TVL</option>
+                <option value="spread">APY Spread</option>
+                <option value="best_apy">Best APY</option>
+                <option value="venues">Venues</option>
+              </select>
+            </label>
+            <label>
+              Direction:&nbsp;
+              <select value={query.apiDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
+                <option value="desc">Highest first</option>
+                <option value="asc">Lowest first</option>
+              </select>
+            </label>
+            <label>
+              Token Search:&nbsp;
+              <input
+                type="text"
+                value={query.tokenQuery}
+                onChange={(event) => updateQuery({ token_query: event.target.value, token: null })}
+                placeholder="e.g. DAI, WETH"
+              />
+            </label>
+          </div>
+        }
+      />
 
       {assetsError ? <section className="card">{assetsError}</section> : null}
       {detailError ? <section className="card">{detailError}</section> : null}
-
-      <section className="card">
-        <h2>Filters</h2>
-        <p className="muted card-intro">All controls are URL-backed so this comparison view is shareable.</p>
-        <div className="inline-controls controls-tight">
-          <label>
-            List:&nbsp;
-            <select value={query.tokenScope} onChange={(event) => updateQuery({ token_scope: event.target.value as TokenScope, token: null })}>
-              <option value="featured">Featured (clean list)</option>
-              <option value="canonical">Canonical only</option>
-              <option value="all">All symbols (incl. LP/structured)</option>
-            </select>
-          </label>
-          <label>
-            Universe:&nbsp;
-            <select
-              value={query.universe}
-              onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
-            >
-              {UNIVERSE_VALUES.map((value) => (
-                <option key={value} value={value}>
-                  {universeLabel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field-compact">
-            Min TVL (USD):&nbsp;
-            <input
-              type="number"
-              min={0}
-              value={query.minTvl}
-              onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label className="field-compact">
-            Min Points:&nbsp;
-            <input
-              type="number"
-              min={0}
-              max={365}
-              value={query.minPoints}
-              onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label>
-            Rows:&nbsp;
-            <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
-              <option value={60}>60</option>
-              <option value={120}>120</option>
-              <option value={180}>180</option>
-            </select>
-          </label>
-          <label>
-            Sort:&nbsp;
-            <select value={query.apiSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
-              <option value="tvl">TVL</option>
-              <option value="spread">APY Spread</option>
-              <option value="best_apy">Best APY</option>
-              <option value="venues">Venues</option>
-            </select>
-          </label>
-          <label>
-            Direction:&nbsp;
-            <select value={query.apiDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
-              <option value="desc">Highest first</option>
-              <option value="asc">Lowest first</option>
-            </select>
-          </label>
-          <label>
-            Token Search:&nbsp;
-            <input
-              type="text"
-              value={query.tokenQuery}
-              onChange={(event) => updateQuery({ token_query: event.target.value, token: null })}
-              placeholder="e.g. DAI, WETH"
-            />
-          </label>
-        </div>
-      </section>
 
       <section className="card assets-universe-card">
         <h2>Token Universe</h2>

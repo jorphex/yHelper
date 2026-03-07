@@ -7,6 +7,7 @@ import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, useInViewOnce } from "../components/visuals";
+import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -375,77 +376,80 @@ function CompositionPageContent() {
         <p className="muted">Map where TVL concentrates and which vaults look crowded or under-owned.</p>
       </section>
 
-      <section className="card explain-card">
-        <h2>Read Me First</h2>
-        <p className="muted card-intro">
-          Crowding index compares normalized size (TVL) against normalized yield. Higher values imply “large for their current yield.”
-        </p>
-        <p className="muted">
-          HHI (Herfindahl-Hirschman Index) runs from near 0 (spread out) to 1 (concentrated). It helps detect concentration risk.
-        </p>
-      </section>
+      <PageTopPanel
+        intro={
+          <>
+            <p className="muted card-intro">
+              Crowding index compares normalized size against normalized yield. Higher values imply vaults that are large for their
+              current yield.
+            </p>
+            <p className="muted">
+              HHI runs from near 0 when spread out toward 1 when concentrated. It helps detect concentration risk by chain,
+              category, and token.
+            </p>
+          </>
+        }
+        filtersIntro={<p className="muted card-intro">Composition controls are URL-backed for reproducible views.</p>}
+        filters={
+          <div className="inline-controls controls-tight">
+            <label>
+              Universe:&nbsp;
+              <select
+                value={query.universe}
+                onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
+              >
+                {UNIVERSE_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {universeLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Min TVL (USD):&nbsp;
+              <input
+                type="number"
+                min={0}
+                value={query.minTvl}
+                onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label>
+              Min Points:&nbsp;
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={query.minPoints}
+                onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label>
+              Top Groups:&nbsp;
+              <select value={query.topN} onChange={(event) => updateQuery({ top_n: Number(event.target.value) })}>
+                <option value={10}>10</option>
+                <option value={12}>12</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+              </select>
+            </label>
+            <label>
+              Crowding Rows:&nbsp;
+              <select
+                value={query.crowdingLimit}
+                onChange={(event) => updateQuery({ crowding_limit: Number(event.target.value) })}
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={25}>25</option>
+                <option value={40}>40</option>
+              </select>
+            </label>
+          </div>
+        }
+      />
 
       {error ? <section className="card">{error}</section> : null}
-
-      <section className="card">
-        <h2>Filters</h2>
-        <p className="muted card-intro">Composition controls are URL-backed for reproducible views.</p>
-        <div className="inline-controls controls-tight">
-          <label>
-            Universe:&nbsp;
-            <select
-              value={query.universe}
-              onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
-            >
-              {UNIVERSE_VALUES.map((value) => (
-                <option key={value} value={value}>
-                  {universeLabel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Min TVL (USD):&nbsp;
-            <input
-              type="number"
-              min={0}
-              value={query.minTvl}
-              onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label>
-            Min Points:&nbsp;
-            <input
-              type="number"
-              min={0}
-              max={365}
-              value={query.minPoints}
-              onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label>
-            Top Groups:&nbsp;
-            <select value={query.topN} onChange={(event) => updateQuery({ top_n: Number(event.target.value) })}>
-              <option value={10}>10</option>
-              <option value={12}>12</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-            </select>
-          </label>
-          <label>
-            Crowding Rows:&nbsp;
-            <select
-              value={query.crowdingLimit}
-              onChange={(event) => updateQuery({ crowding_limit: Number(event.target.value) })}
-            >
-              <option value={10}>10</option>
-              <option value={15}>15</option>
-              <option value={25}>25</option>
-              <option value={40}>40</option>
-            </select>
-          </label>
-        </div>
-      </section>
 
       <section className="card composition-visuals-card">
         <h2>Summary</h2>

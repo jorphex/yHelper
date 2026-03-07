@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { queryBool, queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips, useInViewOnce } from "../components/visuals";
+import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -679,148 +680,149 @@ function DiscoverPageContent() {
         </p>
       </section>
 
-      <section className="card explain-card">
-        <h2>Read Me First</h2>
-        <p className="muted card-intro">
-          APY (annual percentage yield) here is an estimate from Price Per Share history, not a guaranteed forward rate. Momentum
-          means 7-day APY minus 30-day APY. Positive momentum means yield has improved recently.
-        </p>
-        <p className="muted">
-          Lifecycle flags come from yDaemon metadata: highlighted (promoted), migration-ready (new vault target exists), retired
-          (legacy/being phased out).
-        </p>
-      </section>
+      <PageTopPanel
+        intro={
+          <>
+            <p className="muted card-intro">
+              APY here is an estimate from Price Per Share history, not a guaranteed forward rate. Momentum means 7-day APY minus
+              30-day APY, so positive momentum means yield improved recently.
+            </p>
+            <p className="muted">
+              Lifecycle flags come from yDaemon metadata: highlighted means promoted, migration ready means a newer vault target
+              exists, and retired means legacy or phasing out.
+            </p>
+          </>
+        }
+        filtersIntro={<p className="muted card-intro">All controls are encoded in the URL, so this exact view is shareable.</p>}
+        filters={
+          <div className="inline-controls controls-tight">
+            <label>
+              Chain:&nbsp;
+              <select
+                value={query.chain ? String(query.chain) : ""}
+                onChange={(event) => updateQuery({ chain: event.target.value || null })}
+              >
+                <option value="">All</option>
+                {availableChains.map((chain) => (
+                  <option key={chain} value={chain}>
+                    {chainLabel(chain)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Category:&nbsp;
+              <select
+                value={query.category}
+                onChange={(event) => updateQuery({ category: event.target.value || null })}
+              >
+                <option value="">All</option>
+                {availableCategories.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Token:&nbsp;
+              <select value={query.token} onChange={(event) => updateQuery({ token: event.target.value || null })}>
+                <option value="">All</option>
+                {availableTokens.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Universe:&nbsp;
+              <select
+                value={query.universe}
+                onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
+              >
+                {UNIVERSE_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {universeLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field-compact">
+              Min TVL (USD):&nbsp;
+              <input
+                type="number"
+                min={0}
+                value={query.minTvl}
+                onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label className="field-compact">
+              Min Points:&nbsp;
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={query.minPoints}
+                onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label className="toggle-label">
+              <input
+                type="checkbox"
+                checked={query.migrationOnly}
+                onChange={(event) => updateQuery({ migration_only: event.target.checked ? "true" : null })}
+              />
+              <span>Migration ready only</span>
+            </label>
+            <label className="toggle-label">
+              <input
+                type="checkbox"
+                checked={query.highlightedOnly}
+                onChange={(event) => updateQuery({ highlighted_only: event.target.checked ? "true" : null })}
+              />
+              <span>Highlighted only</span>
+            </label>
+            <label>
+              Rows:&nbsp;
+              <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
+                <option value={30}>30</option>
+                <option value={60}>60</option>
+                <option value={100}>100</option>
+                <option value={150}>150</option>
+              </select>
+            </label>
+            <label>
+              Sort:&nbsp;
+              <select value={query.serverSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
+                <option value="quality">Quality</option>
+                <option value="tvl">TVL</option>
+                <option value="apy_30d">APY 30d</option>
+                <option value="momentum">Momentum</option>
+                <option value="consistency">Consistency</option>
+              </select>
+            </label>
+            <label>
+              Direction:&nbsp;
+              <select value={query.serverDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
+                <option value="desc">Highest first</option>
+                <option value="asc">Lowest first</option>
+              </select>
+            </label>
+            <label>
+              Trend View:&nbsp;
+              <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value })}>
+                <option value="none">Global</option>
+                <option value="chain">By Chain</option>
+                <option value="category">By Category</option>
+              </select>
+            </label>
+          </div>
+        }
+      />
 
       {error ? <section className="card">{error}</section> : null}
       {trendError ? <section className="card">{trendError}</section> : null}
-
-      <section className="card">
-        <h2>Filters</h2>
-        <p className="muted card-intro">All controls are encoded in the URL, so this exact view is shareable.</p>
-        <div className="inline-controls controls-tight">
-          <label>
-            Chain:&nbsp;
-            <select
-              value={query.chain ? String(query.chain) : ""}
-              onChange={(event) => updateQuery({ chain: event.target.value || null })}
-            >
-              <option value="">All</option>
-              {availableChains.map((chain) => (
-                <option key={chain} value={chain}>
-                  {chainLabel(chain)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Category:&nbsp;
-            <select
-              value={query.category}
-              onChange={(event) => updateQuery({ category: event.target.value || null })}
-            >
-              <option value="">All</option>
-              {availableCategories.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Token:&nbsp;
-            <select value={query.token} onChange={(event) => updateQuery({ token: event.target.value || null })}>
-              <option value="">All</option>
-              {availableTokens.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Universe:&nbsp;
-            <select
-              value={query.universe}
-              onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
-            >
-              {UNIVERSE_VALUES.map((value) => (
-                <option key={value} value={value}>
-                  {universeLabel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field-compact">
-            Min TVL (USD):&nbsp;
-            <input
-              type="number"
-              min={0}
-              value={query.minTvl}
-              onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label className="field-compact">
-            Min Points:&nbsp;
-            <input
-              type="number"
-              min={0}
-              max={365}
-              value={query.minPoints}
-              onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label className="toggle-label">
-            <input
-              type="checkbox"
-              checked={query.migrationOnly}
-              onChange={(event) => updateQuery({ migration_only: event.target.checked ? "true" : null })}
-            />
-            <span>Migration ready only</span>
-          </label>
-          <label className="toggle-label">
-            <input
-              type="checkbox"
-              checked={query.highlightedOnly}
-              onChange={(event) => updateQuery({ highlighted_only: event.target.checked ? "true" : null })}
-            />
-            <span>Highlighted only</span>
-          </label>
-          <label>
-            Rows:&nbsp;
-            <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
-              <option value={30}>30</option>
-              <option value={60}>60</option>
-              <option value={100}>100</option>
-              <option value={150}>150</option>
-            </select>
-          </label>
-          <label>
-            Sort:&nbsp;
-            <select value={query.serverSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
-              <option value="quality">Quality</option>
-              <option value="tvl">TVL</option>
-              <option value="apy_30d">APY 30d</option>
-              <option value="momentum">Momentum</option>
-              <option value="consistency">Consistency</option>
-            </select>
-          </label>
-          <label>
-            Direction:&nbsp;
-            <select value={query.serverDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
-              <option value="desc">Highest first</option>
-              <option value="asc">Lowest first</option>
-            </select>
-          </label>
-          <label>
-            Trend View:&nbsp;
-            <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value })}>
-              <option value="none">Global</option>
-              <option value="chain">By Chain</option>
-              <option value="category">By Category</option>
-            </select>
-          </label>
-        </div>
-      </section>
 
       {!error && !data?.rows?.length ? (
         <section className="card">

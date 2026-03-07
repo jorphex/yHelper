@@ -7,6 +7,7 @@ import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "..
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips } from "../components/visuals";
+import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
@@ -675,103 +676,104 @@ function ChangesPageContent() {
         </p>
       </section>
 
-      <section className="card explain-card">
-        <h2>Read Me First</h2>
-        <p className="muted card-intro">
-          Delta = current window APY minus previous window APY. Positive delta means yield is strengthening; negative delta means it
-          is weakening.
-        </p>
-        <p className="muted">
-          Example: on 7d mode, current APY uses the latest 7 days, previous APY uses the 7 days before that.
-        </p>
-      </section>
+      <PageTopPanel
+        intro={
+          <>
+            <p className="muted card-intro">
+              Delta is current window APY minus previous window APY. Positive delta means yield is strengthening and negative delta
+              means it is weakening.
+            </p>
+            <p className="muted">
+              Example: in 7d mode, current APY uses the latest 7 days and previous APY uses the 7 days before that.
+            </p>
+          </>
+        }
+        filtersIntro={<p className="muted card-intro">All controls are URL-backed so this view stays shareable.</p>}
+        filters={
+          <div className="inline-controls controls-tight">
+            <label>
+              Range:&nbsp;
+              <select value={query.window} onChange={(event) => updateQuery({ window: event.target.value as WindowKey })}>
+                <option value="24h">24h</option>
+                <option value="7d">7d</option>
+                <option value="30d">30d</option>
+              </select>
+            </label>
+            <label>
+              Stale Cutoff:&nbsp;
+              <select
+                value={query.staleThreshold}
+                onChange={(event) => updateQuery({ stale_threshold: event.target.value as StaleThresholdKey })}
+              >
+                <option value="auto">Auto (2× APY range)</option>
+                <option value="24h">24h</option>
+                <option value="7d">7d</option>
+                <option value="30d">30d</option>
+              </select>
+            </label>
+            <label>
+              Universe:&nbsp;
+              <select
+                value={query.universe}
+                onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
+              >
+                {UNIVERSE_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {universeLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              TVL View:&nbsp;
+              <select value={query.tvlView} onChange={(event) => updateQuery({ tvl_view: event.target.value as TvlView })}>
+                <option value="both">Both (Filtered + Yearn Proxy)</option>
+                <option value="filtered">Filtered Universe Only</option>
+                <option value="yearn">Yearn-Aligned Proxy Only</option>
+              </select>
+            </label>
+            <label className="field-compact">
+              Min TVL (USD):&nbsp;
+              <input
+                type="number"
+                min={0}
+                value={query.minTvl}
+                onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label>
+              Trend View:&nbsp;
+              <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value as TrendGroupKey })}>
+                <option value="none">Global</option>
+                <option value="chain">By Chain</option>
+                <option value="category">By Category</option>
+              </select>
+            </label>
+            <label>
+              Movers Limit:&nbsp;
+              <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+            <label className="field-compact">
+              Min Points:&nbsp;
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={query.minPoints}
+                onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
+              />
+            </label>
+          </div>
+        }
+      />
 
       {error ? <section className="card">{error}</section> : null}
       {trendError ? <section className="card">{trendError}</section> : null}
-
-      <section className="card">
-        <h2>Filters</h2>
-        <p className="muted card-intro">All controls are URL-backed so this view stays shareable.</p>
-        <div className="inline-controls controls-tight">
-          <label>
-            Range:&nbsp;
-            <select value={query.window} onChange={(event) => updateQuery({ window: event.target.value as WindowKey })}>
-              <option value="24h">24h</option>
-              <option value="7d">7d</option>
-              <option value="30d">30d</option>
-            </select>
-          </label>
-          <label>
-            Stale Cutoff:&nbsp;
-            <select
-              value={query.staleThreshold}
-              onChange={(event) => updateQuery({ stale_threshold: event.target.value as StaleThresholdKey })}
-            >
-              <option value="auto">Auto (2× APY range)</option>
-              <option value="24h">24h</option>
-              <option value="7d">7d</option>
-              <option value="30d">30d</option>
-            </select>
-          </label>
-          <label>
-            Universe:&nbsp;
-            <select
-              value={query.universe}
-              onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
-            >
-              {UNIVERSE_VALUES.map((value) => (
-                <option key={value} value={value}>
-                  {universeLabel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            TVL View:&nbsp;
-            <select value={query.tvlView} onChange={(event) => updateQuery({ tvl_view: event.target.value as TvlView })}>
-              <option value="both">Both (Filtered + Yearn Proxy)</option>
-              <option value="filtered">Filtered Universe Only</option>
-              <option value="yearn">Yearn-Aligned Proxy Only</option>
-            </select>
-          </label>
-          <label className="field-compact">
-            Min TVL (USD):&nbsp;
-            <input
-              type="number"
-              min={0}
-              value={query.minTvl}
-              onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
-            />
-          </label>
-          <label>
-            Trend View:&nbsp;
-            <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value as TrendGroupKey })}>
-              <option value="none">Global</option>
-              <option value="chain">By Chain</option>
-              <option value="category">By Category</option>
-            </select>
-          </label>
-          <label>
-            Movers Limit:&nbsp;
-            <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-              <option value={50}>50</option>
-            </select>
-          </label>
-          <label className="field-compact">
-            Min Points:&nbsp;
-            <input
-              type="number"
-              min={0}
-              max={365}
-              value={query.minPoints}
-              onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
-            />
-          </label>
-        </div>
-      </section>
 
       <section className="card">
         <h2>Window Summary</h2>
