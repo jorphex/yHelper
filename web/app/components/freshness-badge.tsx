@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatHours, formatPct } from "../lib/format";
 
 type FreshnessResponse = {
@@ -21,12 +21,30 @@ const REFRESH_MS = 60_000;
 const DELAY_AGE_SECONDS = 24 * 3600;
 const DELAY_STALE_RATIO = 0.2;
 
-function deriveBadgeState(data: FreshnessResponse | null): BadgeState {
-  if (!data) {
+function deriveBadgeState(data: FreshnessResponse | null, loadState: "loading" | "ready" | "error"): BadgeState {
+  if (loadState === "loading" && !data) {
     return {
       tone: "unknown",
       label: "Checking",
       detail: "Fetching freshness data.",
+      ageSeconds: null,
+      staleRatio: null,
+    };
+  }
+  if (loadState === "error" && !data) {
+    return {
+      tone: "unknown",
+      label: "Unavailable",
+      detail: "Freshness data could not be loaded.",
+      ageSeconds: null,
+      staleRatio: null,
+    };
+  }
+  if (!data) {
+    return {
+      tone: "unknown",
+      label: "Unknown",
+      detail: "No freshness data is available yet.",
       ageSeconds: null,
       staleRatio: null,
     };
@@ -72,17 +90,26 @@ function deriveBadgeState(data: FreshnessResponse | null): BadgeState {
 
 export function FreshnessBadge() {
   const [payload, setPayload] = useState<FreshnessResponse | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const payloadRef = useRef<FreshnessResponse | null>(null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       try {
         const res = await fetch("/api/meta/freshness?threshold=24h", { cache: "no-store" });
-        if (!res.ok || !active) return;
+        if (!active) return;
+        if (!res.ok) {
+          if (!payloadRef.current) setLoadState("error");
+          return;
+        }
         const next = (await res.json()) as FreshnessResponse;
+        payloadRef.current = next;
         setPayload(next);
+        setLoadState("ready");
       } catch {
         if (!active) return;
+        if (!payloadRef.current) setLoadState("error");
       }
     };
     void load();
@@ -95,7 +122,7 @@ export function FreshnessBadge() {
     };
   }, []);
 
-  const badge = deriveBadgeState(payload);
+  const badge = deriveBadgeState(payload, loadState);
   const staleText = badge.staleRatio === null ? null : formatPct(badge.staleRatio, 0);
   const detail = `${badge.detail} Latest PPS age: ${formatHours(badge.ageSeconds)}. 24h stale ratio: ${staleText ?? "n/a"}.`;
 

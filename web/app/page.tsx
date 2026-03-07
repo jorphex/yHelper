@@ -39,6 +39,8 @@ type MetaMoversResponse = {
   };
 };
 
+const HOME_REFRESH_MS = 60_000;
+
 function pctDelta(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
   const signed = value * 100;
@@ -53,17 +55,24 @@ function moverTitle(row: MetaMoverRow | undefined): string {
   return "Vault";
 }
 
-function liveSummary(
+function liveHeadline(
   topRiser: MetaMoverRow | undefined,
-  avgDeltaApy: number | null | undefined,
-  eligibleVaults: number | undefined,
 ): string {
   const topMoverName = topRiser ? moverTitle(topRiser) : "syncing";
   const topMoverApy = Number.isFinite(topRiser?.safe_apy_30d ?? null) ? formatPct(topRiser?.safe_apy_30d ?? null, 2) : "n/a";
   const topMoverDelta = Number.isFinite(topRiser?.delta_apy ?? null) ? pctDelta(topRiser?.delta_apy, 2) : "n/a";
+  return `Top mover ${topMoverName} · 30d APY ${topMoverApy} · 24h move ${topMoverDelta}`;
+}
+
+function liveMeta(
+  avgDeltaApy: number | null | undefined,
+  eligibleVaults: number | undefined,
+  ageSeconds: number | null | undefined,
+): string {
   const universeDelta = Number.isFinite(avgDeltaApy ?? null) ? pctDelta(avgDeltaApy, 2) : "n/a";
   const universeCoverage = Number.isFinite(eligibleVaults ?? null) ? `${eligibleVaults} vaults tracked` : "vault count syncing";
-  return `Top mover ${topMoverName} · APY 30d ${topMoverApy} · 24h change ${topMoverDelta} | Universe avg 24h change ${universeDelta} | ${universeCoverage}`;
+  const freshness = freshnessSummary(ageSeconds);
+  return `Universe avg 24h move ${universeDelta} · ${universeCoverage} · ${freshness}`;
 }
 
 function freshnessSummary(ageSeconds: number | null | undefined): string {
@@ -94,8 +103,12 @@ export default function HomePage() {
     };
 
     void load();
+    const timer = window.setInterval(() => {
+      void load();
+    }, HOME_REFRESH_MS);
     return () => {
       active = false;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -126,8 +139,12 @@ export default function HomePage() {
   }, []);
 
   const topRiser = movers?.movers?.risers?.[0];
-  const liveNowLine = liveSummary(topRiser, movers?.summary?.avg_delta_apy ?? null, overview?.coverage?.global?.eligible_vaults);
-  const liveFreshnessLine = freshnessSummary(overview?.freshness?.latest_pps_age_seconds ?? null);
+  const liveNowLine = liveHeadline(topRiser);
+  const liveFreshnessLine = liveMeta(
+    movers?.summary?.avg_delta_apy ?? null,
+    overview?.coverage?.global?.eligible_vaults,
+    overview?.freshness?.latest_pps_age_seconds ?? null,
+  );
 
   return (
     <main className="container home-minimal">

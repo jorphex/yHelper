@@ -12,9 +12,10 @@ function applyAudienceMode(mode: AudienceMode) {
 }
 
 export function AudienceToggle() {
-  const [mode, setMode] = useState<AudienceMode>("guide");
+  const [mode, setMode] = useState<AudienceMode | null>(null);
 
   useEffect(() => {
+    const documentMode = document.documentElement.dataset.audience === "analyst" ? "analyst" : "guide";
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (stored === "guide" || stored === "analyst") {
@@ -25,10 +26,12 @@ export function AudienceToggle() {
     } catch {
       // no-op: fallback to default mode
     }
-    applyAudienceMode("guide");
+    setMode(documentMode);
+    applyAudienceMode(documentMode);
   }, []);
 
   useEffect(() => {
+    if (!mode) return;
     applyAudienceMode(mode);
     try {
       window.localStorage.setItem(STORAGE_KEY, mode);

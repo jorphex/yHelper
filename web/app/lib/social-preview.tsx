@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 /* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
 import { chainLabel, formatPct } from "./format";
+import { SHELL_THEME } from "./shell-theme";
 
 type RegimesPayload = {
   summary?: Array<{
@@ -236,7 +237,7 @@ export async function renderSocialPreviewImage({
           position: "relative",
           color: "#f4f8ff",
           fontFamily: "Aeonik, Inter, system-ui, sans-serif",
-          background: "#060c1f",
+          background: SHELL_THEME.previewBg,
           overflow: "hidden",
         }}
       >
@@ -276,7 +277,7 @@ export async function renderSocialPreviewImage({
             inset: 0,
             opacity: 0.22,
             background:
-              "radial-gradient(118% 88% at 22% 18%, rgba(84, 125, 255, 0.2) 0%, rgba(84, 125, 255, 0) 58%), radial-gradient(130% 95% at 82% 72%, rgba(58, 166, 184, 0.18) 0%, rgba(58, 166, 184, 0) 62%)",
+              `radial-gradient(118% 88% at 22% 18%, ${SHELL_THEME.previewGlowPrimary} 0%, rgba(84, 125, 255, 0) 58%), radial-gradient(130% 95% at 82% 72%, ${SHELL_THEME.previewGlowSecondary} 0%, rgba(58, 166, 184, 0) 62%)`,
           }}
         />
         <div
@@ -285,7 +286,7 @@ export async function renderSocialPreviewImage({
             inset: 0,
             opacity: 0.2,
             background:
-              "linear-gradient(180deg, rgba(4, 10, 24, 0.18) 0%, rgba(5, 12, 30, 0.62) 100%)",
+              `linear-gradient(180deg, ${SHELL_THEME.previewShadeTop} 0%, ${SHELL_THEME.previewShadeBottom} 100%)`,
           }}
         />
         <div
@@ -377,10 +378,10 @@ function StatCard({
         gap: featured ? 8 : 6,
         minHeight: featured ? 188 : 168,
         borderRadius: featured ? 16 : 14,
-        border: featured ? "1px solid rgba(146,190,255,0.5)" : "1px solid rgba(122,170,255,0.34)",
+        border: featured ? `1px solid ${SHELL_THEME.previewFeaturedBorder}` : `1px solid ${SHELL_THEME.previewCardBorder}`,
         background: featured
-          ? "linear-gradient(180deg, rgba(26,54,106,0.86) 0%, rgba(10,24,52,0.94) 100%)"
-          : "linear-gradient(180deg, rgba(18,40,79,0.82) 0%, rgba(9,20,41,0.92) 100%)",
+          ? `linear-gradient(180deg, ${SHELL_THEME.previewFeaturedTop} 0%, ${SHELL_THEME.previewFeaturedBottom} 100%)`
+          : `linear-gradient(180deg, ${SHELL_THEME.previewCardTop} 0%, ${SHELL_THEME.previewCardBottom} 100%)`,
         padding: featured ? "16px 18px" : "15px 16px",
       }}
     >

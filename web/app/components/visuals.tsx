@@ -512,7 +512,7 @@ export function ScatterPlot({
         </svg>
       </div>
       <p className="muted viz-legend">
-        Hover points for exact values. Click a point to open the vault on Yearn. Dot size scales with TVL when available.
+        Desktop hover reveals exact values. Linked points open the vault on Yearn. Dot size scales with TVL when available.
       </p>
     </section>
   );

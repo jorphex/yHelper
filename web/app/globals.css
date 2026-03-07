@@ -118,6 +118,11 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-reveal: cubic-bezier(0.2, 0.85, 0.35, 1);
+  --header-bg: rgba(6, 12, 31, 0.84);
+  --shell-overlay-top: rgba(0, 0, 0, 0);
+  --shell-overlay-bottom: rgba(0, 0, 0, 0);
+  --shell-shade-top: rgba(4, 9, 24, 0.06);
+  --shell-shade-bottom: rgba(5, 11, 28, 0.22);
   --bg-texture-url: url("/bg/grit-abstract-v1.webp?v=20260304bg12");
   --font-sans: "Aeonik", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Aeonik Mono", "Source Code Pro", Consolas, "Courier New", monospace;
@@ -154,16 +159,17 @@ body::before {
   pointer-events: none;
   z-index: -2;
   background:
+    linear-gradient(180deg, var(--shell-overlay-top) 0%, var(--shell-overlay-bottom) 100%),
     var(--bg-texture-url),
     radial-gradient(62% 44% at 16% 24%, rgba(62, 118, 228, 0.2) 0 36%, rgba(62, 118, 228, 0) 54%),
     radial-gradient(56% 40% at 78% 20%, rgba(54, 165, 171, 0.18) 0 34%, rgba(54, 165, 171, 0) 52%),
     radial-gradient(54% 38% at 46% 70%, rgba(113, 90, 194, 0.16) 0 30%, rgba(113, 90, 194, 0) 48%),
     radial-gradient(52% 36% at 84% 74%, rgba(64, 135, 95, 0.14) 0 28%, rgba(64, 135, 95, 0) 46%),
     radial-gradient(138% 92% at 50% -8%, rgba(4, 9, 24, 0.03) 0%, rgba(4, 9, 24, 0.16) 74%, rgba(4, 9, 24, 0.32) 100%),
-    linear-gradient(180deg, rgba(4, 9, 24, 0.06) 0%, rgba(5, 11, 28, 0.22) 100%);
-  background-position: center, center, center, center, center, center, center;
-  background-size: cover, cover, cover, cover, cover, cover, cover;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    linear-gradient(180deg, var(--shell-shade-top) 0%, var(--shell-shade-bottom) 100%);
+  background-position: center, center, center, center, center, center, center, center;
+  background-size: cover, cover, cover, cover, cover, cover, cover, cover;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
 }
 
 body::after {
@@ -212,7 +218,7 @@ body::after {
   top: 0;
   z-index: 20;
   padding-top: max(0.18rem, env(safe-area-inset-top));
-  background: rgba(6, 12, 31, 0.84);
+  background: var(--header-bg);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line-2);
 }
@@ -2829,6 +2835,10 @@ input:focus-visible {
   .tablet-hide {
     display: none;
   }
+
+  :root[data-audience="analyst"] .tablet-hide.analyst-only {
+    display: table-cell;
+  }
 }
 
 @media (max-width: 720px) {
@@ -2918,38 +2928,9 @@ input:focus-visible {
     display: none;
   }
 
-  :root[data-audience="analyst"] .discover-table th.col-chain,
-  :root[data-audience="analyst"] .discover-table td.col-chain,
-  :root[data-audience="analyst"] .discover-table th.col-category,
-  :root[data-audience="analyst"] .discover-table td.col-category,
-  :root[data-audience="analyst"] .discover-table th.col-regime,
-  :root[data-audience="analyst"] .discover-table td.col-regime,
-  :root[data-audience="analyst"] .assets-token-table th.col-spread,
-  :root[data-audience="analyst"] .assets-token-table td.col-spread,
-  :root[data-audience="analyst"] .assets-venues-table th.col-consistency,
-  :root[data-audience="analyst"] .assets-venues-table td.col-consistency,
-  :root[data-audience="analyst"] .assets-venues-table th.col-regime,
-  :root[data-audience="analyst"] .assets-venues-table td.col-regime,
-  :root[data-audience="analyst"] .composition-crowding-table th.col-chain,
-  :root[data-audience="analyst"] .composition-crowding-table td.col-chain,
-  :root[data-audience="analyst"] .composition-crowding-table th.col-token,
-  :root[data-audience="analyst"] .composition-crowding-table td.col-token,
-  :root[data-audience="analyst"] .changes-mover-table th.col-chain,
-  :root[data-audience="analyst"] .changes-mover-table td.col-chain,
-  :root[data-audience="analyst"] .changes-mover-table th.col-age,
-  :root[data-audience="analyst"] .changes-mover-table td.col-age,
-  :root[data-audience="analyst"] .regimes-mover-table th.col-chain,
-  :root[data-audience="analyst"] .regimes-mover-table td.col-chain,
-  :root[data-audience="analyst"] .chains-rollup-table th.col-momentum,
-  :root[data-audience="analyst"] .chains-rollup-table td.col-momentum {
-    display: none;
-  }
-
-  :root[data-audience="analyst"] .composition-summary-table th:nth-child(4),
-  :root[data-audience="analyst"] .composition-summary-table td:nth-child(4),
-  :root[data-audience="analyst"] .changes-stale-table th:nth-child(3),
-  :root[data-audience="analyst"] .changes-stale-table td:nth-child(3) {
-    display: none;
+  :root[data-audience="analyst"] .tablet-hide.analyst-only,
+  :root[data-audience="analyst"] .mobile-hide.analyst-only {
+    display: table-cell;
   }
 
   .vault-link {
@@ -3042,10 +3023,6 @@ input:focus-visible {
     table-layout: auto;
   }
 
-  :root[data-audience="analyst"] .discover-table {
-    min-width: 540px;
-  }
-
   .discover-table th.col-vault,
   .discover-table td.col-vault {
     width: 3.1rem;
@@ -3100,10 +3077,6 @@ input:focus-visible {
   .changes-mover-table {
     min-width: 650px;
     table-layout: fixed;
-  }
-
-  :root[data-audience="analyst"] .changes-mover-table {
-    min-width: 520px;
   }
 
   .changes-mover-table th.col-vault,
@@ -3179,10 +3152,6 @@ input:focus-visible {
     min-width: 590px;
   }
 
-  :root[data-audience="analyst"] .composition-crowding-table {
-    min-width: 540px;
-  }
-
   .composition-crowding-table th.col-vault,
   .composition-crowding-table td.col-vault {
     width: 3.1rem;
@@ -3211,10 +3180,6 @@ input:focus-visible {
 
   .assets-venues-table {
     min-width: 570px;
-  }
-
-  :root[data-audience="analyst"] .assets-venues-table {
-    min-width: 520px;
   }
 
   .assets-venues-table th.col-vault,
@@ -3246,10 +3211,6 @@ input:focus-visible {
   .regimes-mover-table {
     min-width: 540px;
     table-layout: fixed;
-  }
-
-  :root[data-audience="analyst"] .regimes-mover-table {
-    min-width: 500px;
   }
 
   .regimes-mover-table th.col-vault,
@@ -3319,10 +3280,6 @@ input:focus-visible {
     table-layout: auto;
   }
 
-  :root[data-audience="analyst"] .chains-rollup-table {
-    min-width: 520px;
-  }
-
   .chains-rollup-table th,
   .chains-rollup-table td {
     white-space: nowrap;
@@ -3330,10 +3287,6 @@ input:focus-visible {
 
   .assets-token-table {
     min-width: 570px;
-  }
-
-  :root[data-audience="analyst"] .assets-token-table {
-    min-width: 520px;
   }
 
   .assets-token-table th.col-token,
@@ -3374,10 +3327,6 @@ input:focus-visible {
     min-width: 560px;
   }
 
-  :root[data-audience="analyst"] .composition-summary-table {
-    min-width: 500px;
-  }
-
   .composition-summary-table th:nth-child(4),
   .composition-summary-table td:nth-child(4),
   .composition-summary-table th:nth-child(5),
@@ -3390,10 +3339,6 @@ input:focus-visible {
   .changes-stale-table,
   .regimes-split-table {
     min-width: 560px;
-  }
-
-  :root[data-audience="analyst"] .changes-stale-table {
-    min-width: 500px;
   }
 
   .assets-universe-card .kpi-grid,
