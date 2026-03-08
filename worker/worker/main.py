@@ -53,8 +53,8 @@ query Query($label: String!, $chainId: Int, $address: String, $component: String
 
 DDL = """
 CREATE TABLE IF NOT EXISTS vault_dim (
-    vault_address TEXT PRIMARY KEY,
     chain_id INTEGER NOT NULL,
+    vault_address TEXT NOT NULL,
     name TEXT,
     symbol TEXT,
     category TEXT,
@@ -69,13 +69,14 @@ CREATE TABLE IF NOT EXISTS vault_dim (
     active BOOLEAN NOT NULL DEFAULT TRUE,
     first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    raw JSONB NOT NULL
+    raw JSONB NOT NULL,
+    PRIMARY KEY (chain_id, vault_address)
 );
 CREATE INDEX IF NOT EXISTS idx_vault_dim_active_rank
-    ON vault_dim(feature_score DESC NULLS LAST, tvl_usd DESC NULLS LAST, vault_address)
+    ON vault_dim(feature_score DESC NULLS LAST, tvl_usd DESC NULLS LAST, chain_id, vault_address)
     WHERE active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_vault_dim_active_tvl
-    ON vault_dim(tvl_usd DESC NULLS LAST, vault_address)
+    ON vault_dim(tvl_usd DESC NULLS LAST, chain_id, vault_address)
     WHERE active = TRUE;
 
 CREATE TABLE IF NOT EXISTS ingestion_runs (
@@ -89,19 +90,19 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
 );
 
 CREATE TABLE IF NOT EXISTS pps_timeseries (
-    vault_address TEXT NOT NULL,
     chain_id INTEGER NOT NULL,
+    vault_address TEXT NOT NULL,
     ts BIGINT NOT NULL,
     pps_raw DOUBLE PRECISION NOT NULL,
     fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (vault_address, ts)
+    PRIMARY KEY (chain_id, vault_address, ts)
 );
 
 CREATE INDEX IF NOT EXISTS idx_pps_chain_ts ON pps_timeseries(chain_id, ts DESC);
 
 CREATE TABLE IF NOT EXISTS vault_metrics_latest (
-    vault_address TEXT PRIMARY KEY,
     chain_id INTEGER NOT NULL,
+    vault_address TEXT NOT NULL,
     as_of TIMESTAMPTZ NOT NULL,
     points_count INTEGER NOT NULL DEFAULT 0,
     last_point_time TIMESTAMPTZ,
@@ -110,9 +111,10 @@ CREATE TABLE IF NOT EXISTS vault_metrics_latest (
     apy_90d DOUBLE PRECISION,
     vol_30d DOUBLE PRECISION,
     momentum_7d_30d DOUBLE PRECISION,
-    consistency_score DOUBLE PRECISION
+    consistency_score DOUBLE PRECISION,
+    PRIMARY KEY (chain_id, vault_address)
 );
-CREATE INDEX IF NOT EXISTS idx_vault_metrics_points ON vault_metrics_latest(points_count DESC, vault_address);
+CREATE INDEX IF NOT EXISTS idx_vault_metrics_points ON vault_metrics_latest(points_count DESC, chain_id, vault_address);
 
 CREATE TABLE IF NOT EXISTS alert_state (
     alert_key TEXT PRIMARY KEY,
@@ -184,8 +186,7 @@ INSERT INTO vault_dim (
     NOW(),
     %(raw)s
 )
-ON CONFLICT (vault_address) DO UPDATE SET
-    chain_id = EXCLUDED.chain_id,
+ON CONFLICT (chain_id, vault_address) DO UPDATE SET
     name = EXCLUDED.name,
     symbol = EXCLUDED.symbol,
     category = EXCLUDED.category,
@@ -329,6 +330,97 @@ def _connect() -> psycopg.Connection:
 def _ensure_schema(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute(DDL)
+        cur.execute(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'vault_dim_pkey'
+                      AND conrelid = 'vault_dim'::regclass
+                      AND pg_get_constraintdef(oid) <> 'PRIMARY KEY (chain_id, vault_address)'
+                ) THEN
+                    ALTER TABLE vault_dim DROP CONSTRAINT vault_dim_pkey;
+                    ALTER TABLE vault_dim ADD CONSTRAINT vault_dim_pkey PRIMARY KEY (chain_id, vault_address);
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'pps_timeseries_pkey'
+                      AND conrelid = 'pps_timeseries'::regclass
+                      AND pg_get_constraintdef(oid) <> 'PRIMARY KEY (chain_id, vault_address, ts)'
+                ) THEN
+                    ALTER TABLE pps_timeseries DROP CONSTRAINT pps_timeseries_pkey;
+                    ALTER TABLE pps_timeseries ADD CONSTRAINT pps_timeseries_pkey PRIMARY KEY (chain_id, vault_address, ts);
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM pg_constraint
+                    WHERE conname = 'vault_metrics_latest_pkey'
+                      AND conrelid = 'vault_metrics_latest'::regclass
+                      AND pg_get_constraintdef(oid) <> 'PRIMARY KEY (chain_id, vault_address)'
+                ) THEN
+                    ALTER TABLE vault_metrics_latest DROP CONSTRAINT vault_metrics_latest_pkey;
+                    ALTER TABLE vault_metrics_latest ADD CONSTRAINT vault_metrics_latest_pkey PRIMARY KEY (chain_id, vault_address);
+                END IF;
+            END
+            $$;
+            """
+        )
+        cur.execute(
+            """
+            DO $$
+            DECLARE
+                idx_def TEXT;
+            BEGIN
+                SELECT indexdef
+                INTO idx_def
+                FROM pg_indexes
+                WHERE schemaname = 'public' AND indexname = 'idx_vault_dim_active_rank';
+                IF idx_def IS NOT NULL
+                   AND idx_def <> 'CREATE INDEX idx_vault_dim_active_rank ON public.vault_dim USING btree (feature_score DESC NULLS LAST, tvl_usd DESC NULLS LAST, chain_id, vault_address) WHERE (active = true)'
+                THEN
+                    EXECUTE 'DROP INDEX IF EXISTS idx_vault_dim_active_rank';
+                END IF;
+
+                SELECT indexdef
+                INTO idx_def
+                FROM pg_indexes
+                WHERE schemaname = 'public' AND indexname = 'idx_vault_dim_active_tvl';
+                IF idx_def IS NOT NULL
+                   AND idx_def <> 'CREATE INDEX idx_vault_dim_active_tvl ON public.vault_dim USING btree (tvl_usd DESC NULLS LAST, chain_id, vault_address) WHERE (active = true)'
+                THEN
+                    EXECUTE 'DROP INDEX IF EXISTS idx_vault_dim_active_tvl';
+                END IF;
+
+                SELECT indexdef
+                INTO idx_def
+                FROM pg_indexes
+                WHERE schemaname = 'public' AND indexname = 'idx_vault_metrics_points';
+                IF idx_def IS NOT NULL
+                   AND idx_def <> 'CREATE INDEX idx_vault_metrics_points ON public.vault_metrics_latest USING btree (points_count DESC, chain_id, vault_address)'
+                THEN
+                    EXECUTE 'DROP INDEX IF EXISTS idx_vault_metrics_points';
+                END IF;
+            END
+            $$;
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_vault_dim_active_rank
+                ON vault_dim(feature_score DESC NULLS LAST, tvl_usd DESC NULLS LAST, chain_id, vault_address)
+                WHERE active = TRUE;
+            CREATE INDEX IF NOT EXISTS idx_vault_dim_active_tvl
+                ON vault_dim(tvl_usd DESC NULLS LAST, chain_id, vault_address)
+                WHERE active = TRUE;
+            CREATE INDEX IF NOT EXISTS idx_vault_metrics_points
+                ON vault_metrics_latest(points_count DESC, chain_id, vault_address);
+            """
+        )
     conn.commit()
 
 
@@ -715,12 +807,10 @@ def _fetch_ydaemon_snapshot() -> list[dict]:
 
 
 def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
-    rows_by_address: dict[str, dict] = {}
+    rows_by_identity: dict[tuple[int, str], dict] = {}
     numeric_failures = {"tvl_usd": 0, "apr_net": 0, "feature_score": 0}
     skipped_missing_identity = 0
-    duplicate_addresses = 0
-    chain_conflicts = 0
-    chain_conflict_samples: list[str] = []
+    duplicate_identities = 0
     for vault in vaults:
         raw_address = _first_present(vault, ("address", "vaultAddress", "vault_address"))
         vault_address = str(raw_address or "").strip().lower()
@@ -732,24 +822,12 @@ def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
         row, parse_failures = _normalize_vault(vault, vault_address=vault_address, chain_id=chain_id)
         for field in parse_failures:
             numeric_failures[field] += 1
-        existing = rows_by_address.get(vault_address)
-        if existing is not None:
-            duplicate_addresses += 1
-            if existing["chain_id"] != chain_id:
-                chain_conflicts += 1
-                if len(chain_conflict_samples) < 10:
-                    chain_conflict_samples.append(f"{vault_address}:{existing['chain_id']}->{chain_id}")
-                continue
-        rows_by_address[vault_address] = row
+        identity = (chain_id, vault_address)
+        if identity in rows_by_identity:
+            duplicate_identities += 1
+        rows_by_identity[identity] = row
 
-    rows = list(rows_by_address.values())
-    if chain_conflicts:
-        logging.warning(
-            "Snapshot normalization found cross-chain duplicate vault addresses; "
-            "keeping first-seen rows (count=%s, samples=%s)",
-            chain_conflicts,
-            chain_conflict_samples,
-        )
+    rows = list(rows_by_identity.values())
     if not rows:
         raise ValueError(
             "Snapshot normalization produced 0 valid rows "
@@ -767,12 +845,11 @@ def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
             cur.execute("UPDATE vault_dim SET active = FALSE WHERE active = TRUE")
             cur.executemany(UPSERT_SQL, rows)
 
-    if skipped_missing_identity or duplicate_addresses or chain_conflicts:
+    if skipped_missing_identity or duplicate_identities:
         logging.warning(
-            "Snapshot normalization anomalies: skipped_missing_identity=%s duplicate_addresses=%s chain_conflicts=%s",
+            "Snapshot normalization anomalies: skipped_missing_identity=%s duplicate_identities=%s",
             skipped_missing_identity,
-            duplicate_addresses,
-            chain_conflicts,
+            duplicate_identities,
         )
     if any(numeric_failures.values()):
         logging.warning(
@@ -892,8 +969,7 @@ def _upsert_pps_points(conn: psycopg.Connection, chain_id: int, vault_address: s
             """
             INSERT INTO pps_timeseries (vault_address, chain_id, ts, pps_raw, fetched_at)
             VALUES (%(vault_address)s, %(chain_id)s, %(ts)s, %(pps_raw)s, NOW())
-            ON CONFLICT (vault_address, ts) DO UPDATE SET
-                chain_id = EXCLUDED.chain_id,
+            ON CONFLICT (chain_id, vault_address, ts) DO UPDATE SET
                 pps_raw = EXCLUDED.pps_raw,
                 fetched_at = NOW()
             """,
@@ -1009,8 +1085,7 @@ def _upsert_metrics(conn: psycopg.Connection, rows: list[dict]) -> int:
                 %(momentum_7d_30d)s,
                 %(consistency_score)s
             )
-            ON CONFLICT (vault_address) DO UPDATE SET
-                chain_id = EXCLUDED.chain_id,
+            ON CONFLICT (chain_id, vault_address) DO UPDATE SET
                 as_of = EXCLUDED.as_of,
                 points_count = EXCLUDED.points_count,
                 last_point_time = EXCLUDED.last_point_time,
@@ -1144,7 +1219,7 @@ def run_once() -> None:
 def main() -> None:
     configure_logging()
     _validate_data_policy_config()
-    interval = int(os.getenv("WORKER_INTERVAL_SEC", "300"))
+    interval = int(os.getenv("WORKER_INTERVAL_SEC", "21600"))
     logging.info("Worker booted with interval=%ss", interval)
     with _connect() as conn:
         _ensure_schema(conn)

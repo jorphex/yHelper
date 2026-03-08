@@ -10,32 +10,31 @@ type OverviewResponse = {
     latest_pps_age_seconds?: number | null;
     pps_stale_ratio?: number | null;
   } | null;
-  coverage?: {
-    global?: {
-      eligible_vaults?: number;
-    };
+  tracked_scope?: {
+    tracked_tvl_active_usd?: number | null;
   } | null;
   protocol_context?: {
     tvl_change_7d_pct?: number | null;
-    yearn_aligned_proxy?: {
-      tvl_usd?: number | null;
-    } | null;
   } | null;
 };
 
-type MetaMoverRow = {
+type ChangeMoverRow = {
   symbol?: string | null;
   token_symbol?: string | null;
   delta_apy?: number | null;
   safe_apy_30d?: number | null;
 };
 
-type MetaMoversResponse = {
+type ChangesResponse = {
   summary?: {
     avg_delta_apy?: number | null;
+    vaults_with_change?: number | null;
   };
+  freshness?: {
+    latest_pps_age_seconds?: number | null;
+  } | null;
   movers?: {
-    risers?: MetaMoverRow[];
+    risers?: ChangeMoverRow[];
   };
 };
 
@@ -48,7 +47,7 @@ function pctDelta(value: number | null | undefined, digits = 2): string {
   return `${prefix}${signed.toFixed(digits)}%`;
 }
 
-function moverTitle(row: MetaMoverRow | undefined): string {
+function moverTitle(row: ChangeMoverRow | undefined): string {
   if (!row) return "n/a";
   if (row.symbol && row.symbol.trim().length > 0) return row.symbol.trim();
   if (row.token_symbol && row.token_symbol.trim().length > 0) return row.token_symbol.trim();
@@ -56,7 +55,7 @@ function moverTitle(row: MetaMoverRow | undefined): string {
 }
 
 function liveHeadline(
-  topRiser: MetaMoverRow | undefined,
+  topRiser: ChangeMoverRow | undefined,
 ): string {
   const topMoverName = topRiser ? moverTitle(topRiser) : "syncing";
   const topMoverApy = Number.isFinite(topRiser?.safe_apy_30d ?? null) ? formatPct(topRiser?.safe_apy_30d ?? null, 2) : "n/a";
@@ -66,13 +65,13 @@ function liveHeadline(
 
 function liveMeta(
   avgDeltaApy: number | null | undefined,
-  eligibleVaults: number | undefined,
+  trackedVaults: number | null | undefined,
   ageSeconds: number | null | undefined,
 ): string {
   const universeDelta = Number.isFinite(avgDeltaApy ?? null) ? pctDelta(avgDeltaApy, 2) : "n/a";
-  const universeCoverage = Number.isFinite(eligibleVaults ?? null) ? `${eligibleVaults} vaults tracked` : "vault count syncing";
+  const universeCoverage = Number.isFinite(trackedVaults ?? null) ? `${trackedVaults} vaults with change` : "vault count syncing";
   const freshness = freshnessSummary(ageSeconds);
-  return `Universe avg 24h move ${universeDelta} · ${universeCoverage} · ${freshness}`;
+  return `Core universe avg 24h move ${universeDelta} · ${universeCoverage} · ${freshness}`;
 }
 
 function freshnessSummary(ageSeconds: number | null | undefined): string {
@@ -83,14 +82,14 @@ function freshnessSummary(ageSeconds: number | null | undefined): string {
 
 export default function HomePage() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
-  const [movers, setMovers] = useState<MetaMoversResponse | null>(null);
+  const [changes, setChanges] = useState<ChangesResponse | null>(null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       const [overviewResult, moversResult] = await Promise.allSettled([
         fetch("/api/overview", { cache: "no-store" }),
-        fetch("/api/meta/movers?window=24h&limit=1&include_freshness=false", { cache: "no-store" }),
+        fetch("/api/changes?window=24h&universe=core&limit=1", { cache: "no-store" }),
       ]);
       if (!active) return;
 
@@ -98,7 +97,7 @@ export default function HomePage() {
         setOverview((await overviewResult.value.json()) as OverviewResponse);
       }
       if (moversResult.status === "fulfilled" && moversResult.value.ok) {
-        setMovers((await moversResult.value.json()) as MetaMoversResponse);
+        setChanges((await moversResult.value.json()) as ChangesResponse);
       }
     };
 
@@ -138,12 +137,12 @@ export default function HomePage() {
     };
   }, []);
 
-  const topRiser = movers?.movers?.risers?.[0];
+  const topRiser = changes?.movers?.risers?.[0];
   const liveNowLine = liveHeadline(topRiser);
   const liveFreshnessLine = liveMeta(
-    movers?.summary?.avg_delta_apy ?? null,
-    overview?.coverage?.global?.eligible_vaults,
-    overview?.freshness?.latest_pps_age_seconds ?? null,
+    changes?.summary?.avg_delta_apy ?? null,
+    changes?.summary?.vaults_with_change ?? null,
+    changes?.freshness?.latest_pps_age_seconds ?? null,
   );
 
   return (
@@ -173,10 +172,10 @@ export default function HomePage() {
       <section className="home-minimal-signals">
         <article className="card home-sparse-signal-card home-reveal">
           <p className="home-sparse-signal-label">Tracked TVL</p>
-          <p className="home-sparse-signal-value">{formatUsd(overview?.protocol_context?.yearn_aligned_proxy?.tvl_usd ?? null, 0)}</p>
+          <p className="home-sparse-signal-value">{formatUsd(overview?.tracked_scope?.tracked_tvl_active_usd ?? null, 0)}</p>
         </article>
         <article className="card home-sparse-signal-card home-reveal">
-          <p className="home-sparse-signal-label">TVL Change 7d</p>
+          <p className="home-sparse-signal-label">Protocol TVL Change 7d</p>
           <p className="home-sparse-signal-value">{formatPct(overview?.protocol_context?.tvl_change_7d_pct ?? null, 2)}</p>
         </article>
         <article className="card home-sparse-signal-card home-reveal">

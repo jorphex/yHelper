@@ -30,7 +30,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3010}
       API_ASSETS_FEATURED_MIN_TVL_USD: ${API_ASSETS_FEATURED_MIN_TVL_USD:-1000000}
       DEFI_LLAMA_PROTOCOL_URL: ${DEFI_LLAMA_PROTOCOL_URL:-https://api.llama.fi/protocol/yearn-finance}
-      WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-86400}
+      WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-21600}
       PPS_RETENTION_DAYS: ${PPS_RETENTION_DAYS:-122}
       INGESTION_RUN_RETENTION_DAYS: ${INGESTION_RUN_RETENTION_DAYS:-14}
       DB_CLEANUP_MIN_INTERVAL_SEC: ${DB_CLEANUP_MIN_INTERVAL_SEC:-86400}
@@ -55,7 +55,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://yhelper:change_me@yhelper-postgres:5432/yhelper}
-      WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-86400}
+      WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-21600}
       YDAEMON_URL: ${YDAEMON_URL:-https://ydaemon.yearn.fi/vaults/detected?limit=2000}
       KONG_GQL_URL: ${KONG_GQL_URL:-https://kong.yearn.farm/api/gql}
       KONG_MAX_VAULTS: ${KONG_MAX_VAULTS:-120}

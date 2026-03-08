@@ -24,6 +24,9 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://yhelper:change_me@yhelper
 APY_MIN = -0.95
 APY_MAX = 3.0
 MOMENTUM_ABS_MAX = 1.0
+DAILY_APY_MAX_WINDOW_DAYS = 90
+DAILY_APY_LOOKBACK_BUFFER_DAYS = 21
+DAILY_APY_LOOKBACK_DAYS = DAILY_APY_MAX_WINDOW_DAYS + DAILY_APY_LOOKBACK_BUFFER_DAYS
 USER_VISIBLE_KIND = "Multi Strategy"
 USER_VISIBLE_VERSION_PREFIX = "3."
 EXCLUDED_CHAIN_IDS = (250,)  # Fantom deprecated
@@ -45,7 +48,7 @@ DEFI_LLAMA_CACHE_TTL_SEC = 600
 ASSETS_FEATURED_MIN_TVL_USD = float(os.getenv("API_ASSETS_FEATURED_MIN_TVL_USD", "1000000"))
 ASSETS_FEATURED_MIN_VENUES = 2
 ASSETS_FEATURED_MIN_CHAINS = 1
-WORKER_INTERVAL_SEC = int(os.getenv("WORKER_INTERVAL_SEC", "300"))
+WORKER_INTERVAL_SEC = int(os.getenv("WORKER_INTERVAL_SEC", "21600"))
 PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
 INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
 DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
@@ -124,11 +127,11 @@ def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None) -> str:
     if max_vaults is None or max_vaults <= 0:
         return ""
     return """
-    {alias}.vault_address IN (
-        SELECT r.vault_address
+    ({alias}.chain_id, {alias}.vault_address) IN (
+        SELECT r.chain_id, r.vault_address
         FROM vault_dim r
         WHERE {scope_sql}
-        ORDER BY r.feature_score DESC NULLS LAST, r.tvl_usd DESC NULLS LAST, r.vault_address
+        ORDER BY r.feature_score DESC NULLS LAST, r.tvl_usd DESC NULLS LAST, r.chain_id, r.vault_address
         LIMIT %(max_vaults)s
     )
     """.format(alias=alias, scope_sql=_user_visible_filter_sql("r", include_retired=False))
@@ -141,6 +144,7 @@ def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> st
         f"COALESCE({alias}.kind, '') = '{USER_VISIBLE_KIND}'",
         f"COALESCE({alias}.version, '') LIKE '{USER_VISIBLE_VERSION_PREFIX}%%'",
         f"COALESCE({alias}.chain_id, -1) NOT IN ({excluded_ids_sql})",
+        f"COALESCE(({alias}.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE",
     ]
     if not include_retired:
         clauses.append(f"COALESCE(({alias}.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE")
@@ -176,23 +180,26 @@ def _freshness_snapshot(
         cur.execute(
             f"""
             WITH latest AS (
-                SELECT p.vault_address, MAX(p.ts) AS latest_ts
+                SELECT p.chain_id, p.vault_address, MAX(p.ts) AS latest_ts
                 FROM pps_timeseries p
-                GROUP BY p.vault_address
+                GROUP BY p.chain_id, p.vault_address
             ),
             counts AS (
-                SELECT p.vault_address, COUNT(*) AS points_count
+                SELECT p.chain_id, p.vault_address, COUNT(*) AS points_count
                 FROM pps_timeseries p
-                GROUP BY p.vault_address
+                GROUP BY p.chain_id, p.vault_address
             )
             SELECT
                 MAX(to_timestamp(l.latest_ts)) AS latest_pps_at,
                 SUM(c.points_count) AS pps_points,
                 COUNT(*) AS pps_vaults
             FROM latest l
-            JOIN counts c ON c.vault_address = l.vault_address
+            JOIN counts c
+              ON c.chain_id = l.chain_id
+             AND c.vault_address = l.vault_address
             JOIN vault_dim d
-              ON d.vault_address = l.vault_address
+              ON d.chain_id = l.chain_id
+             AND d.vault_address = l.vault_address
              AND {_user_visible_filter_sql("d", include_retired=False)}
              AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             """,
@@ -206,16 +213,17 @@ def _freshness_snapshot(
         cur.execute(
             f"""
             WITH latest AS (
-                SELECT vault_address, MAX(ts) AS latest_ts
+                SELECT chain_id, vault_address, MAX(ts) AS latest_ts
                 FROM pps_timeseries
-                GROUP BY vault_address
+                GROUP BY chain_id, vault_address
             )
             SELECT
                 COUNT(*) AS pps_vaults_total,
                 COUNT(*) FILTER (WHERE %(now_epoch)s - latest_ts > %(stale_threshold)s) AS pps_vaults_stale
             FROM latest l
             JOIN vault_dim d
-              ON d.vault_address = l.vault_address
+              ON d.chain_id = l.chain_id
+             AND d.vault_address = l.vault_address
              AND {_user_visible_filter_sql("d", include_retired=False)}
              AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             """,
@@ -245,21 +253,22 @@ def _freshness_snapshot(
         cur.execute(
             f"""
             WITH latest AS (
-                SELECT vault_address, MAX(ts) AS latest_ts
+                SELECT chain_id, vault_address, MAX(ts) AS latest_ts
                 FROM pps_timeseries
-                GROUP BY vault_address
+                GROUP BY chain_id, vault_address
             ),
             annotated AS (
                 SELECT
+                    l.chain_id,
                     l.vault_address,
                     l.latest_ts,
-                    COALESCE(d.chain_id, -1) AS chain_id,
                     COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
                     COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
                     (%(now_epoch)s - l.latest_ts) AS age_seconds
                 FROM latest l
                 JOIN vault_dim d
-                 ON d.vault_address = l.vault_address
+                 ON d.chain_id = l.chain_id
+                 AND d.vault_address = l.vault_address
                  AND {_user_visible_filter_sql("d", include_retired=False)}
                  AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             )
@@ -291,12 +300,13 @@ def _freshness_snapshot(
         cur.execute(
             f"""
             WITH latest AS (
-                SELECT vault_address, MAX(ts) AS latest_ts
+                SELECT chain_id, vault_address, MAX(ts) AS latest_ts
                 FROM pps_timeseries
-                GROUP BY vault_address
+                GROUP BY chain_id, vault_address
             ),
             annotated AS (
                 SELECT
+                    l.chain_id,
                     l.vault_address,
                     l.latest_ts,
                     COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
@@ -304,7 +314,8 @@ def _freshness_snapshot(
                     (%(now_epoch)s - l.latest_ts) AS age_seconds
                 FROM latest l
                 JOIN vault_dim d
-                 ON d.vault_address = l.vault_address
+                 ON d.chain_id = l.chain_id
+                 AND d.vault_address = l.vault_address
                  AND {_user_visible_filter_sql("d", include_retired=False)}
                  AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             )
@@ -444,7 +455,7 @@ def _coverage_snapshot(
                     (COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s) AS pass_tvl,
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {_user_visible_filter_sql("d", include_retired=False)}
             )
             SELECT
@@ -487,7 +498,7 @@ def _coverage_snapshot(
                     (COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s) AS pass_tvl,
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {_user_visible_filter_sql("d", include_retired=False)}
             )
             SELECT
@@ -518,7 +529,7 @@ def _coverage_snapshot(
                     (COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s) AS pass_tvl,
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {_user_visible_filter_sql("d", include_retired=False)}
             )
             SELECT
@@ -559,6 +570,14 @@ def _median(values: list[float]) -> float | None:
     if n % 2 == 1:
         return ordered[mid]
     return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def _delta_or_none(left: object, right: object) -> float | None:
+    left_value = _to_float_or_none(left)
+    right_value = _to_float_or_none(right)
+    if left_value is None or right_value is None:
+        return None
+    return left_value - right_value
 
 
 def _extract_defillama_tvl_series(raw_tvl: object) -> list[tuple[int, float]]:
@@ -632,6 +651,106 @@ def _yearn_aligned_proxy_scope(cur: psycopg.Cursor) -> dict[str, object]:
             "exclude_hidden": True,
             "exclude_retired": True,
             "kinds": ["Multi Strategy", "Single Strategy"],
+        },
+    }
+
+
+def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
+    cur.execute(
+        """
+        WITH all_vaults AS (
+            SELECT
+                d.chain_id,
+                d.vault_address,
+                d.active,
+                COALESCE(d.kind, '') AS kind,
+                COALESCE(d.tvl_usd, 0.0)::numeric AS tvl_usd,
+                COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) AS is_retired,
+                COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) AS is_hidden
+            FROM vault_dim d
+        ),
+        active_visible AS (
+            SELECT *
+            FROM all_vaults
+            WHERE active = TRUE
+              AND is_retired = FALSE
+              AND is_hidden = FALSE
+        ),
+        strategy_debt_usd AS (
+            SELECT
+                m.chain_id,
+                LOWER(s->>'address') AS vault_address,
+                SUM(
+                    (
+                        COALESCE(NULLIF(s->'details'->>'totalDebt', '')::numeric, 0)
+                        / POWER(10::numeric, COALESCE(NULLIF(v.raw->>'decimals', '')::numeric, 18))
+                    )
+                    * COALESCE(NULLIF(v.raw->'tvl'->>'price', '')::numeric, 0)
+                ) AS debt_usd
+            FROM vault_dim m
+            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(m.raw->'strategies', '[]'::jsonb)) s
+            JOIN vault_dim v
+              ON v.chain_id = m.chain_id
+             AND LOWER(v.vault_address) = LOWER(s->>'address')
+            WHERE m.active = TRUE
+              AND COALESCE(m.kind, '') = 'Multi Strategy'
+              AND COALESCE((m.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
+              AND COALESCE((m.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
+            GROUP BY 1, 2
+        ),
+        single_independent AS (
+            SELECT
+                SUM(
+                    GREATEST(
+                        a.tvl_usd - COALESCE(sd.debt_usd, 0),
+                        0
+                    )
+                ) AS tvl_usd
+            FROM active_visible a
+            LEFT JOIN strategy_debt_usd sd
+              ON sd.chain_id = a.chain_id
+             AND sd.vault_address = a.vault_address
+            WHERE a.kind = 'Single Strategy'
+        ),
+        multi_visible AS (
+            SELECT SUM(a.tvl_usd) AS tvl_usd
+            FROM active_visible a
+            WHERE a.kind = 'Multi Strategy'
+        ),
+        other_visible AS (
+            SELECT SUM(a.tvl_usd) AS tvl_usd
+            FROM active_visible a
+            WHERE a.kind NOT IN ('Multi Strategy', 'Single Strategy')
+        )
+        SELECT
+            (SELECT COUNT(*) FROM all_vaults) AS total_vaults,
+            (SELECT COUNT(*) FROM active_visible) AS active_vaults,
+            (
+                COALESCE((SELECT tvl_usd FROM multi_visible), 0)
+                + COALESCE((SELECT tvl_usd FROM single_independent), 0)
+                + COALESCE((SELECT tvl_usd FROM other_visible), 0)
+            )::double precision AS tracked_tvl_active_usd,
+            (
+                SELECT COUNT(DISTINCT (a.chain_id, a.vault_address))
+                FROM all_vaults a
+                JOIN vault_metrics_latest m
+                  ON m.chain_id = a.chain_id
+                 AND m.vault_address = a.vault_address
+                WHERE a.active = TRUE
+            ) AS active_with_metrics
+        """
+    )
+    row = cur.fetchone() or {}
+    return {
+        "total_vaults": int(row.get("total_vaults") or 0),
+        "active_vaults": int(row.get("active_vaults") or 0),
+        "tracked_tvl_active_usd": _to_float_or_none(row.get("tracked_tvl_active_usd")),
+        "active_with_metrics": int(row.get("active_with_metrics") or 0),
+        "criteria": {
+            "active": True,
+            "exclude_hidden": True,
+            "exclude_retired": True,
+            "tracked_tvl_method": "debt_adjusted_single_strategy_overlap",
         },
     }
 
@@ -857,104 +976,26 @@ async def meta_movers(
 
 @app.get("/api/meta/social-preview")
 async def meta_social_preview() -> dict[str, object]:
-    summary_row: dict[str, object] = {}
+    tracked_scope: dict[str, object] = {}
     highest_row: dict[str, object] = {}
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
+            tracked_scope = _tracked_scope_snapshot(cur)
             cur.execute(
-                """
-                WITH all_vaults AS (
-                    SELECT
-                        d.vault_address,
-                        d.active,
-                        COALESCE(d.kind, '') AS kind,
-                        COALESCE(d.tvl_usd, 0.0)::numeric AS tvl_usd,
-                        COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) AS is_retired,
-                        COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) AS is_hidden
-                    FROM vault_dim d
-                ),
-                active_visible AS (
-                    SELECT *
-                    FROM all_vaults
-                    WHERE active = TRUE
-                      AND is_retired = FALSE
-                      AND is_hidden = FALSE
-                ),
-                strategy_debt_usd AS (
-                    SELECT
-                        LOWER(s->>'address') AS vault_address,
-                        SUM(
-                            (
-                                COALESCE(NULLIF(s->'details'->>'totalDebt', '')::numeric, 0)
-                                / POWER(10::numeric, COALESCE(NULLIF(v.raw->>'decimals', '')::numeric, 18))
-                            )
-                            * COALESCE(NULLIF(v.raw->'tvl'->>'price', '')::numeric, 0)
-                        ) AS debt_usd
-                    FROM vault_dim m
-                    CROSS JOIN LATERAL jsonb_array_elements(COALESCE(m.raw->'strategies', '[]'::jsonb)) s
-                    JOIN vault_dim v ON LOWER(v.vault_address) = LOWER(s->>'address')
-                    WHERE m.active = TRUE
-                      AND COALESCE(m.kind, '') = 'Multi Strategy'
-                      AND COALESCE((m.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
-                      AND COALESCE((m.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
-                    GROUP BY 1
-                ),
-                single_independent AS (
-                    SELECT
-                        SUM(
-                            GREATEST(
-                                a.tvl_usd - COALESCE(sd.debt_usd, 0),
-                                0
-                            )
-                        ) AS tvl_usd
-                    FROM active_visible a
-                    LEFT JOIN strategy_debt_usd sd
-                      ON LOWER(a.vault_address) = sd.vault_address
-                    WHERE a.kind = 'Single Strategy'
-                ),
-                multi_visible AS (
-                    SELECT SUM(a.tvl_usd) AS tvl_usd
-                    FROM active_visible a
-                    WHERE a.kind = 'Multi Strategy'
-                ),
-                other_visible AS (
-                    SELECT SUM(a.tvl_usd) AS tvl_usd
-                    FROM active_visible a
-                    WHERE a.kind NOT IN ('Multi Strategy', 'Single Strategy')
-                )
-                SELECT
-                    (SELECT COUNT(*) FROM all_vaults) AS total_vaults,
-                    (SELECT COUNT(*) FROM active_visible) AS active_vaults,
-                    (
-                        COALESCE((SELECT tvl_usd FROM multi_visible), 0)
-                        + COALESCE((SELECT tvl_usd FROM single_independent), 0)
-                        + COALESCE((SELECT tvl_usd FROM other_visible), 0)
-                    )::double precision AS tracked_tvl_active_usd,
-                    (
-                        SELECT COUNT(DISTINCT a.vault_address)
-                        FROM all_vaults a
-                        JOIN vault_metrics_latest m ON m.vault_address = a.vault_address
-                        WHERE a.active = TRUE
-                    ) AS active_with_metrics
-                """
-            )
-            summary_row = cur.fetchone() or {}
-            cur.execute(
-                """
+                f"""
                 SELECT
                     a.vault_address,
                     a.name,
                     a.symbol,
                     a.chain_id,
                     a.tvl_usd,
-                    LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s) AS safe_apy_30d
+                    {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d
                 FROM vault_dim a
-                JOIN vault_metrics_latest m ON m.vault_address = a.vault_address
+                JOIN vault_metrics_latest m
+                  ON m.chain_id = a.chain_id
+                 AND m.vault_address = a.vault_address
                 WHERE m.apy_30d IS NOT NULL
-                  AND a.active = TRUE
-                  AND COALESCE(a.kind, '') <> 'Single Strategy'
-                  AND COALESCE((a.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
-                  AND COALESCE((a.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
+                  AND {_user_visible_filter_sql("a", include_retired=False)}
                 ORDER BY safe_apy_30d DESC, COALESCE(a.tvl_usd, 0.0) DESC, a.vault_address
                 LIMIT 1
                 """,
@@ -964,14 +1005,19 @@ async def meta_social_preview() -> dict[str, object]:
     return {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "filters": {
-            "total_vaults_scope": "all vaults in vault_dim",
+            "total_vaults_scope": "all rows in vault_dim",
             "active_vaults_scope": "active + non-retired + non-hidden vaults in vault_dim",
-            "tracked_tvl_scope": "active + non-retired + non-hidden, debt-adjusted for single strategy overlap",
-            "highest_apy_scope": "active + non-single-strategy + non-retired + non-hidden",
+            "tracked_tvl_scope": "active + non-retired + non-hidden, debt-adjusted for single-strategy overlap",
+            "highest_apy_scope": "user-visible multi-strategy v3 scope with metrics",
             "exclude_retired": True,
             "exclude_hidden": True,
         },
-        "summary": summary_row,
+        "summary": {
+            "total_vaults": tracked_scope.get("total_vaults"),
+            "active_vaults": tracked_scope.get("active_vaults"),
+            "tracked_tvl_active_usd": tracked_scope.get("tracked_tvl_active_usd"),
+            "active_with_metrics": tracked_scope.get("active_with_metrics"),
+        },
         "highest_apy_vault": highest_row,
     }
 
@@ -986,6 +1032,7 @@ async def overview() -> dict[str, object]:
     coverage: dict[str, object] | None = None
     protocol_context: dict[str, object] | None = None
     yearn_proxy: dict[str, object] | None = None
+    tracked_scope: dict[str, object] | None = None
     lifecycle: dict[str, object] | None = None
     last_runs: dict[str, dict[str, object] | None] = {"ydaemon_snapshot": None, "kong_pps_metrics": None}
     try:
@@ -1043,6 +1090,7 @@ async def overview() -> dict[str, object]:
                             "error_summary": row["error_summary"],
                         }
                 yearn_proxy = _yearn_aligned_proxy_scope(cur)
+                tracked_scope = _tracked_scope_snapshot(cur)
             freshness = _freshness_snapshot(
                 conn,
                 stale_threshold_seconds=24 * 3600,
@@ -1097,6 +1145,7 @@ async def overview() -> dict[str, object]:
         "freshness": freshness,
         "coverage": coverage,
         "protocol_context": protocol_context,
+        "tracked_scope": tracked_scope,
         "lifecycle": lifecycle,
         "message": "Phase 6 hardening is in progress: freshness calibration, trust diagnostics, UX consistency, and data-quality safeguards are actively being refined.",
     }
@@ -1124,14 +1173,18 @@ def _quality_score_sql() -> str:
     return f"({safe_apy} - 0.5 * COALESCE(m.vol_30d, 0.0))"
 
 
+def _bounded_metric_sql(expr: str, lower: float | str, upper: float | str) -> str:
+    return f"CASE WHEN {expr} IS NULL THEN NULL ELSE LEAST(GREATEST({expr}, {lower}), {upper}) END"
+
+
 def _safe_apy_sql() -> str:
-    return f"LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), {APY_MIN}), {APY_MAX})"
+    return _bounded_metric_sql("m.apy_30d", APY_MIN, APY_MAX)
 
 
 def _safe_momentum_sql(alias: str = "m") -> str:
     lower = -abs(MOMENTUM_ABS_MAX)
     upper = abs(MOMENTUM_ABS_MAX)
-    return f"LEAST(GREATEST(COALESCE({alias}.momentum_7d_30d, 0.0), {lower}), {upper})"
+    return _bounded_metric_sql(f"{alias}.momentum_7d_30d", lower, upper)
 
 
 def _composition_filtered_cte(*, max_vaults: int | None) -> str:
@@ -1147,11 +1200,11 @@ def _composition_filtered_cte(*, max_vaults: int | None) -> str:
             COALESCE(NULLIF(d.token_symbol, ''), 'unknown') AS token_symbol,
             COALESCE(NULLIF(d.symbol, ''), d.vault_address) AS symbol,
             COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
-            LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s) AS safe_apy_30d,
+            {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d,
             {safe_momentum_sql} AS momentum_7d_30d,
             m.consistency_score
         FROM vault_dim d
-        JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+        JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
         WHERE
             {_user_visible_filter_sql("d", include_retired=False)}
             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
@@ -1175,14 +1228,14 @@ def _changes_base_cte(*, max_vaults: int | None) -> str:
             COALESCE(NULLIF(d.token_symbol, ''), 'unknown') AS token_symbol,
             COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
             COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
-            LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s) AS safe_apy_30d,
+            {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d,
             m.points_count,
             m.last_point_time,
             {safe_momentum_sql} AS momentum_7d_30d,
             m.consistency_score,
             m.vol_30d
         FROM vault_dim d
-        JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+        JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
         WHERE
             {_user_visible_filter_sql("d", include_retired=False)}
             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
@@ -1190,10 +1243,12 @@ def _changes_base_cte(*, max_vaults: int | None) -> str:
             {rank_clause}
     ),
     latest AS (
-        SELECT p.vault_address, MAX(p.ts) AS latest_ts
+        SELECT p.chain_id, p.vault_address, MAX(p.ts) AS latest_ts
         FROM pps_timeseries p
-        JOIN eligible e ON e.vault_address = p.vault_address
-        GROUP BY p.vault_address
+        JOIN eligible e
+          ON e.chain_id = p.chain_id
+         AND e.vault_address = p.vault_address
+        GROUP BY p.chain_id, p.vault_address
     ),
     anchors AS (
         SELECT
@@ -1218,26 +1273,34 @@ def _changes_base_cte(*, max_vaults: int | None) -> str:
             prev_point.ts AS prev_ts,
             prev_point.pps_raw AS prev_pps
         FROM eligible e
-        JOIN latest l ON l.vault_address = e.vault_address
+        JOIN latest l
+          ON l.chain_id = e.chain_id
+         AND l.vault_address = e.vault_address
         JOIN LATERAL (
             SELECT p.ts, p.pps_raw
             FROM pps_timeseries p
-            WHERE p.vault_address = e.vault_address AND p.ts <= l.latest_ts
+            WHERE p.chain_id = e.chain_id AND p.vault_address = e.vault_address AND p.ts <= l.latest_ts
             ORDER BY p.ts DESC
             LIMIT 1
         ) latest_point ON TRUE
         JOIN LATERAL (
             SELECT p.ts, p.pps_raw
             FROM pps_timeseries p
-            WHERE p.vault_address = e.vault_address AND p.ts <= l.latest_ts - %(window_sec)s
-            ORDER BY p.ts DESC
+            WHERE p.chain_id = e.chain_id
+              AND p.vault_address = e.vault_address
+              AND p.ts >= l.latest_ts - %(window_sec)s
+              AND p.ts < l.latest_ts
+            ORDER BY p.ts ASC
             LIMIT 1
         ) curr_point ON TRUE
         JOIN LATERAL (
             SELECT p.ts, p.pps_raw
             FROM pps_timeseries p
-            WHERE p.vault_address = e.vault_address AND p.ts <= l.latest_ts - (2 * %(window_sec)s)
-            ORDER BY p.ts DESC
+            WHERE p.chain_id = e.chain_id
+              AND p.vault_address = e.vault_address
+              AND p.ts >= curr_point.ts - %(window_sec)s
+              AND p.ts < curr_point.ts
+            ORDER BY p.ts ASC
             LIMIT 1
         ) prev_point ON TRUE
     ),
@@ -1264,8 +1327,8 @@ def _changes_base_cte(*, max_vaults: int | None) -> str:
     normalized AS (
         SELECT
             s.*,
-            LEAST(GREATEST(COALESCE(s.apy_window_raw, 0.0), %(apy_min)s), %(apy_max)s) AS safe_apy_window,
-            LEAST(GREATEST(COALESCE(s.apy_prev_window_raw, 0.0), %(apy_min)s), %(apy_max)s) AS safe_apy_prev_window
+            {_bounded_metric_sql("s.apy_window_raw", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_window,
+            {_bounded_metric_sql("s.apy_prev_window_raw", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_prev_window
         FROM scored s
     )
     """
@@ -1416,7 +1479,7 @@ async def discover(
                 f"""
                 SELECT COUNT(*) AS total
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {where_sql}
                 """,
                 params,
@@ -1435,15 +1498,16 @@ async def discover(
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {safe_apy_sql}) AS median_safe_apy_30d,
                     AVG({safe_momentum_sql}) AS avg_momentum_7d_30d,
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {safe_momentum_sql}) AS median_momentum_7d_30d,
-                    AVG(COALESCE(m.consistency_score, 0.0)) AS avg_consistency_score,
-                    AVG(COALESCE(d.feature_score, 0.0)) AS avg_feature_score,
+                    AVG(m.consistency_score) AS avg_consistency_score,
+                    AVG(d.feature_score) AS avg_feature_score,
                     COUNT(*) FILTER (WHERE {retired_sql} = TRUE) AS retired_vaults,
                     COUNT(*) FILTER (WHERE {highlighted_sql} = TRUE) AS highlighted_vaults,
                     COUNT(*) FILTER (WHERE {migration_sql} = TRUE) AS migration_ready_vaults,
                     AVG({strategies_count_sql})::DOUBLE PRECISION AS avg_strategies_per_vault,
                     CASE
-                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) > 0
-                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * {safe_apy_sql}) / SUM(COALESCE(d.tvl_usd, 0.0))
+                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE {safe_apy_sql} IS NOT NULL) > 0
+                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * {safe_apy_sql}) FILTER (WHERE {safe_apy_sql} IS NOT NULL)
+                             / SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE {safe_apy_sql} IS NOT NULL)
                         ELSE NULL
                     END AS tvl_weighted_safe_apy_30d,
                     COUNT(*) FILTER (WHERE {safe_apy_sql} < 0.0) AS apy_negative_vaults,
@@ -1451,7 +1515,7 @@ async def discover(
                     COUNT(*) FILTER (WHERE {safe_apy_sql} >= 0.05 AND {safe_apy_sql} < 0.15) AS apy_mid_vaults,
                     COUNT(*) FILTER (WHERE {safe_apy_sql} >= 0.15) AS apy_high_vaults
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {where_sql}
                 """,
                 params,
@@ -1465,7 +1529,7 @@ async def discover(
                     COUNT(*) AS vaults,
                     SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {where_sql}
                 GROUP BY risk_level
                 ORDER BY
@@ -1488,7 +1552,7 @@ async def discover(
                     COUNT(*) AS vaults,
                     SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {where_sql}
                 GROUP BY regime
                 ORDER BY tvl_usd DESC NULLS LAST, vaults DESC
@@ -1528,7 +1592,7 @@ async def discover(
                     {quality_sql} AS quality_score,
                     {regime_sql} AS regime
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {where_sql}
                 ORDER BY {order_expr} {order_dir}, d.tvl_usd DESC
                 LIMIT %(limit)s OFFSET %(offset)s
@@ -1603,7 +1667,7 @@ async def regimes(
                     COUNT(*) AS vaults,
                     SUM(COALESCE(d.tvl_usd, 0)) AS tvl_usd
                 FROM vault_dim d
-                JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {where_sql}
                 GROUP BY regime
                 ORDER BY vaults DESC
@@ -1628,7 +1692,7 @@ async def regimes(
                     m.consistency_score,
                     {regime_sql} AS regime
                 FROM vault_dim d
-                JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {where_sql}
                 ORDER BY ABS({safe_momentum_sql}) DESC, d.tvl_usd DESC
                 LIMIT %(limit)s
@@ -1687,9 +1751,9 @@ async def regime_transitions(
         filters.append("d.chain_id = %(chain_id)s")
         params["chain_id"] = chain_id
     where_sql = " AND ".join(filters)
-    safe_apy_7d_sql = "LEAST(GREATEST(COALESCE(m.apy_7d, 0.0), %(apy_min)s), %(apy_max)s)"
-    safe_apy_30d_sql = "LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s)"
-    safe_apy_90d_sql = "LEAST(GREATEST(COALESCE(m.apy_90d, 0.0), %(apy_min)s), %(apy_max)s)"
+    safe_apy_7d_sql = _bounded_metric_sql("m.apy_7d", "%(apy_min)s", "%(apy_max)s")
+    safe_apy_30d_sql = _bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")
+    safe_apy_90d_sql = _bounded_metric_sql("m.apy_90d", "%(apy_min)s", "%(apy_max)s")
     curr_momentum_sql = f"({safe_apy_7d_sql} - {safe_apy_30d_sql})"
     prev_momentum_sql = f"({safe_apy_30d_sql} - {safe_apy_90d_sql})"
     current_regime_sql = _regime_from_momentum_sql(curr_momentum_sql, vol_sql="m.vol_30d")
@@ -1709,7 +1773,7 @@ async def regime_transitions(
                         {current_regime_sql} AS current_regime,
                         {previous_regime_sql} AS previous_regime
                     FROM vault_dim d
-                    JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                    JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                     WHERE {where_sql}
                 )
                 SELECT
@@ -1735,7 +1799,7 @@ async def regime_transitions(
                         {current_regime_sql} AS current_regime,
                         {previous_regime_sql} AS previous_regime
                     FROM vault_dim d
-                    JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                    JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                     WHERE {where_sql}
                 ),
                 scored AS (
@@ -1768,7 +1832,7 @@ async def regime_transitions(
                         {current_regime_sql} AS current_regime,
                         {previous_regime_sql} AS previous_regime
                     FROM vault_dim d
-                    JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                    JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                     WHERE {where_sql}
                 ),
                 chain_scored AS (
@@ -1846,6 +1910,7 @@ async def regime_transitions_daily(
 
     params: dict[str, object] = {
         "days": days,
+        "history_days": days + DAILY_APY_LOOKBACK_DAYS,
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "apy_min": APY_MIN,
@@ -1859,126 +1924,160 @@ async def regime_transitions_daily(
 
     current_regime_sql = _regime_from_momentum_sql("current_momentum", vol_sql="vol_30d")
     previous_regime_sql = _regime_from_momentum_sql("previous_momentum", vol_sql="vol_30d")
+    daily_regime_cte = f"""
+        WITH eligible AS (
+            SELECT
+                d.vault_address,
+                d.chain_id,
+                COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
+                COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
+                m.vol_30d AS vol_30d
+            FROM vault_dim d
+            JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
+            WHERE
+                {_user_visible_filter_sql("d", include_retired=False)}
+                AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
+                AND COALESCE(m.points_count, 0) >= %(min_points)s
+                {chain_clause}
+                {rank_clause}
+        ),
+        daily_ranked AS (
+            SELECT
+                e.vault_address,
+                e.chain_id,
+                e.category,
+                e.tvl_usd,
+                e.vol_30d,
+                (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date AS day,
+                p.ts,
+                p.pps_raw,
+                ROW_NUMBER() OVER (
+                    PARTITION BY e.chain_id, e.vault_address, (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date
+                    ORDER BY p.ts DESC
+                ) AS rn
+            FROM pps_timeseries p
+            JOIN eligible e ON e.chain_id = p.chain_id AND e.vault_address = p.vault_address
+            WHERE p.ts >= EXTRACT(EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - (%(history_days)s * INTERVAL '1 day')))
+        ),
+        daily_latest AS (
+            SELECT
+                vault_address,
+                chain_id,
+                category,
+                tvl_usd,
+                vol_30d,
+                day,
+                pps_raw
+            FROM daily_ranked
+            WHERE rn = 1
+        ),
+        calc AS (
+            SELECT
+                base.vault_address,
+                base.chain_id,
+                base.category,
+                base.tvl_usd,
+                base.vol_30d,
+                base.day,
+                base.pps_raw,
+                anchor_7.day AS day_7d,
+                anchor_7.pps_raw AS pps_7d,
+                anchor_30.day AS day_30d,
+                anchor_30.pps_raw AS pps_30d,
+                anchor_90.day AS day_90d,
+                anchor_90.pps_raw AS pps_90d
+            FROM daily_latest base
+            LEFT JOIN LATERAL (
+                SELECT prior.day, prior.pps_raw
+                FROM daily_latest prior
+                WHERE prior.chain_id = base.chain_id
+                  AND prior.vault_address = base.vault_address
+                  AND prior.day >= base.day - 7
+                  AND prior.day < base.day
+                ORDER BY prior.day ASC
+                LIMIT 1
+            ) anchor_7 ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT prior.day, prior.pps_raw
+                FROM daily_latest prior
+                WHERE prior.chain_id = base.chain_id
+                  AND prior.vault_address = base.vault_address
+                  AND prior.day >= base.day - 30
+                  AND prior.day < base.day
+                ORDER BY prior.day ASC
+                LIMIT 1
+            ) anchor_30 ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT prior.day, prior.pps_raw
+                FROM daily_latest prior
+                WHERE prior.chain_id = base.chain_id
+                  AND prior.vault_address = base.vault_address
+                  AND prior.day >= base.day - 90
+                  AND prior.day < base.day
+                ORDER BY prior.day ASC
+                LIMIT 1
+            ) anchor_90 ON TRUE
+        ),
+        apy AS (
+            SELECT
+                vault_address,
+                chain_id,
+                category,
+                tvl_usd,
+                vol_30d,
+                day,
+                CASE
+                    WHEN pps_raw > 0 AND pps_7d > 0 AND day_7d IS NOT NULL AND (day - day_7d) > 0
+                    THEN LEAST(GREATEST(POWER(pps_raw / pps_7d, 365.0 / NULLIF((day - day_7d), 0)) - 1, %(apy_min)s), %(apy_max)s)
+                    ELSE NULL
+                END AS apy_7d,
+                CASE
+                    WHEN pps_raw > 0 AND pps_30d > 0 AND day_30d IS NOT NULL AND (day - day_30d) > 0
+                    THEN LEAST(GREATEST(POWER(pps_raw / pps_30d, 365.0 / NULLIF((day - day_30d), 0)) - 1, %(apy_min)s), %(apy_max)s)
+                    ELSE NULL
+                END AS apy_30d,
+                CASE
+                    WHEN pps_raw > 0 AND pps_90d > 0 AND day_90d IS NOT NULL AND (day - day_90d) > 0
+                    THEN LEAST(GREATEST(POWER(pps_raw / pps_90d, 365.0 / NULLIF((day - day_90d), 0)) - 1, %(apy_min)s), %(apy_max)s)
+                    ELSE NULL
+                END AS apy_90d
+            FROM calc
+        ),
+        momentum AS (
+            SELECT
+                vault_address,
+                chain_id,
+                category,
+                tvl_usd,
+                vol_30d,
+                day,
+                (apy_7d - apy_30d) AS current_momentum,
+                (apy_30d - apy_90d) AS previous_momentum
+            FROM apy
+            WHERE day >= ((NOW() AT TIME ZONE 'UTC')::date - ((%(days)s::text || ' days')::interval))
+              AND apy_30d IS NOT NULL
+              AND apy_90d IS NOT NULL
+        ),
+        regimes AS (
+            SELECT
+                vault_address,
+                chain_id,
+                category,
+                tvl_usd,
+                day,
+                current_momentum,
+                previous_momentum,
+                {current_regime_sql} AS current_regime,
+                {previous_regime_sql} AS previous_regime
+            FROM momentum
+        )
+    """
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                f"""
-                WITH eligible AS (
-                    SELECT
-                        d.vault_address,
-                        d.chain_id,
-                        COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
-                        COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
-                        COALESCE(m.vol_30d, 0.0) AS vol_30d
-                    FROM vault_dim d
-                    JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
-                    WHERE
-                        {_user_visible_filter_sql("d", include_retired=False)}
-                        AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
-                        AND COALESCE(m.points_count, 0) >= %(min_points)s
-                        {chain_clause}
-                        {rank_clause}
-                ),
-                daily_ranked AS (
-                    SELECT
-                        e.vault_address,
-                        e.chain_id,
-                        e.category,
-                        e.tvl_usd,
-                        e.vol_30d,
-                        (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date AS day,
-                        p.ts,
-                        p.pps_raw,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY e.vault_address, (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date
-                            ORDER BY p.ts DESC
-                        ) AS rn
-                    FROM pps_timeseries p
-                    JOIN eligible e ON e.vault_address = p.vault_address
-                    WHERE p.ts >= EXTRACT(
-                        EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - ((%(days)s + 110) * INTERVAL '1 day'))
-                    )
-                ),
-                daily_latest AS (
-                    SELECT
-                        vault_address,
-                        chain_id,
-                        category,
-                        tvl_usd,
-                        vol_30d,
-                        day,
-                        pps_raw
-                    FROM daily_ranked
-                    WHERE rn = 1
-                ),
-                calc AS (
-                    SELECT
-                        vault_address,
-                        chain_id,
-                        category,
-                        tvl_usd,
-                        vol_30d,
-                        day,
-                        pps_raw,
-                        LAG(pps_raw, 7) OVER (PARTITION BY vault_address ORDER BY day) AS pps_7d,
-                        LAG(pps_raw, 30) OVER (PARTITION BY vault_address ORDER BY day) AS pps_30d,
-                        LAG(pps_raw, 90) OVER (PARTITION BY vault_address ORDER BY day) AS pps_90d
-                    FROM daily_latest
-                ),
-                apy AS (
-                    SELECT
-                        vault_address,
-                        chain_id,
-                        category,
-                        tvl_usd,
-                        vol_30d,
-                        day,
-                        CASE
-                            WHEN pps_raw > 0 AND pps_7d > 0
-                            THEN LEAST(GREATEST(POWER(pps_raw / pps_7d, 365.0 / 7.0) - 1, %(apy_min)s), %(apy_max)s)
-                            ELSE NULL
-                        END AS apy_7d,
-                        CASE
-                            WHEN pps_raw > 0 AND pps_30d > 0
-                            THEN LEAST(GREATEST(POWER(pps_raw / pps_30d, 365.0 / 30.0) - 1, %(apy_min)s), %(apy_max)s)
-                            ELSE NULL
-                        END AS apy_30d,
-                        CASE
-                            WHEN pps_raw > 0 AND pps_90d > 0
-                            THEN LEAST(GREATEST(POWER(pps_raw / pps_90d, 365.0 / 90.0) - 1, %(apy_min)s), %(apy_max)s)
-                            ELSE NULL
-                        END AS apy_90d
-                    FROM calc
-                ),
-                momentum AS (
-                    SELECT
-                        vault_address,
-                        chain_id,
-                        category,
-                        tvl_usd,
-                        vol_30d,
-                        day,
-                        (apy_7d - apy_30d) AS current_momentum,
-                        (apy_30d - apy_90d) AS previous_momentum
-                    FROM apy
-                    WHERE day >= ((NOW() AT TIME ZONE 'UTC')::date - ((%(days)s::text || ' days')::interval))
-                      AND apy_30d IS NOT NULL
-                      AND apy_90d IS NOT NULL
-                ),
-                regimes AS (
-                    SELECT
-                        vault_address,
-                        chain_id,
-                        category,
-                        tvl_usd,
-                        day,
-                        current_momentum,
-                        previous_momentum,
-                        {current_regime_sql} AS current_regime,
-                        {previous_regime_sql} AS previous_regime
-                    FROM momentum
-                )
+                daily_regime_cte
+                + """
                 SELECT
                     day::text AS day,
                     COUNT(*) AS vaults_total,
@@ -1998,123 +2097,9 @@ async def regime_transitions_daily(
             if group_by != "none":
                 group_expr = "chain_id::text" if group_by == "chain" else "category"
                 cur.execute(
-                    f"""
-                    WITH eligible AS (
-                        SELECT
-                            d.vault_address,
-                            d.chain_id,
-                            COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
-                            COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
-                            COALESCE(m.vol_30d, 0.0) AS vol_30d
-                        FROM vault_dim d
-                        JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
-                        WHERE
-                            {_user_visible_filter_sql("d", include_retired=False)}
-                            AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
-                            AND COALESCE(m.points_count, 0) >= %(min_points)s
-                            {chain_clause}
-                            {rank_clause}
-                    ),
-                    daily_ranked AS (
-                        SELECT
-                            e.vault_address,
-                            e.chain_id,
-                            e.category,
-                            e.tvl_usd,
-                            e.vol_30d,
-                            (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date AS day,
-                            p.ts,
-                            p.pps_raw,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY e.vault_address, (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date
-                                ORDER BY p.ts DESC
-                            ) AS rn
-                        FROM pps_timeseries p
-                        JOIN eligible e ON e.vault_address = p.vault_address
-                        WHERE p.ts >= EXTRACT(
-                            EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - ((%(days)s + 110) * INTERVAL '1 day'))
-                        )
-                    ),
-                    daily_latest AS (
-                        SELECT
-                            vault_address,
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            vol_30d,
-                            day,
-                            pps_raw
-                        FROM daily_ranked
-                        WHERE rn = 1
-                    ),
-                    calc AS (
-                        SELECT
-                            vault_address,
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            vol_30d,
-                            day,
-                            pps_raw,
-                            LAG(pps_raw, 7) OVER (PARTITION BY vault_address ORDER BY day) AS pps_7d,
-                            LAG(pps_raw, 30) OVER (PARTITION BY vault_address ORDER BY day) AS pps_30d,
-                            LAG(pps_raw, 90) OVER (PARTITION BY vault_address ORDER BY day) AS pps_90d
-                        FROM daily_latest
-                    ),
-                    apy AS (
-                        SELECT
-                            vault_address,
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            vol_30d,
-                            day,
-                            CASE
-                                WHEN pps_raw > 0 AND pps_7d > 0
-                                THEN LEAST(GREATEST(POWER(pps_raw / pps_7d, 365.0 / 7.0) - 1, %(apy_min)s), %(apy_max)s)
-                                ELSE NULL
-                            END AS apy_7d,
-                            CASE
-                                WHEN pps_raw > 0 AND pps_30d > 0
-                                THEN LEAST(GREATEST(POWER(pps_raw / pps_30d, 365.0 / 30.0) - 1, %(apy_min)s), %(apy_max)s)
-                                ELSE NULL
-                            END AS apy_30d,
-                            CASE
-                                WHEN pps_raw > 0 AND pps_90d > 0
-                                THEN LEAST(GREATEST(POWER(pps_raw / pps_90d, 365.0 / 90.0) - 1, %(apy_min)s), %(apy_max)s)
-                                ELSE NULL
-                            END AS apy_90d
-                        FROM calc
-                    ),
-                    momentum AS (
-                        SELECT
-                            vault_address,
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            vol_30d,
-                            day,
-                            (apy_7d - apy_30d) AS current_momentum,
-                            (apy_30d - apy_90d) AS previous_momentum
-                        FROM apy
-                        WHERE day >= ((NOW() AT TIME ZONE 'UTC')::date - ((%(days)s::text || ' days')::interval))
-                          AND apy_30d IS NOT NULL
-                          AND apy_90d IS NOT NULL
-                    ),
-                    regimes AS (
-                        SELECT
-                            vault_address,
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            day,
-                            current_momentum,
-                            previous_momentum,
-                            {current_regime_sql} AS current_regime,
-                            {previous_regime_sql} AS previous_regime
-                        FROM momentum
-                    ),
-                    grouped AS (
+                    daily_regime_cte
+                    + f"""
+                    , grouped AS (
                         SELECT
                             day::text AS day,
                             {group_expr} AS group_key,
@@ -2183,12 +2168,9 @@ async def regime_transitions_daily(
         "latest_changed_ratio": latest.get("changed_ratio") if latest else None,
         "latest_changed_tvl_ratio": latest.get("changed_tvl_ratio") if latest else None,
         "latest_momentum_spread": latest.get("momentum_spread") if latest else None,
-        "delta_changed_ratio": (
-            (_to_float_or_none(latest.get("changed_ratio")) or 0.0)
-            - (_to_float_or_none(first.get("changed_ratio")) or 0.0)
-            if latest and first
-            else None
-        ),
+        "delta_changed_ratio": _delta_or_none(latest.get("changed_ratio"), first.get("changed_ratio"))
+        if latest and first
+        else None,
     }
 
     return {
@@ -2253,7 +2235,7 @@ async def chains_rollups(
                                 (
                                     COALESCE(d.tvl_usd, 0)
                                     *
-                                    LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s)
+                                    {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")}
                                 )
                             ) FILTER (WHERE m.apy_30d IS NOT NULL)
                             /
@@ -2261,11 +2243,11 @@ async def chains_rollups(
                         ELSE NULL
                     END AS weighted_apy_30d,
                     AVG(
-                        LEAST(GREATEST(COALESCE(m.momentum_7d_30d, 0.0), %(momentum_min)s), %(momentum_max)s)
+                        {_bounded_metric_sql("m.momentum_7d_30d", "%(momentum_min)s", "%(momentum_max)s")}
                     ) FILTER (WHERE m.momentum_7d_30d IS NOT NULL) AS avg_momentum_7d_30d,
                     AVG(m.consistency_score) FILTER (WHERE m.consistency_score IS NOT NULL) AS avg_consistency
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {_user_visible_filter_sql("d", include_retired=False)}
                   AND COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s
                   {rank_clause}
@@ -2350,6 +2332,7 @@ async def daily_trends(
 
     params: dict[str, object] = {
         "days": days,
+        "history_days": days + DAILY_APY_LOOKBACK_DAYS,
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "apy_min": APY_MIN,
@@ -2361,7 +2344,7 @@ async def daily_trends(
     if max_vaults is not None:
         params["max_vaults"] = max_vaults
 
-    sql = f"""
+    daily_trends_cte = f"""
         WITH eligible AS (
             SELECT
                 d.vault_address,
@@ -2369,7 +2352,7 @@ async def daily_trends(
                 COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
                 COALESCE(d.tvl_usd, 0.0) AS tvl_usd
             FROM vault_dim d
-            JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+            JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
             WHERE
                 {_user_visible_filter_sql("d", include_retired=False)}
                 AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
@@ -2387,14 +2370,12 @@ async def daily_trends(
                 p.ts,
                 p.pps_raw,
                 ROW_NUMBER() OVER (
-                    PARTITION BY e.vault_address, (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date
+                    PARTITION BY e.chain_id, e.vault_address, (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date
                     ORDER BY p.ts DESC
                 ) AS rn
             FROM pps_timeseries p
-            JOIN eligible e ON e.vault_address = p.vault_address
-            WHERE p.ts >= EXTRACT(
-                EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - ((%(days)s + 110) * INTERVAL '1 day'))
-            )
+            JOIN eligible e ON e.chain_id = p.chain_id AND e.vault_address = p.vault_address
+            WHERE p.ts >= EXTRACT(EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - (%(history_days)s * INTERVAL '1 day')))
         ),
         daily_latest AS (
             SELECT
@@ -2409,16 +2390,49 @@ async def daily_trends(
         ),
         calc AS (
             SELECT
-                vault_address,
-                chain_id,
-                category,
-                tvl_usd,
-                day,
-                pps_raw,
-                LAG(pps_raw, 7) OVER (PARTITION BY vault_address ORDER BY day) AS pps_7d,
-                LAG(pps_raw, 30) OVER (PARTITION BY vault_address ORDER BY day) AS pps_30d,
-                LAG(pps_raw, 90) OVER (PARTITION BY vault_address ORDER BY day) AS pps_90d
-            FROM daily_latest
+                base.vault_address,
+                base.chain_id,
+                base.category,
+                base.tvl_usd,
+                base.day,
+                base.pps_raw,
+                anchor_7.day AS day_7d,
+                anchor_7.pps_raw AS pps_7d,
+                anchor_30.day AS day_30d,
+                anchor_30.pps_raw AS pps_30d,
+                anchor_90.day AS day_90d,
+                anchor_90.pps_raw AS pps_90d
+            FROM daily_latest base
+            LEFT JOIN LATERAL (
+                SELECT prior.day, prior.pps_raw
+                FROM daily_latest prior
+                WHERE prior.chain_id = base.chain_id
+                  AND prior.vault_address = base.vault_address
+                  AND prior.day >= base.day - 7
+                  AND prior.day < base.day
+                ORDER BY prior.day ASC
+                LIMIT 1
+            ) anchor_7 ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT prior.day, prior.pps_raw
+                FROM daily_latest prior
+                WHERE prior.chain_id = base.chain_id
+                  AND prior.vault_address = base.vault_address
+                  AND prior.day >= base.day - 30
+                  AND prior.day < base.day
+                ORDER BY prior.day ASC
+                LIMIT 1
+            ) anchor_30 ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT prior.day, prior.pps_raw
+                FROM daily_latest prior
+                WHERE prior.chain_id = base.chain_id
+                  AND prior.vault_address = base.vault_address
+                  AND prior.day >= base.day - 90
+                  AND prior.day < base.day
+                ORDER BY prior.day ASC
+                LIMIT 1
+            ) anchor_90 ON TRUE
         ),
         vault_daily AS (
             SELECT
@@ -2427,18 +2441,18 @@ async def daily_trends(
                 tvl_usd,
                 day,
                 CASE
-                    WHEN pps_raw > 0 AND pps_7d > 0
-                    THEN POWER(pps_raw / pps_7d, 365.0 / 7.0) - 1
+                    WHEN pps_raw > 0 AND pps_7d > 0 AND day_7d IS NOT NULL AND (day - day_7d) > 0
+                    THEN POWER(pps_raw / pps_7d, 365.0 / NULLIF((day - day_7d), 0)) - 1
                     ELSE NULL
                 END AS apy_7d_raw,
                 CASE
-                    WHEN pps_raw > 0 AND pps_30d > 0
-                    THEN POWER(pps_raw / pps_30d, 365.0 / 30.0) - 1
+                    WHEN pps_raw > 0 AND pps_30d > 0 AND day_30d IS NOT NULL AND (day - day_30d) > 0
+                    THEN POWER(pps_raw / pps_30d, 365.0 / NULLIF((day - day_30d), 0)) - 1
                     ELSE NULL
                 END AS apy_30d_raw,
                 CASE
-                    WHEN pps_raw > 0 AND pps_90d > 0
-                    THEN POWER(pps_raw / pps_90d, 365.0 / 90.0) - 1
+                    WHEN pps_raw > 0 AND pps_90d > 0 AND day_90d IS NOT NULL AND (day - day_90d) > 0
+                    THEN POWER(pps_raw / pps_90d, 365.0 / NULLIF((day - day_90d), 0)) - 1
                     ELSE NULL
                 END AS apy_90d_raw
             FROM calc
@@ -2455,6 +2469,11 @@ async def daily_trends(
             FROM vault_daily
             WHERE day >= ((NOW() AT TIME ZONE 'UTC')::date - ((%(days)s::text || ' days')::interval))
         )
+    """
+
+    sql = (
+        daily_trends_cte
+        + """
         SELECT
             day::text AS day,
             COUNT(*) AS vaults,
@@ -2492,7 +2511,8 @@ async def daily_trends(
         FROM trimmed
         GROUP BY day
         ORDER BY day
-    """
+        """
+    )
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
@@ -2501,101 +2521,10 @@ async def daily_trends(
             grouped_rows: list[dict] = []
             if group_by != "none":
                 group_expr = "chain_id::text" if group_by == "chain" else "category"
-                grouped_sql = f"""
-                    WITH eligible AS (
-                        SELECT
-                            d.vault_address,
-                            d.chain_id,
-                            COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
-                            COALESCE(d.tvl_usd, 0.0) AS tvl_usd
-                        FROM vault_dim d
-                        JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
-                        WHERE
-                            {_user_visible_filter_sql("d", include_retired=False)}
-                            AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
-                            AND COALESCE(m.points_count, 0) >= %(min_points)s
-                            {chain_clause}
-                            {rank_clause}
-                    ),
-                    daily_ranked AS (
-                        SELECT
-                            e.vault_address,
-                            e.chain_id,
-                            e.category,
-                            e.tvl_usd,
-                            (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date AS day,
-                            p.ts,
-                            p.pps_raw,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY e.vault_address, (to_timestamp(p.ts) AT TIME ZONE 'UTC')::date
-                                ORDER BY p.ts DESC
-                            ) AS rn
-                        FROM pps_timeseries p
-                        JOIN eligible e ON e.vault_address = p.vault_address
-                        WHERE p.ts >= EXTRACT(
-                            EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - ((%(days)s + 110) * INTERVAL '1 day'))
-                        )
-                    ),
-                    daily_latest AS (
-                        SELECT
-                            vault_address,
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            day,
-                            pps_raw
-                        FROM daily_ranked
-                        WHERE rn = 1
-                    ),
-                    calc AS (
-                        SELECT
-                            vault_address,
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            day,
-                            pps_raw,
-                            LAG(pps_raw, 7) OVER (PARTITION BY vault_address ORDER BY day) AS pps_7d,
-                            LAG(pps_raw, 30) OVER (PARTITION BY vault_address ORDER BY day) AS pps_30d,
-                            LAG(pps_raw, 90) OVER (PARTITION BY vault_address ORDER BY day) AS pps_90d
-                        FROM daily_latest
-                    ),
-                    vault_daily AS (
-                        SELECT
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            day,
-                            CASE
-                                WHEN pps_raw > 0 AND pps_7d > 0
-                                THEN POWER(pps_raw / pps_7d, 365.0 / 7.0) - 1
-                                ELSE NULL
-                            END AS apy_7d_raw,
-                            CASE
-                                WHEN pps_raw > 0 AND pps_30d > 0
-                                THEN POWER(pps_raw / pps_30d, 365.0 / 30.0) - 1
-                                ELSE NULL
-                            END AS apy_30d_raw,
-                            CASE
-                                WHEN pps_raw > 0 AND pps_90d > 0
-                                THEN POWER(pps_raw / pps_90d, 365.0 / 90.0) - 1
-                                ELSE NULL
-                            END AS apy_90d_raw
-                        FROM calc
-                    ),
-                    trimmed AS (
-                        SELECT
-                            chain_id,
-                            category,
-                            tvl_usd,
-                            day,
-                            LEAST(GREATEST(apy_7d_raw, %(apy_min)s), %(apy_max)s) AS apy_7d,
-                            LEAST(GREATEST(apy_30d_raw, %(apy_min)s), %(apy_max)s) AS apy_30d,
-                            LEAST(GREATEST(apy_90d_raw, %(apy_min)s), %(apy_max)s) AS apy_90d
-                        FROM vault_daily
-                        WHERE day >= ((NOW() AT TIME ZONE 'UTC')::date - ((%(days)s::text || ' days')::interval))
-                    ),
-                    grouped AS (
+                grouped_sql = (
+                    daily_trends_cte
+                    + f"""
+                    , grouped AS (
                         SELECT
                             day::text AS day,
                             {group_expr} AS group_key,
@@ -2641,7 +2570,8 @@ async def daily_trends(
                     FROM grouped g
                     JOIN ranked_groups r ON r.group_key = g.group_key
                     ORDER BY g.day, g.group_key
-                """
+                    """
+                )
                 cur.execute(grouped_sql, params)
                 grouped_rows = cur.fetchall()
 
@@ -2675,12 +2605,9 @@ async def daily_trends(
         "latest_weighted_apy_30d": latest.get("weighted_apy_30d") if latest else None,
         "latest_weighted_apy_90d": latest.get("weighted_apy_90d") if latest else None,
         "latest_weighted_momentum_7d_30d": latest.get("weighted_momentum_7d_30d") if latest else None,
-        "delta_weighted_apy_30d": (
-            (_to_float_or_none(latest.get("weighted_apy_30d")) or 0.0)
-            - (_to_float_or_none(first.get("weighted_apy_30d")) or 0.0)
-            if latest and first
-            else None
-        ),
+        "delta_weighted_apy_30d": _delta_or_none(latest.get("weighted_apy_30d"), first.get("weighted_apy_30d"))
+        if latest and first
+        else None,
     }
 
     return {
@@ -2753,9 +2680,9 @@ async def assets(
                 {token_type_sql} AS token_type,
                 d.chain_id,
                 COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
-                LEAST(GREATEST(COALESCE(m.apy_30d, 0.0), %(apy_min)s), %(apy_max)s) AS safe_apy_30d
+                {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d
             FROM vault_dim d
-            JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+            JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
             WHERE
                 {_user_visible_filter_sql("d", include_retired=False)}
                 AND COALESCE(d.token_symbol, '') <> ''
@@ -2800,8 +2727,9 @@ async def assets(
                 MIN(safe_apy_30d) AS worst_safe_apy_30d,
                 MAX(safe_apy_30d) - MIN(safe_apy_30d) AS spread_safe_apy_30d,
                 CASE
-                    WHEN SUM(tvl_usd) > 0
-                    THEN SUM(tvl_usd * safe_apy_30d) / SUM(tvl_usd)
+                    WHEN SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL) > 0
+                    THEN SUM(tvl_usd * safe_apy_30d) FILTER (WHERE safe_apy_30d IS NOT NULL)
+                         / SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL)
                     ELSE NULL
                 END AS weighted_safe_apy_30d
             FROM scoped
@@ -2870,8 +2798,9 @@ async def assets(
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY spread_safe_apy_30d) AS median_spread_safe_apy_30d,
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY best_safe_apy_30d) AS median_best_safe_apy_30d,
                     CASE
-                        WHEN SUM(total_tvl_usd) > 0
-                        THEN SUM(total_tvl_usd * weighted_safe_apy_30d) / SUM(total_tvl_usd)
+                        WHEN SUM(total_tvl_usd) FILTER (WHERE weighted_safe_apy_30d IS NOT NULL) > 0
+                        THEN SUM(total_tvl_usd * weighted_safe_apy_30d) FILTER (WHERE weighted_safe_apy_30d IS NOT NULL)
+                             / SUM(total_tvl_usd) FILTER (WHERE weighted_safe_apy_30d IS NOT NULL)
                         ELSE NULL
                     END AS tvl_weighted_safe_apy_30d,
                     (SELECT token_symbol FROM final_tokens ORDER BY total_tvl_usd DESC NULLS LAST LIMIT 1) AS top_token_symbol,
@@ -2977,14 +2906,14 @@ async def asset_venues(
                     {quality_sql} AS quality_score,
                     {regime_sql} AS regime
                 FROM vault_dim d
-                JOIN vault_metrics_latest m ON m.vault_address = d.vault_address
+                JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE
                     {_user_visible_filter_sql("d", include_retired=False)}
                     AND LOWER(COALESCE(d.token_symbol, '')) = LOWER(%(token_symbol)s)
                     AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                     AND COALESCE(m.points_count, 0) >= %(min_points)s
                     {rank_clause}
-                ORDER BY safe_apy_30d DESC, d.tvl_usd DESC
+                ORDER BY safe_apy_30d DESC NULLS LAST, d.tvl_usd DESC
                 LIMIT %(limit)s
                 """,
                 params,
@@ -2993,15 +2922,25 @@ async def asset_venues(
 
     total_tvl = sum(float(row.get("tvl_usd") or 0.0) for row in rows)
     weighted_safe_apy = None
-    if total_tvl > 0:
-        weighted_safe_apy = sum(float(row.get("tvl_usd") or 0.0) * float(row.get("safe_apy_30d") or 0.0) for row in rows) / total_tvl
+    apy_weight_tvl = sum(float(row.get("tvl_usd") or 0.0) for row in rows if row.get("safe_apy_30d") is not None)
+    if apy_weight_tvl > 0:
+        weighted_safe_apy = (
+            sum(
+                float(row.get("tvl_usd") or 0.0) * float(row.get("safe_apy_30d"))
+                for row in rows
+                if row.get("safe_apy_30d") is not None
+            )
+            / apy_weight_tvl
+        )
+
+    best_apy_values = [float(row.get("safe_apy_30d")) for row in rows if row.get("safe_apy_30d") is not None]
 
     summary = {
         "venues": len(rows),
         "chains": len({int(row["chain_id"]) for row in rows if row.get("chain_id") is not None}),
         "total_tvl_usd": total_tvl,
-        "best_safe_apy_30d": max((row.get("safe_apy_30d") for row in rows), default=None),
-        "worst_safe_apy_30d": min((row.get("safe_apy_30d") for row in rows), default=None),
+        "best_safe_apy_30d": max(best_apy_values) if best_apy_values else None,
+        "worst_safe_apy_30d": min(best_apy_values) if best_apy_values else None,
         "weighted_safe_apy_30d": weighted_safe_apy,
         "best_venue_vault": rows[0]["vault_address"] if rows else None,
         "best_venue_symbol": rows[0]["symbol"] if rows else None,
@@ -3095,7 +3034,9 @@ async def composition(
                     COUNT(*) AS vaults,
                     SUM(tvl_usd) AS tvl_usd,
                     CASE
-                        WHEN SUM(tvl_usd) > 0 THEN SUM(tvl_usd * safe_apy_30d) / SUM(tvl_usd)
+                        WHEN SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL) > 0
+                        THEN SUM(tvl_usd * safe_apy_30d) FILTER (WHERE safe_apy_30d IS NOT NULL)
+                             / SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL)
                         ELSE NULL
                     END AS weighted_safe_apy_30d
                 FROM filtered
@@ -3115,7 +3056,9 @@ async def composition(
                     COUNT(*) AS vaults,
                     SUM(tvl_usd) AS tvl_usd,
                     CASE
-                        WHEN SUM(tvl_usd) > 0 THEN SUM(tvl_usd * safe_apy_30d) / SUM(tvl_usd)
+                        WHEN SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL) > 0
+                        THEN SUM(tvl_usd * safe_apy_30d) FILTER (WHERE safe_apy_30d IS NOT NULL)
+                             / SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL)
                         ELSE NULL
                     END AS weighted_safe_apy_30d
                 FROM filtered
@@ -3135,7 +3078,9 @@ async def composition(
                     COUNT(*) AS vaults,
                     SUM(tvl_usd) AS tvl_usd,
                     CASE
-                        WHEN SUM(tvl_usd) > 0 THEN SUM(tvl_usd * safe_apy_30d) / SUM(tvl_usd)
+                        WHEN SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL) > 0
+                        THEN SUM(tvl_usd * safe_apy_30d) FILTER (WHERE safe_apy_30d IS NOT NULL)
+                             / SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL)
                         ELSE NULL
                     END AS weighted_safe_apy_30d
                 FROM filtered
