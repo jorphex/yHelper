@@ -8,6 +8,7 @@ NOTES.md
 PLAN.md
 plan.md
 reports/
+infra/cloudflared/config.yml.example
 
 # Python
 __pycache__/
