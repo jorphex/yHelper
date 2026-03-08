@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiUrl } from "../lib/api";
-import { chainLabel, formatPct, formatUsd } from "../lib/format";
+import { chainLabel, compactChainLabel, formatPct, formatUsd } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, replaceQuery } from "../lib/url";
 import { PageTopPanel } from "../components/page-top-panel";
@@ -45,6 +45,7 @@ function ChainsPageContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<ChainsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [sort, setSort] = useState<SortState<ChainSortKey>>({ key: "tvl", direction: "desc" });
 
   const query = useMemo(() => {
@@ -66,6 +67,14 @@ function ChainsPageContent() {
   useEffect(() => {
     setSort({ key: query.sort, direction: query.dir });
   }, [query.sort, query.dir]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const onChange = () => setIsCompactViewport(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
@@ -295,9 +304,9 @@ function ChainsPageContent() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.chain_id}>
-                  <td className="col-chain">
+                  <td className="col-chain" title={chainLabel(row.chain_id)}>
                     <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                      {chainLabel(row.chain_id)}
+                      {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
                   <td className="is-numeric col-active">{row.active_vaults}</td>

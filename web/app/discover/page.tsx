@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiUrl } from "../lib/api";
-import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
+import { chainLabel, compactCategoryLabel, compactChainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { queryBool, queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips, useInViewOnce } from "../components/visuals";
 import { PageTopPanel } from "../components/page-top-panel";
@@ -233,6 +233,27 @@ function riskLevelLabel(value: string | null | undefined): string {
   return value;
 }
 
+function compactRiskCellLabel(
+  row: Pick<DiscoverRow, "risk_level" | "strategies_count" | "migration_available" | "is_highlighted" | "is_retired">,
+  compact: boolean,
+): string {
+  if (!compact) {
+    return `${riskLevelLabel(row.risk_level)}${row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}${row.migration_available ? " · Migr" : ""}${row.is_highlighted ? " · High" : ""}${row.is_retired ? " · Ret" : ""}`;
+  }
+  const base =
+    row.risk_level === null || row.risk_level === undefined || row.risk_level === "" || row.risk_level === "unknown"
+      ? "Unk."
+      : row.risk_level === "-1"
+        ? "U"
+        : row.risk_level;
+  const parts = [base];
+  if (row.strategies_count > 0) parts.push(`${row.strategies_count}s`);
+  if (row.migration_available) parts.push("M");
+  if (row.is_highlighted) parts.push("H");
+  if (row.is_retired) parts.push("R");
+  return parts.join(" · ");
+}
+
 function compactRegimeLabel(value: string | null | undefined): string {
   if (!value) return "Unknown";
   const key = value.toLowerCase();
@@ -266,14 +287,14 @@ function DiscoverRidgeline({
       </section>
     );
   }
-  const width = 1000;
-  const rowH = valid.length >= 5 ? 26 : 30;
+  const width = 920;
+  const rowH = valid.length >= 5 ? 28 : 32;
   const maxLabelChars = valid.reduce((acc, row) => Math.max(acc, row.label.length), 0);
   const maxNoteChars = valid.reduce((acc, row) => Math.max(acc, row.note.length), 0);
-  const chartLeft = Math.round(width * Math.max(0.12, Math.min(0.2, 0.045 + maxLabelChars * 0.008)));
-  const chartRight = Math.round(width * Math.max(0.12, Math.min(0.22, 0.055 + maxNoteChars * 0.0075)));
+  const chartLeft = Math.round(width * Math.max(0.102, Math.min(0.172, 0.036 + maxLabelChars * 0.0072)));
+  const chartRight = Math.round(width * Math.max(0.104, Math.min(0.188, 0.048 + maxNoteChars * 0.0068)));
   const chartWidth = Math.max(220, width - chartLeft - chartRight);
-  const peakHeight = Math.max(7, Math.min(10, rowH * 0.36));
+  const peakHeight = Math.max(8, Math.min(11, rowH * 0.38));
   const height = 8 + valid.length * rowH + 16;
   const bins = Math.max(14, Math.min(20, Math.round(chartWidth / 48)));
   const allValues = valid.flatMap((row) => row.values);
@@ -1049,12 +1070,12 @@ function DiscoverPageContent() {
               {rows.map((row) => (
                 <tr key={row.vault_address}>
                   <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td className="col-chain">
+                  <td className="col-chain" title={chainLabel(row.chain_id)}>
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                       scroll={false}
                     >
-                      {chainLabel(row.chain_id)}
+                      {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
                   <td className="col-token">
@@ -1069,7 +1090,9 @@ function DiscoverPageContent() {
                       "n/a"
                     )}
                   </td>
-                  <td className="analyst-only col-category" title={row.category || "n/a"}>{row.category || "n/a"}</td>
+                  <td className="analyst-only col-category" title={row.category || "n/a"}>
+                    {compactCategoryLabel(row.category, isCompactViewport)}
+                  </td>
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
@@ -1078,11 +1101,7 @@ function DiscoverPageContent() {
                     className="tablet-hide analyst-only col-risk"
                     title={`${riskLevelLabel(row.risk_level)}${row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}${row.migration_available ? " · Migr" : ""}${row.is_highlighted ? " · High" : ""}${row.is_retired ? " · Ret" : ""}`}
                   >
-                    {riskLevelLabel(row.risk_level)}
-                    {row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}
-                    {row.migration_available ? " · Migr" : ""}
-                    {row.is_highlighted ? " · High" : ""}
-                    {row.is_retired ? " · Ret" : ""}
+                    {compactRiskCellLabel(row, isCompactViewport)}
                   </td>
                   <td className="analyst-only col-regime" title={compactRegimeLabel(row.regime)}>{compactRegimeLabel(row.regime)}</td>
                 </tr>

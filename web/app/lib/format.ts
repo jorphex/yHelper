@@ -24,6 +24,32 @@ export function chainLabel(chainId: number | null | undefined): string {
   return CHAIN_NAMES[chainId] ?? `Chain ${chainId}`;
 }
 
+const CHAIN_COMPACT_NAMES: Record<number, string> = {
+  1: "ETH",
+  10: "OP",
+  56: "BNB",
+  100: "Gnosis",
+  137: "Polygon",
+  146: "Sonic",
+  250: "Fantom",
+  252: "Fraxtal",
+  324: "zkSync",
+  8453: "Base",
+  42161: "Arbitrum",
+  43114: "Avalanche",
+  59144: "Linea",
+  81457: "Blast",
+  534352: "Scroll",
+  747474: "Katana",
+};
+
+export function compactChainLabel(chainId: number | null | undefined, compact = false): string {
+  const label = chainLabel(chainId);
+  if (!compact) return label;
+  if (chainId === null || chainId === undefined) return label;
+  return CHAIN_COMPACT_NAMES[chainId] ?? label;
+}
+
 export function formatPct(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined) {
     return "n/a";
@@ -90,4 +116,17 @@ export function regimeLabel(value: string | null | undefined): string {
   if (key === "stable") return "Stable (small trend, lower volatility)";
   if (key === "choppy") return "Choppy (high volatility)";
   return value;
+}
+
+export function compactCategoryLabel(value: string | null | undefined, compact = false): string {
+  if (!value || value.trim().length === 0) return "unknown";
+  const label = value.trim();
+  if (!compact) return label;
+  const key = label.toLowerCase();
+  if (key === "stablecoin") return "Stable";
+  if (key === "volatile") return "Vol.";
+  if (key === "liquid staking") return "LST";
+  if (key === "restaking") return "Restk.";
+  if (label.length <= 7) return label;
+  return `${label.slice(0, 6)}…`;
 }

@@ -39,11 +39,12 @@ type ChangeMoverRow = {
   token_symbol?: string | null;
   delta_apy?: number | null;
   safe_apy_30d?: number | null;
+  safe_apy_window?: number | null;
 };
 
 type ChangesResponse = {
   summary?: {
-    avg_delta_apy?: number | null;
+    avg_delta?: number | null;
     vaults_with_change?: number | null;
   };
   freshness?: {
@@ -51,6 +52,8 @@ type ChangesResponse = {
   } | null;
   movers?: {
     risers?: ChangeMoverRow[];
+    fallers?: ChangeMoverRow[];
+    largest_abs_delta?: ChangeMoverRow[];
   };
 };
 
@@ -70,13 +73,26 @@ function moverTitle(row: ChangeMoverRow | undefined): string {
   return "Vault";
 }
 
+function isMeaningfulMove(row: ChangeMoverRow | undefined): boolean {
+  return Number.isFinite(row?.delta_apy ?? null) && Math.abs(row?.delta_apy ?? 0) >= 0.0001;
+}
+
+function featuredMover(changes: ChangesResponse | null): ChangeMoverRow | undefined {
+  const largest = changes?.movers?.largest_abs_delta?.[0];
+  if (isMeaningfulMove(largest)) return largest;
+  const riser = changes?.movers?.risers?.find((row) => isMeaningfulMove(row));
+  if (riser) return riser;
+  return changes?.movers?.fallers?.find((row) => isMeaningfulMove(row));
+}
+
 function liveHeadline(
-  topRiser: ChangeMoverRow | undefined,
+  mover: ChangeMoverRow | undefined,
 ): string {
-  const topMoverName = topRiser ? moverTitle(topRiser) : "syncing";
-  const topMoverApy = Number.isFinite(topRiser?.safe_apy_30d ?? null) ? formatPct(topRiser?.safe_apy_30d ?? null, 2) : "n/a";
-  const topMoverDelta = Number.isFinite(topRiser?.delta_apy ?? null) ? pctDelta(topRiser?.delta_apy, 2) : "n/a";
-  return `Top mover ${topMoverName} · 30d APY ${topMoverApy} · 24h move ${topMoverDelta}`;
+  if (!mover) return "Largest 24h APY shift syncing";
+  const moverName = moverTitle(mover);
+  const moverApy = Number.isFinite(mover?.safe_apy_window ?? null) ? formatPct(mover?.safe_apy_window ?? null, 2) : "n/a";
+  const moverDelta = Number.isFinite(mover?.delta_apy ?? null) ? pctDelta(mover?.delta_apy, 2) : "n/a";
+  return `Largest 24h APY shift ${moverName} · Current APY ${moverApy} · Change ${moverDelta}`;
 }
 
 function liveMeta(
@@ -167,10 +183,10 @@ export default function HomePage() {
     };
   }, []);
 
-  const topRiser = changes?.movers?.risers?.[0];
-  const liveNowLine = liveHeadline(topRiser);
+  const topMover = featuredMover(changes);
+  const liveNowLine = liveHeadline(topMover);
   const liveFreshnessLine = liveMeta(
-    changes?.summary?.avg_delta_apy ?? null,
+    changes?.summary?.avg_delta ?? null,
     changes?.summary?.vaults_with_change ?? null,
     changes?.freshness?.latest_pps_age_seconds ?? null,
   );
@@ -275,7 +291,7 @@ export default function HomePage() {
       <section className="card home-live-strip home-reveal" aria-live="polite">
         <span className="home-live-dot" aria-hidden="true" />
         <div className="home-live-copy">
-          <p className="home-live-label">Live now</p>
+          <p className="home-live-label">Latest shift</p>
           <p className="home-live-text">{liveNowLine}</p>
           <p className="home-live-meta">{liveFreshnessLine}</p>
         </div>

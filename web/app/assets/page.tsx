@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiUrl } from "../lib/api";
-import { chainLabel, formatPct, formatUsd } from "../lib/format";
+import { chainLabel, compactCategoryLabel, compactChainLabel, formatPct, formatUsd } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, KpiGrid } from "../components/visuals";
@@ -105,6 +105,7 @@ function AssetsPageContent() {
   const [assetsError, setAssetsError] = useState<string | null>(null);
   const [detail, setDetail] = useState<AssetVenuesResponse | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [tokenSort, setTokenSort] = useState<SortState<TokenSortKey>>({ key: "tvl", direction: "desc" });
   const [venueSort, setVenueSort] = useState<SortState<VenueSortKey>>({ key: "apy", direction: "desc" });
 
@@ -142,6 +143,14 @@ function AssetsPageContent() {
     setTokenSort({ key: query.tokenSort, direction: query.tokenDir });
     setVenueSort({ key: query.venueSort, direction: query.venueDir });
   }, [query.tokenSort, query.tokenDir, query.venueSort, query.venueDir]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const onChange = () => setIsCompactViewport(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
@@ -763,16 +772,18 @@ function AssetsPageContent() {
               {venueRows.map((row) => (
                 <tr key={row.vault_address}>
                   <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td className="col-chain">
+                  <td className="col-chain" title={chainLabel(row.chain_id)}>
                     <Link
                       href={`/discover?chain=${row.chain_id}&token=${encodeURIComponent(
                         detail?.token_symbol ?? selectedSymbol,
                       )}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
-                      {chainLabel(row.chain_id)}
+                      {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
-                  <td className="tablet-hide analyst-only col-category" title={row.category || "n/a"}>{row.category || "n/a"}</td>
+                  <td className="tablet-hide analyst-only col-category" title={row.category || "n/a"}>
+                    {compactCategoryLabel(row.category, isCompactViewport)}
+                  </td>
                   <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
                   <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
                   <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>

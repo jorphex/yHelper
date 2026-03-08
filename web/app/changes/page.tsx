@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiUrl } from "../lib/api";
-import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
+import { chainLabel, compactChainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, ShareMeter, TrendStrips } from "../components/visuals";
@@ -157,12 +157,14 @@ function MoverTable({
   universe,
   minTvl,
   minPoints,
+  compact,
 }: {
   title: string;
   rows: ChangeRow[];
   universe: UniverseKind;
   minTvl: number;
   minPoints: number;
+  compact: boolean;
 }) {
   const [sort, setSort] = useState<SortState<MoverSortKey>>({
     key: title === "Stalest Series" ? "age" : "delta",
@@ -251,9 +253,9 @@ function MoverTable({
               {sortedRows.map((row) => (
                 <tr key={`${title}-${row.vault_address}`}>
                   <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td className="col-chain">
+                  <td className="col-chain" title={chainLabel(row.chain_id)}>
                     <Link href={`/discover?chain=${row.chain_id}&universe=${universe}&min_tvl=${minTvl}&min_points=${minPoints}`}>
-                      {chainLabel(row.chain_id)}
+                      {compactChainLabel(row.chain_id, compact)}
                     </Link>
                   </td>
                   <td className="tablet-hide analyst-only col-token">
@@ -1184,6 +1186,7 @@ function ChangesPageContent() {
         universe={query.universe}
         minTvl={query.minTvl}
         minPoints={query.minPoints}
+        compact={isCompactViewport}
       />
       <MoverTable
         title="Top Fallers"
@@ -1191,6 +1194,7 @@ function ChangesPageContent() {
         universe={query.universe}
         minTvl={query.minTvl}
         minPoints={query.minPoints}
+        compact={isCompactViewport}
       />
       <div className="analyst-only">
         <MoverTable
@@ -1199,6 +1203,7 @@ function ChangesPageContent() {
           universe={query.universe}
           minTvl={query.minTvl}
           minPoints={query.minPoints}
+          compact={isCompactViewport}
         />
       </div>
       <div className="analyst-only">
@@ -1208,6 +1213,7 @@ function ChangesPageContent() {
           universe={query.universe}
           minTvl={query.minTvl}
           minPoints={query.minPoints}
+          compact={isCompactViewport}
         />
       </div>
     </main>

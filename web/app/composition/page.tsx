@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "reac
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiUrl } from "../lib/api";
-import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
+import { chainLabel, compactChainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, useInViewOnce } from "../components/visuals";
@@ -81,8 +81,8 @@ function TvlTreemap({
   tokens: BreakdownRow[];
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
-  const width = 1000;
-  const height = 126;
+  const width = 820;
+  const height = 168;
   const topChains = [...chains]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
@@ -109,8 +109,8 @@ function TvlTreemap({
       </section>
     );
   }
-  const laneGap = Math.max(5, Math.round(height * 0.04));
-  const laneHeight = (height - 10 - (validGroups.length - 1) * laneGap) / validGroups.length;
+  const laneGap = Math.max(7, Math.round(height * 0.04));
+  const laneHeight = (height - 12 - (validGroups.length - 1) * laneGap) / validGroups.length;
 
   return (
     <section ref={ref} className={`viz-panel composition-treemap-viz ${isInView ? "is-in-view" : ""}`.trim()}>
@@ -120,7 +120,7 @@ function TvlTreemap({
           {validGroups.map((group, groupIndex) => {
             const y = 5 + groupIndex * (laneHeight + laneGap);
             const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
-            const labelOffset = Math.max(72, Math.min(112, Math.round(width * 0.1)));
+            const labelOffset = Math.max(68, Math.min(98, Math.round(width * 0.095)));
             const laneWidth = width - labelOffset - 8;
             const scaledWidths = group.rows.map((row) => {
               const value = Number(row.tvl_usd ?? 0);
@@ -138,7 +138,7 @@ function TvlTreemap({
                   const rectX = labelOffset + x;
                   x += w;
                   const name = group.text(row);
-                  const maxChars = Math.max(0, Math.floor((w - 10) / 6.2));
+                  const maxChars = Math.max(0, Math.floor((w - 10) / 5.8));
                   const compactName = maxChars > 0 ? (name.length > maxChars ? `${name.slice(0, Math.max(2, maxChars - 1))}…` : name) : "";
                   return (
                     <g key={`${group.key}-${name}`} className="treemap-cell">
@@ -153,8 +153,8 @@ function TvlTreemap({
                         className="treemap-cell-rect"
                         style={{ "--treemap-delay": `${Math.min(rowIndex, 10) * 0.02}s` } as CSSProperties}
                       />
-                      {w >= 58 && compactName ? (
-                        <text x={rectX + 5} y={y + Math.min(16, laneHeight - 6)} className="treemap-cell-label">
+                      {w >= 54 && compactName ? (
+                        <text x={rectX + 5} y={y + Math.min(18, laneHeight - 6)} className="treemap-cell-label">
                           {compactName}
                         </text>
                       ) : null}
@@ -599,7 +599,7 @@ function CompositionPageContent() {
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
-                      {chainLabel(row.chain_id)}
+                      {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
                   <td className="is-numeric">{row.vaults}</td>
@@ -896,11 +896,11 @@ function CompositionPageContent() {
               {crowdedRows.map((row) => (
                 <tr key={`crowded-${row.vault_address}`}>
                   <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td className="col-chain">
+                  <td className="col-chain" title={chainLabel(row.chain_id)}>
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
-                      {chainLabel(row.chain_id)}
+                      {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
                   <td className="col-token">
@@ -1022,11 +1022,11 @@ function CompositionPageContent() {
               {uncrowdedRows.map((row) => (
                 <tr key={`uncrowded-${row.vault_address}`}>
                   <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td className="col-chain">
+                  <td className="col-chain" title={chainLabel(row.chain_id)}>
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
-                      {chainLabel(row.chain_id)}
+                      {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
                   <td className="col-token">

@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiUrl } from "../lib/api";
-import { chainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
+import { chainLabel, compactChainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, TrendStrips, useInViewOnce } from "../components/visuals";
@@ -145,12 +145,12 @@ function RegimeFlowSankey({
       </section>
     );
   }
-  const width = 780;
-  const height = 244;
-  const xLeft = 124;
-  const xRight = width - 124;
-  const laneTop = 56;
-  const laneBottom = height - 34;
+  const width = 720;
+  const height = 268;
+  const xLeft = 112;
+  const xRight = width - 112;
+  const laneTop = 60;
+  const laneBottom = height - 38;
   const laneHeight = laneBottom - laneTop;
   const laneStep = regimes.length > 1 ? laneHeight / (regimes.length - 1) : laneHeight / 2;
   const yPos = new Map(regimes.map((key, index) => [key, laneTop + index * laneStep]));
@@ -208,11 +208,11 @@ function RegimeFlowSankey({
             const stroke = `rgba(${Math.min(255, r + 36)}, ${Math.min(255, g + 36)}, ${Math.min(255, b + 36)}, 0.78)`;
             return (
               <g key={`left-${regime}`}>
-                <rect x={8} y={y - 13} width={114} height={26} rx={6} fill={fill} stroke={stroke} />
+                <rect x={8} y={y - 15} width={104} height={30} rx={6} fill={fill} stroke={stroke} />
                 <text x={14} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
-                <text x={116} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(outValue)}</text>
-                <rect x={width - 122} y={y - 13} width={114} height={26} rx={6} fill={fill} stroke={stroke} />
-                <text x={width - 116} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
+                <text x={106} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(outValue)}</text>
+                <rect x={width - 112} y={y - 15} width={104} height={30} rx={6} fill={fill} stroke={stroke} />
+                <text x={width - 106} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
                 <text x={width - 14} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(inValue)}</text>
               </g>
             );
@@ -236,6 +236,7 @@ function RegimesPageContent() {
   const [transitionDaily, setTransitionDaily] = useState<TransitionDailyRow[]>([]);
   const [transitionDailyGrouped, setTransitionDailyGrouped] = useState<TransitionDailyResponse["grouped"] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [summarySort, setSummarySort] = useState<SortState<RegimeSummarySortKey>>({ key: "vaults", direction: "desc" });
   const [moverSort, setMoverSort] = useState<SortState<RegimeMoverSortKey>>({ key: "momentum", direction: "desc" });
   const [splitSnapshotSort, setSplitSnapshotSort] = useState<SortState<SplitSnapshotSortKey>>({ key: "churn", direction: "desc" });
@@ -273,6 +274,14 @@ function RegimesPageContent() {
     setSummarySort({ key: query.summarySort, direction: query.summaryDir });
     setMoverSort({ key: query.moverSort, direction: query.moverDir });
   }, [query.summarySort, query.summaryDir, query.moverSort, query.moverDir]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const onChange = () => setIsCompactViewport(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
@@ -934,11 +943,11 @@ function RegimesPageContent() {
               {moverRows.map((row) => (
                 <tr key={row.vault_address}>
                   <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td className="col-chain">
+                  <td className="col-chain" title={chainLabel(row.chain_id)}>
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                     >
-                      {chainLabel(row.chain_id)}
+                      {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
                   <td className="tablet-hide analyst-only col-token">
