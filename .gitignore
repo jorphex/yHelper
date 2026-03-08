@@ -33,6 +33,16 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 coverage/
+playwright-report/
+test-results/
+blob-report/
+*.tsbuildinfo
+
+# Local cloudflared runtime files
+infra/cloudflared/config.yml
+infra/cloudflared/config.yaml
+infra/cloudflared/*.json
+infra/cloudflared/*.pem
 
 # Build / runtime artifacts
 dist/
