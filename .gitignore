@@ -6,6 +6,8 @@
 # Local planning/notes (kept out of git history)
 NOTES.md
 PLAN.md
+plan.md
+reports/
 
 # Python
 __pycache__/
