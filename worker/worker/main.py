@@ -443,6 +443,12 @@ def _eth_encode_uint256(value: int) -> str:
     return f"{value:064x}"
 
 
+def _eth_decode_address(result: str) -> str:
+    if len(result) < 66:
+        raise ValueError(f"Unexpected address result length: {result!r}")
+    return f"0x{result[-40:]}".lower()
+
+
 def _eth_call(address: str, signature: str, encoded_args: str = "", block_tag: str = "latest") -> str:
     data = f"0x{_eth_selector(signature)}{encoded_args}"
     result = _eth_rpc("eth_call", [{"to": address, "data": data}, block_tag])
@@ -457,6 +463,21 @@ def _eth_decode_uint256(result: str) -> int:
     return int(result[2:66], 16)
 
 
+def _eth_decode_string(result: str) -> str:
+    payload = result[2:] if result.startswith("0x") else result
+    if len(payload) < 128:
+        raise ValueError(f"Unexpected string result length: {result!r}")
+    offset = int(payload[:64], 16) * 2
+    if len(payload) < offset + 64:
+        raise ValueError(f"Unexpected string offset: {result!r}")
+    length = int(payload[offset : offset + 64], 16)
+    start = offset + 64
+    end = start + length * 2
+    if len(payload) < end:
+        raise ValueError(f"Unexpected string payload length: {result!r}")
+    return bytes.fromhex(payload[start:end]).decode("utf-8")
+
+
 def _eth_call_uint(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> int:
     encoded = ""
     for arg_type, value in args:
@@ -467,6 +488,30 @@ def _eth_call_uint(address: str, signature: str, *args: tuple[str, str] | tuple[
         else:
             raise ValueError(f"Unsupported abi arg type: {arg_type}")
     return _eth_decode_uint256(_eth_call(address, signature, encoded))
+
+
+def _eth_call_address(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> str:
+    encoded = ""
+    for arg_type, value in args:
+        if arg_type == "address":
+            encoded += _eth_encode_address(str(value))
+        elif arg_type == "uint256":
+            encoded += _eth_encode_uint256(int(value))
+        else:
+            raise ValueError(f"Unsupported abi arg type: {arg_type}")
+    return _eth_decode_address(_eth_call(address, signature, encoded))
+
+
+def _eth_call_string(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> str:
+    encoded = ""
+    for arg_type, value in args:
+        if arg_type == "address":
+            encoded += _eth_encode_address(str(value))
+        elif arg_type == "uint256":
+            encoded += _eth_encode_uint256(int(value))
+        else:
+            raise ValueError(f"Unsupported abi arg type: {arg_type}")
+    return _eth_decode_string(_eth_call(address, signature, encoded))
 
 
 def _styfi_epoch_start(genesis: int, epoch: int) -> datetime:
@@ -484,6 +529,9 @@ def _styfi_component_reward(epoch: int, component_address: str) -> int:
 
 def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
     observed_at = datetime.now(UTC)
+    reward_token_address = _eth_call_address(STYFI_CONTRACTS["reward_distributor"], "token()")
+    reward_token_decimals = _eth_call_uint(reward_token_address, "decimals()")
+    reward_token_symbol = _eth_call_string(reward_token_address, "symbol()")
     current_epoch = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch()")
     genesis = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "genesis()")
     yfi_total_supply = _eth_call_uint(STYFI_CONTRACTS["yfi"], "totalSupply()")
@@ -533,6 +581,11 @@ def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, obje
             "genesis": genesis,
             "epoch_lookback": STYFI_EPOCH_LOOKBACK,
             "contracts": STYFI_CONTRACTS,
+            "reward_token": {
+                "address": reward_token_address,
+                "decimals": reward_token_decimals,
+                "symbol": reward_token_symbol,
+            },
         },
     }
     return snapshot, epochs, sync_state

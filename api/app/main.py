@@ -58,6 +58,7 @@ STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "
 STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
 STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
 STYFI_TOKEN_SCALE = float(10**18)
+STYFI_REWARD_TOKEN_DEFAULT = {"address": None, "symbol": "yvUSDC-1", "decimals": 6}
 
 
 def _validate_data_policy_config() -> None:
@@ -878,6 +879,36 @@ def _styfi_summary_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     }
 
 
+def _styfi_reward_token(cur: psycopg.Cursor) -> dict[str, object]:
+    cur.execute(
+        """
+        SELECT payload
+        FROM styfi_sync_state
+        WHERE stream_name = %(stream_name)s
+          AND chain_id = %(chain_id)s
+        LIMIT 1
+        """,
+        {"stream_name": "styfi_reward_epoch", "chain_id": STYFI_CHAIN_ID},
+    )
+    row = cur.fetchone() or {}
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    reward_token = payload.get("reward_token") if isinstance(payload, dict) else None
+    if not isinstance(reward_token, dict):
+        return dict(STYFI_REWARD_TOKEN_DEFAULT)
+    decimals = reward_token.get("decimals")
+    if isinstance(decimals, (int, float)):
+        scale_decimals = int(decimals)
+    elif isinstance(decimals, str) and decimals.isdigit():
+        scale_decimals = int(decimals)
+    else:
+        scale_decimals = int(STYFI_REWARD_TOKEN_DEFAULT["decimals"])
+    return {
+        "address": reward_token.get("address") if isinstance(reward_token.get("address"), str) else STYFI_REWARD_TOKEN_DEFAULT["address"],
+        "symbol": reward_token.get("symbol") if isinstance(reward_token.get("symbol"), str) and reward_token.get("symbol") else STYFI_REWARD_TOKEN_DEFAULT["symbol"],
+        "decimals": scale_decimals,
+    }
+
+
 def _styfi_snapshot_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, object]]:
     cur.execute(
         """
@@ -913,7 +944,7 @@ def _styfi_snapshot_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, 
     ]
 
 
-def _styfi_epoch_series(cur: psycopg.Cursor, *, epoch_limit: int) -> list[dict[str, object]]:
+def _styfi_epoch_series(cur: psycopg.Cursor, *, epoch_limit: int, reward_scale: float) -> list[dict[str, object]]:
     cur.execute(
         """
         SELECT
@@ -929,7 +960,7 @@ def _styfi_epoch_series(cur: psycopg.Cursor, *, epoch_limit: int) -> list[dict[s
         ORDER BY epoch DESC
         LIMIT %(epoch_limit)s
         """,
-        {"chain_id": STYFI_CHAIN_ID, "epoch_limit": epoch_limit, "scale": STYFI_TOKEN_SCALE},
+        {"chain_id": STYFI_CHAIN_ID, "epoch_limit": epoch_limit, "scale": reward_scale},
     )
     rows = list(reversed(cur.fetchall()))
     return [
@@ -946,7 +977,7 @@ def _styfi_epoch_series(cur: psycopg.Cursor, *, epoch_limit: int) -> list[dict[s
     ]
 
 
-def _styfi_latest_component_split(cur: psycopg.Cursor, *, current_epoch: int | None) -> dict[str, object]:
+def _styfi_latest_component_split(cur: psycopg.Cursor, *, current_epoch: int | None, reward_scale: float) -> dict[str, object]:
     if current_epoch is None or current_epoch <= 0:
         return {"epoch": None, "rows": []}
     cur.execute(
@@ -963,7 +994,7 @@ def _styfi_latest_component_split(cur: psycopg.Cursor, *, current_epoch: int | N
         ORDER BY epoch DESC
         LIMIT 1
         """,
-        {"chain_id": STYFI_CHAIN_ID, "current_epoch": current_epoch, "scale": STYFI_TOKEN_SCALE},
+        {"chain_id": STYFI_CHAIN_ID, "current_epoch": current_epoch, "scale": reward_scale},
     )
     row = cur.fetchone()
     if not row:
@@ -1413,10 +1444,16 @@ async def styfi(
 ) -> dict[str, object]:
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
+            reward_token = _styfi_reward_token(cur)
+            reward_scale = float(10 ** int(reward_token.get("decimals") or 0))
             summary = _styfi_summary_snapshot(cur)
             series = _styfi_snapshot_series(cur, days=days)
-            epochs = _styfi_epoch_series(cur, epoch_limit=epoch_limit)
-            component_split = _styfi_latest_component_split(cur, current_epoch=summary.get("reward_epoch"))
+            epochs = _styfi_epoch_series(cur, epoch_limit=epoch_limit, reward_scale=reward_scale)
+            component_split = _styfi_latest_component_split(
+                cur,
+                current_epoch=summary.get("reward_epoch"),
+                reward_scale=reward_scale,
+            )
             last_run = _styfi_last_run(cur)
 
     latest_snapshot_at = summary.get("latest_snapshot_at")
@@ -1428,6 +1465,7 @@ async def styfi(
             "chain_id": STYFI_CHAIN_ID,
         },
         "summary": summary,
+        "reward_token": reward_token,
         "series": {
             "snapshots": series,
             "epochs": epochs,

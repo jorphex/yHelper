@@ -2271,6 +2271,62 @@ input[type="text"] {
   margin-top: 0.25rem;
 }
 
+.styfi-summary-card .kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.styfi-visual-grid > .viz-panel,
+.styfi-visual-grid > .bar-panel,
+.styfi-visual-grid > .meter-panel {
+  height: 100%;
+}
+
+.styfi-epoch-table {
+  min-width: 820px;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.styfi-epoch-table th,
+.styfi-epoch-table td {
+  overflow-wrap: normal;
+  word-break: normal;
+  vertical-align: middle;
+}
+
+.styfi-epoch-table th.col-epoch,
+.styfi-epoch-table td.col-epoch {
+  width: 3.6rem;
+}
+
+.styfi-epoch-table th.col-status,
+.styfi-epoch-table td.col-status {
+  width: 5.6rem;
+}
+
+.styfi-epoch-table th.col-start,
+.styfi-epoch-table td.col-start {
+  width: 10.9rem;
+}
+
+.styfi-epoch-table th.col-total,
+.styfi-epoch-table td.col-total,
+.styfi-epoch-table th.col-styfi,
+.styfi-epoch-table td.col-styfi,
+.styfi-epoch-table th.col-styfix,
+.styfi-epoch-table td.col-styfix,
+.styfi-epoch-table th.col-veyfi,
+.styfi-epoch-table td.col-veyfi,
+.styfi-epoch-table th.col-lockers,
+.styfi-epoch-table td.col-lockers {
+  width: 7.1rem;
+}
+
+.styfi-epoch-table td.col-start {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
 .chains-rollup-wrap {
   margin-top: 0.3rem;
 }
@@ -3606,6 +3662,10 @@ input:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .styfi-summary-card .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .chains-snapshot-kpis .kpi-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
@@ -3728,6 +3788,10 @@ input:focus-visible {
 
   .home-lite-paths {
     grid-template-columns: 1fr;
+  }
+
+  .home-minimal-routes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -3998,6 +4062,10 @@ input:focus-visible {
   transition-delay: calc(var(--motion-step) * 3);
 }
 
+.home-minimal-routes .home-reveal:nth-child(4) {
+  transition-delay: calc(var(--motion-step) * 4);
+}
+
 .home-live-strip.home-reveal {
   transition-delay: calc(var(--motion-step) * 2);
 }
@@ -4218,7 +4286,7 @@ input:focus-visible {
 
 .home-minimal-routes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1.2rem;
 }
 
@@ -4423,6 +4491,28 @@ input:focus-visible {
   .prism-purpose-image {
     object-position: 46% 50%;
     transform: scale(1.12);
+  }
+
+  .styfi-epoch-table {
+    min-width: 700px;
+  }
+
+  .styfi-epoch-table th.col-start,
+  .styfi-epoch-table td.col-start {
+    width: 9rem;
+  }
+
+  .styfi-epoch-table th.col-total,
+  .styfi-epoch-table td.col-total,
+  .styfi-epoch-table th.col-styfi,
+  .styfi-epoch-table td.col-styfi,
+  .styfi-epoch-table th.col-styfix,
+  .styfi-epoch-table td.col-styfix,
+  .styfi-epoch-table th.col-veyfi,
+  .styfi-epoch-table td.col-veyfi,
+  .styfi-epoch-table th.col-lockers,
+  .styfi-epoch-table td.col-lockers {
+    width: 6.2rem;
   }
 
   .home-minimal-signals,

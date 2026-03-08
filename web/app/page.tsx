@@ -265,6 +265,13 @@ export default function HomePage() {
       </section>
 
       <section className="home-minimal-routes">
+        <Link href="/styfi" className="card home-sparse-route-card home-route-clickable home-reveal">
+          <div className="home-route-head">
+            <h2>stYFI</h2>
+          </div>
+          <p className="muted">Track Yearn staking balances, reward epochs, and how the latest completed epoch split across components.</p>
+          <span className="home-route-arrow" aria-hidden="true">→</span>
+        </Link>
         <Link href="/discover" className="card home-sparse-route-card home-route-clickable home-reveal">
           <div className="home-route-head">
             <h2>Discover</h2>
