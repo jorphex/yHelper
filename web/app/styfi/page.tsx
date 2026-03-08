@@ -1,10 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiUrl } from "../lib/api";
 import { formatHours, formatPct, formatUtcDateTime } from "../lib/format";
-import { queryChoice, replaceQuery } from "../lib/url";
 import { BarList, KpiGrid, ShareMeter, TrendStrips } from "../components/visuals";
 import { PageTopPanel } from "../components/page-top-panel";
 
@@ -87,8 +85,8 @@ type StYfiResponse = {
   };
 };
 
-const STYFI_DAY_OPTIONS = ["30", "60", "90", "122"] as const;
-const STYFI_EPOCH_OPTIONS = ["6", "12", "18", "24"] as const;
+const STYFI_PAGE_SNAPSHOT_DAYS = 122;
+const STYFI_PAGE_EPOCH_LIMIT = 12;
 
 function formatTokenCompact(value: number | null | undefined, symbol: string, digits = 1): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
@@ -126,32 +124,28 @@ function percentShare(value: number | null | undefined, total: number | null | u
   return `${formatPct(value / total, 0)} of the current total`;
 }
 
+function formatRollingSpan(start: string | null | undefined, end: string | null | undefined): string {
+  if (!start || !end) return "n/a";
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  const diffMs = endDate.getTime() - startDate.getTime();
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return "n/a";
+  const diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours < 24) return `${diffHours.toFixed(1)}h`;
+  return `${(diffHours / 24).toFixed(1)}d`;
+}
+
 function StYfiPageContent() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [data, setData] = useState<StYfiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const query = useMemo(() => {
-    const days = queryChoice(searchParams, "days", STYFI_DAY_OPTIONS, "30");
-    const epochLimit = queryChoice(searchParams, "epochs", STYFI_EPOCH_OPTIONS, "12");
-    return {
-      days,
-      epochLimit,
-    };
-  }, [searchParams]);
-
-  const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
-    replaceQuery(router, pathname, searchParams, updates);
 
   useEffect(() => {
     let active = true;
     const run = async () => {
       try {
         const params = new URLSearchParams({
-          days: query.days,
-          epoch_limit: query.epochLimit,
+          days: String(STYFI_PAGE_SNAPSHOT_DAYS),
+          epoch_limit: String(STYFI_PAGE_EPOCH_LIMIT),
         });
         const res = await fetch(apiUrl("/styfi", params), { cache: "no-store" });
         if (!res.ok) {
@@ -171,7 +165,7 @@ function StYfiPageContent() {
     return () => {
       active = false;
     };
-  }, [query.days, query.epochLimit]);
+  }, []);
 
   const rewardSymbol = data?.reward_token?.symbol?.trim() || "yvUSDC-1";
   const summary = data?.summary ?? null;
@@ -185,60 +179,91 @@ function StYfiPageContent() {
       : null;
   const latestCompletedEpochRow =
     latestCompletedEpoch !== null ? epochSeries.find((row) => row.epoch === latestCompletedEpoch) ?? null : null;
+  const historySpan = formatRollingSpan(summary?.first_snapshot_at ?? null, summary?.latest_snapshot_at ?? null);
+  const snapshotCountValue =
+    summary?.snapshots_count !== null && summary?.snapshots_count !== undefined && Number.isFinite(summary.snapshots_count)
+      ? String(summary.snapshots_count)
+      : "n/a";
+  const hasNetFlow24h = summary?.net_flow_24h !== null && summary?.net_flow_24h !== undefined && Number.isFinite(summary.net_flow_24h);
+  const hasNetFlow7d = summary?.net_flow_7d !== null && summary?.net_flow_7d !== undefined && Number.isFinite(summary.net_flow_7d);
 
   const summaryItems = useMemo(
-    () => [
-      {
-        label: "Combined Staked",
-        value: formatTokenCompact(summary?.combined_staked ?? null, "YFI"),
-        hint: "Current stYFI plus stYFIx balance",
-      },
-      {
-        label: "Share of YFI Supply",
-        value: formatPct(summary?.staked_share_supply ?? null, 2),
-        hint: formatTokenCompact(summary?.yfi_total_supply ?? null, "YFI"),
-      },
-      {
-        label: "Current Reward Epoch",
-        value:
-          summary?.reward_epoch !== null && summary?.reward_epoch !== undefined && Number.isFinite(summary.reward_epoch)
-            ? String(summary.reward_epoch)
-            : "n/a",
-        hint: `Rewards accrue in ${rewardSymbol}`,
-      },
-      {
-        label: "Latest Completed Reward Pot",
-        value: formatTokenCompact(latestCompletedEpochRow?.reward_total ?? null, rewardSymbol),
-        hint: latestCompletedEpoch !== null ? `Epoch ${latestCompletedEpoch}` : "Completed epoch syncing",
-      },
-      {
-        label: "Net Flow 24h",
-        value: formatSignedToken(summary?.net_flow_24h ?? null, "YFI"),
-        hint: "Snapshot derived, not gross stake and unstake",
-      },
-      {
-        label: "Net Flow 7d",
-        value: formatSignedToken(summary?.net_flow_7d ?? null, "YFI"),
-        hint: "Compared with the latest snapshot seven days back",
-      },
-      {
-        label: "Snapshot Freshness",
-        value: formatHours(freshness?.latest_snapshot_age_seconds ?? null, 1),
-        hint: formatUtcDateTime(freshness?.latest_snapshot_at ?? null),
-      },
-    ],
+    () => {
+      const items = [
+        {
+          label: "Combined Staked",
+          value: formatTokenCompact(summary?.combined_staked ?? null, "YFI"),
+          hint: "Current stYFI plus stYFIx balance",
+        },
+        {
+          label: "Share of YFI Supply",
+          value: formatPct(summary?.staked_share_supply ?? null, 2),
+          hint: formatTokenCompact(summary?.yfi_total_supply ?? null, "YFI"),
+        },
+        {
+          label: "Current Reward Epoch",
+          value:
+            summary?.reward_epoch !== null && summary?.reward_epoch !== undefined && Number.isFinite(summary.reward_epoch)
+              ? String(summary.reward_epoch)
+              : "n/a",
+          hint: `Rewards accrue in ${rewardSymbol}`,
+        },
+        {
+          label: "Latest Completed Reward Pot",
+          value: formatTokenCompact(latestCompletedEpochRow?.reward_total ?? null, rewardSymbol),
+          hint: latestCompletedEpoch !== null ? `Epoch ${latestCompletedEpoch}` : "Completed epoch syncing",
+        },
+        {
+          label: "Snapshot Freshness",
+          value: formatHours(freshness?.latest_snapshot_age_seconds ?? null, 1),
+          hint: formatUtcDateTime(freshness?.latest_snapshot_at ?? null),
+        },
+      ];
+      items.push(
+        hasNetFlow24h
+          ? {
+              label: "Net Flow 24h",
+              value: formatSignedToken(summary?.net_flow_24h ?? null, "YFI"),
+              hint: "Snapshot derived, not gross stake and unstake",
+            }
+          : {
+              label: "Snapshots Captured",
+              value: snapshotCountValue,
+              hint: formatUtcDateTime(summary?.first_snapshot_at ?? null),
+            },
+      );
+      items.push(
+        hasNetFlow7d
+          ? {
+              label: "Net Flow 7d",
+              value: formatSignedToken(summary?.net_flow_7d ?? null, "YFI"),
+              hint: "Compared with the latest snapshot seven days back",
+            }
+          : {
+              label: "History Span",
+              value: historySpan,
+              hint: "Rolling snapshot history available so far",
+            },
+      );
+      return items;
+    },
     [
       freshness?.latest_snapshot_age_seconds,
       freshness?.latest_snapshot_at,
+      hasNetFlow24h,
+      hasNetFlow7d,
+      historySpan,
       latestCompletedEpoch,
       latestCompletedEpochRow?.reward_total,
       rewardSymbol,
       summary?.combined_staked,
+      summary?.first_snapshot_at,
       summary?.net_flow_24h,
       summary?.net_flow_7d,
       summary?.reward_epoch,
       summary?.staked_share_supply,
       summary?.yfi_total_supply,
+      snapshotCountValue,
     ],
   );
 
@@ -337,31 +362,29 @@ function StYfiPageContent() {
             </p>
           </>
         }
-        filtersIntro={<p className="muted card-intro">Window controls are URL-backed so protocol views stay shareable.</p>}
+        filtersIntro={<p className="muted card-intro">The page uses the full retained snapshot history and the latest stored reward epochs.</p>}
         filters={
           <div className="inline-controls controls-tight">
             <label>
-              Snapshot Window:&nbsp;
-              <select value={query.days} onChange={(event) => updateQuery({ days: event.target.value })}>
-                <option value="30">30d</option>
-                <option value="60">60d</option>
-                <option value="90">90d</option>
-                <option value="122">122d</option>
-              </select>
+              <span>Snapshot history</span>
+              <strong>{summary?.snapshots_count ?? "n/a"} captures</strong>
             </label>
             <label>
-              Epoch Window:&nbsp;
-              <select value={query.epochLimit} onChange={(event) => updateQuery({ epochs: event.target.value })}>
-                <option value="6">6 epochs</option>
-                <option value="12">12 epochs</option>
-                <option value="18">18 epochs</option>
-                <option value="24">24 epochs</option>
-              </select>
+              <span>History span</span>
+              <strong>{historySpan}</strong>
+            </label>
+            <label>
+              <span>Reward epochs shown</span>
+              <strong>{Math.min(epochSeries.length, STYFI_PAGE_EPOCH_LIMIT)}</strong>
+            </label>
+            <label>
+              <span>Current reward token</span>
+              <strong>{rewardSymbol}</strong>
             </label>
           </div>
         }
         introTitle="What It Tracks"
-        filtersTitle="View Window"
+        filtersTitle="History Coverage"
       />
 
       {error ? <section className="card">{error}</section> : null}
@@ -370,7 +393,8 @@ function StYfiPageContent() {
         <h2>Protocol Snapshot</h2>
         <p className="muted card-intro">
           The reward token is currently {rewardSymbol}. Rolling history is capped at {data?.data_policy?.retention_days ?? "n/a"} days,
-          with higher-frequency snapshots capped at {data?.data_policy?.snapshot_retention_days ?? "n/a"} days.
+          with higher-frequency snapshots capped at {data?.data_policy?.snapshot_retention_days ?? "n/a"} days. Net-flow cards appear
+          only once enough history exists to make them meaningful.
         </p>
         <KpiGrid items={summaryItems} />
       </section>
@@ -402,10 +426,10 @@ function StYfiPageContent() {
           valueFormatter={(value) => formatTokenCompact(value, "YFI")}
           deltaFormatter={(value) => formatSignedToken(value, "YFI", 2)}
           columns={1}
-          emptyText="More snapshots are needed before the stake trend becomes useful."
+          emptyText="Snapshot history is still warming up."
         />
         <BarList
-          title={`Reward Pot by Epoch (${rewardSymbol})`}
+          title={`Reward Pot by Epoch (${rewardSymbol}, latest ${STYFI_PAGE_EPOCH_LIMIT})`}
           items={rewardEpochBars}
           valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
           emptyText="Epoch rewards syncing."
