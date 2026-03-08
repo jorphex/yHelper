@@ -1,73 +1,73 @@
 # yHelper
 
-yHelper is a public Yearn dashboard focused on protocol-level insight, not wallet tracking.
+yHelper is a public Yearn analytics dashboard.
 
-It helps users compare:
-- where yield is rising or falling
-- where TVL is concentrated
-- how stable or volatile vault behavior has been
-- how chains, tokens, and categories differ over time
+It is built to answer a few simple questions fast:
+- where yield is moving
+- which vaults or assets are crowded
+- how chains and categories compare
+- whether the data is fresh enough to trust
 
-## What It Includes
-- `Overview`: protocol snapshot and guardrails
-- `Discover`: vault scanner by APY, momentum, consistency, and regime
-- `Assets`: venue comparison for the same underlying token
-- `Composition`: concentration and crowding across chains/categories/tokens
-- `Changes`: top risers, fallers, and freshness-aware deltas
-- `Regimes`: behavior classes and transition trends
-- `Chains`: chain-level weighted rollups
+## Pages
+- `Overview` for the high-level snapshot
+- `Discover` for vault scanning and ranking
+- `Assets` for token and venue comparison
+- `Composition` for concentration and crowding
+- `Changes` for recent movers and stale data checks
+- `Regimes` for behavior classes and transitions
+- `Chains` for chain-level rollups
 
-## Data Sources
-- Yearn yDaemon metadata/snapshots
+## Data
+The app combines:
+- Yearn yDaemon metadata and snapshots
 - Kong PPS history and derived yield metrics
-- Optional DefiLlama context for protocol-level confluence
+- optional DefiLlama context for protocol-level TVL comparisons
 
-## Run Locally
+## Stack
+- `web` is the Next.js frontend
+- `api` serves dashboard endpoints
+- `worker` ingests and refreshes data
+- `postgres` stores snapshots, PPS history, and derived metrics
+
+## Run locally
 1. Copy `.env.example` to `.env`
-2. Start services:
+2. Start the stack:
+
 ```bash
 docker compose up --build
 ```
-3. Open:
-- `http://localhost:3010`
 
-## Verification
-Run after deploy/restart:
+3. Open `http://localhost:3010`
+
+## Useful commands
+Lint the frontend:
+
 ```bash
 npm --prefix web run lint
+```
+
+Rebuild the web app only:
+
+```bash
 docker compose up -d --build yhelper-web
+```
+
+Run the smoke check:
+
+```bash
 python3 scripts/post_deploy_smoke.py --base-url http://127.0.0.1:3010
 ```
 
-Capture visual baseline (first run or intentional redesign):
-```bash
-UI_AUDIT_CAPTURE_BASELINE=1 \
-UI_AUDIT_BASELINE_DIR=tmp/ui-baseline/current \
-node web/scripts/ui_audit_playwright.mjs
-```
+Render the landing-page Blender assets:
 
-Compare current UI against baseline (strict mode fails on structural regressions):
-```bash
-UI_AUDIT_COMPARE_BASELINE=1 \
-UI_AUDIT_STRICT=1 \
-UI_AUDIT_BASELINE_DIR=tmp/ui-baseline/current \
-node web/scripts/ui_audit_playwright.mjs
-```
-
-## Home Asset Rendering
-Render the landing page Blender assets with deterministic names and sizes:
 ```bash
 blender --background --python scripts/generate_yearn_blender_assets.py -- \
   --output-dir web/public/home-assets-yearn-blender \
   --scenes hero,purpose,divider
 ```
 
-Useful flags:
-- `--logo-png` override logo source directly (defaults to `web/public/yearn-symbol-white-rgb.png`).
-- `--scenes` render a subset (for example `hero` or `hero,divider`).
-
 ## Scope
-- Public dashboards only
-- No wallet connect / EOA input flow
-- No support/docs workflows
-- No export features unless explicitly requested
+- public dashboard only
+- no wallet tracking
+- no connect flow
+- no exports unless explicitly added
