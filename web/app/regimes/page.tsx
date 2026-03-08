@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { apiUrl } from "../lib/api";
 import { chainLabel, formatPct, formatUsd, regimeLabel } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
@@ -294,9 +295,9 @@ function RegimesPageContent() {
         dailyParams.set("group_by", query.transitionSplit);
         dailyParams.set("group_limit", "8");
         const [regimesRes, transitionsRes, transitionsDailyRes] = await Promise.all([
-          fetch(`/api/regimes?${params.toString()}`, { cache: "no-store" }),
-          fetch(`/api/regimes/transitions?${transitionsParams.toString()}`, { cache: "no-store" }),
-          fetch(`/api/regimes/transitions/daily?${dailyParams.toString()}`, { cache: "no-store" }),
+          fetch(apiUrl("/regimes", params), { cache: "no-store" }),
+          fetch(apiUrl("/regimes/transitions", transitionsParams), { cache: "no-store" }),
+          fetch(apiUrl("/regimes/transitions/daily", dailyParams), { cache: "no-store" }),
         ]);
         if (!regimesRes.ok || !transitionsRes.ok || !transitionsDailyRes.ok) {
           const status = !regimesRes.ok ? regimesRes.status : !transitionsRes.ok ? transitionsRes.status : transitionsDailyRes.status;
@@ -331,7 +332,6 @@ function RegimesPageContent() {
     query.limit,
     query.transitionSplit,
     query.transitionDays,
-    query.transitionMinCohortTvl,
   ]);
 
   const summaryRows = sortRows(data?.summary ?? [], summarySort, {

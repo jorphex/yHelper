@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { apiUrl } from "../lib/api";
 import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, replaceQuery } from "../lib/url";
@@ -77,7 +78,7 @@ function ChainsPageContent() {
           universe: query.universe,
           min_tvl_usd: String(query.minTvl),
         });
-        const res = await fetch(`/api/chains/rollups?${params.toString()}`, {
+        const res = await fetch(apiUrl("/chains/rollups", params), {
           cache: "no-store",
         });
         if (!res.ok) {

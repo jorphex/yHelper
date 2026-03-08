@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatHours, formatPct, formatUsd } from "./lib/format";
+import { apiUrl } from "./lib/api";
 import { ShareMeter } from "./components/visuals";
 
 type OverviewResponse = {
@@ -20,6 +21,18 @@ type OverviewResponse = {
     tvl_change_7d_pct?: number | null;
   } | null;
 };
+
+type SocialPreviewSummaryResponse = {
+  summary?: {
+    tracked_tvl_active_usd?: number | null;
+    active_vaults?: number | null;
+    active_with_metrics?: number | null;
+  } | null;
+};
+
+type ProtocolContextResponse = {
+  tvl_change_7d_pct?: number | null;
+} | null;
 
 type ChangeMoverRow = {
   symbol?: string | null;
@@ -90,14 +103,28 @@ export default function HomePage() {
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const [overviewResult, moversResult] = await Promise.allSettled([
-        fetch("/api/overview", { cache: "no-store" }),
-        fetch("/api/changes?window=24h&universe=core&limit=1", { cache: "no-store" }),
+      const [freshnessResult, trackedScopeResult, protocolResult, moversResult] = await Promise.allSettled([
+        fetch(apiUrl("/meta/freshness", { threshold: "24h" }), { cache: "no-store" }),
+        fetch(apiUrl("/meta/social-preview"), { cache: "no-store" }),
+        fetch(apiUrl("/meta/protocol-context"), { cache: "no-store" }),
+        fetch(apiUrl("/changes", { window: "24h", universe: "core", limit: 1 }), { cache: "no-store" }),
       ]);
       if (!active) return;
 
-      if (overviewResult.status === "fulfilled" && overviewResult.value.ok) {
-        setOverview((await overviewResult.value.json()) as OverviewResponse);
+      const nextOverview: OverviewResponse = {};
+
+      if (freshnessResult.status === "fulfilled" && freshnessResult.value.ok) {
+        nextOverview.freshness = (await freshnessResult.value.json()) as OverviewResponse["freshness"];
+      }
+      if (trackedScopeResult.status === "fulfilled" && trackedScopeResult.value.ok) {
+        const payload = (await trackedScopeResult.value.json()) as SocialPreviewSummaryResponse;
+        nextOverview.tracked_scope = payload.summary ?? null;
+      }
+      if (protocolResult.status === "fulfilled" && protocolResult.value.ok) {
+        nextOverview.protocol_context = (await protocolResult.value.json()) as ProtocolContextResponse;
+      }
+      if (Object.keys(nextOverview).length > 0) {
+        setOverview((previous) => ({ ...(previous ?? {}), ...nextOverview }));
       }
       if (moversResult.status === "fulfilled" && moversResult.value.ok) {
         setChanges((await moversResult.value.json()) as ChangesResponse);

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { apiUrl } from "../lib/api";
 import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
@@ -158,7 +159,7 @@ function AssetsPageContent() {
           sort_by: query.apiSort,
           direction: query.apiDir,
         });
-        const res = await fetch(`/api/assets?${params.toString()}`, { cache: "no-store" });
+        const res = await fetch(apiUrl("/assets", params), { cache: "no-store" });
         if (!res.ok) {
           if (active) setAssetsError(`API error: ${res.status}`);
           return;
@@ -193,7 +194,7 @@ function AssetsPageContent() {
           min_points: String(query.minPoints),
           limit: String(query.limit),
         });
-        const path = `/api/assets/${encodeURIComponent(selectedSymbol)}/venues?${params.toString()}`;
+        const path = apiUrl(`/assets/${encodeURIComponent(selectedSymbol)}/venues`, params);
         const res = await fetch(path, { cache: "no-store" });
         if (!res.ok) {
           if (active) setDetailError(`API error: ${res.status}`);

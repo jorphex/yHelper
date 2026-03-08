@@ -889,6 +889,7 @@ async def meta_coverage(
     min_points: int = Query(default=DEFAULT_MIN_POINTS, ge=0),
     split_limit: int = Query(default=8, ge=1, le=25),
 ) -> dict[str, object]:
+    """Compatibility coverage snapshot for external consumers and smoke checks."""
     with psycopg.connect(DATABASE_URL) as conn:
         return _coverage_snapshot(conn, min_tvl_usd=min_tvl_usd, min_points=min_points, split_limit=split_limit)
 
@@ -906,6 +907,7 @@ async def meta_movers(
     min_points: int = Query(default=30, ge=0),
     include_freshness: bool = Query(default=False),
 ) -> dict[str, object]:
+    """Compatibility movers snapshot for external consumers and automation."""
     window_seconds = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}[window]
     params = {
         "window_sec": window_seconds,

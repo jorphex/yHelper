@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 /* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
+import { internalApiUrl, publicSiteApiUrl } from "./api";
 import { chainLabel, formatPct } from "./format";
 import { SHELL_THEME } from "./shell-theme";
 
@@ -77,11 +78,6 @@ function buildPreviewGrainDataUri(): string {
 }
 
 const PREVIEW_GRAIN_DATA_URI = buildPreviewGrainDataUri();
-function normalizeSiteUrl(raw: string): string {
-  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/+$/, "");
-  return `https://${raw.replace(/\/+$/, "")}`;
-}
-
 function compactNumber(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
   return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
@@ -145,15 +141,13 @@ async function fetchFromCandidates<T>(urls: string[]): Promise<T | null> {
 }
 
 async function fetchPreviewStats(): Promise<PreviewStats> {
-  const publicSite = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app");
-  const internalApiBase = (process.env.YHELPER_API_INTERNAL_URL || "http://yhelper-api:8000").replace(/\/+$/, "");
   const socialPayload = await fetchFromCandidates<SocialPreviewPayload>([
-    `${internalApiBase}/api/meta/social-preview`,
-    `${publicSite}/api/meta/social-preview`,
+    internalApiUrl("/meta/social-preview"),
+    publicSiteApiUrl("/meta/social-preview"),
   ]);
   const regimesPayload = await fetchFromCandidates<RegimesPayload>([
-    `${internalApiBase}/api/regimes?universe=raw&min_tvl_usd=0&min_points=0&limit=1`,
-    `${publicSite}/api/regimes?universe=raw&min_tvl_usd=0&min_points=0&limit=1`,
+    internalApiUrl("/regimes", { universe: "raw", min_tvl_usd: 0, min_points: 0, limit: 1 }),
+    publicSiteApiUrl("/regimes", { universe: "raw", min_tvl_usd: 0, min_points: 0, limit: 1 }),
   ]);
   const regimeRows = regimesPayload?.summary ?? [];
   const byRegime = new Map<string, { vaults: number; tvlUsd: number | null }>();

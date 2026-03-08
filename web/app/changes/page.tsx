@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { apiUrl } from "../lib/api";
 import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
@@ -367,7 +368,7 @@ function ChangesPageContent() {
           min_tvl_usd: String(query.minTvl),
           min_points: String(query.minPoints),
         });
-        const res = await fetch(`/api/changes?${params.toString()}`, { cache: "no-store" });
+        const res = await fetch(apiUrl("/changes", params), { cache: "no-store" });
         if (!res.ok) {
           if (active) setError(`API error: ${res.status}`);
           return;
@@ -407,9 +408,9 @@ function ChangesPageContent() {
         categoryParams.set("group_by", "category");
         categoryParams.set("group_limit", "10");
         const requests: Array<Promise<Response>> = [
-          fetch(`/api/trends/daily?${globalParams.toString()}`, { cache: "no-store" }),
-          fetch(`/api/trends/daily?${chainParams.toString()}`, { cache: "no-store" }),
-          fetch(`/api/trends/daily?${categoryParams.toString()}`, { cache: "no-store" }),
+          fetch(apiUrl("/trends/daily", globalParams), { cache: "no-store" }),
+          fetch(apiUrl("/trends/daily", chainParams), { cache: "no-store" }),
+          fetch(apiUrl("/trends/daily", categoryParams), { cache: "no-store" }),
         ];
 
         const responses = await Promise.all(requests);

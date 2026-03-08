@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { apiUrl } from "../lib/api";
 import { formatHours, formatPct } from "../lib/format";
 
 type FreshnessResponse = {
@@ -97,7 +98,7 @@ export function FreshnessBadge() {
     let active = true;
     const load = async () => {
       try {
-        const res = await fetch("/api/meta/freshness?threshold=24h", { cache: "no-store" });
+        const res = await fetch(apiUrl("/meta/freshness", { threshold: "24h" }), { cache: "no-store" });
         if (!active) return;
         if (!res.ok) {
           if (!payloadRef.current) setLoadState("error");

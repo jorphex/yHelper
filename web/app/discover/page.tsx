@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { apiUrl } from "../lib/api";
 import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { queryBool, queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips, useInViewOnce } from "../components/visuals";
@@ -62,7 +63,6 @@ type DiscoverResponse = {
     visible_tvl_usd?: number | null;
     with_metrics_tvl_usd?: number | null;
   };
-  regime_mix?: Array<{ regime: string; vaults: number; tvl_usd: number | null }>;
   risk_mix?: Array<{ risk_level: string; vaults: number; tvl_usd: number | null }>;
   rows: DiscoverRow[];
 };
@@ -209,17 +209,6 @@ function normalizeDiscoverRow(raw: unknown): DiscoverRow | null {
         : 0,
     regime: typeof candidate.regime === "string" && candidate.regime.length > 0 ? candidate.regime : "unknown",
   };
-}
-
-function normalizeRegimeMix(raw: unknown): Array<{ regime: string; vaults: number; tvl_usd: number | null }> {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === "object"))
-    .map((entry) => ({
-      regime: typeof entry.regime === "string" && entry.regime.length > 0 ? entry.regime : "unknown",
-      vaults: typeof entry.vaults === "number" && Number.isFinite(entry.vaults) ? entry.vaults : 0,
-      tvl_usd: typeof entry.tvl_usd === "number" && Number.isFinite(entry.tvl_usd) ? entry.tvl_usd : null,
-    }));
 }
 
 function normalizeRiskMix(raw: unknown): Array<{ risk_level: string; vaults: number; tvl_usd: number | null }> {
@@ -402,7 +391,7 @@ function DiscoverPageContent() {
         if (query.token) params.set("token_symbol", query.token);
         if (query.migrationOnly) params.set("migration_only", "true");
         if (query.highlightedOnly) params.set("highlighted_only", "true");
-        const res = await fetch(`/api/discover?${params.toString()}`, { cache: "no-store" });
+        const res = await fetch(apiUrl("/discover", params), { cache: "no-store" });
         if (!res.ok) {
           if (active) setError(`API error: ${res.status}`);
           return;
@@ -432,7 +421,6 @@ function DiscoverPageContent() {
           rows: normalizedRows,
           summary: normalizeSummary(raw.summary),
           coverage: normalizeCoverage(raw.coverage),
-          regime_mix: normalizeRegimeMix(raw.regime_mix),
           risk_mix: normalizeRiskMix(raw.risk_mix),
         };
         if (active) {
@@ -462,7 +450,7 @@ function DiscoverPageContent() {
         if (query.chain) params.set("chain_id", String(query.chain));
         params.set("group_by", query.trendGroup);
         if (query.trendGroup !== "none") params.set("group_limit", "8");
-        const res = await fetch(`/api/trends/daily?${params.toString()}`, { cache: "no-store" });
+        const res = await fetch(apiUrl("/trends/daily", params), { cache: "no-store" });
         if (!res.ok) {
           if (active) setTrendError(`Trends API error: ${res.status}`);
           return;

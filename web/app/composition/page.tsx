@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { apiUrl } from "../lib/api";
 import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
@@ -262,7 +263,7 @@ function CompositionPageContent() {
           top_n: String(query.topN),
           crowding_limit: String(query.crowdingLimit),
         });
-        const res = await fetch(`/api/composition?${params.toString()}`, { cache: "no-store" });
+        const res = await fetch(apiUrl("/composition", params), { cache: "no-store" });
         if (!res.ok) {
           if (active) setError(`API error: ${res.status}`);
           return;
