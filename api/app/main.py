@@ -53,6 +53,11 @@ PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
 INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
 DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
 KONG_PPS_LOOKBACK_DAYS = int(os.getenv("KONG_PPS_LOOKBACK_DAYS", "119"))
+STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_DAYS)))
+STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
+STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
+STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
+STYFI_TOKEN_SCALE = float(10**18)
 
 
 def _validate_data_policy_config() -> None:
@@ -60,6 +65,31 @@ def _validate_data_policy_config() -> None:
         raise ValueError(
             "Invalid retention policy: PPS_RETENTION_DAYS must be >= KONG_PPS_LOOKBACK_DAYS "
             f"(got retention={PPS_RETENTION_DAYS}, lookback={KONG_PPS_LOOKBACK_DAYS})"
+        )
+    if STYFI_RETENTION_DAYS < 0:
+        raise ValueError(
+            "Invalid stYFI retention: STYFI_RETENTION_DAYS must be >= 0 "
+            f"(got {STYFI_RETENTION_DAYS})"
+        )
+    if STYFI_SNAPSHOT_RETENTION_DAYS < 0:
+        raise ValueError(
+            "Invalid stYFI retention: STYFI_SNAPSHOT_RETENTION_DAYS must be >= 0 "
+            f"(got {STYFI_SNAPSHOT_RETENTION_DAYS})"
+        )
+    if STYFI_RETENTION_DAYS > 0 and STYFI_SNAPSHOT_RETENTION_DAYS > STYFI_RETENTION_DAYS:
+        raise ValueError(
+            "Invalid stYFI retention: STYFI_SNAPSHOT_RETENTION_DAYS must be <= STYFI_RETENTION_DAYS "
+            f"(got snapshot={STYFI_SNAPSHOT_RETENTION_DAYS}, retention={STYFI_RETENTION_DAYS})"
+        )
+    if STYFI_EPOCH_LOOKBACK <= 0:
+        raise ValueError(
+            "Invalid stYFI config: STYFI_EPOCH_LOOKBACK must be > 0 "
+            f"(got {STYFI_EPOCH_LOOKBACK})"
+        )
+    if STYFI_CHAIN_ID <= 0:
+        raise ValueError(
+            "Invalid stYFI config: STYFI_CHAIN_ID must be > 0 "
+            f"(got {STYFI_CHAIN_ID})"
         )
 
 
@@ -759,6 +789,218 @@ def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     }
 
 
+def _styfi_summary_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
+    cur.execute(
+        """
+        WITH latest AS (
+            SELECT *
+            FROM styfi_snapshots
+            WHERE chain_id = %(chain_id)s
+            ORDER BY observed_at DESC
+            LIMIT 1
+        ),
+        flow_24h AS (
+            SELECT combined_staked_raw
+            FROM styfi_snapshots
+            WHERE chain_id = %(chain_id)s
+              AND observed_at <= (SELECT observed_at FROM latest) - INTERVAL '24 hours'
+            ORDER BY observed_at DESC
+            LIMIT 1
+        ),
+        flow_7d AS (
+            SELECT combined_staked_raw
+            FROM styfi_snapshots
+            WHERE chain_id = %(chain_id)s
+              AND observed_at <= (SELECT observed_at FROM latest) - INTERVAL '7 days'
+            ORDER BY observed_at DESC
+            LIMIT 1
+        ),
+        stats AS (
+            SELECT
+                COUNT(*) AS snapshots_count,
+                MIN(observed_at) AS first_snapshot_at,
+                MAX(observed_at) AS latest_snapshot_at
+            FROM styfi_snapshots
+            WHERE chain_id = %(chain_id)s
+        )
+        SELECT
+            l.observed_at,
+            l.reward_epoch,
+            (l.yfi_total_supply_raw::numeric / %(scale)s)::double precision AS yfi_total_supply,
+            (l.styfi_total_assets_raw::numeric / %(scale)s)::double precision AS styfi_staked,
+            (l.styfi_total_supply_raw::numeric / %(scale)s)::double precision AS styfi_supply,
+            (l.styfix_total_assets_raw::numeric / %(scale)s)::double precision AS styfix_staked,
+            (l.styfix_total_supply_raw::numeric / %(scale)s)::double precision AS styfix_supply,
+            (l.combined_staked_raw::numeric / %(scale)s)::double precision AS combined_staked,
+            CASE
+                WHEN l.yfi_total_supply_raw > 0
+                THEN (l.combined_staked_raw::numeric / l.yfi_total_supply_raw::numeric)::double precision
+                ELSE NULL
+            END AS staked_share_supply,
+            CASE
+                WHEN f24.combined_staked_raw IS NOT NULL
+                THEN ((l.combined_staked_raw - f24.combined_staked_raw)::numeric / %(scale)s)::double precision
+                ELSE NULL
+            END AS net_flow_24h,
+            CASE
+                WHEN f7d.combined_staked_raw IS NOT NULL
+                THEN ((l.combined_staked_raw - f7d.combined_staked_raw)::numeric / %(scale)s)::double precision
+                ELSE NULL
+            END AS net_flow_7d,
+            s.snapshots_count,
+            s.first_snapshot_at,
+            s.latest_snapshot_at
+        FROM latest l
+        CROSS JOIN stats s
+        LEFT JOIN flow_24h f24 ON TRUE
+        LEFT JOIN flow_7d f7d ON TRUE
+        """,
+        {"chain_id": STYFI_CHAIN_ID, "scale": STYFI_TOKEN_SCALE},
+    )
+    row = cur.fetchone() or {}
+    observed_at = row.get("observed_at")
+    latest_snapshot_at = row.get("latest_snapshot_at")
+    return {
+        "observed_at": observed_at.isoformat() if observed_at else None,
+        "reward_epoch": int(row.get("reward_epoch") or 0),
+        "yfi_total_supply": _to_float_or_none(row.get("yfi_total_supply")),
+        "styfi_staked": _to_float_or_none(row.get("styfi_staked")),
+        "styfi_supply": _to_float_or_none(row.get("styfi_supply")),
+        "styfix_staked": _to_float_or_none(row.get("styfix_staked")),
+        "styfix_supply": _to_float_or_none(row.get("styfix_supply")),
+        "combined_staked": _to_float_or_none(row.get("combined_staked")),
+        "staked_share_supply": _to_float_or_none(row.get("staked_share_supply")),
+        "net_flow_24h": _to_float_or_none(row.get("net_flow_24h")),
+        "net_flow_7d": _to_float_or_none(row.get("net_flow_7d")),
+        "snapshots_count": int(row.get("snapshots_count") or 0),
+        "first_snapshot_at": row.get("first_snapshot_at").isoformat() if row.get("first_snapshot_at") else None,
+        "latest_snapshot_at": latest_snapshot_at.isoformat() if latest_snapshot_at else None,
+    }
+
+
+def _styfi_snapshot_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, object]]:
+    cur.execute(
+        """
+        SELECT
+            observed_at,
+            reward_epoch,
+            (styfi_total_assets_raw::numeric / %(scale)s)::double precision AS styfi_staked,
+            (styfix_total_assets_raw::numeric / %(scale)s)::double precision AS styfix_staked,
+            (combined_staked_raw::numeric / %(scale)s)::double precision AS combined_staked,
+            CASE
+                WHEN yfi_total_supply_raw > 0
+                THEN (combined_staked_raw::numeric / yfi_total_supply_raw::numeric)::double precision
+                ELSE NULL
+            END AS staked_share_supply
+        FROM styfi_snapshots
+        WHERE chain_id = %(chain_id)s
+          AND observed_at >= NOW() - (%(days)s * INTERVAL '1 day')
+        ORDER BY observed_at
+        """,
+        {"chain_id": STYFI_CHAIN_ID, "days": days, "scale": STYFI_TOKEN_SCALE},
+    )
+    rows = cur.fetchall()
+    return [
+        {
+            "observed_at": row["observed_at"].isoformat() if row.get("observed_at") else None,
+            "reward_epoch": int(row.get("reward_epoch") or 0),
+            "styfi_staked": _to_float_or_none(row.get("styfi_staked")),
+            "styfix_staked": _to_float_or_none(row.get("styfix_staked")),
+            "combined_staked": _to_float_or_none(row.get("combined_staked")),
+            "staked_share_supply": _to_float_or_none(row.get("staked_share_supply")),
+        }
+        for row in rows
+    ]
+
+
+def _styfi_epoch_series(cur: psycopg.Cursor, *, epoch_limit: int) -> list[dict[str, object]]:
+    cur.execute(
+        """
+        SELECT
+            epoch,
+            epoch_start,
+            (reward_total_raw::numeric / %(scale)s)::double precision AS reward_total,
+            (reward_styfi_raw::numeric / %(scale)s)::double precision AS reward_styfi,
+            (reward_styfix_raw::numeric / %(scale)s)::double precision AS reward_styfix,
+            (reward_veyfi_raw::numeric / %(scale)s)::double precision AS reward_veyfi,
+            (reward_liquid_lockers_raw::numeric / %(scale)s)::double precision AS reward_liquid_lockers
+        FROM styfi_epoch_stats
+        WHERE chain_id = %(chain_id)s
+        ORDER BY epoch DESC
+        LIMIT %(epoch_limit)s
+        """,
+        {"chain_id": STYFI_CHAIN_ID, "epoch_limit": epoch_limit, "scale": STYFI_TOKEN_SCALE},
+    )
+    rows = list(reversed(cur.fetchall()))
+    return [
+        {
+            "epoch": int(row.get("epoch") or 0),
+            "epoch_start": row["epoch_start"].isoformat() if row.get("epoch_start") else None,
+            "reward_total": _to_float_or_none(row.get("reward_total")),
+            "reward_styfi": _to_float_or_none(row.get("reward_styfi")),
+            "reward_styfix": _to_float_or_none(row.get("reward_styfix")),
+            "reward_veyfi": _to_float_or_none(row.get("reward_veyfi")),
+            "reward_liquid_lockers": _to_float_or_none(row.get("reward_liquid_lockers")),
+        }
+        for row in rows
+    ]
+
+
+def _styfi_latest_component_split(cur: psycopg.Cursor, *, current_epoch: int | None) -> dict[str, object]:
+    if current_epoch is None or current_epoch <= 0:
+        return {"epoch": None, "rows": []}
+    cur.execute(
+        """
+        SELECT
+            epoch,
+            (reward_styfi_raw::numeric / %(scale)s)::double precision AS reward_styfi,
+            (reward_styfix_raw::numeric / %(scale)s)::double precision AS reward_styfix,
+            (reward_veyfi_raw::numeric / %(scale)s)::double precision AS reward_veyfi,
+            (reward_liquid_lockers_raw::numeric / %(scale)s)::double precision AS reward_liquid_lockers
+        FROM styfi_epoch_stats
+        WHERE chain_id = %(chain_id)s
+          AND epoch < %(current_epoch)s
+        ORDER BY epoch DESC
+        LIMIT 1
+        """,
+        {"chain_id": STYFI_CHAIN_ID, "current_epoch": current_epoch, "scale": STYFI_TOKEN_SCALE},
+    )
+    row = cur.fetchone()
+    if not row:
+        return {"epoch": None, "rows": []}
+    return {
+        "epoch": int(row.get("epoch") or 0),
+        "rows": [
+            {"component": "stYFI", "reward": _to_float_or_none(row.get("reward_styfi"))},
+            {"component": "stYFIx", "reward": _to_float_or_none(row.get("reward_styfix"))},
+            {"component": "Migrated veYFI", "reward": _to_float_or_none(row.get("reward_veyfi"))},
+            {"component": "Liquid lockers", "reward": _to_float_or_none(row.get("reward_liquid_lockers"))},
+        ],
+    }
+
+
+def _styfi_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
+    cur.execute(
+        """
+        SELECT status, started_at, ended_at, records, error_summary
+        FROM ingestion_runs
+        WHERE job_name = 'styfi_snapshot'
+        ORDER BY id DESC
+        LIMIT 1
+        """
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "status": row["status"],
+        "started_at": row["started_at"].isoformat() if row.get("started_at") else None,
+        "ended_at": row["ended_at"].isoformat() if row.get("ended_at") else None,
+        "records": int(row.get("records") or 0),
+        "error_summary": row.get("error_summary"),
+    }
+
+
 def _series_change_pct(series: list[tuple[int, float]], *, lookback_days: int) -> float | None:
     if not series:
         return None
@@ -1040,7 +1282,11 @@ async def overview() -> dict[str, object]:
     yearn_proxy: dict[str, object] | None = None
     tracked_scope: dict[str, object] | None = None
     lifecycle: dict[str, object] | None = None
-    last_runs: dict[str, dict[str, object] | None] = {"ydaemon_snapshot": None, "kong_pps_metrics": None}
+    last_runs: dict[str, dict[str, object] | None] = {
+        "ydaemon_snapshot": None,
+        "kong_pps_metrics": None,
+        "styfi_snapshot": None,
+    }
     try:
         with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
@@ -1140,6 +1386,9 @@ async def overview() -> dict[str, object]:
             "ingestion_run_retention_days": INGESTION_RUN_RETENTION_DAYS,
             "db_cleanup_min_interval_sec": DB_CLEANUP_MIN_INTERVAL_SEC,
             "kong_pps_lookback_days": KONG_PPS_LOOKBACK_DAYS,
+            "styfi_retention_days": STYFI_RETENTION_DAYS,
+            "styfi_snapshot_retention_days": STYFI_SNAPSHOT_RETENTION_DAYS,
+            "styfi_epoch_lookback": STYFI_EPOCH_LOOKBACK,
         },
         "ingestion": {
             "active_vaults": active_vaults,
@@ -1154,6 +1403,50 @@ async def overview() -> dict[str, object]:
         "tracked_scope": tracked_scope,
         "lifecycle": lifecycle,
         "message": "Phase 6 hardening is in progress: freshness calibration, trust diagnostics, UX consistency, and data-quality safeguards are actively being refined.",
+    }
+
+
+@app.get("/api/styfi")
+async def styfi(
+    days: int = Query(default=30, ge=7, le=STYFI_RETENTION_DAYS if STYFI_RETENTION_DAYS > 0 else 365),
+    epoch_limit: int = Query(default=STYFI_EPOCH_LOOKBACK, ge=3, le=max(STYFI_EPOCH_LOOKBACK, 24)),
+) -> dict[str, object]:
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            summary = _styfi_summary_snapshot(cur)
+            series = _styfi_snapshot_series(cur, days=days)
+            epochs = _styfi_epoch_series(cur, epoch_limit=epoch_limit)
+            component_split = _styfi_latest_component_split(cur, current_epoch=summary.get("reward_epoch"))
+            last_run = _styfi_last_run(cur)
+
+    latest_snapshot_at = summary.get("latest_snapshot_at")
+    latest_snapshot_dt = datetime.fromisoformat(latest_snapshot_at) if isinstance(latest_snapshot_at, str) else None
+    return {
+        "filters": {
+            "days": days,
+            "epoch_limit": epoch_limit,
+            "chain_id": STYFI_CHAIN_ID,
+        },
+        "summary": summary,
+        "series": {
+            "snapshots": series,
+            "epochs": epochs,
+        },
+        "component_split_latest_completed": component_split,
+        "freshness": {
+            "latest_snapshot_at": latest_snapshot_at,
+            "latest_snapshot_age_seconds": _seconds_since(latest_snapshot_dt, datetime.now(UTC)),
+            "snapshots_count": summary.get("snapshots_count"),
+            "first_snapshot_at": summary.get("first_snapshot_at"),
+        },
+        "data_policy": {
+            "retention_days": STYFI_RETENTION_DAYS,
+            "snapshot_retention_days": STYFI_SNAPSHOT_RETENTION_DAYS,
+            "epoch_lookback": STYFI_EPOCH_LOOKBACK,
+        },
+        "ingestion": {
+            "last_run": last_run,
+        },
     }
 
 
