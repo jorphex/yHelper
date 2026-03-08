@@ -52,6 +52,16 @@ type DiscoverResponse = {
     apy_mid_vaults?: number;
     apy_high_vaults?: number;
   };
+  coverage?: {
+    visible_vaults?: number;
+    with_metrics?: number;
+    missing_metrics?: number;
+    low_points?: number;
+    missing_or_low_points?: number;
+    coverage_ratio?: number | null;
+    visible_tvl_usd?: number | null;
+    with_metrics_tvl_usd?: number | null;
+  };
   regime_mix?: Array<{ regime: string; vaults: number; tvl_usd: number | null }>;
   risk_mix?: Array<{ risk_level: string; vaults: number; tvl_usd: number | null }>;
   rows: DiscoverRow[];
@@ -149,6 +159,21 @@ function normalizeSummary(raw: unknown): DiscoverResponse["summary"] | undefined
     apy_low_vaults: asFiniteInt(entry.apy_low_vaults) ?? undefined,
     apy_mid_vaults: asFiniteInt(entry.apy_mid_vaults) ?? undefined,
     apy_high_vaults: asFiniteInt(entry.apy_high_vaults) ?? undefined,
+  };
+}
+
+function normalizeCoverage(raw: unknown): DiscoverResponse["coverage"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const entry = raw as Record<string, unknown>;
+  return {
+    visible_vaults: asFiniteInt(entry.visible_vaults) ?? undefined,
+    with_metrics: asFiniteInt(entry.with_metrics) ?? undefined,
+    missing_metrics: asFiniteInt(entry.missing_metrics) ?? undefined,
+    low_points: asFiniteInt(entry.low_points) ?? undefined,
+    missing_or_low_points: asFiniteInt(entry.missing_or_low_points) ?? undefined,
+    coverage_ratio: asFiniteNumber(entry.coverage_ratio),
+    visible_tvl_usd: asFiniteNumber(entry.visible_tvl_usd),
+    with_metrics_tvl_usd: asFiniteNumber(entry.with_metrics_tvl_usd),
   };
 }
 
@@ -406,6 +431,7 @@ function DiscoverPageContent() {
           pagination: safePagination,
           rows: normalizedRows,
           summary: normalizeSummary(raw.summary),
+          coverage: normalizeCoverage(raw.coverage),
           regime_mix: normalizeRegimeMix(raw.regime_mix),
           risk_mix: normalizeRiskMix(raw.risk_mix),
         };
@@ -840,7 +866,10 @@ function DiscoverPageContent() {
 
       <section className="card discover-universe-card">
         <h2>Universe Snapshot</h2>
-        <p className="muted card-intro">Current size and quality profile for the filtered vault universe.</p>
+        <p className="muted card-intro">
+          Current size and quality profile for the filtered vault universe. Coverage below separates vaults with enough PPS history
+          from visible vaults that are still missing or too thin for APY scoring.
+        </p>
         <div className="discover-universe-layout">
           <div className="discover-kpis">
           <KpiGrid
@@ -849,6 +878,14 @@ function DiscoverPageContent() {
               { label: "Chains", value: String(data?.summary?.chains ?? "n/a") },
               { label: "Tokens", value: String(data?.summary?.tokens ?? "n/a") },
               { label: "Median APY", value: formatPct(data?.summary?.median_safe_apy_30d) },
+              {
+                label: "Metric Coverage",
+                value: formatPct(data?.coverage?.coverage_ratio, 0),
+                hint:
+                  data?.coverage?.with_metrics !== undefined && data?.coverage?.visible_vaults !== undefined
+                    ? `${data.coverage.with_metrics}/${data.coverage.visible_vaults} visible vaults scoreable`
+                    : "Visible vaults with enough PPS history for APY",
+              },
               {
                 label: "Avg Momentum",
                 value: formatPct(data?.summary?.avg_momentum_7d_30d),
@@ -866,11 +903,15 @@ function DiscoverPageContent() {
               },
               { label: "Migration Ready", value: String(data?.summary?.migration_ready_vaults ?? "n/a") },
               { label: "Highlighted", value: String(data?.summary?.highlighted_vaults ?? "n/a") },
-              { label: "Retired in Scope", value: String(data?.summary?.retired_vaults ?? "n/a") },
+              {
+                label: "Needs More History",
+                value: String(data?.coverage?.missing_or_low_points ?? "n/a"),
+                hint: "Visible vaults missing metrics or still below the point threshold",
+              },
             ]}
           />
           </div>
-          <div className="discover-mix-grid analyst-only">
+          <div className="discover-mix-grid">
             <BarList
               title="APY Bucket Count"
               items={[
@@ -878,24 +919,35 @@ function DiscoverPageContent() {
                 { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
                 { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
                 { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
+                {
+                  id: "unknown",
+                  label: "Unknown / thin history",
+                  value: data?.coverage?.missing_or_low_points ?? null,
+                  note: "Visible vaults missing metrics or still below the point threshold",
+                },
               ]}
               valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
               emptyText="No APY bucket counts for this filter yet."
             />
-            <BarList
-              title="Risk Level Mix (TVL)"
-              items={(data?.risk_mix ?? []).map((row) => ({
-                id: String(row.risk_level),
-                label: riskLevelLabel(row.risk_level),
-                value: row.tvl_usd,
-                note: `${row.vaults} vaults`,
-              }))}
-              valueFormatter={(value) => formatUsd(value)}
-              emptyText="No risk mix for this filter yet."
-            />
+            <div className="analyst-only">
+              <BarList
+                title="Risk Level Mix (TVL)"
+                items={(data?.risk_mix ?? []).map((row) => ({
+                  id: String(row.risk_level),
+                  label: riskLevelLabel(row.risk_level),
+                  value: row.tvl_usd,
+                  note: `${row.vaults} vaults`,
+                }))}
+                valueFormatter={(value) => formatUsd(value)}
+                emptyText="No risk mix for this filter yet."
+              />
+            </div>
           </div>
         </div>
-        <p className="muted card-intro">Regime mix is shown on the Regimes page to avoid duplicated charts.</p>
+        <p className="muted card-intro">
+          Unknown APY means the vault is visible in scope but still missing enough PPS history to score. Regime mix is shown on the
+          Regimes page to avoid duplicated charts.
+        </p>
       </section>
 
       <section className="card discover-analytics-card">

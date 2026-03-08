@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatHours, formatPct, formatUsd } from "./lib/format";
+import { ShareMeter } from "./components/visuals";
 
 type OverviewResponse = {
   freshness?: {
@@ -12,6 +13,8 @@ type OverviewResponse = {
   } | null;
   tracked_scope?: {
     tracked_tvl_active_usd?: number | null;
+    active_vaults?: number | null;
+    active_with_metrics?: number | null;
   } | null;
   protocol_context?: {
     tvl_change_7d_pct?: number | null;
@@ -144,6 +147,14 @@ export default function HomePage() {
     changes?.summary?.vaults_with_change ?? null,
     changes?.freshness?.latest_pps_age_seconds ?? null,
   );
+  const staleRatio = overview?.freshness?.pps_stale_ratio ?? null;
+  const freshRatio = staleRatio !== null && staleRatio !== undefined ? Math.max(0, 1 - staleRatio) : null;
+  const trackedScopeNote =
+    overview?.tracked_scope?.active_vaults !== null &&
+    overview?.tracked_scope?.active_vaults !== undefined &&
+    Number.isFinite(overview?.tracked_scope?.active_vaults)
+      ? `${overview?.tracked_scope?.active_vaults} active visible vaults`
+      : "Active visible vault scope";
 
   return (
     <main className="container home-minimal">
@@ -173,14 +184,40 @@ export default function HomePage() {
         <article className="card home-sparse-signal-card home-reveal">
           <p className="home-sparse-signal-label">Tracked TVL</p>
           <p className="home-sparse-signal-value">{formatUsd(overview?.tracked_scope?.tracked_tvl_active_usd ?? null, 0)}</p>
+          <p className="home-sparse-signal-note">{trackedScopeNote}. Debt-adjusted to avoid double counting overlap.</p>
         </article>
         <article className="card home-sparse-signal-card home-reveal">
           <p className="home-sparse-signal-label">Protocol TVL Change 7d</p>
           <p className="home-sparse-signal-value">{formatPct(overview?.protocol_context?.tvl_change_7d_pct ?? null, 2)}</p>
+          <p className="home-sparse-signal-note">Protocol-wide change from DefiLlama. This is broader than the tracked vault scope.</p>
         </article>
-        <article className="card home-sparse-signal-card home-reveal">
+        <article className="card home-sparse-signal-card home-reveal home-freshness-signal-card">
           <p className="home-sparse-signal-label">Data Freshness</p>
           <p className="home-sparse-signal-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}</p>
+          <p className="home-sparse-signal-note">Latest PPS in tracked scope. Stale means older than 24 hours.</p>
+          <ShareMeter
+            title=""
+            embedded
+            total={1}
+            segments={[
+              {
+                id: "fresh",
+                label: "Fresh",
+                value: freshRatio,
+                note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within the 24h cutoff` : "Latest coverage syncing",
+                tone: "positive",
+              },
+              {
+                id: "stale",
+                label: "Stale",
+                value: staleRatio,
+                note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} older than the 24h cutoff` : "Stale ratio syncing",
+                tone: "warning",
+              },
+            ]}
+            valueFormatter={(value) => formatPct(value, 0)}
+            legend="Freshness combines latest PPS age with the share of tracked rows still inside the cutoff."
+          />
         </article>
       </section>
 

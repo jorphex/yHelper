@@ -22,6 +22,14 @@ type HeatCellDatum = {
   note?: string;
 };
 
+type MeterSegmentDatum = {
+  id: string;
+  label: string;
+  value: number | null | undefined;
+  note?: string;
+  tone?: "primary" | "positive" | "warning" | "muted";
+};
+
 type ScatterPoint = {
   id: string;
   x: number | null | undefined;
@@ -217,6 +225,84 @@ export function HeatGrid({
   if (embedded) return <div ref={ref} className={isInView ? "is-in-view" : undefined}>{content}</div>;
 
   return <section ref={ref} className={`viz-panel ${isInView ? "is-in-view" : ""}`.trim()}>{content}</section>;
+}
+
+export function ShareMeter({
+  title,
+  segments,
+  total,
+  valueFormatter,
+  legend,
+  embedded = false,
+  emptyText = "No data available.",
+}: {
+  title: string;
+  segments: MeterSegmentDatum[];
+  total?: number | null | undefined;
+  valueFormatter: (value: number | null | undefined) => string;
+  legend?: string;
+  embedded?: boolean;
+  emptyText?: string;
+}) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
+  const normalizedSegments = segments
+    .map((segment) => ({
+      ...segment,
+      value:
+        segment.value !== null && segment.value !== undefined && Number.isFinite(segment.value)
+          ? Math.max(0, Number(segment.value))
+          : null,
+    }))
+    .filter((segment) => segment.value !== null);
+  const computedTotal = normalizedSegments.reduce((sum, segment) => sum + Number(segment.value), 0);
+  const resolvedTotal =
+    total !== null && total !== undefined && Number.isFinite(total) && Number(total) > 0 ? Number(total) : computedTotal;
+
+  const content = (
+    <>
+      {title ? <h3>{title}</h3> : null}
+      {normalizedSegments.length === 0 || resolvedTotal <= 0 ? (
+        <p className="muted">{emptyText}</p>
+      ) : (
+        <>
+          <div className="meter-track" aria-hidden="true">
+            {normalizedSegments.map((segment, index) => {
+              const share = Math.max(0, Number(segment.value) / resolvedTotal);
+              return (
+                <span
+                  key={segment.id}
+                  className={`meter-segment tone-${segment.tone ?? "primary"}`}
+                  style={
+                    {
+                      "--meter-share": `${share}`,
+                      "--meter-delay": `${Math.min(index, 8) * 0.018}s`,
+                    } as CSSProperties
+                  }
+                />
+              );
+            })}
+          </div>
+          <ul className="meter-legend">
+            {normalizedSegments.map((segment) => (
+              <li key={segment.id} className="meter-legend-item">
+                <div className="meter-legend-head">
+                  <span className={`meter-dot tone-${segment.tone ?? "primary"}`} aria-hidden="true" />
+                  <span className="meter-label">{segment.label}</span>
+                  <span className="meter-value">{valueFormatter(segment.value)}</span>
+                </div>
+                {segment.note ? <p className="meter-note muted">{segment.note}</p> : null}
+              </li>
+            ))}
+          </ul>
+          {legend ? <p className="muted viz-legend">{legend}</p> : null}
+        </>
+      )}
+    </>
+  );
+
+  if (embedded) return <div ref={ref} className={`meter-panel ${isInView ? "is-in-view" : ""}`.trim()}>{content}</div>;
+
+  return <section ref={ref} className={`viz-panel meter-panel ${isInView ? "is-in-view" : ""}`.trim()}>{content}</section>;
 }
 
 export function TrendStrips({

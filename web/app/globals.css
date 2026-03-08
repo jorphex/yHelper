@@ -1244,7 +1244,7 @@ input[type="text"] {
 
 .discover-mix-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 0.75rem;
 }
 
@@ -2248,6 +2248,17 @@ input[type="text"] {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.changes-trust-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.changes-trust-ages .kpi-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .overview-snapshot-card .kpi-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
 }
@@ -2474,6 +2485,120 @@ input[type="text"] {
   animation: bar-fill-in var(--motion-chart) var(--ease-emphasis) both;
   animation-delay: var(--bar-delay, 0s);
   animation-play-state: paused;
+}
+
+.meter-panel {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.meter-track {
+  display: flex;
+  width: 100%;
+  min-height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(8, 17, 36, 0.58);
+  border: 1px solid rgba(149, 177, 231, 0.12);
+}
+
+.meter-segment {
+  flex: 0 0 calc(var(--meter-share, 0) * 100%);
+  min-width: 0;
+  transform-origin: left center;
+  animation: meter-grow-in var(--motion-chart) var(--ease-emphasis) both;
+  animation-delay: var(--meter-delay, 0s);
+  animation-play-state: paused;
+}
+
+.is-in-view .meter-segment {
+  animation-play-state: running;
+}
+
+.meter-segment.tone-primary {
+  background: linear-gradient(90deg, rgba(95, 138, 255, 0.88), rgba(122, 189, 255, 0.82));
+}
+
+.meter-segment.tone-positive {
+  background: linear-gradient(90deg, rgba(82, 203, 164, 0.86), rgba(119, 223, 195, 0.8));
+}
+
+.meter-segment.tone-warning {
+  background: linear-gradient(90deg, rgba(255, 181, 94, 0.88), rgba(255, 132, 132, 0.82));
+}
+
+.meter-segment.tone-muted {
+  background: linear-gradient(90deg, rgba(103, 122, 156, 0.72), rgba(135, 152, 187, 0.64));
+}
+
+.meter-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.48rem;
+}
+
+.meter-legend-item {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.meter-legend-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.meter-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.meter-dot.tone-primary {
+  background: rgba(122, 189, 255, 0.92);
+}
+
+.meter-dot.tone-positive {
+  background: rgba(114, 221, 187, 0.92);
+}
+
+.meter-dot.tone-warning {
+  background: rgba(255, 176, 104, 0.95);
+}
+
+.meter-dot.tone-muted {
+  background: rgba(144, 160, 193, 0.86);
+}
+
+.meter-label {
+  color: var(--bar-label);
+}
+
+.meter-value {
+  color: var(--bar-value);
+  font-variant-numeric: tabular-nums;
+}
+
+.meter-note {
+  margin: 0 0 0 1.2rem;
+  font-size: 0.76rem;
+}
+
+@keyframes meter-grow-in {
+  from {
+    transform: scaleX(0);
+    opacity: 0.45;
+  }
+
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
 }
 
 .viz-panel {
@@ -2878,6 +3003,10 @@ input:focus-visible {
 
   .changes-summary-kpis .kpi-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .changes-trust-layout {
+    grid-template-columns: 1fr;
   }
 
   .overview-snapshot-card .kpi-grid,
@@ -3664,8 +3793,8 @@ input:focus-visible {
   min-height: 150px;
   padding: 1.1rem;
   display: grid;
-  align-content: center;
-  gap: 0.35rem;
+  align-content: start;
+  gap: 0.45rem;
 }
 
 .home-sparse-signal-label {
@@ -3681,6 +3810,29 @@ input:focus-visible {
   font-family: var(--font-mono);
   font-size: clamp(1.35rem, 2.6vw, 2rem);
   line-height: 1.12;
+}
+
+.home-sparse-signal-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.home-freshness-signal-card {
+  gap: 0.55rem;
+}
+
+.home-freshness-signal-card .meter-panel {
+  gap: 0.55rem;
+}
+
+.home-freshness-signal-card .meter-track {
+  min-height: 9px;
+}
+
+.home-freshness-signal-card .viz-legend {
+  margin-top: -0.1rem;
 }
 
 .home-sparse-live-note {

@@ -1,0 +1,1 @@
+export const SOCIAL_IMAGE_VERSION = process.env.NEXT_PUBLIC_SOCIAL_IMAGE_VERSION || "20260308data1";

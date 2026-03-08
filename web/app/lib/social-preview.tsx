@@ -215,7 +215,7 @@ export async function renderSocialPreviewImage({
   const topCards = [
     {
       key: "tracked-tvl",
-      label: "Tracked TVL",
+      label: "Tracked Scope TVL",
       value: formatUsdCompact(stats.trackedTvlActiveUsd),
     },
     {

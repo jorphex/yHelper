@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
-import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips } from "../components/visuals";
+import { BarList, HeatGrid, KpiGrid, ScatterPlot, ShareMeter, TrendStrips } from "../components/visuals";
 import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
@@ -72,6 +72,8 @@ type ChangesResponse = {
     latest_pps_age_seconds?: number | null;
     pps_stale_ratio?: number | null;
     metrics_newest_age_seconds?: number | null;
+    window_stale_vaults?: number | null;
+    window_tracked_vaults?: number | null;
     window_stale_ratio?: number | null;
     stale_by_chain?: Array<{
       chain_id: number;
@@ -570,6 +572,77 @@ function ChangesPageContent() {
       : []),
     { label: "Average Delta", value: formatPct(data?.summary.avg_delta) },
   ];
+  const eligibleVaults = data?.summary.vaults_eligible ?? 0;
+  const comparedVaults = data?.freshness?.window_tracked_vaults ?? data?.summary.vaults_with_change ?? 0;
+  const staleVaults = data?.freshness?.window_stale_vaults ?? data?.summary.stale_vaults ?? 0;
+  const freshComparedVaults = Math.max(0, comparedVaults - staleVaults);
+  const missingWindowVaults = Math.max(0, eligibleVaults - comparedVaults);
+  const staleTrackedTvl = (data?.freshness?.stale_by_chain ?? []).reduce(
+    (sum, row) => sum + (row.stale_tvl_usd ?? 0),
+    0,
+  );
+  const trackedTvl = data?.summary.tracked_tvl_usd ?? 0;
+  const totalEligibleTvl = data?.summary.total_tvl_usd ?? 0;
+  const freshTrackedTvl = Math.max(0, trackedTvl - staleTrackedTvl);
+  const missingWindowTvl = Math.max(0, totalEligibleTvl - trackedTvl);
+  const vaultCoverageSegments = [
+    {
+      id: "fresh-window",
+      label: "Fresh window",
+      value: freshComparedVaults,
+      note: eligibleVaults > 0 ? `${formatPct(freshComparedVaults / eligibleVaults, 0)} of eligible vaults` : "Waiting for eligible scope",
+      tone: "positive" as const,
+    },
+    {
+      id: "stale-window",
+      label: "Stale window",
+      value: staleVaults,
+      note: eligibleVaults > 0 ? `${formatPct(staleVaults / eligibleVaults, 0)} beyond the cutoff` : "Stale share syncing",
+      tone: "warning" as const,
+    },
+    {
+      id: "missing-window",
+      label: "Missing window",
+      value: missingWindowVaults,
+      note:
+        eligibleVaults > 0
+          ? `${formatPct(missingWindowVaults / eligibleVaults, 0)} missing one side of the APY window`
+          : "Window coverage syncing",
+      tone: "muted" as const,
+    },
+  ];
+  const tvlCoverageSegments = [
+    {
+      id: "fresh-tvl",
+      label: "Fresh tracked TVL",
+      value: freshTrackedTvl,
+      note:
+        totalEligibleTvl > 0
+          ? `${formatPct(freshTrackedTvl / totalEligibleTvl, 0)} of eligible TVL with fresh deltas`
+          : "TVL coverage syncing",
+      tone: "positive" as const,
+    },
+    {
+      id: "stale-tvl",
+      label: "Stale tracked TVL",
+      value: staleTrackedTvl,
+      note:
+        totalEligibleTvl > 0
+          ? `${formatPct(staleTrackedTvl / totalEligibleTvl, 0)} beyond the cutoff`
+          : "Stale TVL syncing",
+      tone: "warning" as const,
+    },
+    {
+      id: "missing-tvl",
+      label: "Missing window TVL",
+      value: missingWindowTvl,
+      note:
+        totalEligibleTvl > 0
+          ? `${formatPct(missingWindowTvl / totalEligibleTvl, 0)} missing one side of the APY window`
+          : "Missing TVL syncing",
+      tone: "muted" as const,
+    },
+  ];
   const trendSlice = useMemo(() => trends.slice(Math.max(0, trends.length - 60)), [trends]);
   const moverDriftTrendItems = useMemo(
     () => [
@@ -794,14 +867,32 @@ function ChangesPageContent() {
           These metrics show whether recent data is fresh enough to trust changes. Current stale cutoff:{" "}
           {staleThresholdLabel(data?.filters?.stale_threshold ?? query.staleThreshold)}.
         </p>
-        <KpiGrid
-          items={[
-            { label: "Latest PPS Age", value: formatHours(data?.freshness?.latest_pps_age_seconds) },
-            { label: "Newest Metrics Age", value: formatHours(data?.freshness?.metrics_newest_age_seconds) },
-            { label: "Global PPS Stale Ratio", value: formatPct(data?.freshness?.pps_stale_ratio) },
-            { label: "Window Stale Ratio", value: formatPct(data?.freshness?.window_stale_ratio) },
-          ]}
-        />
+        <div className="changes-trust-layout">
+          <div className="changes-trust-ages">
+            <KpiGrid
+              items={[
+                { label: "Latest PPS Age", value: formatHours(data?.freshness?.latest_pps_age_seconds) },
+                { label: "Newest Metrics Age", value: formatHours(data?.freshness?.metrics_newest_age_seconds) },
+              ]}
+            />
+          </div>
+          <ShareMeter
+            title="Window Coverage by Vaults"
+            segments={vaultCoverageSegments}
+            total={eligibleVaults}
+            valueFormatter={(value) =>
+              value === null || value === undefined || !Number.isFinite(value) ? "n/a" : Number(value).toLocaleString("en-US")
+            }
+            legend="Eligible vaults split into fresh comparisons, stale comparisons, and rows missing enough history for a full delta."
+          />
+          <ShareMeter
+            title="Window Coverage by TVL"
+            segments={tvlCoverageSegments}
+            total={totalEligibleTvl}
+            valueFormatter={(value) => formatUsd(value)}
+            legend="TVL split the same way, so missing history is visible in dollars instead of only ratios."
+          />
+        </div>
       </section>
 
       <section className="card changes-visuals-card analyst-only">

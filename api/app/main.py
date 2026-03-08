@@ -452,6 +452,7 @@ def _coverage_snapshot(
                     COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
                     COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
                     (m.vault_address IS NOT NULL) AS has_metrics,
+                    (m.apy_30d IS NOT NULL) AS has_scoreable_apy,
                     (COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s) AS pass_tvl,
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
@@ -460,12 +461,12 @@ def _coverage_snapshot(
             )
             SELECT
                 COUNT(*) AS active_vaults,
-                COUNT(*) FILTER (WHERE has_metrics AND pass_tvl AND pass_points) AS eligible_vaults,
-                COUNT(*) FILTER (WHERE NOT has_metrics) AS missing_metrics,
-                COUNT(*) FILTER (WHERE has_metrics AND NOT pass_tvl) AS below_tvl,
+                COUNT(*) FILTER (WHERE has_scoreable_apy AND pass_tvl AND pass_points) AS eligible_vaults,
+                COUNT(*) FILTER (WHERE NOT has_metrics OR (pass_points AND NOT has_scoreable_apy)) AS missing_metrics,
+                COUNT(*) FILTER (WHERE has_scoreable_apy AND NOT pass_tvl) AS below_tvl,
                 COUNT(*) FILTER (WHERE has_metrics AND pass_tvl AND NOT pass_points) AS low_points,
                 SUM(tvl_usd) AS active_tvl_usd,
-                SUM(tvl_usd) FILTER (WHERE has_metrics AND pass_tvl AND pass_points) AS eligible_tvl_usd
+                SUM(tvl_usd) FILTER (WHERE has_scoreable_apy AND pass_tvl AND pass_points) AS eligible_tvl_usd
             FROM base
             """,
             params,
@@ -495,6 +496,7 @@ def _coverage_snapshot(
                     COALESCE(d.chain_id, -1) AS chain_id,
                     COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
                     (m.vault_address IS NOT NULL) AS has_metrics,
+                    (m.apy_30d IS NOT NULL) AS has_scoreable_apy,
                     (COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s) AS pass_tvl,
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
@@ -504,12 +506,12 @@ def _coverage_snapshot(
             SELECT
                 chain_id,
                 COUNT(*) AS active_vaults,
-                COUNT(*) FILTER (WHERE has_metrics AND pass_tvl AND pass_points) AS eligible_vaults,
-                COUNT(*) FILTER (WHERE NOT has_metrics) AS missing_metrics,
-                COUNT(*) FILTER (WHERE has_metrics AND NOT pass_tvl) AS below_tvl,
+                COUNT(*) FILTER (WHERE has_scoreable_apy AND pass_tvl AND pass_points) AS eligible_vaults,
+                COUNT(*) FILTER (WHERE NOT has_metrics OR (pass_points AND NOT has_scoreable_apy)) AS missing_metrics,
+                COUNT(*) FILTER (WHERE has_scoreable_apy AND NOT pass_tvl) AS below_tvl,
                 COUNT(*) FILTER (WHERE has_metrics AND pass_tvl AND NOT pass_points) AS low_points,
                 SUM(tvl_usd) AS active_tvl_usd,
-                SUM(tvl_usd) FILTER (WHERE has_metrics AND pass_tvl AND pass_points) AS eligible_tvl_usd
+                SUM(tvl_usd) FILTER (WHERE has_scoreable_apy AND pass_tvl AND pass_points) AS eligible_tvl_usd
             FROM base
             GROUP BY chain_id
             ORDER BY eligible_tvl_usd DESC NULLS LAST, active_tvl_usd DESC
@@ -526,6 +528,7 @@ def _coverage_snapshot(
                     COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
                     COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
                     (m.vault_address IS NOT NULL) AS has_metrics,
+                    (m.apy_30d IS NOT NULL) AS has_scoreable_apy,
                     (COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s) AS pass_tvl,
                     (COALESCE(m.points_count, 0) >= %(min_points)s) AS pass_points
                 FROM vault_dim d
@@ -535,12 +538,12 @@ def _coverage_snapshot(
             SELECT
                 category,
                 COUNT(*) AS active_vaults,
-                COUNT(*) FILTER (WHERE has_metrics AND pass_tvl AND pass_points) AS eligible_vaults,
-                COUNT(*) FILTER (WHERE NOT has_metrics) AS missing_metrics,
-                COUNT(*) FILTER (WHERE has_metrics AND NOT pass_tvl) AS below_tvl,
+                COUNT(*) FILTER (WHERE has_scoreable_apy AND pass_tvl AND pass_points) AS eligible_vaults,
+                COUNT(*) FILTER (WHERE NOT has_metrics OR (pass_points AND NOT has_scoreable_apy)) AS missing_metrics,
+                COUNT(*) FILTER (WHERE has_scoreable_apy AND NOT pass_tvl) AS below_tvl,
                 COUNT(*) FILTER (WHERE has_metrics AND pass_tvl AND NOT pass_points) AS low_points,
                 SUM(tvl_usd) AS active_tvl_usd,
-                SUM(tvl_usd) FILTER (WHERE has_metrics AND pass_tvl AND pass_points) AS eligible_tvl_usd
+                SUM(tvl_usd) FILTER (WHERE has_scoreable_apy AND pass_tvl AND pass_points) AS eligible_tvl_usd
             FROM base
             GROUP BY category
             ORDER BY eligible_tvl_usd DESC NULLS LAST, active_tvl_usd DESC
@@ -737,6 +740,7 @@ def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
                   ON m.chain_id = a.chain_id
                  AND m.vault_address = a.vault_address
                 WHERE a.active = TRUE
+                  AND m.apy_30d IS NOT NULL
             ) AS active_with_metrics
         """
     )
@@ -1437,10 +1441,9 @@ async def discover(
     }
     order_expr = order_map[sort_by]
     order_dir = "ASC" if direction == "asc" else "DESC"
-    filters = [
+    scope_filters = [
         _user_visible_filter_sql("d", include_retired=False),
         "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s",
-        "COALESCE(m.points_count, 0) >= %(min_points)s",
     ]
     params: dict[str, object] = {
         "min_tvl_usd": min_tvl_usd,
@@ -1451,30 +1454,65 @@ async def discover(
     # `include_retired` remains in the API for backward URL compatibility, but discover defaults
     # to user-visible scope (active + non-retired + Multi Strategy v3).
     if migration_only:
-        filters.append(f"{migration_sql} = TRUE")
+        scope_filters.append(f"{migration_sql} = TRUE")
     if highlighted_only:
-        filters.append(f"{highlighted_sql} = TRUE")
+        scope_filters.append(f"{highlighted_sql} = TRUE")
     if chain_id is not None:
-        filters.append("d.chain_id = %(chain_id)s")
+        scope_filters.append("d.chain_id = %(chain_id)s")
         params["chain_id"] = chain_id
     if category:
-        filters.append("LOWER(COALESCE(d.category, '')) = LOWER(%(category)s)")
+        scope_filters.append("LOWER(COALESCE(d.category, '')) = LOWER(%(category)s)")
         params["category"] = category
     if token_symbol:
-        filters.append("LOWER(COALESCE(d.token_symbol, '')) = LOWER(%(token_symbol)s)")
+        scope_filters.append("LOWER(COALESCE(d.token_symbol, '')) = LOWER(%(token_symbol)s)")
         params["token_symbol"] = token_symbol
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     if rank_filter_sql:
-        filters.append(rank_filter_sql)
+        scope_filters.append(rank_filter_sql)
         params["max_vaults"] = max_vaults
 
+    filters = [*scope_filters, "COALESCE(m.points_count, 0) >= %(min_points)s"]
+    scope_where_sql = " AND ".join(scope_filters)
     where_sql = " AND ".join(filters)
     regime_sql = _regime_case_sql()
     quality_sql = _quality_score_sql()
     safe_apy_sql = _safe_apy_sql()
+    scoreable_apy_sql = "m.apy_30d IS NOT NULL"
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS visible_vaults,
+                    COUNT(*) FILTER (
+                        WHERE {scoreable_apy_sql}
+                          AND COALESCE(m.points_count, 0) >= %(min_points)s
+                    ) AS with_metrics,
+                    COUNT(*) FILTER (
+                        WHERE m.vault_address IS NULL
+                           OR (
+                                COALESCE(m.points_count, 0) >= %(min_points)s
+                                AND NOT ({scoreable_apy_sql})
+                           )
+                    ) AS missing_metrics,
+                    COUNT(*) FILTER (
+                        WHERE m.vault_address IS NOT NULL
+                          AND COALESCE(m.points_count, 0) < %(min_points)s
+                    ) AS low_points,
+                    SUM(COALESCE(d.tvl_usd, 0.0)) AS visible_tvl_usd,
+                    SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (
+                        WHERE {scoreable_apy_sql}
+                          AND COALESCE(m.points_count, 0) >= %(min_points)s
+                    ) AS with_metrics_tvl_usd
+                FROM vault_dim d
+                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
+                WHERE {scope_where_sql}
+                """,
+                params,
+            )
+            coverage = cur.fetchone() or {}
+
             cur.execute(
                 f"""
                 SELECT COUNT(*) AS total
@@ -1601,6 +1639,13 @@ async def discover(
             )
             rows = cur.fetchall()
 
+    visible_vaults = int(coverage.get("visible_vaults") or 0)
+    with_metrics = int(coverage.get("with_metrics") or 0)
+    low_points = int(coverage.get("low_points") or 0)
+    missing_metrics = int(coverage.get("missing_metrics") or 0)
+    coverage["missing_or_low_points"] = max(0, visible_vaults - with_metrics)
+    coverage["coverage_ratio"] = (with_metrics / visible_vaults) if visible_vaults > 0 else None
+
     return {
         "filters": {
             "universe": universe,
@@ -1619,6 +1664,16 @@ async def discover(
         "universe_gate": universe_gate,
         "pagination": {"limit": limit, "offset": offset, "total": total},
         "summary": summary,
+        "coverage": {
+            "visible_vaults": visible_vaults,
+            "with_metrics": with_metrics,
+            "missing_metrics": missing_metrics,
+            "low_points": low_points,
+            "missing_or_low_points": coverage["missing_or_low_points"],
+            "coverage_ratio": coverage["coverage_ratio"],
+            "visible_tvl_usd": _to_float_or_none(coverage.get("visible_tvl_usd")),
+            "with_metrics_tvl_usd": _to_float_or_none(coverage.get("with_metrics_tvl_usd")),
+        },
         "risk_mix": risk_mix,
         "regime_mix": regime_mix,
         "rows": rows,
