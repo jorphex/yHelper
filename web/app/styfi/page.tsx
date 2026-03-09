@@ -258,9 +258,9 @@ function StYfiPageContent() {
               hint: "Snapshot derived, not gross stake and unstake",
             }
           : {
-              label: "Snapshots Captured",
-              value: snapshotCountValue,
-              hint: formatUtcDateTime(summary?.first_snapshot_at ?? null),
+              label: "History Warm-Up",
+              value: `${snapshotCountValue} captures`,
+              hint: "Each capture stores protocol stake balances and reward epoch state.",
             },
       );
       items.push(
@@ -288,7 +288,6 @@ function StYfiPageContent() {
       historySpan,
       rewardSymbol,
       summary?.combined_staked,
-      summary?.first_snapshot_at,
       summary?.net_flow_24h,
       summary?.net_flow_7d,
       summary?.styfi_staked,
@@ -411,7 +410,7 @@ function StYfiPageContent() {
         </p>
         <div className="home-minimal-cta-row">
           <a href="https://styfi.yearn.fi" target="_blank" rel="noreferrer noopener" className="home-lite-cta primary">
-            Stake YFI on stYFI
+            Open stYFI App
           </a>
         </div>
       </section>
@@ -433,12 +432,14 @@ function StYfiPageContent() {
         filters={
           <div className="inline-controls controls-tight">
             <label>
-              <span>Snapshot history</span>
-              <strong>{summary?.snapshots_count ?? "n/a"} captures</strong>
+              <span>Stored history</span>
+              <strong>
+                {summary?.snapshots_count ?? "n/a"} captures across {historySpan}
+              </strong>
             </label>
             <label>
-              <span>History span</span>
-              <strong>{historySpan}</strong>
+              <span>Each snapshot stores</span>
+              <strong>staked balances plus reward epoch state</strong>
             </label>
             <label>
               <span>Reward epochs shown</span>
@@ -447,10 +448,6 @@ function StYfiPageContent() {
             <label>
               <span>Current reward token</span>
               <strong>{rewardSymbol}</strong>
-            </label>
-            <label>
-              <span>stYFI site</span>
-              <strong>Headline defaults to stYFI only</strong>
             </label>
           </div>
         }

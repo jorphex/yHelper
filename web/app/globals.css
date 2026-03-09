@@ -2279,7 +2279,7 @@ input[type="text"] {
 .styfi-visual-grid > .bar-panel,
 .styfi-visual-grid > .meter-panel {
   height: 100%;
-  padding-top: 0.64rem;
+  padding-top: 0;
 }
 
 .styfi-visual-grid > .viz-panel > h3,
