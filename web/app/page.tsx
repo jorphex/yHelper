@@ -88,11 +88,11 @@ function featuredMover(changes: ChangesResponse | null): ChangeMoverRow | undefi
 function liveHeadline(
   mover: ChangeMoverRow | undefined,
 ): string {
-  if (!mover) return "Largest 24h APY shift syncing";
+  if (!mover) return "Largest 24h APY move syncing";
   const moverName = moverTitle(mover);
-  const moverApy = Number.isFinite(mover?.safe_apy_window ?? null) ? formatPct(mover?.safe_apy_window ?? null, 2) : "n/a";
+  const moverApy = Number.isFinite(mover?.safe_apy_30d ?? null) ? formatPct(mover?.safe_apy_30d ?? null, 2) : "n/a";
   const moverDelta = Number.isFinite(mover?.delta_apy ?? null) ? pctDelta(mover?.delta_apy, 2) : "n/a";
-  return `Largest 24h APY shift ${moverName} · Current APY ${moverApy} · Change ${moverDelta}`;
+  return `Largest 24h APY move ${moverName} · 30d APY now ${moverApy} · 24h move ${moverDelta}`;
 }
 
 function liveMeta(
