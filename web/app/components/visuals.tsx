@@ -372,8 +372,8 @@ export function TrendStrips({
               <div className="trend-strip-head">
                 <p className="trend-strip-label">{item.label}</p>
                 <p className="trend-strip-value">
-                  <span>{valueFormatter(latest)}</span>
-                  <span className={`trend-strip-delta ${toneClass}`.trim()}>Delta {deltaFormatter(delta)}</span>
+                  <span className="trend-strip-latest">{valueFormatter(latest)}</span>
+                  <span className={`trend-strip-delta ${toneClass}`.trim()}>{`Delta ${deltaFormatter(delta)}`}</span>
                 </p>
               </div>
               <svg

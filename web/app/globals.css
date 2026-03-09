@@ -2831,9 +2831,20 @@ input[type="text"] {
 
 .trend-strip-value {
   margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem 0.7rem;
   font-size: 0.77rem;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.trend-strip-latest,
+.trend-strip-delta {
+  display: inline-flex;
+  white-space: nowrap;
 }
 
 .trend-strip svg {

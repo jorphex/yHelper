@@ -342,23 +342,6 @@ function StYfiPageContent() {
     [snapshotSeries],
   );
 
-  const rewardEpochBars = useMemo(
-    () =>
-      epochSeries
-        .slice()
-        .reverse()
-        .map((row) => ({
-          id: `epoch-${row.epoch ?? "na"}`,
-          label: row.epoch !== null && row.epoch !== undefined ? `Epoch ${row.epoch}` : "Epoch",
-          value: row.reward_total ?? null,
-          note:
-            row.epoch !== null && row.epoch !== undefined && currentEpoch !== null && row.epoch === currentEpoch
-              ? `Started ${formatUtcDateTime(row.epoch_start ?? null)} • current epoch can stay unsplit until sync`
-              : `Started ${formatUtcDateTime(row.epoch_start ?? null)}`,
-        })),
-    [currentEpoch, epochSeries],
-  );
-
   const latestComponentBars = useMemo(
     () => [
       {
@@ -438,10 +421,6 @@ function StYfiPageContent() {
               </strong>
             </label>
             <label>
-              <span>Each snapshot stores</span>
-              <strong>staked balances plus reward epoch state</strong>
-            </label>
-            <label>
               <span>Reward epochs shown</span>
               <strong>{Math.min(epochSeries.length, STYFI_PAGE_EPOCH_LIMIT)}</strong>
             </label>
@@ -487,20 +466,15 @@ function StYfiPageContent() {
         />
       </section>
 
-      <section className="split-grid styfi-visual-grid">
+      <section className="card">
         <TrendStrips
           title="Stake Trend"
           items={stakeTrendItems}
           valueFormatter={(value) => formatTokenCompact(value, "YFI")}
           deltaFormatter={(value) => formatSignedToken(value, "YFI", 2)}
           columns={1}
+          embedded
           emptyText="Snapshot history is still warming up."
-        />
-        <BarList
-          title={`Reward Pot by Epoch (${rewardSymbol}, latest ${STYFI_PAGE_EPOCH_LIMIT})`}
-          items={rewardEpochBars}
-          valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
-          emptyText="Epoch rewards syncing."
         />
       </section>
 
