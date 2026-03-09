@@ -53,6 +53,8 @@ PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
 INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
 DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
 KONG_PPS_LOOKBACK_DAYS = int(os.getenv("KONG_PPS_LOOKBACK_DAYS", "119"))
+YDAEMON_URL = os.getenv("YDAEMON_URL", "https://ydaemon.yearn.fi/vaults/detected?limit=2000")
+SOCIAL_PREVIEW_LIVE_TTL_SEC = int(os.getenv("SOCIAL_PREVIEW_LIVE_TTL_SEC", "300"))
 STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_DAYS)))
 STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
 STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
@@ -60,6 +62,7 @@ STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
 STYFI_TOKEN_SCALE = float(10**18)
 STYFI_SITE_REWARD_SCALE = float(10**18)
 STYFI_REWARD_TOKEN_DEFAULT = {"address": None, "symbol": "yvUSDC-1", "decimals": 6}
+_SOCIAL_PREVIEW_LIVE_CACHE: dict[str, float | dict[str, object] | None] = {"fetched_at": 0.0, "highest_apy_vault": None}
 
 
 def _validate_data_policy_config() -> None:
@@ -449,6 +452,84 @@ def _freshness_snapshot(
             result["alerts"] = alerts
 
     return result
+
+
+def _fetch_ydaemon_vaults() -> list[dict]:
+    request = Request(YDAEMON_URL, headers={"User-Agent": "yHelper/0.1"})
+    with urlopen(request, timeout=8.0) as response:
+        payload = loads(response.read().decode("utf-8"))
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for key in ("data", "vaults", "items", "results"):
+            candidate = payload.get(key)
+            if isinstance(candidate, list):
+                return candidate
+            if isinstance(candidate, dict):
+                for nested_key in ("vaults", "items", "results"):
+                    nested = candidate.get(nested_key)
+                    if isinstance(nested, list):
+                        return nested
+    return []
+
+
+def _live_social_preview_highest_vault() -> dict[str, object]:
+    now_mono = time.monotonic()
+    cached_at = float(_SOCIAL_PREVIEW_LIVE_CACHE.get("fetched_at") or 0.0)
+    cached_value = _SOCIAL_PREVIEW_LIVE_CACHE.get("highest_apy_vault")
+    if cached_value is not None and now_mono - cached_at < SOCIAL_PREVIEW_LIVE_TTL_SEC:
+        return dict(cached_value)
+
+    best: dict[str, object] = {}
+    best_score = float("-inf")
+    best_tvl = float("-inf")
+    try:
+        for vault in _fetch_ydaemon_vaults():
+            if not isinstance(vault, dict):
+                continue
+            if str(vault.get("kind") or "") != USER_VISIBLE_KIND:
+                continue
+            if not str(vault.get("version") or "").startswith(USER_VISIBLE_VERSION_PREFIX):
+                continue
+            raw_chain_id = vault.get("chainID") or vault.get("chainId") or vault.get("chain_id")
+            try:
+                chain_id = int(raw_chain_id) if raw_chain_id is not None else None
+            except (TypeError, ValueError):
+                chain_id = None
+            if chain_id is None or chain_id in EXCLUDED_CHAIN_IDS:
+                continue
+            info = vault.get("info") if isinstance(vault.get("info"), dict) else {}
+            if bool(info.get("isHidden")) or bool(info.get("isRetired")):
+                continue
+            apr = vault.get("apr") if isinstance(vault.get("apr"), dict) else {}
+            tvl = vault.get("tvl") if isinstance(vault.get("tvl"), dict) else {}
+            current_net_apy = _to_float_or_none(apr.get("netAPR"))
+            if current_net_apy is None:
+                continue
+            tvl_usd = _to_float_or_none(tvl.get("tvl"))
+            candidate_tvl = float("-inf") if tvl_usd is None else tvl_usd
+            if current_net_apy < best_score or (current_net_apy == best_score and candidate_tvl <= best_tvl):
+                continue
+            best_score = current_net_apy
+            best_tvl = candidate_tvl
+            best = {
+                "vault_address": vault.get("address"),
+                "name": vault.get("name"),
+                "symbol": vault.get("symbol"),
+                "chain_id": chain_id,
+                "tvl_usd": tvl_usd,
+                "current_net_apy": current_net_apy,
+                "apy_type": apr.get("type"),
+                "source": "ydaemon_live",
+            }
+    except Exception:
+        if isinstance(cached_value, dict):
+            return dict(cached_value)
+        return {}
+
+    _SOCIAL_PREVIEW_LIVE_CACHE["fetched_at"] = now_mono
+    _SOCIAL_PREVIEW_LIVE_CACHE["highest_apy_vault"] = dict(best) if best else None
+    return best
 
 
 def _coverage_snapshot(
@@ -1316,38 +1397,39 @@ async def meta_movers(
 @app.get("/api/meta/social-preview")
 async def meta_social_preview() -> dict[str, object]:
     tracked_scope: dict[str, object] = {}
-    highest_row: dict[str, object] = {}
+    highest_row = _live_social_preview_highest_vault()
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             tracked_scope = _tracked_scope_snapshot(cur)
-            cur.execute(
-                f"""
-                SELECT
-                    a.vault_address,
-                    a.name,
-                    a.symbol,
-                    a.chain_id,
-                    a.tvl_usd,
-                    {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d
-                FROM vault_dim a
-                JOIN vault_metrics_latest m
-                  ON m.chain_id = a.chain_id
-                 AND m.vault_address = a.vault_address
-                WHERE m.apy_30d IS NOT NULL
-                  AND {_user_visible_filter_sql("a", include_retired=False)}
-                ORDER BY safe_apy_30d DESC, COALESCE(a.tvl_usd, 0.0) DESC, a.vault_address
-                LIMIT 1
-                """,
-                {"apy_min": APY_MIN, "apy_max": APY_MAX},
-            )
-            highest_row = cur.fetchone() or {}
+            if not highest_row:
+                cur.execute(
+                    f"""
+                    SELECT
+                        a.vault_address,
+                        a.name,
+                        a.symbol,
+                        a.chain_id,
+                        a.tvl_usd,
+                        {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d
+                    FROM vault_dim a
+                    JOIN vault_metrics_latest m
+                      ON m.chain_id = a.chain_id
+                     AND m.vault_address = a.vault_address
+                    WHERE m.apy_30d IS NOT NULL
+                      AND {_user_visible_filter_sql("a", include_retired=False)}
+                    ORDER BY safe_apy_30d DESC, COALESCE(a.tvl_usd, 0.0) DESC, a.vault_address
+                    LIMIT 1
+                    """,
+                    {"apy_min": APY_MIN, "apy_max": APY_MAX},
+                )
+                highest_row = cur.fetchone() or {}
     return {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "filters": {
             "total_vaults_scope": "all rows in vault_dim",
             "active_vaults_scope": "active + non-retired + non-hidden vaults in vault_dim",
             "tracked_tvl_scope": "active + non-retired + non-hidden, debt-adjusted for single-strategy overlap",
-            "highest_apy_scope": "user-visible multi-strategy v3 scope with metrics",
+            "highest_apy_scope": "live yDaemon user-visible multi-strategy v3 scope",
             "exclude_retired": True,
             "exclude_hidden": True,
         },

@@ -19,7 +19,7 @@ type PreviewStats = {
     name: string | null;
     chainId: number | null;
     tvlUsd: number | null;
-    apy30d: number | null;
+    netApy: number | null;
   } | null;
   regimeCounts: Array<{
     regime: string;
@@ -39,6 +39,7 @@ type SocialPreviewPayload = {
     symbol?: string | null;
     chain_id?: number | null;
     tvl_usd?: number | null;
+    current_net_apy?: number | null;
     safe_apy_30d?: number | null;
   } | null;
 };
@@ -178,7 +179,7 @@ async function fetchPreviewStats(): Promise<PreviewStats> {
           name: (highest.name || highest.symbol || null) as string | null,
           chainId: toFiniteNumber(highest.chain_id),
           tvlUsd: toFiniteNumber(highest.tvl_usd),
-          apy30d: toFiniteNumber(highest.safe_apy_30d),
+          netApy: toFiniteNumber(highest.current_net_apy ?? highest.safe_apy_30d),
         }
       : null,
     regimeCounts,
@@ -217,7 +218,7 @@ export async function renderSocialPreviewImage({
       label: "Highest APY Vault",
       value: shortLabel(stats.highestApyVault?.name ?? null, 24),
       note: stats.highestApyVault
-        ? `${chainLabel(stats.highestApyVault.chainId)} • APY ${formatPctCompact(stats.highestApyVault.apy30d, 1)} • TVL ${formatUsdCompact(stats.highestApyVault.tvlUsd)}`
+        ? `${chainLabel(stats.highestApyVault.chainId)} • Net APY ${formatPctCompact(stats.highestApyVault.netApy, 1)} • TVL ${formatUsdCompact(stats.highestApyVault.tvlUsd)}`
         : "No active vault with APY metrics.",
     },
   ];
