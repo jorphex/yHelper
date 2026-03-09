@@ -35,6 +35,7 @@ STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
 STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_DAYS)))
 STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
 STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
+STYFI_SITE_GLOBAL_DATA_URL = os.getenv("STYFI_SITE_GLOBAL_DATA_URL", "https://styfi.yearn.fi/api/global-data").strip()
 JOB_YDAEMON = "ydaemon_snapshot"
 JOB_KONG = "kong_pps_metrics"
 JOB_STYFI = "styfi_snapshot"
@@ -514,6 +515,19 @@ def _eth_call_string(address: str, signature: str, *args: tuple[str, str] | tupl
     return _eth_decode_string(_eth_call(address, signature, encoded))
 
 
+def _safe_int(value: object) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
 def _styfi_epoch_start(genesis: int, epoch: int) -> datetime:
     return datetime.fromtimestamp(genesis + epoch * STYFI_EPOCH_LENGTH_SEC, tz=UTC)
 
@@ -525,6 +539,54 @@ def _styfi_component_reward(epoch: int, component_address: str) -> int:
         ("address", component_address),
         ("uint256", epoch),
     )
+
+
+def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
+    if not STYFI_SITE_GLOBAL_DATA_URL:
+        return None
+    response = requests.get(
+        STYFI_SITE_GLOBAL_DATA_URL,
+        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+        timeout=ETH_CALL_TIMEOUT_SEC,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError(f"Unexpected stYFI global-data payload: {payload!r}")
+    meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    global_rewards = payload.get("global", {}).get("rewards") if isinstance(payload.get("global"), dict) else {}
+    styfi = payload.get("styfi") if isinstance(payload.get("styfi"), dict) else {}
+    styfix = payload.get("styfix") if isinstance(payload.get("styfix"), dict) else {}
+    styfi_current = styfi.get("current") if isinstance(styfi.get("current"), dict) else {}
+    styfi_projected = styfi.get("projected") if isinstance(styfi.get("projected"), dict) else {}
+    styfix_current = styfix.get("current") if isinstance(styfix.get("current"), dict) else {}
+    styfix_projected = styfix.get("projected") if isinstance(styfix.get("projected"), dict) else {}
+    return {
+        "source": STYFI_SITE_GLOBAL_DATA_URL,
+        "meta": {
+            "timestamp": _safe_int(meta.get("timestamp")),
+            "epoch": _safe_int(meta.get("epoch")),
+            "block_number": _safe_int(meta.get("blockNumber")),
+        },
+        "global_rewards": {
+            "current_raw": _safe_int(global_rewards.get("current")),
+            "projected_raw": _safe_int(global_rewards.get("projected")),
+            "pps_raw": _safe_int(global_rewards.get("pps")),
+            "apy_bps": _safe_int(global_rewards.get("apyBps")),
+        },
+        "styfi": {
+            "current_rewards_raw": _safe_int(styfi_current.get("rewards")),
+            "current_apr_bps": _safe_int(styfi_current.get("aprBps")),
+            "projected_rewards_raw": _safe_int(styfi_projected.get("rewards")),
+            "projected_apr_bps": _safe_int(styfi_projected.get("aprBps")),
+        },
+        "styfix": {
+            "current_rewards_raw": _safe_int(styfix_current.get("rewards")),
+            "current_apr_bps": _safe_int(styfix_current.get("aprBps")),
+            "projected_rewards_raw": _safe_int(styfix_projected.get("rewards")),
+            "projected_apr_bps": _safe_int(styfix_projected.get("aprBps")),
+        },
+    }
 
 
 def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
@@ -540,6 +602,11 @@ def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, obje
     styfix_total_assets = _eth_call_uint(STYFI_CONTRACTS["styfix"], "totalAssets()")
     styfix_total_supply = _eth_call_uint(STYFI_CONTRACTS["styfix"], "totalSupply()")
     combined_staked = styfi_total_assets + styfix_total_assets
+    reward_state = None
+    try:
+        reward_state = _fetch_styfi_site_reward_state()
+    except Exception as exc:
+        logging.warning("stYFI global-data fetch failed: %s", exc)
 
     snapshot = {
         "chain_id": STYFI_CHAIN_ID,
@@ -586,6 +653,7 @@ def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, obje
                 "decimals": reward_token_decimals,
                 "symbol": reward_token_symbol,
             },
+            "current_reward_state": reward_state,
         },
     }
     return snapshot, epochs, sync_state

@@ -52,6 +52,22 @@ type StYfiResponse = {
     symbol?: string | null;
     decimals?: number | null;
   };
+  current_reward_state?: {
+    source?: string | null;
+    epoch?: number | null;
+    timestamp?: number | null;
+    block_number?: number | null;
+    reward_pps?: number | null;
+    global_apr?: number | null;
+    styfi_current_reward?: number | null;
+    styfi_current_apr?: number | null;
+    styfi_projected_reward?: number | null;
+    styfi_projected_apr?: number | null;
+    styfix_current_reward?: number | null;
+    styfix_current_apr?: number | null;
+    styfix_projected_reward?: number | null;
+    styfix_projected_apr?: number | null;
+  } | null;
   series?: {
     snapshots?: StYfiSnapshotPoint[];
     epochs?: StYfiEpochPoint[];
@@ -135,6 +151,18 @@ function formatRollingSpan(start: string | null | undefined, end: string | null 
   return `${(diffHours / 24).toFixed(1)}d`;
 }
 
+function formatUtcDate(value: Date | number | string | null | undefined): string {
+  if (value === null || value === undefined) return "n/a";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "n/a";
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 function StYfiPageContent() {
   const [data, setData] = useState<StYfiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -168,17 +196,12 @@ function StYfiPageContent() {
   }, []);
 
   const rewardSymbol = data?.reward_token?.symbol?.trim() || "yvUSDC-1";
+  const currentRewardState = data?.current_reward_state ?? null;
   const summary = data?.summary ?? null;
   const freshness = data?.freshness ?? null;
   const epochSeries = useMemo(() => data?.series?.epochs ?? [], [data?.series?.epochs]);
   const snapshotSeries = useMemo(() => data?.series?.snapshots ?? [], [data?.series?.snapshots]);
   const currentEpoch = summary?.reward_epoch ?? null;
-  const latestCompletedEpoch =
-    data?.component_split_latest_completed?.epoch !== null && data?.component_split_latest_completed?.epoch !== undefined
-      ? data.component_split_latest_completed.epoch
-      : null;
-  const latestCompletedEpochRow =
-    latestCompletedEpoch !== null ? epochSeries.find((row) => row.epoch === latestCompletedEpoch) ?? null : null;
   const historySpan = formatRollingSpan(summary?.first_snapshot_at ?? null, summary?.latest_snapshot_at ?? null);
   const snapshotCountValue =
     summary?.snapshots_count !== null && summary?.snapshots_count !== undefined && Number.isFinite(summary.snapshots_count)
@@ -191,27 +214,35 @@ function StYfiPageContent() {
     () => {
       const items = [
         {
+          label: "stYFI Staked",
+          value: formatTokenCompact(summary?.styfi_staked ?? null, "YFI"),
+          hint: "Matches the public stYFI site headline.",
+        },
+        {
+          label: "stYFIx Staked",
+          value: formatTokenCompact(summary?.styfix_staked ?? null, "YFI"),
+          hint: "Additional YFI staked through stYFIx.",
+        },
+        {
           label: "Combined Staked",
           value: formatTokenCompact(summary?.combined_staked ?? null, "YFI"),
-          hint: "Current stYFI plus stYFIx balance",
+          hint: "Combined stYFI plus stYFIx.",
         },
         {
           label: "Share of YFI Supply",
           value: formatPct(summary?.staked_share_supply ?? null, 2),
-          hint: formatTokenCompact(summary?.yfi_total_supply ?? null, "YFI"),
+          hint: `${formatToken(summary?.yfi_total_supply ?? null, "YFI", 0)} total supply`,
         },
         {
-          label: "Current Reward Epoch",
-          value:
-            summary?.reward_epoch !== null && summary?.reward_epoch !== undefined && Number.isFinite(summary.reward_epoch)
-              ? String(summary.reward_epoch)
-              : "n/a",
-          hint: `Rewards accrue in ${rewardSymbol}`,
-        },
-        {
-          label: "Latest Completed Reward Pot",
-          value: formatTokenCompact(latestCompletedEpochRow?.reward_total ?? null, rewardSymbol),
-          hint: latestCompletedEpoch !== null ? `Epoch ${latestCompletedEpoch}` : "Completed epoch syncing",
+          label: "Current Reward APR",
+          value: formatPct(currentRewardState?.styfi_current_apr ?? null, 2),
+          hint:
+            currentRewardState?.styfi_current_apr !== null &&
+            currentRewardState?.styfix_current_apr !== null &&
+            currentRewardState?.styfi_current_apr !== undefined &&
+            currentRewardState?.styfix_current_apr !== undefined
+              ? `stYFI ${formatPct(currentRewardState.styfi_current_apr, 2)} • stYFIx ${formatPct(currentRewardState.styfix_current_apr, 2)}`
+              : `Current run-rate from ${rewardSymbol} rewards`,
         },
         {
           label: "Snapshot Freshness",
@@ -250,17 +281,18 @@ function StYfiPageContent() {
     [
       freshness?.latest_snapshot_age_seconds,
       freshness?.latest_snapshot_at,
+      currentRewardState?.styfi_current_apr,
+      currentRewardState?.styfix_current_apr,
       hasNetFlow24h,
       hasNetFlow7d,
       historySpan,
-      latestCompletedEpoch,
-      latestCompletedEpochRow?.reward_total,
       rewardSymbol,
       summary?.combined_staked,
       summary?.first_snapshot_at,
       summary?.net_flow_24h,
       summary?.net_flow_7d,
-      summary?.reward_epoch,
+      summary?.styfi_staked,
+      summary?.styfix_staked,
       summary?.staked_share_supply,
       summary?.yfi_total_supply,
       snapshotCountValue,
@@ -293,19 +325,19 @@ function StYfiPageContent() {
         id: "combined-staked",
         label: "Combined staked",
         points: snapshotSeries.map((row) => row.combined_staked),
-        note: "Total YFI sitting across stYFI and stYFIx.",
+        note: "Latest combined balance. Delta is versus the previous captured snapshot.",
       },
       {
         id: "styfi-staked",
         label: "stYFI",
         points: snapshotSeries.map((row) => row.styfi_staked),
-        note: "Core stYFI staking balance.",
+        note: "Latest stYFI balance. Delta is versus the previous captured snapshot.",
       },
       {
         id: "styfix-staked",
         label: "stYFIx",
         points: snapshotSeries.map((row) => row.styfix_staked),
-        note: "stYFIx staking balance.",
+        note: "Latest stYFIx balance. Delta is versus the previous captured snapshot.",
       },
     ],
     [snapshotSeries],
@@ -329,14 +361,44 @@ function StYfiPageContent() {
   );
 
   const latestComponentBars = useMemo(
-    () =>
-      (data?.component_split_latest_completed?.rows ?? []).map((row) => ({
-        id: row.component,
-        label: row.component,
-        value: row.reward,
-        note: percentShare(row.reward ?? null, latestCompletedEpochRow?.reward_total ?? null),
-      })),
-    [data?.component_split_latest_completed?.rows, latestCompletedEpochRow?.reward_total],
+    () => [
+      {
+        id: "styfi-current",
+        label: "stYFI",
+        value: currentRewardState?.styfi_current_reward ?? null,
+        note:
+          currentRewardState?.styfi_current_apr !== null && currentRewardState?.styfi_current_apr !== undefined
+            ? `${formatPct(currentRewardState.styfi_current_apr, 2)} APR • ${percentShare(
+                currentRewardState?.styfi_current_reward ?? null,
+                (currentRewardState?.styfi_current_reward ?? 0) + (currentRewardState?.styfix_current_reward ?? 0),
+              )}`
+            : percentShare(
+                currentRewardState?.styfi_current_reward ?? null,
+                (currentRewardState?.styfi_current_reward ?? 0) + (currentRewardState?.styfix_current_reward ?? 0),
+              ),
+      },
+      {
+        id: "styfix-current",
+        label: "stYFIx",
+        value: currentRewardState?.styfix_current_reward ?? null,
+        note:
+          currentRewardState?.styfix_current_apr !== null && currentRewardState?.styfix_current_apr !== undefined
+            ? `${formatPct(currentRewardState.styfix_current_apr, 2)} APR • ${percentShare(
+                currentRewardState?.styfix_current_reward ?? null,
+                (currentRewardState?.styfi_current_reward ?? 0) + (currentRewardState?.styfix_current_reward ?? 0),
+              )}`
+            : percentShare(
+                currentRewardState?.styfix_current_reward ?? null,
+                (currentRewardState?.styfi_current_reward ?? 0) + (currentRewardState?.styfix_current_reward ?? 0),
+              ),
+      },
+    ],
+    [
+      currentRewardState?.styfi_current_apr,
+      currentRewardState?.styfi_current_reward,
+      currentRewardState?.styfix_current_apr,
+      currentRewardState?.styfix_current_reward,
+    ],
   );
 
   return (
@@ -347,6 +409,11 @@ function StYfiPageContent() {
           Track Yearn staking balance, reward epochs, and legacy carryover at the protocol level. This page stays out of
           wallet-level views and focuses on the shared staking surface.
         </p>
+        <div className="home-minimal-cta-row">
+          <a href="https://styfi.yearn.fi" target="_blank" rel="noreferrer noopener" className="home-lite-cta primary">
+            Stake YFI on stYFI
+          </a>
+        </div>
       </section>
 
       <PageTopPanel
@@ -354,11 +421,11 @@ function StYfiPageContent() {
           <>
             <p className="muted card-intro">
               stYFI is Yearn&apos;s staking layer. This page tracks stake balance, epoch reward pots, and how the latest completed
-              epoch split across stYFI, stYFIx, migrated veYFI, and liquid lockers.
+              epoch distribution compares with the current reward run-rate across stYFI and stYFIx.
             </p>
             <p className="muted analyst-only">
               Net flow is derived from rolling snapshots, not from gross deposit and withdrawal logs. Current epochs can show a
-              reward pot before component splits are fully synced.
+              reward run-rate before the completed-epoch allocation below is finalized.
             </p>
           </>
         }
@@ -380,6 +447,10 @@ function StYfiPageContent() {
             <label>
               <span>Current reward token</span>
               <strong>{rewardSymbol}</strong>
+            </label>
+            <label>
+              <span>stYFI site</span>
+              <strong>Headline defaults to stYFI only</strong>
             </label>
           </div>
         }
@@ -405,17 +476,17 @@ function StYfiPageContent() {
           segments={stakeSplitSegments}
           total={summary?.combined_staked ?? null}
           valueFormatter={(value) => formatTokenCompact(value, "YFI")}
-          legend="This is the current stake mix, not a historical average."
+          legend="This is the combined current stake mix across stYFI and stYFIx."
         />
         <BarList
           title={
-            latestCompletedEpoch !== null
-              ? `Latest Completed Reward Split (Epoch ${latestCompletedEpoch})`
-              : "Latest Completed Reward Split"
+            currentRewardState?.epoch !== null && currentRewardState?.epoch !== undefined
+              ? `Current Reward Run-Rate Split (Epoch ${currentRewardState.epoch})`
+              : "Current Reward Run-Rate Split"
           }
           items={latestComponentBars}
           valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
-          emptyText="Completed epoch split syncing."
+          emptyText="Current reward split syncing."
         />
       </section>
 
@@ -439,8 +510,8 @@ function StYfiPageContent() {
       <section className="card">
         <h2>Epoch Detail</h2>
         <p className="muted card-intro">
-          Current epochs can show a funded reward pot before splits are fully synced. Component columns below are protocol-level
-          allocations, not user claim totals.
+          Epochs start at 00:00:00 UTC. Current epochs can show a funded reward pot before splits are fully synced. Component columns
+          below are completed-epoch protocol allocations, not user claim totals.
         </p>
         <div className="table-wrap styfi-epoch-wrap">
           <table className="styfi-epoch-table">
@@ -470,7 +541,7 @@ function StYfiPageContent() {
                     <td className="col-status">
                       <span className="pill">{isCurrentEpoch ? "Ongoing" : "Completed"}</span>
                     </td>
-                    <td className="col-start">{formatUtcDateTime(row.epoch_start ?? null)}</td>
+                    <td className="col-start">{formatUtcDate(row.epoch_start ?? null)}</td>
                     <td className="is-numeric col-total">{formatToken(row.reward_total ?? null, rewardSymbol, 2)}</td>
                     <td className="is-numeric col-styfi">{formatToken(row.reward_styfi ?? null, rewardSymbol, 2)}</td>
                     <td className="is-numeric analyst-only col-styfix">{formatToken(row.reward_styfix ?? null, rewardSymbol, 2)}</td>

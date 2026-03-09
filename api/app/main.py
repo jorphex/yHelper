@@ -58,6 +58,7 @@ STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "
 STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
 STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
 STYFI_TOKEN_SCALE = float(10**18)
+STYFI_SITE_REWARD_SCALE = float(10**18)
 STYFI_REWARD_TOKEN_DEFAULT = {"address": None, "symbol": "yvUSDC-1", "decimals": 6}
 
 
@@ -595,6 +596,15 @@ def _to_float_or_none(value: object) -> float | None:
         return None
 
 
+def _safe_int(value: object) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _median(values: list[float]) -> float | None:
     if not values:
         return None
@@ -906,6 +916,56 @@ def _styfi_reward_token(cur: psycopg.Cursor) -> dict[str, object]:
         "address": reward_token.get("address") if isinstance(reward_token.get("address"), str) else STYFI_REWARD_TOKEN_DEFAULT["address"],
         "symbol": reward_token.get("symbol") if isinstance(reward_token.get("symbol"), str) and reward_token.get("symbol") else STYFI_REWARD_TOKEN_DEFAULT["symbol"],
         "decimals": scale_decimals,
+    }
+
+
+def _styfi_current_reward_state(cur: psycopg.Cursor) -> dict[str, object] | None:
+    cur.execute(
+        """
+        SELECT payload
+        FROM styfi_sync_state
+        WHERE stream_name = %(stream_name)s
+          AND chain_id = %(chain_id)s
+        LIMIT 1
+        """,
+        {"stream_name": "styfi_reward_epoch", "chain_id": STYFI_CHAIN_ID},
+    )
+    row = cur.fetchone() or {}
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    state = payload.get("current_reward_state") if isinstance(payload, dict) else None
+    if not isinstance(state, dict):
+        return None
+
+    def reward(value: object) -> float | None:
+        return _to_float_or_none((int(value) / STYFI_SITE_REWARD_SCALE) if value is not None else None)
+
+    def bps(value: object) -> float | None:
+        if value is None:
+            return None
+        try:
+            return int(value) / 10000
+        except (TypeError, ValueError):
+            return None
+
+    meta = state.get("meta") if isinstance(state.get("meta"), dict) else {}
+    global_rewards = state.get("global_rewards") if isinstance(state.get("global_rewards"), dict) else {}
+    styfi = state.get("styfi") if isinstance(state.get("styfi"), dict) else {}
+    styfix = state.get("styfix") if isinstance(state.get("styfix"), dict) else {}
+    return {
+        "source": state.get("source") if isinstance(state.get("source"), str) else None,
+        "epoch": _safe_int(meta.get("epoch")),
+        "timestamp": _safe_int(meta.get("timestamp")),
+        "block_number": _safe_int(meta.get("block_number")),
+        "reward_pps": reward(global_rewards.get("pps_raw")),
+        "global_apr": bps(global_rewards.get("apy_bps")),
+        "styfi_current_reward": reward(styfi.get("current_rewards_raw")),
+        "styfi_current_apr": bps(styfi.get("current_apr_bps")),
+        "styfi_projected_reward": reward(styfi.get("projected_rewards_raw")),
+        "styfi_projected_apr": bps(styfi.get("projected_apr_bps")),
+        "styfix_current_reward": reward(styfix.get("current_rewards_raw")),
+        "styfix_current_apr": bps(styfix.get("current_apr_bps")),
+        "styfix_projected_reward": reward(styfix.get("projected_rewards_raw")),
+        "styfix_projected_apr": bps(styfix.get("projected_apr_bps")),
     }
 
 
@@ -1446,6 +1506,7 @@ async def styfi(
         with conn.cursor() as cur:
             reward_token = _styfi_reward_token(cur)
             reward_scale = float(10 ** int(reward_token.get("decimals") or 0))
+            current_reward_state = _styfi_current_reward_state(cur)
             summary = _styfi_summary_snapshot(cur)
             series = _styfi_snapshot_series(cur, days=days)
             epochs = _styfi_epoch_series(cur, epoch_limit=epoch_limit, reward_scale=reward_scale)
@@ -1466,6 +1527,7 @@ async def styfi(
         },
         "summary": summary,
         "reward_token": reward_token,
+        "current_reward_state": current_reward_state,
         "series": {
             "snapshots": series,
             "epochs": epochs,
