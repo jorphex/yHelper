@@ -14,6 +14,7 @@ const strictCompare = process.env.UI_AUDIT_STRICT === '1';
 
 const pages = [
   { id: 'overview', route: '/' },
+  { id: 'styfi', route: '/styfi' },
   { id: 'discover', route: '/discover' },
   { id: 'assets', route: '/assets' },
   { id: 'composition', route: '/composition' },

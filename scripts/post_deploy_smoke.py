@@ -43,7 +43,7 @@ def check_with_retries(url: str, timeout: float, retries: int, retry_delay: floa
 
 
 def run_checks(base_url: str, timeout: float, retries: int, retry_delay: float, allow_status: set[int]) -> int:
-    routes = ["/", "/discover", "/assets", "/composition", "/changes", "/regimes", "/chains"]
+    routes = ["/", "/styfi", "/discover", "/assets", "/composition", "/changes", "/regimes", "/chains"]
     apis = [
         "/api/overview",
         "/api/meta/freshness?threshold=24h",
@@ -51,6 +51,7 @@ def run_checks(base_url: str, timeout: float, retries: int, retry_delay: float, 
         "/api/meta/protocol-context",
         "/api/meta/movers?window=7d&limit=5&min_tvl_usd=100000&min_points=30",
         "/api/meta/social-preview",
+        "/api/styfi",
         "/api/discover?limit=1",
         "/api/regimes?limit=5",
         "/api/regimes/transitions?limit=4",

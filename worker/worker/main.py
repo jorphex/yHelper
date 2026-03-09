@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 import psycopg
 import requests
+from eth_utils import keccak
 from psycopg.types.json import Json
 
 YDAEMON_URL = os.getenv("YDAEMON_URL", "https://ydaemon.yearn.fi/vaults/detected?limit=2000")
@@ -28,8 +29,16 @@ PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
 INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
 DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
 DB_CLEANUP_ENABLED = os.getenv("DB_CLEANUP_ENABLED", "1") == "1"
+ETH_RPC_URL = os.getenv("ETH_RPC_URL", "").strip()
+STYFI_SYNC_ENABLED = os.getenv("STYFI_SYNC_ENABLED", "0") == "1"
+STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
+STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_DAYS)))
+STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
+STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
+STYFI_SITE_GLOBAL_DATA_URL = os.getenv("STYFI_SITE_GLOBAL_DATA_URL", "https://styfi.yearn.fi/api/global-data").strip()
 JOB_YDAEMON = "ydaemon_snapshot"
 JOB_KONG = "kong_pps_metrics"
+JOB_STYFI = "styfi_snapshot"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "21600"))
 ALERT_NOTIFY_ON_RECOVERY = os.getenv("ALERT_NOTIFY_ON_RECOVERY", "1") == "1"
@@ -41,6 +50,21 @@ RUNNING_STALE_SECONDS = 1800
 SNAPSHOT_MIN_ACTIVE_RATIO = float(os.getenv("SNAPSHOT_MIN_ACTIVE_RATIO", "0.9"))
 SNAPSHOT_MIN_DROP_COUNT = int(os.getenv("SNAPSHOT_MIN_DROP_COUNT", "25"))
 LAST_CLEANUP_AT: datetime | None = None
+ETH_CALL_TIMEOUT_SEC = 12
+STYFI_DECIMALS = 10**18
+STYFI_EPOCH_LENGTH_SEC = 14 * 24 * 60 * 60
+STYFI_STREAM_STATE = "styfi_reward_epoch"
+
+STYFI_CONTRACTS = {
+    "yfi": "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e",
+    "styfi": "0x42b25284e8ae427d79da78b65dffc232aaecc016",
+    "styfix": "0x9c42461aa8422926e3aef7b1c6e3743597149d79",
+    "reward_distributor": "0xd31911a33a5577be233dc096f6f5a7e496ff5934",
+    "styfi_reward_distributor": "0x95547ede56cf74b73dd78a37f547127dffda6113",
+    "styfix_reward_distributor": "0x952b31960c97e76362ac340d07d183ada15e3d6e",
+    "veyfi_reward_distributor": "0x2548bf65916fdabb5a5673fc4225011ff29ee884",
+    "liquid_locker_reward_distributor": "0x7efc3953bed2fc20b9f825ebffab1cc8b072a000",
+}
 
 KONG_PPS_QUERY = """
 query Query($label: String!, $chainId: Int, $address: String, $component: String, $limit: Int, $timestamp: BigInt) {
@@ -130,6 +154,45 @@ CREATE TABLE IF NOT EXISTS alert_state (
     notify_channels TEXT[] NOT NULL DEFAULT '{}',
     last_notify_result JSONB
 );
+
+CREATE TABLE IF NOT EXISTS styfi_snapshots (
+    chain_id INTEGER NOT NULL,
+    observed_at TIMESTAMPTZ NOT NULL,
+    reward_epoch INTEGER NOT NULL,
+    yfi_total_supply_raw NUMERIC(78, 0) NOT NULL,
+    styfi_total_assets_raw NUMERIC(78, 0) NOT NULL,
+    styfi_total_supply_raw NUMERIC(78, 0) NOT NULL,
+    styfix_total_assets_raw NUMERIC(78, 0) NOT NULL,
+    styfix_total_supply_raw NUMERIC(78, 0) NOT NULL,
+    combined_staked_raw NUMERIC(78, 0) NOT NULL,
+    PRIMARY KEY (chain_id, observed_at)
+);
+CREATE INDEX IF NOT EXISTS idx_styfi_snapshots_chain_observed
+    ON styfi_snapshots(chain_id, observed_at DESC);
+
+CREATE TABLE IF NOT EXISTS styfi_epoch_stats (
+    chain_id INTEGER NOT NULL,
+    epoch INTEGER NOT NULL,
+    epoch_start TIMESTAMPTZ NOT NULL,
+    reward_total_raw NUMERIC(78, 0) NOT NULL,
+    reward_styfi_raw NUMERIC(78, 0) NOT NULL,
+    reward_styfix_raw NUMERIC(78, 0) NOT NULL,
+    reward_veyfi_raw NUMERIC(78, 0) NOT NULL,
+    reward_liquid_lockers_raw NUMERIC(78, 0) NOT NULL,
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (chain_id, epoch)
+);
+CREATE INDEX IF NOT EXISTS idx_styfi_epoch_stats_chain_start
+    ON styfi_epoch_stats(chain_id, epoch_start DESC);
+
+CREATE TABLE IF NOT EXISTS styfi_sync_state (
+    stream_name TEXT PRIMARY KEY,
+    chain_id INTEGER NOT NULL,
+    cursor BIGINT,
+    observed_at TIMESTAMPTZ,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 
@@ -138,6 +201,30 @@ def _validate_data_policy_config() -> None:
         raise ValueError(
             "Invalid retention policy: PPS_RETENTION_DAYS must be >= KONG_PPS_LOOKBACK_DAYS "
             f"(got retention={PPS_RETENTION_DAYS}, lookback={KONG_PPS_LOOKBACK_DAYS})"
+        )
+    if STYFI_SYNC_ENABLED and not ETH_RPC_URL:
+        raise ValueError("Invalid stYFI config: ETH_RPC_URL is required when STYFI_SYNC_ENABLED=1")
+    if STYFI_CHAIN_ID <= 0:
+        raise ValueError(f"Invalid stYFI config: STYFI_CHAIN_ID must be > 0 (got {STYFI_CHAIN_ID})")
+    if STYFI_RETENTION_DAYS < 0:
+        raise ValueError(
+            "Invalid stYFI retention: STYFI_RETENTION_DAYS must be >= 0 "
+            f"(got {STYFI_RETENTION_DAYS})"
+        )
+    if STYFI_SNAPSHOT_RETENTION_DAYS < 0:
+        raise ValueError(
+            "Invalid stYFI retention: STYFI_SNAPSHOT_RETENTION_DAYS must be >= 0 "
+            f"(got {STYFI_SNAPSHOT_RETENTION_DAYS})"
+        )
+    if STYFI_RETENTION_DAYS > 0 and STYFI_SNAPSHOT_RETENTION_DAYS > STYFI_RETENTION_DAYS:
+        raise ValueError(
+            "Invalid stYFI retention: STYFI_SNAPSHOT_RETENTION_DAYS must be <= STYFI_RETENTION_DAYS "
+            f"(got snapshot={STYFI_SNAPSHOT_RETENTION_DAYS}, retention={STYFI_RETENTION_DAYS})"
+        )
+    if STYFI_EPOCH_LOOKBACK <= 0:
+        raise ValueError(
+            "Invalid stYFI config: STYFI_EPOCH_LOOKBACK must be > 0 "
+            f"(got {STYFI_EPOCH_LOOKBACK})"
         )
     if not 0 < SNAPSHOT_MIN_ACTIVE_RATIO <= 1:
         raise ValueError(
@@ -326,6 +413,360 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
 def _connect() -> psycopg.Connection:
     return psycopg.connect(DATABASE_URL)
 
+
+def _eth_rpc(method: str, params: list[object]) -> object:
+    response = requests.post(
+        ETH_RPC_URL,
+        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        timeout=ETH_CALL_TIMEOUT_SEC,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("error"):
+        raise ValueError(f"Ethereum RPC error: {payload['error']}")
+    return payload.get("result")
+
+
+def _eth_selector(signature: str) -> str:
+    return keccak(text=signature)[:4].hex()
+
+
+def _eth_encode_address(value: str) -> str:
+    normalized = value.lower().replace("0x", "")
+    if len(normalized) != 40:
+        raise ValueError(f"Invalid address length: {value}")
+    return normalized.rjust(64, "0")
+
+
+def _eth_encode_uint256(value: int) -> str:
+    if value < 0:
+        raise ValueError(f"uint256 cannot be negative: {value}")
+    return f"{value:064x}"
+
+
+def _eth_decode_address(result: str) -> str:
+    if len(result) < 66:
+        raise ValueError(f"Unexpected address result length: {result!r}")
+    return f"0x{result[-40:]}".lower()
+
+
+def _eth_call(address: str, signature: str, encoded_args: str = "", block_tag: str = "latest") -> str:
+    data = f"0x{_eth_selector(signature)}{encoded_args}"
+    result = _eth_rpc("eth_call", [{"to": address, "data": data}, block_tag])
+    if not isinstance(result, str) or not result.startswith("0x"):
+        raise ValueError(f"Unexpected eth_call result for {signature}: {result!r}")
+    return result
+
+
+def _eth_decode_uint256(result: str) -> int:
+    if len(result) < 66:
+        raise ValueError(f"Unexpected uint256 result length: {result!r}")
+    return int(result[2:66], 16)
+
+
+def _eth_decode_string(result: str) -> str:
+    payload = result[2:] if result.startswith("0x") else result
+    if len(payload) < 128:
+        raise ValueError(f"Unexpected string result length: {result!r}")
+    offset = int(payload[:64], 16) * 2
+    if len(payload) < offset + 64:
+        raise ValueError(f"Unexpected string offset: {result!r}")
+    length = int(payload[offset : offset + 64], 16)
+    start = offset + 64
+    end = start + length * 2
+    if len(payload) < end:
+        raise ValueError(f"Unexpected string payload length: {result!r}")
+    return bytes.fromhex(payload[start:end]).decode("utf-8")
+
+
+def _eth_call_uint(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> int:
+    encoded = ""
+    for arg_type, value in args:
+        if arg_type == "address":
+            encoded += _eth_encode_address(str(value))
+        elif arg_type == "uint256":
+            encoded += _eth_encode_uint256(int(value))
+        else:
+            raise ValueError(f"Unsupported abi arg type: {arg_type}")
+    return _eth_decode_uint256(_eth_call(address, signature, encoded))
+
+
+def _eth_call_address(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> str:
+    encoded = ""
+    for arg_type, value in args:
+        if arg_type == "address":
+            encoded += _eth_encode_address(str(value))
+        elif arg_type == "uint256":
+            encoded += _eth_encode_uint256(int(value))
+        else:
+            raise ValueError(f"Unsupported abi arg type: {arg_type}")
+    return _eth_decode_address(_eth_call(address, signature, encoded))
+
+
+def _eth_call_string(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> str:
+    encoded = ""
+    for arg_type, value in args:
+        if arg_type == "address":
+            encoded += _eth_encode_address(str(value))
+        elif arg_type == "uint256":
+            encoded += _eth_encode_uint256(int(value))
+        else:
+            raise ValueError(f"Unsupported abi arg type: {arg_type}")
+    return _eth_decode_string(_eth_call(address, signature, encoded))
+
+
+def _safe_int(value: object) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _styfi_epoch_start(genesis: int, epoch: int) -> datetime:
+    return datetime.fromtimestamp(genesis + epoch * STYFI_EPOCH_LENGTH_SEC, tz=UTC)
+
+
+def _styfi_component_reward(epoch: int, component_address: str) -> int:
+    return _eth_call_uint(
+        STYFI_CONTRACTS["reward_distributor"],
+        "rewards(address,uint256)",
+        ("address", component_address),
+        ("uint256", epoch),
+    )
+
+
+def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
+    if not STYFI_SITE_GLOBAL_DATA_URL:
+        return None
+    response = requests.get(
+        STYFI_SITE_GLOBAL_DATA_URL,
+        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+        timeout=ETH_CALL_TIMEOUT_SEC,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError(f"Unexpected stYFI global-data payload: {payload!r}")
+    meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    global_rewards = payload.get("global", {}).get("rewards") if isinstance(payload.get("global"), dict) else {}
+    styfi = payload.get("styfi") if isinstance(payload.get("styfi"), dict) else {}
+    styfix = payload.get("styfix") if isinstance(payload.get("styfix"), dict) else {}
+    styfi_current = styfi.get("current") if isinstance(styfi.get("current"), dict) else {}
+    styfi_projected = styfi.get("projected") if isinstance(styfi.get("projected"), dict) else {}
+    styfix_current = styfix.get("current") if isinstance(styfix.get("current"), dict) else {}
+    styfix_projected = styfix.get("projected") if isinstance(styfix.get("projected"), dict) else {}
+    return {
+        "source": STYFI_SITE_GLOBAL_DATA_URL,
+        "meta": {
+            "timestamp": _safe_int(meta.get("timestamp")),
+            "epoch": _safe_int(meta.get("epoch")),
+            "block_number": _safe_int(meta.get("blockNumber")),
+        },
+        "global_rewards": {
+            "current_raw": _safe_int(global_rewards.get("current")),
+            "projected_raw": _safe_int(global_rewards.get("projected")),
+            "pps_raw": _safe_int(global_rewards.get("pps")),
+            "apy_bps": _safe_int(global_rewards.get("apyBps")),
+        },
+        "styfi": {
+            "current_rewards_raw": _safe_int(styfi_current.get("rewards")),
+            "current_apr_bps": _safe_int(styfi_current.get("aprBps")),
+            "projected_rewards_raw": _safe_int(styfi_projected.get("rewards")),
+            "projected_apr_bps": _safe_int(styfi_projected.get("aprBps")),
+        },
+        "styfix": {
+            "current_rewards_raw": _safe_int(styfix_current.get("rewards")),
+            "current_apr_bps": _safe_int(styfix_current.get("aprBps")),
+            "projected_rewards_raw": _safe_int(styfix_projected.get("rewards")),
+            "projected_apr_bps": _safe_int(styfix_projected.get("aprBps")),
+        },
+    }
+
+
+def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+    observed_at = datetime.now(UTC)
+    reward_token_address = _eth_call_address(STYFI_CONTRACTS["reward_distributor"], "token()")
+    reward_token_decimals = _eth_call_uint(reward_token_address, "decimals()")
+    reward_token_symbol = _eth_call_string(reward_token_address, "symbol()")
+    current_epoch = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch()")
+    genesis = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "genesis()")
+    yfi_total_supply = _eth_call_uint(STYFI_CONTRACTS["yfi"], "totalSupply()")
+    styfi_total_assets = _eth_call_uint(STYFI_CONTRACTS["styfi"], "totalAssets()")
+    styfi_total_supply = _eth_call_uint(STYFI_CONTRACTS["styfi"], "totalSupply()")
+    styfix_total_assets = _eth_call_uint(STYFI_CONTRACTS["styfix"], "totalAssets()")
+    styfix_total_supply = _eth_call_uint(STYFI_CONTRACTS["styfix"], "totalSupply()")
+    combined_staked = styfi_total_assets + styfix_total_assets
+    reward_state = None
+    try:
+        reward_state = _fetch_styfi_site_reward_state()
+    except Exception as exc:
+        logging.warning("stYFI global-data fetch failed: %s", exc)
+
+    snapshot = {
+        "chain_id": STYFI_CHAIN_ID,
+        "observed_at": observed_at,
+        "reward_epoch": current_epoch,
+        "yfi_total_supply_raw": yfi_total_supply,
+        "styfi_total_assets_raw": styfi_total_assets,
+        "styfi_total_supply_raw": styfi_total_supply,
+        "styfix_total_assets_raw": styfix_total_assets,
+        "styfix_total_supply_raw": styfix_total_supply,
+        "combined_staked_raw": combined_staked,
+    }
+
+    start_epoch = max(0, current_epoch - STYFI_EPOCH_LOOKBACK + 1)
+    epochs: list[dict[str, object]] = []
+    for epoch in range(start_epoch, current_epoch + 1):
+        reward_total = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch_rewards(uint256)", ("uint256", epoch))
+        epochs.append(
+            {
+                "chain_id": STYFI_CHAIN_ID,
+                "epoch": epoch,
+                "epoch_start": _styfi_epoch_start(genesis, epoch),
+                "reward_total_raw": reward_total,
+                "reward_styfi_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["styfi_reward_distributor"]),
+                "reward_styfix_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["styfix_reward_distributor"]),
+                "reward_veyfi_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["veyfi_reward_distributor"]),
+                "reward_liquid_lockers_raw": _styfi_component_reward(
+                    epoch, STYFI_CONTRACTS["liquid_locker_reward_distributor"]
+                ),
+            }
+        )
+
+    sync_state = {
+        "stream_name": STYFI_STREAM_STATE,
+        "chain_id": STYFI_CHAIN_ID,
+        "cursor": current_epoch,
+        "observed_at": observed_at,
+        "payload": {
+            "genesis": genesis,
+            "epoch_lookback": STYFI_EPOCH_LOOKBACK,
+            "contracts": STYFI_CONTRACTS,
+            "reward_token": {
+                "address": reward_token_address,
+                "decimals": reward_token_decimals,
+                "symbol": reward_token_symbol,
+            },
+            "current_reward_state": reward_state,
+        },
+    }
+    return snapshot, epochs, sync_state
+
+
+def _upsert_styfi_snapshot(conn: psycopg.Connection, snapshot: dict[str, object]) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO styfi_snapshots (
+                chain_id,
+                observed_at,
+                reward_epoch,
+                yfi_total_supply_raw,
+                styfi_total_assets_raw,
+                styfi_total_supply_raw,
+                styfix_total_assets_raw,
+                styfix_total_supply_raw,
+                combined_staked_raw
+            ) VALUES (
+                %(chain_id)s,
+                %(observed_at)s,
+                %(reward_epoch)s,
+                %(yfi_total_supply_raw)s,
+                %(styfi_total_assets_raw)s,
+                %(styfi_total_supply_raw)s,
+                %(styfix_total_assets_raw)s,
+                %(styfix_total_supply_raw)s,
+                %(combined_staked_raw)s
+            )
+            ON CONFLICT (chain_id, observed_at) DO UPDATE SET
+                reward_epoch = EXCLUDED.reward_epoch,
+                yfi_total_supply_raw = EXCLUDED.yfi_total_supply_raw,
+                styfi_total_assets_raw = EXCLUDED.styfi_total_assets_raw,
+                styfi_total_supply_raw = EXCLUDED.styfi_total_supply_raw,
+                styfix_total_assets_raw = EXCLUDED.styfix_total_assets_raw,
+                styfix_total_supply_raw = EXCLUDED.styfix_total_supply_raw,
+                combined_staked_raw = EXCLUDED.combined_staked_raw
+            """,
+            snapshot,
+        )
+    conn.commit()
+
+
+def _upsert_styfi_epoch_stats(conn: psycopg.Connection, rows: list[dict[str, object]]) -> int:
+    if not rows:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            INSERT INTO styfi_epoch_stats (
+                chain_id,
+                epoch,
+                epoch_start,
+                reward_total_raw,
+                reward_styfi_raw,
+                reward_styfix_raw,
+                reward_veyfi_raw,
+                reward_liquid_lockers_raw
+            ) VALUES (
+                %(chain_id)s,
+                %(epoch)s,
+                %(epoch_start)s,
+                %(reward_total_raw)s,
+                %(reward_styfi_raw)s,
+                %(reward_styfix_raw)s,
+                %(reward_veyfi_raw)s,
+                %(reward_liquid_lockers_raw)s
+            )
+            ON CONFLICT (chain_id, epoch) DO UPDATE SET
+                epoch_start = EXCLUDED.epoch_start,
+                reward_total_raw = EXCLUDED.reward_total_raw,
+                reward_styfi_raw = EXCLUDED.reward_styfi_raw,
+                reward_styfix_raw = EXCLUDED.reward_styfix_raw,
+                reward_veyfi_raw = EXCLUDED.reward_veyfi_raw,
+                reward_liquid_lockers_raw = EXCLUDED.reward_liquid_lockers_raw,
+                fetched_at = NOW()
+            """,
+            rows,
+        )
+    conn.commit()
+    return len(rows)
+
+
+def _upsert_styfi_sync_state(conn: psycopg.Connection, state: dict[str, object]) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO styfi_sync_state (
+                stream_name,
+                chain_id,
+                cursor,
+                observed_at,
+                payload,
+                updated_at
+            ) VALUES (
+                %(stream_name)s,
+                %(chain_id)s,
+                %(cursor)s,
+                %(observed_at)s,
+                %(payload)s,
+                NOW()
+            )
+            ON CONFLICT (stream_name) DO UPDATE SET
+                chain_id = EXCLUDED.chain_id,
+                cursor = EXCLUDED.cursor,
+                observed_at = EXCLUDED.observed_at,
+                payload = EXCLUDED.payload,
+                updated_at = NOW()
+            """,
+            {**state, "payload": Json(state["payload"])},
+        )
+    conn.commit()
 
 def _ensure_schema(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
@@ -1105,11 +1546,25 @@ def _upsert_metrics(conn: psycopg.Connection, rows: list[dict]) -> int:
 def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
     deleted_pps = 0
     deleted_runs = 0
+    deleted_styfi_snapshots = 0
+    deleted_styfi_epochs = 0
     with conn.cursor() as cur:
         if PPS_RETENTION_DAYS > 0:
             cutoff_ts = int((datetime.now(UTC) - timedelta(days=PPS_RETENTION_DAYS)).timestamp())
             cur.execute("DELETE FROM pps_timeseries WHERE ts < %s", (cutoff_ts,))
             deleted_pps = cur.rowcount
+        if STYFI_SNAPSHOT_RETENTION_DAYS > 0:
+            cur.execute(
+                "DELETE FROM styfi_snapshots WHERE observed_at < NOW() - (%s * INTERVAL '1 day')",
+                (STYFI_SNAPSHOT_RETENTION_DAYS,),
+            )
+            deleted_styfi_snapshots = cur.rowcount
+        if STYFI_RETENTION_DAYS > 0:
+            cur.execute(
+                "DELETE FROM styfi_epoch_stats WHERE epoch_start < NOW() - (%s * INTERVAL '1 day')",
+                (STYFI_RETENTION_DAYS,),
+            )
+            deleted_styfi_epochs = cur.rowcount
         if INGESTION_RUN_RETENTION_DAYS > 0:
             cur.execute(
                 "DELETE FROM ingestion_runs WHERE started_at < NOW() - (%s * INTERVAL '1 day')",
@@ -1117,7 +1572,12 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
             )
             deleted_runs = cur.rowcount
     conn.commit()
-    return {"pps_timeseries": deleted_pps, "ingestion_runs": deleted_runs}
+    return {
+        "pps_timeseries": deleted_pps,
+        "styfi_snapshots": deleted_styfi_snapshots,
+        "styfi_epoch_stats": deleted_styfi_epochs,
+        "ingestion_runs": deleted_runs,
+    }
 
 
 def _maybe_cleanup_old_data(conn: psycopg.Connection) -> None:
@@ -1131,10 +1591,12 @@ def _maybe_cleanup_old_data(conn: psycopg.Connection) -> None:
             return
     result = _cleanup_old_data(conn)
     LAST_CLEANUP_AT = now
-    if result["pps_timeseries"] > 0 or result["ingestion_runs"] > 0:
+    if any(value > 0 for value in result.values()):
         logging.info(
-            "DB cleanup removed rows: pps_timeseries=%s ingestion_runs=%s",
+            "DB cleanup removed rows: pps_timeseries=%s styfi_snapshots=%s styfi_epoch_stats=%s ingestion_runs=%s",
             result["pps_timeseries"],
+            result["styfi_snapshots"],
+            result["styfi_epoch_stats"],
             result["ingestion_runs"],
         )
     else:
@@ -1199,6 +1661,34 @@ def _run_kong_ingestion(conn: psycopg.Connection) -> tuple[int, int, int]:
         return run_id, pps_rows_stored, metrics_rows
 
 
+def _run_styfi_snapshot(conn: psycopg.Connection) -> tuple[int, int, int]:
+    started_at = datetime.now(UTC)
+    run_id = _insert_run(conn, JOB_STYFI, started_at)
+    try:
+        snapshot, epochs, sync_state = _fetch_styfi_snapshot_data()
+        _upsert_styfi_snapshot(conn, snapshot)
+        epoch_rows = _upsert_styfi_epoch_stats(conn, epochs)
+        _upsert_styfi_sync_state(conn, sync_state)
+        summary = {
+            "observed_at": snapshot["observed_at"].isoformat(),
+            "reward_epoch": snapshot["reward_epoch"],
+            "epoch_rows": epoch_rows,
+            "combined_staked_raw": str(snapshot["combined_staked_raw"]),
+        }
+        _complete_run(conn, run_id, "success", epoch_rows + 1, json.dumps(summary))
+        logging.info(
+            "stYFI snapshot success: reward_epoch=%s combined_staked_raw=%s epoch_rows=%s",
+            snapshot["reward_epoch"],
+            snapshot["combined_staked_raw"],
+            epoch_rows,
+        )
+        return run_id, 1, epoch_rows
+    except Exception as exc:
+        _complete_run(conn, run_id, "failed", 0, json.dumps({"error": str(exc)}))
+        logging.exception("stYFI snapshot failed: %s", exc)
+        return run_id, 0, 0
+
+
 def run_once() -> None:
     logging.info("Tick at %s", datetime.now(UTC).isoformat())
     logging.info("Fetching yDaemon snapshot: %s", YDAEMON_URL)
@@ -1212,6 +1702,10 @@ def run_once() -> None:
             _run_kong_ingestion(conn)
         else:
             logging.warning("Skipping Kong ingestion because yDaemon snapshot stored 0 records")
+        if STYFI_SYNC_ENABLED:
+            _run_styfi_snapshot(conn)
+        else:
+            logging.info("Skipping stYFI snapshot because STYFI_SYNC_ENABLED=0")
         _evaluate_alerts(conn)
         _maybe_cleanup_old_data(conn)
 
