@@ -12,27 +12,17 @@ type OverviewResponse = {
     latest_pps_age_seconds?: number | null;
     pps_stale_ratio?: number | null;
   } | null;
-  tracked_scope?: {
-    tracked_tvl_active_usd?: number | null;
-    active_vaults?: number | null;
-    active_with_metrics?: number | null;
-  } | null;
   protocol_context?: {
-    tvl_change_7d_pct?: number | null;
+    current_yearn?: {
+      tvl_usd?: number | null;
+      vaults?: number | null;
+    } | null;
+    total_yearn?: {
+      tvl_usd?: number | null;
+      vaults?: number | null;
+    } | null;
   } | null;
 };
-
-type SocialPreviewSummaryResponse = {
-  summary?: {
-    tracked_tvl_active_usd?: number | null;
-    active_vaults?: number | null;
-    active_with_metrics?: number | null;
-  } | null;
-};
-
-type ProtocolContextResponse = {
-  tvl_change_7d_pct?: number | null;
-} | null;
 
 type ChangeMoverRow = {
   symbol?: string | null;
@@ -119,28 +109,14 @@ export default function HomePage() {
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const [freshnessResult, trackedScopeResult, protocolResult, moversResult] = await Promise.allSettled([
-        fetch(apiUrl("/meta/freshness", { threshold: "24h" }), { cache: "no-store" }),
-        fetch(apiUrl("/meta/social-preview"), { cache: "no-store" }),
-        fetch(apiUrl("/meta/protocol-context"), { cache: "no-store" }),
+      const [overviewResult, moversResult] = await Promise.allSettled([
+        fetch(apiUrl("/overview"), { cache: "no-store" }),
         fetch(apiUrl("/changes", { window: "24h", universe: "core", limit: 1 }), { cache: "no-store" }),
       ]);
       if (!active) return;
 
-      const nextOverview: OverviewResponse = {};
-
-      if (freshnessResult.status === "fulfilled" && freshnessResult.value.ok) {
-        nextOverview.freshness = (await freshnessResult.value.json()) as OverviewResponse["freshness"];
-      }
-      if (trackedScopeResult.status === "fulfilled" && trackedScopeResult.value.ok) {
-        const payload = (await trackedScopeResult.value.json()) as SocialPreviewSummaryResponse;
-        nextOverview.tracked_scope = payload.summary ?? null;
-      }
-      if (protocolResult.status === "fulfilled" && protocolResult.value.ok) {
-        nextOverview.protocol_context = (await protocolResult.value.json()) as ProtocolContextResponse;
-      }
-      if (Object.keys(nextOverview).length > 0) {
-        setOverview((previous) => ({ ...(previous ?? {}), ...nextOverview }));
+      if (overviewResult.status === "fulfilled" && overviewResult.value.ok) {
+        setOverview((await overviewResult.value.json()) as OverviewResponse);
       }
       if (moversResult.status === "fulfilled" && moversResult.value.ok) {
         setChanges((await moversResult.value.json()) as ChangesResponse);
@@ -192,12 +168,18 @@ export default function HomePage() {
   );
   const staleRatio = overview?.freshness?.pps_stale_ratio ?? null;
   const freshRatio = staleRatio !== null && staleRatio !== undefined ? Math.max(0, 1 - staleRatio) : null;
-  const trackedScopeNote =
-    overview?.tracked_scope?.active_vaults !== null &&
-    overview?.tracked_scope?.active_vaults !== undefined &&
-    Number.isFinite(overview?.tracked_scope?.active_vaults)
-      ? `${overview?.tracked_scope?.active_vaults} active visible vaults`
-      : "Active visible vault scope";
+  const currentYearnNote =
+    overview?.protocol_context?.current_yearn?.vaults !== null &&
+    overview?.protocol_context?.current_yearn?.vaults !== undefined &&
+    Number.isFinite(overview?.protocol_context?.current_yearn?.vaults)
+      ? `${overview?.protocol_context?.current_yearn?.vaults} active visible current-scope vaults`
+      : "Deduped active visible current-scope Yearn inventory";
+  const totalYearnNote =
+    overview?.protocol_context?.total_yearn?.vaults !== null &&
+    overview?.protocol_context?.total_yearn?.vaults !== undefined &&
+    Number.isFinite(overview?.protocol_context?.total_yearn?.vaults)
+      ? `${overview?.protocol_context?.total_yearn?.vaults} active Yearn vaults including hidden, retired, and Fantom`
+      : "Deduped full Yearn inventory";
 
   return (
     <main className="container home-minimal">
@@ -225,14 +207,14 @@ export default function HomePage() {
 
       <section className="home-minimal-signals">
         <article className="card home-sparse-signal-card home-reveal">
-          <p className="home-sparse-signal-label">Tracked TVL</p>
-          <p className="home-sparse-signal-value">{formatUsd(overview?.tracked_scope?.tracked_tvl_active_usd ?? null, 0)}</p>
-          <p className="home-sparse-signal-note">{trackedScopeNote}. Debt-adjusted to avoid double counting overlap.</p>
+          <p className="home-sparse-signal-label">Current Yearn TVL</p>
+          <p className="home-sparse-signal-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
+          <p className="home-sparse-signal-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
         </article>
         <article className="card home-sparse-signal-card home-reveal">
-          <p className="home-sparse-signal-label">Protocol TVL Change 7d</p>
-          <p className="home-sparse-signal-value">{formatPct(overview?.protocol_context?.tvl_change_7d_pct ?? null, 2)}</p>
-          <p className="home-sparse-signal-note">Protocol-wide change from DefiLlama. This is broader than the tracked vault scope.</p>
+          <p className="home-sparse-signal-label">Total Yearn TVL</p>
+          <p className="home-sparse-signal-value">{formatUsd(overview?.protocol_context?.total_yearn?.tvl_usd ?? null, 0)}</p>
+          <p className="home-sparse-signal-note">{totalYearnNote}. Uses the same deduped accounting rule.</p>
         </article>
         <article className="card home-sparse-signal-card home-reveal home-freshness-signal-card">
           <p className="home-sparse-signal-label">Data Freshness</p>

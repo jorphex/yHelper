@@ -5,7 +5,6 @@ import time
 from datetime import UTC, datetime
 from json import loads
 from typing import Literal
-from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, Query
@@ -41,10 +40,6 @@ UNIVERSE_RAW_MIN_POINTS = 0
 UNIVERSE_CORE_MAX_VAULTS = 250
 UNIVERSE_EXTENDED_MAX_VAULTS = 700
 UNIVERSE_RAW_MAX_VAULTS = 0
-DEFI_LLAMA_PROTOCOL_URL = os.getenv("DEFI_LLAMA_PROTOCOL_URL", "https://api.llama.fi/protocol/yearn-finance")
-COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price"
-DEFI_LLAMA_TIMEOUT_SEC = 8.0
-DEFI_LLAMA_CACHE_TTL_SEC = 600
 ASSETS_FEATURED_MIN_TVL_USD = float(os.getenv("API_ASSETS_FEATURED_MIN_TVL_USD", "1000000"))
 ASSETS_FEATURED_MIN_VENUES = 2
 ASSETS_FEATURED_MIN_CHAINS = 1
@@ -99,8 +94,6 @@ def _validate_data_policy_config() -> None:
 
 
 _validate_data_policy_config()
-
-_defillama_cache: dict[str, object] = {"fetched_at_epoch": 0.0, "snapshot": None}
 
 cors_origins = _parse_origins(os.getenv("CORS_ORIGINS", "http://localhost:3010"))
 app.add_middleware(
@@ -705,81 +698,6 @@ def _delta_or_none(left: object, right: object) -> float | None:
     return left_value - right_value
 
 
-def _extract_defillama_tvl_series(raw_tvl: object) -> list[tuple[int, float]]:
-    if not isinstance(raw_tvl, list):
-        return []
-    series: list[tuple[int, float]] = []
-    for point in raw_tvl:
-        if not isinstance(point, dict):
-            continue
-        ts_raw = point.get("date")
-        try:
-            ts = int(ts_raw)
-        except (TypeError, ValueError):
-            continue
-        tvl = _to_float_or_none(point.get("totalLiquidityUSD"))
-        if tvl is None:
-            continue
-        series.append((ts, tvl))
-    series.sort(key=lambda item: item[0])
-    return series
-
-
-def _coingecko_market_cap_usd(gecko_id: str | None) -> float | None:
-    if gecko_id is None:
-        return None
-    cleaned = gecko_id.strip()
-    if not cleaned:
-        return None
-    query = urlencode(
-        {
-            "ids": cleaned,
-            "vs_currencies": "usd",
-            "include_market_cap": "true",
-        }
-    )
-    request = Request(
-        f"{COINGECKO_SIMPLE_PRICE_URL}?{query}",
-        headers={"User-Agent": "yhelper/0.1"},
-    )
-    with urlopen(request, timeout=DEFI_LLAMA_TIMEOUT_SEC) as response:
-        payload = loads(response.read().decode("utf-8"))
-    if not isinstance(payload, dict):
-        return None
-    token_entry = payload.get(cleaned)
-    if not isinstance(token_entry, dict):
-        return None
-    return _to_float_or_none(token_entry.get("usd_market_cap"))
-
-
-def _yearn_aligned_proxy_scope(cur: psycopg.Cursor) -> dict[str, object]:
-    cur.execute(
-            """
-        SELECT
-            COUNT(*) AS vaults,
-            SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
-        FROM vault_dim d
-        WHERE
-            d.active = TRUE
-            AND COALESCE(d.chain_id, -1) NOT IN (250)
-            AND COALESCE(d.kind, '') IN ('Multi Strategy', 'Single Strategy')
-            AND COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
-            AND COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
-        """
-    )
-    row = cur.fetchone() or {}
-    return {
-        "vaults": int(row.get("vaults") or 0),
-        "tvl_usd": _to_float_or_none(row.get("tvl_usd")),
-        "criteria": {
-            "active": True,
-            "exclude_hidden": True,
-            "exclude_retired": True,
-            "kinds": ["Multi Strategy", "Single Strategy"],
-        },
-    }
-
-
 def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     cur.execute(
         """
@@ -878,6 +796,132 @@ def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
             "exclude_retired": True,
             "tracked_tvl_method": "debt_adjusted_single_strategy_overlap",
         },
+    }
+
+
+def _yearn_scope_filter_sql(alias: str, *, include_hidden: bool, include_retired: bool, include_fantom: bool) -> str:
+    clauses = [f"{alias}.active = TRUE"]
+    if not include_hidden:
+        clauses.append(f"COALESCE(({alias}.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE")
+    if not include_retired:
+        clauses.append(f"COALESCE(({alias}.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE")
+    if not include_fantom:
+        clauses.append(f"COALESCE({alias}.chain_id, -1) <> 250")
+    return " AND ".join(clauses)
+
+
+def _deduped_yearn_scope_snapshot(
+    cur: psycopg.Cursor,
+    *,
+    include_hidden: bool,
+    include_retired: bool,
+    include_fantom: bool,
+) -> dict[str, object]:
+    scope_sql = _yearn_scope_filter_sql(
+        "d",
+        include_hidden=include_hidden,
+        include_retired=include_retired,
+        include_fantom=include_fantom,
+    )
+    parent_scope_sql = _yearn_scope_filter_sql(
+        "m",
+        include_hidden=include_hidden,
+        include_retired=include_retired,
+        include_fantom=include_fantom,
+    )
+    child_scope_sql = _yearn_scope_filter_sql(
+        "v",
+        include_hidden=include_hidden,
+        include_retired=include_retired,
+        include_fantom=include_fantom,
+    )
+    cur.execute(
+        f"""
+        WITH in_scope AS (
+            SELECT
+                d.chain_id,
+                LOWER(d.vault_address) AS vault_address,
+                COALESCE(d.kind, '') AS kind,
+                COALESCE(d.tvl_usd, 0.0)::numeric AS tvl_usd
+            FROM vault_dim d
+            WHERE {scope_sql}
+        ),
+        strategy_debt_usd AS (
+            SELECT
+                m.chain_id,
+                LOWER(s->>'address') AS vault_address,
+                SUM(
+                    (
+                        COALESCE(NULLIF(s->'details'->>'totalDebt', '')::numeric, 0)
+                        / POWER(10::numeric, COALESCE(NULLIF(v.raw->>'decimals', '')::numeric, 18))
+                    )
+                    * COALESCE(NULLIF(v.raw->'tvl'->>'price', '')::numeric, 0)
+                ) AS debt_usd
+            FROM vault_dim m
+            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(m.raw->'strategies', '[]'::jsonb)) s
+            JOIN vault_dim v
+              ON v.chain_id = m.chain_id
+             AND LOWER(v.vault_address) = LOWER(s->>'address')
+            WHERE {parent_scope_sql}
+              AND {child_scope_sql}
+              AND COALESCE(m.kind, '') = 'Multi Strategy'
+              AND COALESCE(v.kind, '') = 'Single Strategy'
+            GROUP BY 1, 2
+        )
+        SELECT
+            COUNT(*) AS vaults,
+            COUNT(*) FILTER (WHERE kind = 'Multi Strategy') AS multi_vaults,
+            COUNT(*) FILTER (WHERE kind = 'Single Strategy') AS single_vaults,
+            COUNT(*) FILTER (WHERE kind NOT IN ('Multi Strategy', 'Single Strategy')) AS other_vaults,
+            SUM(tvl_usd) FILTER (WHERE kind = 'Multi Strategy') AS multi_tvl_usd,
+            SUM(tvl_usd) FILTER (WHERE kind = 'Single Strategy') AS single_raw_tvl_usd,
+            SUM(GREATEST(tvl_usd - COALESCE(sd.debt_usd, 0), 0)) FILTER (WHERE kind = 'Single Strategy') AS single_deduped_tvl_usd,
+            SUM(tvl_usd) FILTER (WHERE kind NOT IN ('Multi Strategy', 'Single Strategy')) AS other_tvl_usd
+        FROM in_scope s
+        LEFT JOIN strategy_debt_usd sd
+          ON sd.chain_id = s.chain_id
+         AND sd.vault_address = s.vault_address
+        """
+    )
+    row = cur.fetchone() or {}
+    multi_tvl_usd = _to_float_or_none(row.get("multi_tvl_usd")) or 0.0
+    single_raw_tvl_usd = _to_float_or_none(row.get("single_raw_tvl_usd")) or 0.0
+    single_deduped_tvl_usd = _to_float_or_none(row.get("single_deduped_tvl_usd")) or 0.0
+    other_tvl_usd = _to_float_or_none(row.get("other_tvl_usd")) or 0.0
+    return {
+        "vaults": int(row.get("vaults") or 0),
+        "tvl_usd": multi_tvl_usd + single_deduped_tvl_usd + other_tvl_usd,
+        "criteria": {
+            "active": True,
+            "include_hidden": include_hidden,
+            "include_retired": include_retired,
+            "include_fantom": include_fantom,
+            "tvl_method": "deduped_multi_single_overlap",
+        },
+        "components": {
+            "multi_vaults": int(row.get("multi_vaults") or 0),
+            "single_vaults": int(row.get("single_vaults") or 0),
+            "other_vaults": int(row.get("other_vaults") or 0),
+            "multi_tvl_usd": multi_tvl_usd,
+            "single_raw_tvl_usd": single_raw_tvl_usd,
+            "single_deduped_tvl_usd": single_deduped_tvl_usd,
+            "removed_overlap_usd": max(0.0, single_raw_tvl_usd - single_deduped_tvl_usd),
+            "other_tvl_usd": other_tvl_usd,
+        },
+    }
+
+
+def _protocol_context_snapshot(
+    *,
+    current_yearn: dict[str, object] | None,
+    total_yearn: dict[str, object] | None,
+) -> dict[str, object]:
+    return {
+        "source": "internal",
+        "status": "ok",
+        "as_of_utc": datetime.now(UTC).isoformat(),
+        "current_yearn": current_yearn if isinstance(current_yearn, dict) else {},
+        "total_yearn": total_yearn if isinstance(total_yearn, dict) else {},
     }
 
 
@@ -1173,107 +1217,6 @@ def _styfi_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
     }
 
 
-def _series_change_pct(series: list[tuple[int, float]], *, lookback_days: int) -> float | None:
-    if not series:
-        return None
-    latest_ts, latest_value = series[-1]
-    target_ts = latest_ts - (lookback_days * 86400)
-    baseline: float | None = None
-    for ts, value in reversed(series):
-        if ts <= target_ts:
-            baseline = value
-            break
-    if baseline is None:
-        baseline = series[0][1]
-    if baseline <= 0:
-        return None
-    return (latest_value / baseline) - 1.0
-
-
-def _defillama_snapshot() -> dict[str, object]:
-    now_epoch = time.time()
-    cached = _defillama_cache.get("snapshot")
-    fetched_epoch = float(_defillama_cache.get("fetched_at_epoch") or 0.0)
-    if isinstance(cached, dict) and (now_epoch - fetched_epoch) <= DEFI_LLAMA_CACHE_TTL_SEC:
-        return cached
-
-    try:
-        request = Request(
-            DEFI_LLAMA_PROTOCOL_URL,
-            headers={"User-Agent": "yhelper/0.1"},
-        )
-        with urlopen(request, timeout=DEFI_LLAMA_TIMEOUT_SEC) as response:
-            payload = loads(response.read().decode("utf-8"))
-
-        raw_tvl = payload.get("tvl")
-        series = _extract_defillama_tvl_series(raw_tvl)
-        tvl_usd = series[-1][1] if series else _to_float_or_none(raw_tvl)
-        mcap_usd = _to_float_or_none(payload.get("mcap"))
-        mcap_source = "defillama" if mcap_usd is not None else None
-        gecko_id_raw = payload.get("gecko_id")
-        gecko_id = gecko_id_raw.strip() if isinstance(gecko_id_raw, str) else ""
-        if not gecko_id:
-            gecko_id = "yearn-finance"
-        if mcap_usd is None:
-            try:
-                fallback_mcap = _coingecko_market_cap_usd(gecko_id)
-            except Exception:
-                fallback_mcap = None
-            if fallback_mcap is not None:
-                mcap_usd = fallback_mcap
-                mcap_source = "coingecko"
-        mcap_tvl_ratio = (mcap_usd / tvl_usd) if mcap_usd is not None and tvl_usd and tvl_usd > 0 else None
-        current_chain_tvls = payload.get("currentChainTvls") or {}
-        if not isinstance(current_chain_tvls, dict):
-            current_chain_tvls = {}
-
-        top_chains: list[dict[str, object]] = []
-        for chain_name, raw_value in current_chain_tvls.items():
-            if str(chain_name).strip().lower() == "fantom":
-                continue
-            numeric = _to_float_or_none(raw_value)
-            if numeric is None:
-                continue
-            top_chains.append({"chain": str(chain_name), "tvl_usd": numeric})
-        top_chains.sort(key=lambda item: float(item.get("tvl_usd") or 0.0), reverse=True)
-
-        snapshot: dict[str, object] = {
-            "source": "defillama",
-            "source_url": DEFI_LLAMA_PROTOCOL_URL,
-            "status": "ok",
-            "fetched_at_utc": datetime.now(UTC).isoformat(),
-            "cache_ttl_seconds": DEFI_LLAMA_CACHE_TTL_SEC,
-            "protocol_name": payload.get("name") or "Yearn Finance",
-            "protocol_slug": payload.get("slug") or "yearn-finance",
-            "gecko_id": gecko_id,
-            "tvl_usd": tvl_usd,
-            "mcap_usd": mcap_usd,
-            "mcap_source": mcap_source,
-            "mcap_tvl_ratio": mcap_tvl_ratio,
-            "tvl_change_7d_pct": _series_change_pct(series, lookback_days=7),
-            "tvl_change_30d_pct": _series_change_pct(series, lookback_days=30),
-            "chain_count": len(top_chains),
-            "top_chains": top_chains[:8],
-        }
-        _defillama_cache["fetched_at_epoch"] = now_epoch
-        _defillama_cache["snapshot"] = snapshot
-        return snapshot
-    except Exception as exc:
-        stale = cached if isinstance(cached, dict) else None
-        snapshot = {
-            "source": "defillama",
-            "source_url": DEFI_LLAMA_PROTOCOL_URL,
-            "status": "unavailable",
-            "fetched_at_utc": datetime.now(UTC).isoformat(),
-            "cache_ttl_seconds": DEFI_LLAMA_CACHE_TTL_SEC,
-            "error": str(exc),
-            "stale_snapshot": stale,
-        }
-        if stale is not None:
-            return {**stale, "status": "stale", "error": str(exc)}
-        return snapshot
-
-
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -1310,7 +1253,29 @@ async def meta_coverage(
 
 @app.get("/api/meta/protocol-context")
 async def meta_protocol_context() -> dict[str, object]:
-    return _defillama_snapshot()
+    try:
+        with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                current_yearn = _deduped_yearn_scope_snapshot(
+                    cur,
+                    include_hidden=False,
+                    include_retired=False,
+                    include_fantom=False,
+                )
+                total_yearn = _deduped_yearn_scope_snapshot(
+                    cur,
+                    include_hidden=True,
+                    include_retired=True,
+                    include_fantom=True,
+                )
+        return _protocol_context_snapshot(current_yearn=current_yearn, total_yearn=total_yearn)
+    except Exception as exc:
+        return {
+            "source": "internal",
+            "status": "unavailable",
+            "as_of_utc": datetime.now(UTC).isoformat(),
+            "error": str(exc),
+        }
 
 
 @app.get("/api/meta/movers")
@@ -1452,7 +1417,6 @@ async def overview() -> dict[str, object]:
     freshness: dict[str, object] | None = None
     coverage: dict[str, object] | None = None
     protocol_context: dict[str, object] | None = None
-    yearn_proxy: dict[str, object] | None = None
     tracked_scope: dict[str, object] | None = None
     lifecycle: dict[str, object] | None = None
     last_runs: dict[str, dict[str, object] | None] = {
@@ -1514,7 +1478,6 @@ async def overview() -> dict[str, object]:
                             "records": row["records"],
                             "error_summary": row["error_summary"],
                         }
-                yearn_proxy = _yearn_aligned_proxy_scope(cur)
                 tracked_scope = _tracked_scope_snapshot(cur)
             freshness = _freshness_snapshot(
                 conn,
@@ -1528,19 +1491,20 @@ async def overview() -> dict[str, object]:
                 min_points=DEFAULT_MIN_POINTS,
                 split_limit=6,
             )
-            protocol_context = _defillama_snapshot()
-            if isinstance(protocol_context, dict) and isinstance(coverage, dict):
-                tvl_usd = _to_float_or_none(protocol_context.get("tvl_usd"))
-                eligible_tvl_usd = _to_float_or_none((coverage.get("global") or {}).get("eligible_tvl_usd"))
-                if tvl_usd and tvl_usd > 0 and eligible_tvl_usd is not None:
-                    protocol_context["eligible_vs_protocol_tvl_ratio"] = max(0.0, eligible_tvl_usd / tvl_usd)
-                    protocol_context["eligible_vs_protocol_tvl_gap_usd"] = tvl_usd - eligible_tvl_usd
-                if isinstance(yearn_proxy, dict):
-                    proxy_tvl_usd = _to_float_or_none(yearn_proxy.get("tvl_usd"))
-                    protocol_context["yearn_aligned_proxy"] = yearn_proxy
-                    if proxy_tvl_usd is not None and tvl_usd is not None:
-                        protocol_context["defillama_vs_yearn_proxy_gap_usd"] = tvl_usd - proxy_tvl_usd
-                        protocol_context["defillama_vs_yearn_proxy_ratio"] = (tvl_usd / proxy_tvl_usd) if proxy_tvl_usd > 0 else None
+            with conn.cursor() as cur:
+                current_yearn = _deduped_yearn_scope_snapshot(
+                    cur,
+                    include_hidden=False,
+                    include_retired=False,
+                    include_fantom=False,
+                )
+                total_yearn = _deduped_yearn_scope_snapshot(
+                    cur,
+                    include_hidden=True,
+                    include_retired=True,
+                    include_fantom=True,
+                )
+            protocol_context = _protocol_context_snapshot(current_yearn=current_yearn, total_yearn=total_yearn)
     except Exception:
         # DB may be empty/not yet initialized during bootstrap.
         pass
