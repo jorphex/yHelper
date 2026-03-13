@@ -405,7 +405,7 @@ function AssetsPageContent() {
       {assetsError ? <section className="card">{assetsError}</section> : null}
       {detailError ? <section className="card">{detailError}</section> : null}
 
-      <section className="card assets-universe-card">
+      <section className="card section-card summary-card assets-universe-card">
         <h2>Token Universe</h2>
         <p className="muted card-intro">
           Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
@@ -638,7 +638,7 @@ function AssetsPageContent() {
         )}
       </section>
 
-      <section className="card assets-venues-card">
+      <section className="card section-card table-card assets-venues-card">
         <h2>{detail?.token_symbol || selectedSymbol || "Token"} Venues</h2>
         <p className="muted card-intro">
           Venue-level detail for the selected token. Sort to compare alternatives quickly. Pro mode adds extra context columns.

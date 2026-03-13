@@ -25,6 +25,9 @@ export function NavLinks() {
     const updateIndicator = () => {
       const active = container.querySelector<HTMLAnchorElement>("a.is-active");
       if (!active) return;
+      if (container.scrollWidth > container.clientWidth + 4) {
+        active.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+      }
       container.style.setProperty("--nav-active-x", `${active.offsetLeft}px`);
       container.style.setProperty("--nav-active-y", `${active.offsetTop}px`);
       container.style.setProperty("--nav-active-w", `${active.offsetWidth}px`);

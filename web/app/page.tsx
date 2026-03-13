@@ -193,6 +193,16 @@ function formatTokenCompact(value: number | null | undefined, symbol: string, di
   }).format(value)} ${symbol}`;
 }
 
+function formatUsdCompact(value: number | null | undefined, digits = 1): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
 export default function HomePage() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [changes, setChanges] = useState<ChangesResponse | null>(null);
@@ -263,13 +273,33 @@ export default function HomePage() {
     <main className="container home-overview">
       <section className="card home-overview-hero">
         <div className="home-overview-hero-copy">
+          <p className="home-kicker">Yearn Decision Surface</p>
           <h1>Clear signals for faster vault decisions</h1>
           <p>Track yield shifts, spot vault trends, and find your next move.</p>
+          <div className="home-overview-hero-highlights" aria-label="Overview highlights">
+            <div className="home-overview-hero-highlight">
+              <span className="home-overview-hero-highlight-label">Current TVL</span>
+              <span className="home-overview-hero-highlight-value">
+                {formatUsdCompact(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 1)}
+              </span>
+            </div>
+            <div className="home-overview-hero-highlight">
+              <span className="home-overview-hero-highlight-label">Freshness</span>
+              <span className="home-overview-hero-highlight-value">
+                {formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}
+              </span>
+            </div>
+            <div className="home-overview-hero-highlight">
+              <span className="home-overview-hero-highlight-label">stYFI</span>
+              <span className="home-overview-hero-highlight-value">{styfiTotalYfi}</span>
+            </div>
+          </div>
           <div className="home-minimal-cta-row">
             <Link href="/discover" className="home-lite-cta primary">Start in Discover</Link>
             <Link href="/changes" className="home-lite-cta">Check Changes</Link>
             <Link href="/assets" className="home-lite-cta">Compare Assets</Link>
           </div>
+          <p className="home-overview-hero-meta">{liveFreshnessLine}</p>
         </div>
         <div className="home-overview-hero-art" aria-hidden="true">
           <Image
@@ -349,7 +379,7 @@ export default function HomePage() {
         </article>
       </section>
 
-      <section className="card home-overview-route-section">
+      <section className="card section-card home-overview-route-section">
         <div className="home-overview-section-head">
           <p className="home-kicker">Explore The Suite</p>
           <h2>Every primary destination is visible from the front door</h2>
@@ -359,8 +389,12 @@ export default function HomePage() {
           </p>
         </div>
         <div className="home-overview-route-grid">
-          {HOME_ROUTE_CARDS.map((card) => (
-            <Link key={card.href} href={card.href} className="card home-route-clickable home-overview-route-card">
+          {HOME_ROUTE_CARDS.map((card, index) => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className={`card home-route-clickable home-overview-route-card${index === 0 ? " is-featured" : ""}`}
+            >
               <p className="home-overview-route-eyebrow">{card.eyebrow}</p>
               <div className="home-route-head">
                 <h2>{card.title}</h2>
@@ -373,7 +407,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="card home-overview-playbooks">
+      <section className="card section-card home-overview-playbooks">
         <div className="home-overview-section-head">
           <p className="home-kicker">How To Use It</p>
           <h2>Move from scan to conviction without leaving the dashboard</h2>
@@ -397,7 +431,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="card home-overview-context">
+      <section className="card section-card home-overview-context">
         <div className="home-overview-context-art" aria-hidden="true">
           <Image
             src="/home-assets-yearn-blender/purpose-yearn-blender-coins.png"

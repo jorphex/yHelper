@@ -24,13 +24,15 @@ export function PageTopPanel({
   return (
     <section className={`card page-top-panel${className ? ` ${className}` : ""}`}>
       <div className="page-top-panel-copy">
-        <h2>{introTitle}</h2>
-        {intro}
+        <div className="page-top-panel-copy-head">
+          <h2>{introTitle}</h2>
+        </div>
+        <div className="page-top-panel-copy-body">{intro}</div>
       </div>
       <div className="page-top-panel-controls">
         <div className="page-top-panel-controls-head">
           <h2>{filtersTitle}</h2>
-          {filtersIntro}
+          {filtersIntro ? <div className="page-top-panel-controls-copy">{filtersIntro}</div> : null}
         </div>
         <div className="page-top-panel-controls-body">
           <div className="page-top-panel-controls-primary">{filters}</div>

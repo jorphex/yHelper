@@ -172,7 +172,7 @@ function ChainsPageContent() {
 
       {error ? <section className="card">{error}</section> : null}
 
-      <section className="card">
+      <section className="card section-card summary-card">
         <h2>Chain Universe Snapshot</h2>
         <p className="muted card-intro">At-a-glance totals for the current filter set.</p>
         <div className="split-grid chains-snapshot-layout">

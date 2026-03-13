@@ -70,17 +70,23 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </a>
         <header className="site-header">
           <nav className="site-nav" aria-label="Primary">
-            <div className="site-nav-top">
+            <div className="site-nav-shell">
               <Link href="/" className="site-brand" aria-label="yHelper overview">
-                <span className="site-brand-name">yHelper</span>
+                <span className="site-brand-mark" aria-hidden>
+                  YH
+                </span>
+                <span className="site-brand-copy">
+                  <span className="site-brand-name">yHelper</span>
+                  <span className="site-brand-tag">Vault signal layer</span>
+                </span>
               </Link>
+              <div className="site-nav-center">
+                <NavLinks />
+              </div>
               <div className="site-controls">
                 <FreshnessBadge />
                 <AudienceToggle />
               </div>
-            </div>
-            <div className="site-nav-bottom">
-              <NavLinks />
             </div>
           </nav>
         </header>

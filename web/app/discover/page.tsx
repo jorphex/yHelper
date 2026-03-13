@@ -866,7 +866,7 @@ function DiscoverPageContent() {
       {trendError ? <section className="card">{trendError}</section> : null}
 
       {!error && !data?.rows?.length ? (
-        <section className="card">
+        <section className="card section-card empty-state-card">
           <h2>No Vaults Match This Filter Yet</h2>
           <p className="muted card-intro">
             This usually means current filters are too strict for the latest ingestion cycle, not that the protocol has no vaults.
@@ -878,7 +878,7 @@ function DiscoverPageContent() {
         </section>
       ) : null}
 
-      <section className="card discover-universe-card">
+      <section className="card section-card summary-card discover-universe-card">
         <h2>Universe Snapshot</h2>
         <p className="muted card-intro">
           Current size and quality profile for the filtered vault universe. Coverage below separates vaults with enough PPS history
@@ -964,7 +964,7 @@ function DiscoverPageContent() {
         </p>
       </section>
 
-      <section className="card discover-analytics-card">
+      <section className="card section-card visual-card discover-analytics-card">
         <h2>Yield Structure and Trend Maps</h2>
         <p className="muted card-intro">
           Visual view of yield level, momentum direction, and concentration patterns in the current filtered universe.
@@ -1048,7 +1048,7 @@ function DiscoverPageContent() {
         <p className="muted discover-analytics-note">Delta compares the latest point against the previous day.</p>
       </section>
 
-      <section className="card">
+      <section className="card section-card table-card discover-table-card">
         <h2>Vault Universe</h2>
         <p className="muted card-intro">
           Filtered vaults with enough TVL and data history to reduce noisy outliers. Sort order follows the API sort controls above.

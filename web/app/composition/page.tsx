@@ -452,7 +452,7 @@ function CompositionPageContent() {
 
       {error ? <section className="card">{error}</section> : null}
 
-      <section className="card composition-visuals-card">
+      <section className="card section-card summary-card composition-visuals-card">
         <h2>Summary</h2>
         <p className="muted card-intro">HHI concentration runs from near 0 (diversified) toward 1 (highly concentrated).</p>
         <div className="split-grid composition-visual-grid">
@@ -481,7 +481,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card analyst-only">
+      <section className="card analyst-only section-card visual-card">
         <h2>Crowding Visuals</h2>
         <p className="muted card-intro">
           Scatter highlights APY versus size, while the heatmap shows where TVL share is concentrated in this filtered universe.
@@ -523,7 +523,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card section-card table-card">
         <h2>Chain Concentration</h2>
         <p className="muted card-intro">Click headers to sort by share, TVL, or weighted APY.</p>
         <div className="table-wrap">
@@ -613,7 +613,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card section-card table-card">
         <h2>Category Concentration</h2>
         <div className="table-wrap">
           <table className="composition-summary-table">
@@ -706,7 +706,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card analyst-only">
+      <section className="card analyst-only section-card table-card">
         <h2>Top Tokens by TVL</h2>
         <div className="table-wrap">
           <table className="composition-summary-table">
@@ -799,7 +799,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card section-card table-card">
         <h2>Most Crowded</h2>
         <p className="muted">High TVL relative to APY versus peers in the same filtered universe.</p>
         <div className="table-wrap">
@@ -925,7 +925,7 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <section className="card analyst-only">
+      <section className="card analyst-only section-card table-card">
         <h2>Least Crowded</h2>
         <p className="muted">Lower TVL relative to APY versus peers in the same filtered universe.</p>
         <div className="table-wrap">

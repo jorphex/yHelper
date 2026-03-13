@@ -618,7 +618,7 @@ function RegimesPageContent() {
 
       {error ? <section className="card">{error}</section> : null}
 
-      <section className="card regime-summary-card">
+      <section className="card section-card summary-card regime-summary-card">
         <h2>Current Regime State</h2>
         <p className="muted card-intro">Click column headers to sort by size, vault count, or regime name in the current snapshot.</p>
         <div className="regime-summary-layout">
@@ -703,7 +703,7 @@ function RegimesPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card section-card table-card">
         <h2>Current Regime Movers</h2>
         <p className="muted card-intro">Sort by momentum to spot short-term shifts, or by TVL to focus on size inside the current regime snapshot.</p>
         <div className="table-wrap">
@@ -829,7 +829,7 @@ function RegimesPageContent() {
         </div>
       </section>
 
-      <section className="card regime-transition-callout">
+      <section className="card section-card subtle-card regime-transition-callout">
         <h2>Transition Analysis</h2>
         <p className="muted card-intro">
           Use the next sections when the question is not which regime dominates now, but how cohorts are moving between prior and
@@ -837,7 +837,7 @@ function RegimesPageContent() {
         </p>
       </section>
 
-      <section className="card">
+      <section className="card section-card visual-card">
         <h2>Transition Matrix</h2>
         <p className="muted card-intro">
           Transition view compares short-term regime (7d vs 30d APY) against prior baseline regime (30d vs 90d APY).
@@ -881,7 +881,7 @@ function RegimesPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card section-card visual-card">
         <h2>Transition Flow Story</h2>
         <p className="muted card-intro">Visual flow of where TVL moved between prior and current regime states.</p>
         <div>
@@ -889,7 +889,7 @@ function RegimesPageContent() {
         </div>
       </section>
 
-      <section className="card analyst-only">
+      <section className="card analyst-only section-card visual-card">
         <h2>{`Transition Trend (Last ${query.transitionDays} Days)`}</h2>
         <p className="muted card-intro">
           Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.

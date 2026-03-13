@@ -138,7 +138,7 @@ export function BarList({
     <section ref={ref} className={`bar-panel ${isInView ? "is-in-view" : ""}`.trim()}>
       <h3>{title}</h3>
       {valid.length === 0 ? (
-        <p className="muted">{emptyText}</p>
+        <div className="panel-empty muted">{emptyText}</div>
       ) : (
         <ul className="bar-list">
           {valid.map((item, index) => {
@@ -190,7 +190,7 @@ export function HeatGrid({
     <>
       {title ? <h3>{title}</h3> : null}
       {valid.length === 0 ? (
-        <p className="muted">{emptyText}</p>
+        <div className="panel-empty muted">{emptyText}</div>
       ) : (
         <>
           <div className="heat-grid">
@@ -262,7 +262,7 @@ export function ShareMeter({
     <>
       {title ? <h3>{title}</h3> : null}
       {normalizedSegments.length === 0 || resolvedTotal <= 0 ? (
-        <p className="muted">{emptyText}</p>
+        <div className="panel-empty muted">{emptyText}</div>
       ) : (
         <>
           <div className="meter-track" aria-hidden="true">
@@ -329,14 +329,14 @@ export function TrendStrips({
       return (
         <div ref={ref} className={isInView ? "is-in-view" : undefined}>
           {title ? <h3>{title}</h3> : null}
-          <p className="muted">{emptyText}</p>
+          <div className="panel-empty muted">{emptyText}</div>
         </div>
       );
     }
     return (
       <section ref={ref} className={`viz-panel ${isInView ? "is-in-view" : ""}`.trim()}>
         <h3>{title}</h3>
-        <p className="muted">{emptyText}</p>
+        <div className="panel-empty muted">{emptyText}</div>
       </section>
     );
   }
@@ -433,7 +433,7 @@ export function ScatterPlot({
     return (
       <section ref={ref} className={`viz-panel ${className ?? ""} ${isInView ? "is-in-view" : ""}`.trim()}>
         <h3>{title}</h3>
-        <p className="muted">{emptyText}</p>
+        <div className="panel-empty muted">{emptyText}</div>
       </section>
     );
   }

@@ -184,7 +184,7 @@ function MoverTable({
   });
 
   return (
-    <section className="card">
+    <section className="card section-card table-card changes-mover-card">
       <h2>{title}</h2>
       <p className="muted card-intro">
         Click columns to sort by signal, size, or data staleness. Pro mode adds token/category and previous-APY context columns.
@@ -851,7 +851,7 @@ function ChangesPageContent() {
       {error ? <section className="card">{error}</section> : null}
       {trendError ? <section className="card">{trendError}</section> : null}
 
-      <section className="card">
+      <section className="card section-card summary-card">
         <h2>Window Summary</h2>
         <p className="muted card-intro">
           Current APY uses the selected range. Previous APY uses the immediately prior range. Delta is current minus previous.
@@ -864,7 +864,7 @@ function ChangesPageContent() {
         </p>
       </section>
 
-      <section className="card" id="freshness-panels">
+      <section className="card section-card summary-card" id="freshness-panels">
         <h2>Trust Signals</h2>
         <p className="muted card-intro">
           These metrics show whether recent data is fresh enough to trust changes. Current stale cutoff:{" "}
@@ -898,7 +898,44 @@ function ChangesPageContent() {
         </div>
       </section>
 
-      <section className="card changes-visuals-card analyst-only">
+      <MoverTable
+        title="Top Risers"
+        rows={data?.movers.risers ?? []}
+        universe={query.universe}
+        minTvl={query.minTvl}
+        minPoints={query.minPoints}
+        compact={isCompactViewport}
+      />
+      <MoverTable
+        title="Top Fallers"
+        rows={data?.movers.fallers ?? []}
+        universe={query.universe}
+        minTvl={query.minTvl}
+        minPoints={query.minPoints}
+        compact={isCompactViewport}
+      />
+      <div className="analyst-only">
+        <MoverTable
+          title="Largest Absolute Changes"
+          rows={data?.movers.largest_abs_delta ?? []}
+          universe={query.universe}
+          minTvl={query.minTvl}
+          minPoints={query.minPoints}
+          compact={isCompactViewport}
+        />
+      </div>
+      <div className="analyst-only">
+        <MoverTable
+          title="Stalest Series"
+          rows={data?.stale ?? []}
+          universe={query.universe}
+          minTvl={query.minTvl}
+          minPoints={query.minPoints}
+          compact={isCompactViewport}
+        />
+      </div>
+
+      <section className="card analyst-only section-card visual-card changes-visuals-card">
         <h2>Delta Visuals and Freshness Heatmaps</h2>
         <p className="muted card-intro">
           Delta bands use percentage points (for example, +2.0 means APY rose by two points versus the previous window).
@@ -967,7 +1004,7 @@ function ChangesPageContent() {
         </div>
       </section>
 
-      <section className="card analyst-only">
+      <section className="card analyst-only section-card visual-card">
         <h2>Grouped Momentum Snapshot (Latest Day)</h2>
         <p className="muted card-intro">
           TVL-weighted momentum by chain/category (7d APY minus 30d APY). Positive values indicate short-term strengthening.
@@ -988,7 +1025,7 @@ function ChangesPageContent() {
         </div>
       </section>
 
-      <section className="card">
+      <section className="card section-card table-card">
         <h2>Freshness by Chain</h2>
         <div className="table-wrap">
           <table className="changes-stale-table">
@@ -1084,7 +1121,7 @@ function ChangesPageContent() {
         </div>
       </section>
 
-      <section className="card analyst-only">
+      <section className="card analyst-only section-card table-card">
         <h2>Freshness by Category</h2>
         <div className="table-wrap">
           <table className="changes-stale-table">
@@ -1180,42 +1217,6 @@ function ChangesPageContent() {
         </div>
       </section>
 
-      <MoverTable
-        title="Top Risers"
-        rows={data?.movers.risers ?? []}
-        universe={query.universe}
-        minTvl={query.minTvl}
-        minPoints={query.minPoints}
-        compact={isCompactViewport}
-      />
-      <MoverTable
-        title="Top Fallers"
-        rows={data?.movers.fallers ?? []}
-        universe={query.universe}
-        minTvl={query.minTvl}
-        minPoints={query.minPoints}
-        compact={isCompactViewport}
-      />
-      <div className="analyst-only">
-        <MoverTable
-          title="Largest Absolute Changes"
-          rows={data?.movers.largest_abs_delta ?? []}
-          universe={query.universe}
-          minTvl={query.minTvl}
-          minPoints={query.minPoints}
-          compact={isCompactViewport}
-        />
-      </div>
-      <div className="analyst-only">
-        <MoverTable
-          title="Stalest Series"
-          rows={data?.stale ?? []}
-          universe={query.universe}
-          minTvl={query.minTvl}
-          minPoints={query.minPoints}
-          compact={isCompactViewport}
-        />
-      </div>
     </main>
   );
 }

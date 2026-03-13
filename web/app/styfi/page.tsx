@@ -436,7 +436,7 @@ function StYfiPageContent() {
 
       {error ? <section className="card">{error}</section> : null}
 
-      <section className="card styfi-summary-card">
+      <section className="card section-card summary-card styfi-summary-card">
         <h2>Protocol Snapshot</h2>
         <p className="muted card-intro">
           The reward token is currently {rewardSymbol}. Rolling history is capped at {data?.data_policy?.retention_days ?? "n/a"} days,
@@ -466,7 +466,7 @@ function StYfiPageContent() {
         />
       </section>
 
-      <section className="card">
+      <section className="card section-card visual-card">
         <TrendStrips
           title="Stake Trend"
           items={stakeTrendItems}
@@ -478,7 +478,7 @@ function StYfiPageContent() {
         />
       </section>
 
-      <section className="card">
+      <section className="card section-card table-card">
         <h2>Epoch Detail</h2>
         <p className="muted card-intro">
           Epochs start at 00:00:00 UTC. Current epochs can show a funded reward pot before splits are fully synced. Component columns
