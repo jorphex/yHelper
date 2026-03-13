@@ -743,6 +743,18 @@ function ChangesPageContent() {
         })),
     [categoryTrendLatest, isCompactViewport],
   );
+
+  if (error && !data) {
+    return (
+      <main className="container">
+        <section className="card section-card status-card status-card-error">
+          <h2>Changes data is temporarily unavailable</h2>
+          <p className="card-intro">The change feed failed before any mover rows loaded, so the route is withholding its summary stack until the data source recovers.</p>
+          <p className="muted">Retry after the next ingestion cycle or reopen the route when the API is healthy again.</p>
+        </section>
+      </main>
+    );
+  }
   return (
     <main className="container">
       <section className="hero">
@@ -848,7 +860,6 @@ function ChangesPageContent() {
         }
       />
 
-      {error ? <section className="card">{error}</section> : null}
       {trendError ? <section className="card">{trendError}</section> : null}
 
       <section className="card section-card summary-card">
@@ -906,34 +917,39 @@ function ChangesPageContent() {
         minPoints={query.minPoints}
         compact={isCompactViewport}
       />
-      <MoverTable
-        title="Top Fallers"
-        rows={data?.movers.fallers ?? []}
-        universe={query.universe}
-        minTvl={query.minTvl}
-        minPoints={query.minPoints}
-        compact={isCompactViewport}
-      />
-      <div className="analyst-only">
-        <MoverTable
-          title="Largest Absolute Changes"
-          rows={data?.movers.largest_abs_delta ?? []}
-          universe={query.universe}
-          minTvl={query.minTvl}
-          minPoints={query.minPoints}
-          compact={isCompactViewport}
-        />
-      </div>
-      <div className="analyst-only">
-        <MoverTable
-          title="Stalest Series"
-          rows={data?.stale ?? []}
-          universe={query.universe}
-          minTvl={query.minTvl}
-          minPoints={query.minPoints}
-          compact={isCompactViewport}
-        />
-      </div>
+      <details className="section-details" open={!isCompactViewport}>
+        <summary>More mover tables</summary>
+        <div className="section-details-body">
+          <MoverTable
+            title="Top Fallers"
+            rows={data?.movers.fallers ?? []}
+            universe={query.universe}
+            minTvl={query.minTvl}
+            minPoints={query.minPoints}
+            compact={isCompactViewport}
+          />
+          <div className="analyst-only">
+            <MoverTable
+              title="Largest Absolute Changes"
+              rows={data?.movers.largest_abs_delta ?? []}
+              universe={query.universe}
+              minTvl={query.minTvl}
+              minPoints={query.minPoints}
+              compact={isCompactViewport}
+            />
+          </div>
+          <div className="analyst-only">
+            <MoverTable
+              title="Stalest Series"
+              rows={data?.stale ?? []}
+              universe={query.universe}
+              minTvl={query.minTvl}
+              minPoints={query.minPoints}
+              compact={isCompactViewport}
+            />
+          </div>
+        </div>
+      </details>
 
       <section className="card analyst-only section-card visual-card changes-visuals-card">
         <h2>Delta Visuals and Freshness Heatmaps</h2>

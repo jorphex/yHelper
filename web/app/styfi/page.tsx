@@ -383,6 +383,18 @@ function StYfiPageContent() {
     ],
   );
 
+  if (error && !data) {
+    return (
+      <main className="container">
+        <section className="card section-card status-card status-card-error">
+          <h2>stYFI data is temporarily unavailable</h2>
+          <p className="card-intro">The staking snapshot endpoint failed before any page data loaded. The layout is intact, but the live protocol cards are intentionally withheld until the feed recovers.</p>
+          <p className="muted">Retry after the next ingestion cycle or check the live app again once the API health recovers.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="container">
       <section className="hero">
@@ -396,6 +408,16 @@ function StYfiPageContent() {
             Open stYFI App
           </a>
         </div>
+      </section>
+
+      <section className="card section-card summary-card styfi-summary-card">
+        <h2>Protocol Snapshot</h2>
+        <p className="muted card-intro">
+          The reward token is currently {rewardSymbol}. Rolling history is capped at {data?.data_policy?.retention_days ?? "n/a"} days,
+          with higher-frequency snapshots capped at {data?.data_policy?.snapshot_retention_days ?? "n/a"} days. Net-flow cards appear
+          only once enough history exists to make them meaningful.
+        </p>
+        <KpiGrid items={summaryItems} />
       </section>
 
       <PageTopPanel
@@ -432,19 +454,8 @@ function StYfiPageContent() {
         }
         introTitle="What It Tracks"
         filtersTitle="History Coverage"
+        className="styfi-history-panel"
       />
-
-      {error ? <section className="card">{error}</section> : null}
-
-      <section className="card section-card summary-card styfi-summary-card">
-        <h2>Protocol Snapshot</h2>
-        <p className="muted card-intro">
-          The reward token is currently {rewardSymbol}. Rolling history is capped at {data?.data_policy?.retention_days ?? "n/a"} days,
-          with higher-frequency snapshots capped at {data?.data_policy?.snapshot_retention_days ?? "n/a"} days. Net-flow cards appear
-          only once enough history exists to make them meaningful.
-        </p>
-        <KpiGrid items={summaryItems} />
-      </section>
 
       <section className="split-grid styfi-visual-grid">
         <ShareMeter
@@ -484,7 +495,51 @@ function StYfiPageContent() {
           Epochs start at 00:00:00 UTC. Current epochs can show a funded reward pot before splits are fully synced. Component columns
           below are completed-epoch protocol allocations, not user claim totals.
         </p>
-        <div className="table-wrap styfi-epoch-wrap">
+        <div className="mobile-only styfi-epoch-mobile-list">
+          {[...epochSeries].reverse().map((row) => {
+            const isCurrentEpoch =
+              row.epoch !== null &&
+              row.epoch !== undefined &&
+              currentEpoch !== null &&
+              currentEpoch !== undefined &&
+              row.epoch === currentEpoch;
+            return (
+              <article key={`mobile-${row.epoch ?? row.epoch_start ?? "epoch"}`} className="styfi-epoch-mobile-card">
+                <div className="styfi-epoch-mobile-head">
+                  <p className="home-kicker">Epoch {row.epoch ?? "n/a"}</p>
+                  <span className="pill">{isCurrentEpoch ? "Ongoing" : "Completed"}</span>
+                </div>
+                <div className="styfi-epoch-mobile-grid">
+                  <div>
+                    <span>Start</span>
+                    <strong>{formatUtcDate(row.epoch_start ?? null)}</strong>
+                  </div>
+                  <div>
+                    <span>Reward Pot</span>
+                    <strong>{formatToken(row.reward_total ?? null, rewardSymbol, 2)}</strong>
+                  </div>
+                  <div>
+                    <span>stYFI</span>
+                    <strong>{formatToken(row.reward_styfi ?? null, rewardSymbol, 2)}</strong>
+                  </div>
+                  <div>
+                    <span>stYFIx</span>
+                    <strong>{formatToken(row.reward_styfix ?? null, rewardSymbol, 2)}</strong>
+                  </div>
+                  <div>
+                    <span>Migrated veYFI</span>
+                    <strong>{formatToken(row.reward_veyfi ?? null, rewardSymbol, 2)}</strong>
+                  </div>
+                  <div>
+                    <span>Liquid Lockers</span>
+                    <strong>{formatToken(row.reward_liquid_lockers ?? null, rewardSymbol, 2)}</strong>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        <div className="table-wrap styfi-epoch-wrap desktop-only">
           <table className="styfi-epoch-table">
             <thead>
               <tr>

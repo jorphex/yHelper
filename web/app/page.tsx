@@ -314,6 +314,92 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="card section-card home-overview-route-section">
+        <div className="home-overview-section-head">
+          <p className="home-kicker">Explore The Suite</p>
+          <h2>Every primary destination is visible from the front door</h2>
+          <p className="card-intro">
+            Pick the page that matches your question: scan, compare, time, inspect concentration, follow behavior, compare chains,
+            or check staking context.
+          </p>
+        </div>
+        <div className="home-overview-route-grid">
+          {HOME_ROUTE_CARDS.map((card, index) => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className={`card home-route-clickable home-overview-route-card${index === 0 ? " is-featured" : ""}`}
+            >
+              <p className="home-overview-route-eyebrow">{card.eyebrow}</p>
+              <div className="home-route-head">
+                <h2>{card.title}</h2>
+              </div>
+              <p className="muted">{card.description}</p>
+              <p className="home-overview-route-note">{card.note}</p>
+              <span className="home-route-arrow" aria-hidden="true">→</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="card analyst-only section-card home-overview-analyst-section">
+        <div className="home-overview-section-head">
+          <p className="home-kicker">Live Analyst View</p>
+          <h2>Keep the front door actionable when you already know the workflow</h2>
+          <p className="card-intro">Analyst mode surfaces current movement, coverage quality, and staking context instead of onboarding guidance.</p>
+        </div>
+        <div className="home-overview-analyst-grid">
+          <article className="home-overview-analyst-card" aria-live="polite">
+            <p className="home-kicker">Latest Shift</p>
+            <p className="home-overview-summary-value">{liveShiftValue}</p>
+            <p className="home-overview-summary-note">
+              {liveShiftHref ? (
+                <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
+                  {topMoverName}
+                </a>
+              ) : (
+                topMoverName
+              )}{" "}
+              · 30d APY now {liveShiftApy}
+            </p>
+            <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
+          </article>
+          <article className="home-overview-analyst-card">
+            <p className="home-kicker">Coverage Quality</p>
+            <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}</p>
+            <p className="home-overview-summary-note">Latest PPS age in tracked scope.</p>
+            <ShareMeter
+              title=""
+              embedded
+              total={1}
+              segments={[
+                {
+                  id: "fresh",
+                  label: "Fresh",
+                  value: freshRatio,
+                  note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within 24h cutoff` : "Coverage syncing",
+                  tone: "positive",
+                },
+                {
+                  id: "stale",
+                  label: "Stale",
+                  value: staleRatio,
+                  note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} past 24h cutoff` : "Stale share syncing",
+                  tone: "warning",
+                },
+              ]}
+              valueFormatter={(value) => formatPct(value, 0)}
+            />
+          </article>
+          <article className="home-overview-analyst-card">
+            <p className="home-kicker">Staking Context</p>
+            <p className="home-overview-summary-value">{styfiTotalYfi}</p>
+            <p className="home-overview-summary-note">Combined YFI currently staked across stYFI and stYFIx.</p>
+            <p className="home-overview-summary-meta">Current reward run-rate {styfiApr}</p>
+          </article>
+        </div>
+      </section>
+
       <section className="home-overview-summary">
         <article className="card home-overview-summary-card">
           <p className="home-kicker">Current Yearn TVL</p>
@@ -379,35 +465,7 @@ export default function HomePage() {
         </article>
       </section>
 
-      <section className="card section-card home-overview-route-section">
-        <div className="home-overview-section-head">
-          <p className="home-kicker">Explore The Suite</p>
-          <h2>Every primary destination is visible from the front door</h2>
-          <p className="card-intro">
-            Pick the page that matches your question: scan, compare, time, inspect concentration, follow behavior, compare chains,
-            or check staking context.
-          </p>
-        </div>
-        <div className="home-overview-route-grid">
-          {HOME_ROUTE_CARDS.map((card, index) => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className={`card home-route-clickable home-overview-route-card${index === 0 ? " is-featured" : ""}`}
-            >
-              <p className="home-overview-route-eyebrow">{card.eyebrow}</p>
-              <div className="home-route-head">
-                <h2>{card.title}</h2>
-              </div>
-              <p className="muted">{card.description}</p>
-              <p className="home-overview-route-note">{card.note}</p>
-              <span className="home-route-arrow" aria-hidden="true">→</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="card section-card home-overview-playbooks">
+      <section className="card guide-only section-card home-overview-playbooks">
         <div className="home-overview-section-head">
           <p className="home-kicker">How To Use It</p>
           <h2>Move from scan to conviction without leaving the dashboard</h2>

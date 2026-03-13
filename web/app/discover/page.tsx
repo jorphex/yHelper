@@ -707,6 +707,57 @@ function DiscoverPageContent() {
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
 
+  const discoverSnapshotItems = [
+    { label: "Vaults", value: String(data?.summary?.vaults ?? data?.pagination.total ?? "n/a") },
+    { label: "Chains", value: String(data?.summary?.chains ?? "n/a") },
+    { label: "Tokens", value: String(data?.summary?.tokens ?? "n/a") },
+    { label: "Median APY", value: formatPct(data?.summary?.median_safe_apy_30d) },
+    {
+      label: "Metric Coverage",
+      value: formatPct(data?.coverage?.coverage_ratio, 0),
+      hint:
+        data?.coverage?.with_metrics !== undefined && data?.coverage?.visible_vaults !== undefined
+          ? `${data.coverage.with_metrics}/${data.coverage.visible_vaults} visible vaults scoreable`
+          : "Visible vaults with enough PPS history for APY",
+    },
+    {
+      label: "Avg Momentum",
+      value: formatPct(data?.summary?.avg_momentum_7d_30d),
+      hint: "7d APY minus 30d APY; positive means improving",
+    },
+    ...(isCompactViewport
+      ? []
+      : [
+          {
+            label: "Avg Consistency",
+            value: formatPct(data?.summary?.avg_consistency_score),
+            hint: "Higher means steadier yield behavior",
+          },
+          {
+            label: "Avg Strategies",
+            value: formatFixed(data?.summary?.avg_strategies_per_vault, 2),
+            hint: "Average number of strategy slots per vault",
+          },
+          {
+            label: "Needs More History",
+            value: String(data?.coverage?.missing_or_low_points ?? "n/a"),
+            hint: "Visible vaults missing metrics or still below the point threshold",
+          },
+        ]),
+  ];
+
+  if (error && !data) {
+    return (
+      <main className="container">
+        <section className="card section-card status-card status-card-error">
+          <h2>Discover data is temporarily unavailable</h2>
+          <p className="card-intro">The route loaded without any vault rows, so the page is holding back its ranking cards until the feed recovers.</p>
+          <p className="muted">Try again after the next ingestion run or lower filters once the API is healthy again.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="container">
       <section className="hero">
@@ -862,7 +913,6 @@ function DiscoverPageContent() {
         secondaryFiltersTitle="Segmentation Filters"
       />
 
-      {error ? <section className="card">{error}</section> : null}
       {trendError ? <section className="card">{trendError}</section> : null}
 
       {!error && !data?.rows?.length ? (
@@ -886,44 +936,7 @@ function DiscoverPageContent() {
         </p>
         <div className="discover-universe-layout">
           <div className="discover-kpis">
-          <KpiGrid
-            items={[
-              { label: "Vaults", value: String(data?.summary?.vaults ?? data?.pagination.total ?? "n/a") },
-              { label: "Chains", value: String(data?.summary?.chains ?? "n/a") },
-              { label: "Tokens", value: String(data?.summary?.tokens ?? "n/a") },
-              { label: "Median APY", value: formatPct(data?.summary?.median_safe_apy_30d) },
-              {
-                label: "Metric Coverage",
-                value: formatPct(data?.coverage?.coverage_ratio, 0),
-                hint:
-                  data?.coverage?.with_metrics !== undefined && data?.coverage?.visible_vaults !== undefined
-                    ? `${data.coverage.with_metrics}/${data.coverage.visible_vaults} visible vaults scoreable`
-                    : "Visible vaults with enough PPS history for APY",
-              },
-              {
-                label: "Avg Momentum",
-                value: formatPct(data?.summary?.avg_momentum_7d_30d),
-                hint: "7d APY minus 30d APY; positive means improving",
-              },
-              {
-                label: "Avg Consistency",
-                value: formatPct(data?.summary?.avg_consistency_score),
-                hint: "Higher means steadier yield behavior",
-              },
-              {
-                label: "Avg Strategies",
-                value: formatFixed(data?.summary?.avg_strategies_per_vault, 2),
-                hint: "Average number of strategy slots per vault",
-              },
-              { label: "Migration Ready", value: String(data?.summary?.migration_ready_vaults ?? "n/a") },
-              { label: "Highlighted", value: String(data?.summary?.highlighted_vaults ?? "n/a") },
-              {
-                label: "Needs More History",
-                value: String(data?.coverage?.missing_or_low_points ?? "n/a"),
-                hint: "Visible vaults missing metrics or still below the point threshold",
-              },
-            ]}
-          />
+            <KpiGrid items={discoverSnapshotItems} />
           </div>
           <div className="discover-mix-grid">
             <BarList
@@ -962,6 +975,74 @@ function DiscoverPageContent() {
           Unknown APY means the vault is visible in scope but still missing enough PPS history to score. Regime mix is shown on the
           Regimes page to avoid duplicated charts.
         </p>
+      </section>
+
+      <section className="card section-card table-card discover-table-card">
+        <h2>Vault Universe</h2>
+        <p className="muted card-intro">
+          Filtered vaults with enough TVL and data history to reduce noisy outliers. Sort order follows the API sort controls above.
+          Switch to Pro mode for extra context columns. Rows:{" "}
+          {data?.pagination.total ?? "loading..."}
+        </p>
+        <div className="table-wrap">
+          <table className="discover-table">
+            <thead>
+              <tr>
+                <th className="col-vault">Vault</th>
+                <th className="col-chain">Chain</th>
+                <th className="col-token">Token</th>
+                <th className="analyst-only col-category">Category</th>
+                <th className="is-numeric col-tvl">TVL</th>
+                <th className="is-numeric col-apy">APY 30d</th>
+                <th className="is-numeric col-momentum">Momentum</th>
+                <th className="is-numeric tablet-hide analyst-only col-consistency">Consistency</th>
+                <th className="tablet-hide analyst-only col-risk">Risk</th>
+                <th className="analyst-only col-regime">Regime</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.vault_address}>
+                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
+                  <td className="col-chain" title={chainLabel(row.chain_id)}>
+                    <Link
+                      href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
+                      scroll={false}
+                    >
+                      {compactChainLabel(row.chain_id, isCompactViewport)}
+                    </Link>
+                  </td>
+                  <td className="col-token">
+                    {row.token_symbol ? (
+                      <Link
+                        href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
+                        title="Open token venues in Assets"
+                      >
+                        {row.token_symbol} ↗
+                      </Link>
+                    ) : (
+                      "n/a"
+                    )}
+                  </td>
+                  <td className="analyst-only col-category" title={row.category || "n/a"}>
+                    {compactCategoryLabel(row.category, isCompactViewport)}
+                  </td>
+                  <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
+                  <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
+                  <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
+                  <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
+                  <td
+                    className="tablet-hide analyst-only col-risk"
+                    title={`${riskLevelLabel(row.risk_level)}${row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}${row.migration_available ? " · Migr" : ""}${row.is_highlighted ? " · High" : ""}${row.is_retired ? " · Ret" : ""}`}
+                  >
+                    {compactRiskCellLabel(row, isCompactViewport)}
+                  </td>
+                  <td className="analyst-only col-regime" title={compactRegimeLabel(row.regime)}>{compactRegimeLabel(row.regime)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="card section-card visual-card discover-analytics-card">
@@ -1046,74 +1127,6 @@ function DiscoverPageContent() {
           </div>
         </div>
         <p className="muted discover-analytics-note">Delta compares the latest point against the previous day.</p>
-      </section>
-
-      <section className="card section-card table-card discover-table-card">
-        <h2>Vault Universe</h2>
-        <p className="muted card-intro">
-          Filtered vaults with enough TVL and data history to reduce noisy outliers. Sort order follows the API sort controls above.
-          Switch to Pro mode for extra context columns. Rows:{" "}
-          {data?.pagination.total ?? "loading..."}
-        </p>
-        <div className="table-wrap">
-          <table className="discover-table">
-            <thead>
-              <tr>
-                <th className="col-vault">Vault</th>
-                <th className="col-chain">Chain</th>
-                <th className="col-token">Token</th>
-                <th className="analyst-only col-category">Category</th>
-                <th className="is-numeric col-tvl">TVL</th>
-                <th className="is-numeric col-apy">APY 30d</th>
-                <th className="is-numeric col-momentum">Momentum</th>
-                <th className="is-numeric tablet-hide analyst-only col-consistency">Consistency</th>
-                <th className="tablet-hide analyst-only col-risk">Risk</th>
-                <th className="analyst-only col-regime">Regime</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.vault_address}>
-                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td className="col-chain" title={chainLabel(row.chain_id)}>
-                    <Link
-                      href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
-                      scroll={false}
-                    >
-                      {compactChainLabel(row.chain_id, isCompactViewport)}
-                    </Link>
-                  </td>
-                  <td className="col-token">
-                    {row.token_symbol ? (
-                      <Link
-                        href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
-                        title="Open token venues in Assets"
-                      >
-                        {row.token_symbol} ↗
-                      </Link>
-                    ) : (
-                      "n/a"
-                    )}
-                  </td>
-                  <td className="analyst-only col-category" title={row.category || "n/a"}>
-                    {compactCategoryLabel(row.category, isCompactViewport)}
-                  </td>
-                  <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
-                  <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
-                  <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
-                  <td
-                    className="tablet-hide analyst-only col-risk"
-                    title={`${riskLevelLabel(row.risk_level)}${row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}${row.migration_available ? " · Migr" : ""}${row.is_highlighted ? " · High" : ""}${row.is_retired ? " · Ret" : ""}`}
-                  >
-                    {compactRiskCellLabel(row, isCompactViewport)}
-                  </td>
-                  <td className="analyst-only col-regime" title={compactRegimeLabel(row.regime)}>{compactRegimeLabel(row.regime)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
     </main>
   );

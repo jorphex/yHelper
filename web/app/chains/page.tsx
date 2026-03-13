@@ -126,6 +126,18 @@ function ChainsPageContent() {
     [data?.rows],
   );
 
+  if (error && !data) {
+    return (
+      <main className="container">
+        <section className="card section-card status-card status-card-error">
+          <h2>Chain rollups are temporarily unavailable</h2>
+          <p className="card-intro">The chain snapshot failed before any rollup rows loaded, so the route is holding back the KPI and table stack until the data feed recovers.</p>
+          <p className="muted">Retry after the next ingestion cycle or reopen the route once the API is healthy again.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="container">
       <section className="hero">
@@ -169,8 +181,6 @@ function ChainsPageContent() {
           </div>
         }
       />
-
-      {error ? <section className="card">{error}</section> : null}
 
       <section className="card section-card summary-card">
         <h2>Chain Universe Snapshot</h2>

@@ -284,6 +284,18 @@ function AssetsPageContent() {
     [filteredTokenRows],
   );
 
+  if (assetsError && !assetData) {
+    return (
+      <main className="container">
+        <section className="card section-card status-card status-card-error">
+          <h2>Asset comparison is temporarily unavailable</h2>
+          <p className="card-intro">The token list did not load, so the comparison surface is holding back its KPI and table stack until the feed recovers.</p>
+          <p className="muted">Retry after the next ingestion run or check again once the API is healthy.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="container">
       <section className="hero">
@@ -346,10 +358,6 @@ function AssetsPageContent() {
                 onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
               />
             </label>
-          </div>
-        }
-        secondaryFilters={
-          <div className="inline-controls controls-tight">
             <label>
               Selected Token:&nbsp;
               <select value={selectedSymbol} onChange={(event) => updateQuery({ token: event.target.value })}>
@@ -364,6 +372,10 @@ function AssetsPageContent() {
                 )}
               </select>
             </label>
+          </div>
+        }
+        secondaryFilters={
+          <div className="inline-controls controls-tight">
             <label>
               Rows:&nbsp;
               <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
@@ -402,241 +414,7 @@ function AssetsPageContent() {
         secondaryFiltersTitle="Sort And Search"
       />
 
-      {assetsError ? <section className="card">{assetsError}</section> : null}
       {detailError ? <section className="card">{detailError}</section> : null}
-
-      <section className="card section-card summary-card assets-universe-card">
-        <h2>Token Universe</h2>
-        <p className="muted card-intro">
-          Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
-          Canonical shows all plain symbols. All includes LP and structured symbols.
-        </p>
-        <p className="muted card-intro">
-          Current detail view: <strong>{selectedSymbol || "No token selected"}</strong>. Use <strong>Selected Token</strong> in the
-          filter panel above to change the venue detail below.
-        </p>
-        {query.tokenScope === "featured" ? (
-          <p className="muted card-intro">
-            Featured criteria: token TVL at least {formatUsd(assetData?.filters?.featured_min_tvl_usd)}, at least{" "}
-            {featuredMinVenues ?? "n/a"} {featuredMinVenues === 1 ? "venue" : "venues"}, and at least {featuredMinChains ?? "n/a"}{" "}
-            {featuredMinChains === 1 ? "chain" : "chains"}.
-          </p>
-        ) : null}
-        {filteredTokenRows.length === 0 ? (
-          <p className="muted card-intro">
-            No tokens matched this filter set. Lower <strong>Min TVL</strong>, lower <strong>Min Points</strong>, or switch list mode.
-          </p>
-        ) : null}
-        <div className="split-grid assets-universe-top">
-          <KpiGrid
-            items={[
-              { label: "Tokens", value: String(assetData?.summary?.tokens ?? tokenRows.length) },
-              {
-                label: "Featured Available",
-                value: String(assetData?.summary?.tokens_available_featured ?? "n/a"),
-                hint: "Large + multi-venue",
-              },
-              {
-                label: "Median Spread",
-                value: formatPct(assetData?.summary?.median_spread_safe_apy_30d),
-                hint: "Middle APY spread (best minus worst venue) across tokens",
-              },
-              {
-                label: "Multi-Chain Tokens",
-                value: String(assetData?.summary?.multi_chain_tokens ?? "n/a"),
-                hint: "Tokens available on more than one chain",
-              },
-              {
-                label: "High Spread Tokens",
-                value: String(assetData?.summary?.high_spread_tokens ?? "n/a"),
-                hint: "Tokens with APY spread >= 2 percentage points",
-              },
-              {
-                label: "Canonical Available",
-                value: String(assetData?.summary?.tokens_available_canonical ?? "n/a"),
-                hint: "Plain token symbols (no LP/structured syntax)",
-              },
-              {
-                label: "Structured Available",
-                value: String(assetData?.summary?.tokens_available_structured ?? "n/a"),
-                hint: "LP/pooled/structured symbols detected by token format",
-              },
-            ]}
-          />
-          <div className="analyst-only">
-            <BarList
-              title="Top Tokens by TVL"
-              items={topTokenByTvl.map((row) => ({
-                id: row.token_symbol,
-                label: row.token_symbol,
-                value: row.total_tvl_usd,
-                note: `Spread ${formatPct(row.spread_safe_apy_30d)}`,
-              }))}
-              valueFormatter={(value) => formatUsd(value)}
-            />
-          </div>
-        </div>
-        <section className="assets-spread-cards analyst-only">
-          <h3>Token Spread Cards</h3>
-          <div className="assets-spread-card-grid">
-            {tokenSpreadCards.map((row) => {
-              const best = row.best_safe_apy_30d ?? 0;
-              const weighted = row.weighted_safe_apy_30d ?? 0;
-              const spread = row.spread_safe_apy_30d ?? 0;
-              const worst = best - spread;
-              const maxAbs = Math.max(0.08, Math.abs(best), Math.abs(weighted), Math.abs(worst));
-              const sparkHeight = 58;
-              const sparkBaseline = 54;
-              const toY = (value: number) => sparkBaseline - ((value + maxAbs) / (2 * maxAbs)) * 47;
-              const sparkLeft = 2;
-              const sparkMid = 66;
-              const sparkRight = 130;
-              const spark = `M${sparkLeft},${toY(worst).toFixed(2)} L${sparkMid},${toY(weighted).toFixed(2)} L${sparkRight},${toY(best).toFixed(2)}`;
-              const nearFlat = spread < 0.15;
-              return (
-                <button
-                  key={`spread-card-${row.token_symbol}`}
-                  type="button"
-                  className="assets-spread-card"
-                  onClick={() => updateQuery({ token: row.token_symbol })}
-                >
-                  <p className="assets-spread-token">{row.token_symbol}</p>
-                  <svg viewBox={`0 0 132 ${sparkHeight}`} aria-label={`${row.token_symbol} APY spread shape`}>
-                    <line x1={sparkLeft} y1={sparkBaseline} x2={sparkRight} y2={sparkBaseline} className="assets-spread-baseline" />
-                    <path d={spark} className="assets-spread-line" />
-                    <circle cx={sparkLeft} cy={toY(worst)} r={2.25} className="assets-spread-point" />
-                    <circle cx={sparkMid} cy={toY(weighted)} r={2.25} className="assets-spread-point" />
-                    <circle cx={sparkRight} cy={toY(best)} r={2.25} className="assets-spread-point" />
-                  </svg>
-                  <p className="assets-spread-value">{formatPct(spread)}</p>
-                  <p className="assets-spread-note muted">
-                    {nearFlat ? "Near-flat spread." : "Worst → weighted → best."} {formatPct(worst, 1)} · {formatPct(weighted, 1)} ·{" "}
-                    {formatPct(best, 1)}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-          <p className="muted viz-legend">
-            Cards rank by APY spread. Sparkline points are worst → weighted → best APY; flatter lines mean token venues are currently similar.
-          </p>
-        </section>
-        {filteredTokenRows.length === 0 ? (
-          <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch List mode.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="assets-token-table">
-              <thead>
-                <tr>
-                  <th className="col-token">
-                    <button
-                      className={`th-button ${tokenSort.key === "token" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(tokenSort, "token");
-                        setTokenSort(next);
-                        updateQuery({ token_sort: next.key, token_dir: next.direction });
-                      }}
-                    >
-                      Token <span className="th-indicator">{sortIndicator(tokenSort, "token")}</span>
-                    </button>
-                  </th>
-                  {query.tokenScope === "all" ? <th className="col-type">Type</th> : null}
-                  <th className="is-numeric col-venues">
-                    <button
-                      className={`th-button ${tokenSort.key === "venues" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(tokenSort, "venues");
-                        setTokenSort(next);
-                        updateQuery({ token_sort: next.key, token_dir: next.direction });
-                      }}
-                    >
-                      Venues <span className="th-indicator">{sortIndicator(tokenSort, "venues")}</span>
-                    </button>
-                  </th>
-                  <th className="is-numeric tablet-hide analyst-only col-chains">
-                    <button
-                      className={`th-button ${tokenSort.key === "chains" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(tokenSort, "chains");
-                        setTokenSort(next);
-                        updateQuery({ token_sort: next.key, token_dir: next.direction });
-                      }}
-                    >
-                      Chains <span className="th-indicator">{sortIndicator(tokenSort, "chains")}</span>
-                    </button>
-                  </th>
-                  <th className="is-numeric col-tvl">
-                    <button
-                      className={`th-button ${tokenSort.key === "tvl" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(tokenSort, "tvl");
-                        setTokenSort(next);
-                        updateQuery({ token_sort: next.key, token_dir: next.direction });
-                      }}
-                    >
-                      Total TVL <span className="th-indicator">{sortIndicator(tokenSort, "tvl")}</span>
-                    </button>
-                  </th>
-                  <th className="is-numeric col-best">
-                    <button
-                      className={`th-button ${tokenSort.key === "best" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(tokenSort, "best");
-                        setTokenSort(next);
-                        updateQuery({ token_sort: next.key, token_dir: next.direction });
-                      }}
-                    >
-                      Best APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "best")}</span>
-                    </button>
-                  </th>
-                  <th className="is-numeric tablet-hide analyst-only col-weighted">
-                    <button
-                      className={`th-button ${tokenSort.key === "weighted" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(tokenSort, "weighted");
-                        setTokenSort(next);
-                        updateQuery({ token_sort: next.key, token_dir: next.direction });
-                      }}
-                    >
-                      Weighted APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "weighted")}</span>
-                    </button>
-                  </th>
-                  <th className="is-numeric col-spread">
-                    <button
-                      className={`th-button ${tokenSort.key === "spread" ? "is-active" : ""}`}
-                      onClick={() => {
-                        const next = toggleSort(tokenSort, "spread");
-                        setTokenSort(next);
-                        updateQuery({ token_sort: next.key, token_dir: next.direction });
-                      }}
-                    >
-                      APY Spread <span className="th-indicator">{sortIndicator(tokenSort, "spread")}</span>
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTokenRows.map((row) => (
-                  <tr
-                    key={row.token_symbol}
-                    className={row.token_symbol === selectedSymbol ? "row-selected" : "row-clickable"}
-                    onClick={() => updateQuery({ token: row.token_symbol })}
-                  >
-                    <td className="col-token">{row.token_symbol}</td>
-                    {query.tokenScope === "all" ? <td className="col-type">{row.token_type === "structured" ? "Structured" : "Canonical"}</td> : null}
-                    <td className="is-numeric col-venues">{row.venues}</td>
-                    <td className="is-numeric tablet-hide analyst-only col-chains">{row.chains}</td>
-                    <td className="is-numeric col-tvl">{formatUsd(row.total_tvl_usd)}</td>
-                    <td className="is-numeric col-best">{formatPct(row.best_safe_apy_30d)}</td>
-                    <td className="is-numeric tablet-hide analyst-only col-weighted">{formatPct(row.weighted_safe_apy_30d)}</td>
-                    <td className="is-numeric col-spread">{formatPct(row.spread_safe_apy_30d)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
 
       <section className="card section-card table-card assets-venues-card">
         <h2>{detail?.token_symbol || selectedSymbol || "Token"} Venues</h2>
@@ -802,6 +580,245 @@ function AssetsPageContent() {
           </table>
         </div>
       </section>
+
+      <section className="card section-card summary-card assets-universe-card">
+        <h2>Token Universe</h2>
+        <p className="muted card-intro">
+          Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
+          Canonical shows all plain symbols. All includes LP and structured symbols.
+        </p>
+        <p className="muted card-intro">
+          Current detail view: <strong>{selectedSymbol || "No token selected"}</strong>. Use <strong>Selected Token</strong> in the
+          filter panel above to change the venue detail below.
+        </p>
+        {query.tokenScope === "featured" ? (
+          <p className="muted card-intro">
+            Featured criteria: token TVL at least {formatUsd(assetData?.filters?.featured_min_tvl_usd)}, at least{" "}
+            {featuredMinVenues ?? "n/a"} {featuredMinVenues === 1 ? "venue" : "venues"}, and at least {featuredMinChains ?? "n/a"}{" "}
+            {featuredMinChains === 1 ? "chain" : "chains"}.
+          </p>
+        ) : null}
+        {filteredTokenRows.length === 0 ? (
+          <p className="muted card-intro">
+            No tokens matched this filter set. Lower <strong>Min TVL</strong>, lower <strong>Min Points</strong>, or switch list mode.
+          </p>
+        ) : null}
+        <div className="split-grid assets-universe-top">
+          <KpiGrid
+            items={[
+              { label: "Tokens", value: String(assetData?.summary?.tokens ?? tokenRows.length) },
+              {
+                label: "Featured Available",
+                value: String(assetData?.summary?.tokens_available_featured ?? "n/a"),
+                hint: "Large + multi-venue",
+              },
+              {
+                label: "Median Spread",
+                value: formatPct(assetData?.summary?.median_spread_safe_apy_30d),
+                hint: "Middle APY spread (best minus worst venue) across tokens",
+              },
+              {
+                label: "Multi-Chain Tokens",
+                value: String(assetData?.summary?.multi_chain_tokens ?? "n/a"),
+                hint: "Tokens available on more than one chain",
+              },
+              {
+                label: "High Spread Tokens",
+                value: String(assetData?.summary?.high_spread_tokens ?? "n/a"),
+                hint: "Tokens with APY spread >= 2 percentage points",
+              },
+              {
+                label: "Canonical Available",
+                value: String(assetData?.summary?.tokens_available_canonical ?? "n/a"),
+                hint: "Plain token symbols (no LP/structured syntax)",
+              },
+              {
+                label: "Structured Available",
+                value: String(assetData?.summary?.tokens_available_structured ?? "n/a"),
+                hint: "LP/pooled/structured symbols detected by token format",
+              },
+            ]}
+          />
+          <div className="analyst-only">
+            <BarList
+              title="Top Tokens by TVL"
+              items={topTokenByTvl.map((row) => ({
+                id: row.token_symbol,
+                label: row.token_symbol,
+                value: row.total_tvl_usd,
+                note: `Spread ${formatPct(row.spread_safe_apy_30d)}`,
+              }))}
+              valueFormatter={(value) => formatUsd(value)}
+            />
+          </div>
+        </div>
+        <details className="section-details analyst-only">
+          <summary>Token spread outliers</summary>
+          <div className="section-details-body">
+            <section className="assets-spread-cards analyst-only">
+              <h3>Token Spread Cards</h3>
+              <div className="assets-spread-card-grid">
+                {tokenSpreadCards.map((row) => {
+                  const best = row.best_safe_apy_30d ?? 0;
+                  const weighted = row.weighted_safe_apy_30d ?? 0;
+                  const spread = row.spread_safe_apy_30d ?? 0;
+                  const worst = best - spread;
+                  const maxAbs = Math.max(0.08, Math.abs(best), Math.abs(weighted), Math.abs(worst));
+                  const sparkHeight = 58;
+                  const sparkBaseline = 54;
+                  const toY = (value: number) => sparkBaseline - ((value + maxAbs) / (2 * maxAbs)) * 47;
+                  const sparkLeft = 2;
+                  const sparkMid = 66;
+                  const sparkRight = 130;
+                  const spark = `M${sparkLeft},${toY(worst).toFixed(2)} L${sparkMid},${toY(weighted).toFixed(2)} L${sparkRight},${toY(best).toFixed(2)}`;
+                  const nearFlat = spread < 0.15;
+                  return (
+                    <button
+                      key={`spread-card-${row.token_symbol}`}
+                      type="button"
+                      className="assets-spread-card"
+                      onClick={() => updateQuery({ token: row.token_symbol })}
+                    >
+                      <p className="assets-spread-token">{row.token_symbol}</p>
+                      <svg viewBox={`0 0 132 ${sparkHeight}`} aria-label={`${row.token_symbol} APY spread shape`}>
+                        <line x1={sparkLeft} y1={sparkBaseline} x2={sparkRight} y2={sparkBaseline} className="assets-spread-baseline" />
+                        <path d={spark} className="assets-spread-line" />
+                        <circle cx={sparkLeft} cy={toY(worst)} r={2.25} className="assets-spread-point" />
+                        <circle cx={sparkMid} cy={toY(weighted)} r={2.25} className="assets-spread-point" />
+                        <circle cx={sparkRight} cy={toY(best)} r={2.25} className="assets-spread-point" />
+                      </svg>
+                      <p className="assets-spread-value">{formatPct(spread)}</p>
+                      <p className="assets-spread-note muted">
+                        {nearFlat ? "Near-flat spread." : "Worst → weighted → best."} {formatPct(worst, 1)} · {formatPct(weighted, 1)} ·{" "}
+                        {formatPct(best, 1)}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="muted viz-legend">
+                Cards rank by APY spread. Sparkline points are worst → weighted → best APY; flatter lines mean token venues are currently similar.
+              </p>
+            </section>
+          </div>
+        </details>
+        {filteredTokenRows.length === 0 ? (
+          <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch List mode.</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="assets-token-table">
+              <thead>
+                <tr>
+                  <th className="col-token">
+                    <button
+                      className={`th-button ${tokenSort.key === "token" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "token");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Token <span className="th-indicator">{sortIndicator(tokenSort, "token")}</span>
+                    </button>
+                  </th>
+                  {query.tokenScope === "all" ? <th className="col-type">Type</th> : null}
+                  <th className="is-numeric col-venues">
+                    <button
+                      className={`th-button ${tokenSort.key === "venues" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "venues");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Venues <span className="th-indicator">{sortIndicator(tokenSort, "venues")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric tablet-hide analyst-only col-chains">
+                    <button
+                      className={`th-button ${tokenSort.key === "chains" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "chains");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Chains <span className="th-indicator">{sortIndicator(tokenSort, "chains")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric col-tvl">
+                    <button
+                      className={`th-button ${tokenSort.key === "tvl" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "tvl");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Total TVL <span className="th-indicator">{sortIndicator(tokenSort, "tvl")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric col-best">
+                    <button
+                      className={`th-button ${tokenSort.key === "best" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "best");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Best APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "best")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric tablet-hide analyst-only col-weighted">
+                    <button
+                      className={`th-button ${tokenSort.key === "weighted" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "weighted");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      Weighted APY 30d <span className="th-indicator">{sortIndicator(tokenSort, "weighted")}</span>
+                    </button>
+                  </th>
+                  <th className="is-numeric col-spread">
+                    <button
+                      className={`th-button ${tokenSort.key === "spread" ? "is-active" : ""}`}
+                      onClick={() => {
+                        const next = toggleSort(tokenSort, "spread");
+                        setTokenSort(next);
+                        updateQuery({ token_sort: next.key, token_dir: next.direction });
+                      }}
+                    >
+                      APY Spread <span className="th-indicator">{sortIndicator(tokenSort, "spread")}</span>
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTokenRows.map((row) => (
+                  <tr
+                    key={row.token_symbol}
+                    className={row.token_symbol === selectedSymbol ? "row-selected" : "row-clickable"}
+                    onClick={() => updateQuery({ token: row.token_symbol })}
+                  >
+                    <td className="col-token">{row.token_symbol}</td>
+                    {query.tokenScope === "all" ? <td className="col-type">{row.token_type === "structured" ? "Structured" : "Canonical"}</td> : null}
+                    <td className="is-numeric col-venues">{row.venues}</td>
+                    <td className="is-numeric tablet-hide analyst-only col-chains">{row.chains}</td>
+                    <td className="is-numeric col-tvl">{formatUsd(row.total_tvl_usd)}</td>
+                    <td className="is-numeric col-best">{formatPct(row.best_safe_apy_30d)}</td>
+                    <td className="is-numeric tablet-hide analyst-only col-weighted">{formatPct(row.weighted_safe_apy_30d)}</td>
+                    <td className="is-numeric col-spread">{formatPct(row.spread_safe_apy_30d)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
     </main>
   );
 }
