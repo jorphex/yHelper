@@ -1216,6 +1216,21 @@ a:hover {
   background: var(--row-selected);
 }
 
+.table-wrap a,
+.table-wrap a:visited {
+  color: var(--ink);
+  text-decoration-line: underline;
+  text-decoration-color: rgba(143, 183, 255, 0.62);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.14em;
+}
+
+.table-wrap a:hover,
+.table-wrap a:focus-visible {
+  color: var(--accent-2);
+  text-decoration-color: rgba(143, 183, 255, 0.82);
+}
+
 .split-grid + .table-wrap,
 .kpi-grid + .table-wrap,
 .bar-panel + .table-wrap {
