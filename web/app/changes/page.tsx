@@ -185,6 +185,7 @@ function MoverTable({
 
   return (
     <section className="card section-card table-card changes-mover-card">
+      <p className="section-kicker">Mover Board</p>
       <h2>{title}</h2>
       <p className="muted card-intro">
         Click columns to sort by signal, size, or data staleness. Pro mode adds token/category and previous-APY context columns.
@@ -757,7 +758,8 @@ function ChangesPageContent() {
   }
   return (
     <main className="container">
-      <section className="hero">
+      <section className="hero hero-changes">
+        <p className="hero-kicker">Timing readout</p>
         <h1>Changes</h1>
         <p className="muted">
           Track APY window-to-window shifts with freshness diagnostics beside each signal.
@@ -871,6 +873,7 @@ function ChangesPageContent() {
       {trendError ? <section className="card">{trendError}</section> : null}
 
       <section className="card section-card summary-card">
+        <p className="section-kicker">Window</p>
         <h2>Window Summary</h2>
         <p className="muted card-intro">
           Current APY uses the selected range. Previous APY uses the immediately prior range. Delta is current minus previous.
@@ -884,6 +887,7 @@ function ChangesPageContent() {
       </section>
 
       <section className="card section-card summary-card" id="freshness-panels">
+        <p className="section-kicker">Freshness</p>
         <h2>Trust Signals</h2>
         <p className="muted card-intro">
           These metrics show whether recent data is fresh enough to trust changes. Current stale cutoff:{" "}

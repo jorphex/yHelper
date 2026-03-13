@@ -140,7 +140,8 @@ function ChainsPageContent() {
 
   return (
     <main className="container">
-      <section className="hero">
+      <section className="hero hero-chains">
+        <p className="hero-kicker">Network lens</p>
         <h1>Chains</h1>
         <p className="muted">
           Compare chain scale, weighted yield, and coverage quality from the same filtered universe.
@@ -186,6 +187,7 @@ function ChainsPageContent() {
       />
 
       <section className="card section-card summary-card">
+        <p className="section-kicker">Snapshot</p>
         <h2>Chain Universe Snapshot</h2>
         <p className="muted card-intro">At-a-glance totals for the current filter set.</p>
         <div className="split-grid chains-snapshot-layout">

@@ -274,7 +274,7 @@ export default function HomePage() {
       <section className="card home-overview-hero">
         <div className="home-overview-hero-copy">
           <h1>Clear signals for faster vault decisions</h1>
-          <p>Track yield shifts, spot vault trends, and find your next move.</p>
+          <p>Move from signal to route without wading through repeated chrome or guesswork.</p>
           <div className="home-overview-hero-highlights" aria-label="Overview highlights">
             <div className="home-overview-hero-highlight">
               <span className="home-overview-hero-highlight-label">Current TVL</span>

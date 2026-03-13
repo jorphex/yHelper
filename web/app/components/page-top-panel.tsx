@@ -2,6 +2,16 @@ import type { ReactNode } from "react";
 
 type PageTopPanelTone = "discover" | "assets" | "composition" | "changes" | "regimes" | "chains" | "styfi";
 
+const TONE_LABELS: Record<PageTopPanelTone, string> = {
+  discover: "Opportunity scan",
+  assets: "Venue comparison",
+  composition: "Exposure map",
+  changes: "Timing readout",
+  regimes: "Behavior map",
+  chains: "Network lens",
+  styfi: "Staking surface",
+};
+
 type PageTopPanelProps = {
   intro: ReactNode;
   filters: ReactNode;
@@ -25,22 +35,27 @@ export function PageTopPanel({
   tone = "discover",
   className,
 }: PageTopPanelProps) {
+  const toneLabel = TONE_LABELS[tone];
+
   return (
     <section className={`card page-top-panel tone-${tone}${className ? ` ${className}` : ""}`}>
       <div className="page-top-panel-copy">
+        <div className="page-top-panel-ribbon">
+          <p className="page-top-panel-kicker">{toneLabel}</p>
+          <p className="page-top-panel-ribbon-note">Read this once, then work from the controls.</p>
+        </div>
         <div className="page-top-panel-copy-head">
-          <p className="page-top-panel-kicker">Briefing</p>
           <h2>{introTitle}</h2>
         </div>
         <div className="page-top-panel-copy-body">{intro}</div>
       </div>
       <div className="page-top-panel-controls">
         <div className="page-top-panel-controls-head">
-          <p className="page-top-panel-kicker">Controls</p>
           <div className="page-top-panel-controls-copy-block">
+            <p className="page-top-panel-kicker">Controls</p>
             <h2>{filtersTitle}</h2>
-            {filtersIntro ? <div className="page-top-panel-controls-copy">{filtersIntro}</div> : null}
           </div>
+          {filtersIntro ? <div className="page-top-panel-controls-copy">{filtersIntro}</div> : null}
         </div>
         <div className="page-top-panel-controls-body">
           <div className="page-top-panel-controls-primary">{filters}</div>

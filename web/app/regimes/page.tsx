@@ -520,7 +520,8 @@ function RegimesPageContent() {
 
   return (
     <main className="container">
-      <section className="hero">
+      <section className="hero hero-regimes">
+        <p className="hero-kicker">Behavior map</p>
         <h1>Regimes</h1>
         <p className="muted">
           Follow rising, stable, falling, and choppy states with transparent rule-based labels.
@@ -632,6 +633,7 @@ function RegimesPageContent() {
       />
 
       <section className="card section-card summary-card regime-summary-card">
+        <p className="section-kicker">Snapshot</p>
         <h2>Current Regime State</h2>
         <p className="muted card-intro">Click column headers to sort by size, vault count, or regime name in the current snapshot.</p>
         <div className="regime-summary-layout">
@@ -717,6 +719,7 @@ function RegimesPageContent() {
       </section>
 
       <section className="card section-card table-card">
+        <p className="section-kicker">Movers</p>
         <h2>Current Regime Movers</h2>
         <p className="muted card-intro">Sort by momentum to spot short-term shifts, or by TVL to focus on size inside the current regime snapshot.</p>
         <div className="table-wrap">

@@ -760,7 +760,8 @@ function DiscoverPageContent() {
 
   return (
     <main className="container">
-      <section className="hero">
+      <section className="hero hero-discover">
+        <p className="hero-kicker">Opportunity scan</p>
         <h1>Discover</h1>
         <p className="muted">
           Scan yield opportunities with filters for size, data quality, and trend direction.
@@ -932,6 +933,7 @@ function DiscoverPageContent() {
       ) : null}
 
       <section className="card section-card summary-card discover-universe-card">
+        <p className="section-kicker">Snapshot</p>
         <h2>Universe Snapshot</h2>
         <p className="muted card-intro">
           Current size and quality profile for the filtered vault universe. Coverage below separates vaults with enough PPS history
@@ -981,6 +983,7 @@ function DiscoverPageContent() {
       </section>
 
       <section className="card section-card table-card discover-table-card">
+        <p className="section-kicker">Table</p>
         <h2>Vault Universe</h2>
         <p className="muted card-intro">
           Filtered vaults with enough TVL and data history to reduce noisy outliers. Sort order follows the API sort controls above.
@@ -1049,6 +1052,7 @@ function DiscoverPageContent() {
       </section>
 
       <section className="card section-card visual-card discover-analytics-card">
+        <p className="section-kicker">Visuals</p>
         <h2>Yield Structure and Trend Maps</h2>
         <p className="muted card-intro">
           Visual view of yield level, momentum direction, and concentration patterns in the current filtered universe.

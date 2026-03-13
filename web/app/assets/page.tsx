@@ -298,7 +298,8 @@ function AssetsPageContent() {
 
   return (
     <main className="container">
-      <section className="hero">
+      <section className="hero hero-assets">
+        <p className="hero-kicker">Venue comparison</p>
         <h1>Assets</h1>
         <p className="muted">
           Compare vault venues for the same token to spot meaningful APY dispersion and momentum gaps.
@@ -420,6 +421,7 @@ function AssetsPageContent() {
       {detailError ? <section className="card">{detailError}</section> : null}
 
       <section className="card section-card table-card assets-venues-card">
+        <p className="section-kicker">Selected Token</p>
         <h2>{detail?.token_symbol || selectedSymbol || "Token"} Venues</h2>
         <p className="muted card-intro">
           Venue-level detail for the selected token. Sort to compare alternatives quickly. Pro mode adds extra context columns.
@@ -585,6 +587,7 @@ function AssetsPageContent() {
       </section>
 
       <section className="card section-card summary-card assets-universe-card">
+        <p className="section-kicker">Universe</p>
         <h2>Token Universe</h2>
         <p className="muted card-intro">
           Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
