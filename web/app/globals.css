@@ -226,7 +226,7 @@ body::after {
   position: sticky;
   top: 0;
   z-index: 20;
-  padding: max(0.3rem, env(safe-area-inset-top)) 0.55rem 0;
+  padding: max(0.52rem, env(safe-area-inset-top)) 0.55rem 0.08rem;
   background:
     linear-gradient(180deg, rgba(3, 8, 21, 0.9) 0%, rgba(3, 8, 21, 0.46) 68%, rgba(3, 8, 21, 0) 100%);
   backdrop-filter: blur(10px) saturate(1.12);
@@ -235,15 +235,15 @@ body::after {
 .site-nav {
   max-width: 1360px;
   margin: 0 auto;
-  padding: 0 0.35rem;
+  padding: 0 0.44rem;
 }
 
 .site-nav-shell {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.72rem;
-  padding: 0.46rem 0.56rem;
+  gap: 0.82rem;
+  padding: 0.58rem 0.76rem;
   border: 1px solid rgba(57, 95, 167, 0.56);
   border-radius: 24px;
   background:
@@ -281,7 +281,7 @@ body::after {
 .site-controls {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
   justify-content: flex-end;
   min-width: 0;
 }
@@ -299,7 +299,7 @@ body::after {
   align-items: center;
   width: 100%;
   min-width: 0;
-  padding: 0.18rem;
+  padding: 0.24rem;
   border: 1px solid rgba(47, 82, 145, 0.52);
   border-radius: 18px;
   background:
@@ -393,21 +393,21 @@ body::after {
 .audience-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.18rem;
+  gap: 0.22rem;
   border: 1px solid rgba(56, 95, 166, 0.52);
   background: linear-gradient(180deg, rgba(13, 28, 60, 0.78) 0%, rgba(8, 17, 37, 0.9) 100%);
   box-shadow: inset 0 0 0 1px rgba(150, 190, 255, 0.04);
   border-radius: 999px;
-  padding: 0.18rem;
+  padding: 0.2rem;
 }
 
 .audience-toggle .audience-label {
-  font-size: 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--ink-dim);
-  font-family: var(--font-fono);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  padding: 0 0.26rem 0 0.46rem;
+  letter-spacing: 0.01em;
+  padding: 0 0.28rem 0 0.48rem;
 }
 
 .audience-toggle button {
@@ -415,12 +415,15 @@ body::after {
   background: transparent;
   color: var(--ink-soft);
   border-radius: 999px;
-  padding: 0.34rem 0.7rem;
-  font-size: 0.78rem;
+  padding: 0.36rem 0.8rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
   cursor: pointer;
   line-height: 1.12;
   min-height: 2.04rem;
   font-weight: 560;
+  white-space: nowrap;
 }
 
 .audience-toggle button:hover {
@@ -3529,6 +3532,11 @@ input:focus-visible {
 }
 
 @media (max-width: 960px) {
+  .site-header {
+    padding-top: max(0.34rem, env(safe-area-inset-top));
+    padding-bottom: 0;
+  }
+
   .container {
     padding-top: 1.15rem;
   }
