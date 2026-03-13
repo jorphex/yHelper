@@ -13,7 +13,7 @@ const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
 const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
 const BG_TEXTURE_VERSION = process.env.NEXT_PUBLIC_BG_TEXTURE_VERSION || "20260304bg12";
 const BG_TEXTURE_SRC = `/bg/grit-abstract-v1.webp?v=${BG_TEXTURE_VERSION}`;
-const SOCIAL_PREVIEW_SRC = `/social/yhelper-preview.png?v=${SOCIAL_IMAGE_VERSION}`;
+const SOCIAL_PREVIEW_SRC = `/social/yhelper-preview-${SOCIAL_IMAGE_VERSION}.png`;
 const SOCIAL_PREVIEW_URL = `${siteUrl}${SOCIAL_PREVIEW_SRC}`;
 const AUDIENCE_BOOTSTRAP = `(function(){try{var raw=window.localStorage.getItem("yhelper:audience-mode");var mode=raw==="analyst"?"analyst":"guide";document.documentElement.dataset.audience=mode;}catch(_e){document.documentElement.dataset.audience="guide";}})();`;
 
