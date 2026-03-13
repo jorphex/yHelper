@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
+import Link from "next/link";
 import { AudienceToggle } from "./components/audience-toggle";
 import { ChunkRecovery } from "./components/chunk-recovery";
 import { FreshnessBadge } from "./components/freshness-badge";
@@ -68,11 +69,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Skip to main content
         </a>
         <header className="site-header">
-          <nav className="site-nav">
-            <NavLinks />
-            <div className="site-controls">
-              <FreshnessBadge />
-              <AudienceToggle />
+          <nav className="site-nav" aria-label="Primary">
+            <div className="site-nav-top">
+              <Link href="/" className="site-brand" aria-label="yHelper overview">
+                <span className="site-brand-mark" aria-hidden="true">
+                  yh
+                </span>
+                <span className="site-brand-copy">
+                  <span className="site-brand-name">yHelper</span>
+                  <span className="site-brand-tag">Yearn signal layer</span>
+                </span>
+              </Link>
+              <div className="site-controls">
+                <FreshnessBadge />
+                <AudienceToggle />
+              </div>
+            </div>
+            <div className="site-nav-bottom">
+              <NavLinks />
             </div>
           </nav>
         </header>

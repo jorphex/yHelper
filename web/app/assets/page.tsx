@@ -346,6 +346,24 @@ function AssetsPageContent() {
                 onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
               />
             </label>
+          </div>
+        }
+        secondaryFilters={
+          <div className="inline-controls controls-tight">
+            <label>
+              Selected Token:&nbsp;
+              <select value={selectedSymbol} onChange={(event) => updateQuery({ token: event.target.value })}>
+                {filteredTokenRows.length === 0 ? (
+                  <option value="">No tokens available</option>
+                ) : (
+                  filteredTokenRows.map((row) => (
+                    <option key={row.token_symbol} value={row.token_symbol}>
+                      {row.token_symbol}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
             <label>
               Rows:&nbsp;
               <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
@@ -381,6 +399,7 @@ function AssetsPageContent() {
             </label>
           </div>
         }
+        secondaryFiltersTitle="Sort And Search"
       />
 
       {assetsError ? <section className="card">{assetsError}</section> : null}
@@ -392,22 +411,10 @@ function AssetsPageContent() {
           Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
           Canonical shows all plain symbols. All includes LP and structured symbols.
         </p>
-        <div className="inline-controls controls-tight">
-          <label>
-            Token:&nbsp;
-            <select value={selectedSymbol} onChange={(event) => updateQuery({ token: event.target.value })}>
-              {filteredTokenRows.length === 0 ? (
-                <option value="">No tokens available</option>
-              ) : (
-                filteredTokenRows.map((row) => (
-                  <option key={row.token_symbol} value={row.token_symbol}>
-                    {row.token_symbol}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-        </div>
+        <p className="muted card-intro">
+          Current detail view: <strong>{selectedSymbol || "No token selected"}</strong>. Use <strong>Selected Token</strong> in the
+          filter panel above to change the venue detail below.
+        </p>
         {query.tokenScope === "featured" ? (
           <p className="muted card-intro">
             Featured criteria: token TVL at least {formatUsd(assetData?.filters?.featured_min_tvl_usd)}, at least{" "}

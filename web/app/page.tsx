@@ -48,6 +48,88 @@ type ChangesResponse = {
 };
 
 const HOME_REFRESH_MS = 60_000;
+const HOME_ROUTE_CARDS = [
+  {
+    href: "/discover",
+    eyebrow: "Scan",
+    title: "Discover",
+    description: "Rank vaults by quality, size, and trend direction when you need a fast shortlist.",
+    note: "Best first stop for new ideas",
+  },
+  {
+    href: "/changes",
+    eyebrow: "Time",
+    title: "Changes",
+    description: "See recent APY movers, stale series, and freshness context before acting on a shift.",
+    note: "Use when timing matters",
+  },
+  {
+    href: "/assets",
+    eyebrow: "Compare",
+    title: "Assets",
+    description: "Compare venues for the same token to spot spread, structure, and concentration tradeoffs.",
+    note: "Best for one-asset decisions",
+  },
+  {
+    href: "/composition",
+    eyebrow: "Concentration",
+    title: "Composition",
+    description: "Check chain, category, and token concentration before sizing risk in the filtered universe.",
+    note: "Use before sizing exposure",
+  },
+  {
+    href: "/regimes",
+    eyebrow: "Behavior",
+    title: "Regimes",
+    description: "Follow rising, stable, falling, and choppy states plus how cohorts are transitioning.",
+    note: "Explains recent yield behavior",
+  },
+  {
+    href: "/chains",
+    eyebrow: "Network",
+    title: "Chains",
+    description: "Compare chain scale, weighted yield, and coverage quality from the same filtered universe.",
+    note: "Best for chain-level context",
+  },
+  {
+    href: "/styfi",
+    eyebrow: "Staking",
+    title: "stYFI",
+    description: "Track stake balances, reward epochs, and the current split between stYFI and stYFIx.",
+    note: "For Yearn staking context",
+  },
+] as const;
+
+const HOME_PLAYBOOKS = [
+  {
+    step: "01",
+    title: "Find a candidate",
+    body: "Start in Discover to rank the universe, then confirm the latest move in Changes before treating a vault as actionable.",
+    links: [
+      { href: "/discover", label: "Discover" },
+      { href: "/changes", label: "Changes" },
+    ],
+  },
+  {
+    step: "02",
+    title: "Pressure-test the idea",
+    body: "Use Assets, Composition, and Chains to understand spread, concentration, and chain context before sizing up.",
+    links: [
+      { href: "/assets", label: "Assets" },
+      { href: "/composition", label: "Composition" },
+      { href: "/chains", label: "Chains" },
+    ],
+  },
+  {
+    step: "03",
+    title: "Monitor behavior over time",
+    body: "Use Regimes for state changes and stYFI for staking context when you need to monitor behavior rather than just scan once.",
+    links: [
+      { href: "/regimes", label: "Regimes" },
+      { href: "/styfi", label: "stYFI" },
+    ],
+  },
+] as const;
 
 function pctDelta(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
@@ -73,16 +155,6 @@ function featuredMover(changes: ChangesResponse | null): ChangeMoverRow | undefi
   const riser = changes?.movers?.risers?.find((row) => isMeaningfulMove(row));
   if (riser) return riser;
   return changes?.movers?.fallers?.find((row) => isMeaningfulMove(row));
-}
-
-function liveHeadline(
-  mover: ChangeMoverRow | undefined,
-): string {
-  if (!mover) return "Largest 24h APY move syncing";
-  const moverName = moverTitle(mover);
-  const moverApy = Number.isFinite(mover?.safe_apy_30d ?? null) ? formatPct(mover?.safe_apy_30d ?? null, 2) : "n/a";
-  const moverDelta = Number.isFinite(mover?.delta_apy ?? null) ? pctDelta(mover?.delta_apy, 2) : "n/a";
-  return `Largest 24h APY move ${moverName} · 30d APY now ${moverApy} · 24h move ${moverDelta}`;
 }
 
 function liveMeta(
@@ -133,39 +205,17 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    const revealNodes = Array.from(document.querySelectorAll<HTMLElement>(".home-reveal"));
-    if (revealNodes.length === 0) return;
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      revealNodes.forEach((node) => node.classList.add("is-visible"));
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
-        });
-      },
-      { threshold: 0.14, rootMargin: "0px 0px -8% 0px" },
-    );
-
-    revealNodes.forEach((node) => observer.observe(node));
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
   const topMover = featuredMover(changes);
-  const liveNowLine = liveHeadline(topMover);
   const liveFreshnessLine = liveMeta(
     changes?.summary?.avg_delta ?? null,
     changes?.summary?.vaults_with_change ?? null,
     changes?.freshness?.latest_pps_age_seconds ?? null,
   );
+  const topMoverName = topMover ? moverTitle(topMover) : "Syncing";
+  const liveShiftValue = Number.isFinite(topMover?.delta_apy ?? null) ? pctDelta(topMover?.delta_apy, 2) : "n/a";
+  const liveShiftNote = topMover
+    ? `${topMoverName} · 30d APY now ${formatPct(topMover?.safe_apy_30d ?? null, 2)}`
+    : "Largest 24h APY move syncing";
   const staleRatio = overview?.freshness?.pps_stale_ratio ?? null;
   const freshRatio = staleRatio !== null && staleRatio !== undefined ? Math.max(0, 1 - staleRatio) : null;
   const currentYearnNote =
@@ -182,44 +232,49 @@ export default function HomePage() {
       : "Deduped full Yearn inventory";
 
   return (
-    <main className="container home-minimal">
-      <section className="card home-minimal-hero home-reveal">
-        <div className="home-minimal-hero-copy">
-          <h1>Clear signals for faster vault decisions</h1>
-          <p>Track yield shifts, spot vault trends, and find your next move.</p>
+    <main className="container home-overview">
+      <section className="card home-overview-hero">
+        <div className="home-overview-hero-copy">
+          <p className="home-kicker">Overview</p>
+          <h1>One dashboard for discovery, timing, and risk context</h1>
+          <p>
+            Check protocol scale, data freshness, and the latest APY shift first. Then jump straight into the page built for the
+            question you are asking.
+          </p>
           <div className="home-minimal-cta-row">
             <Link href="/discover" className="home-lite-cta primary">Start in Discover</Link>
-            <Link href="/changes" className="home-lite-cta">See recent changes</Link>
+            <Link href="/changes" className="home-lite-cta">Check Changes</Link>
+            <Link href="/assets" className="home-lite-cta">Compare Assets</Link>
           </div>
         </div>
-        <div className="home-minimal-hero-art" aria-hidden="true">
+        <div className="home-overview-hero-art" aria-hidden="true">
           <Image
             src="/home-assets-yearn-blender/hero-yearn-blender-coins.png"
             alt=""
             fill
             priority
             sizes="(max-width: 1100px) 100vw, 46vw"
-            className="home-art-image prism-hero-image"
+            className="home-art-image home-overview-hero-image"
             draggable={false}
           />
         </div>
       </section>
 
-      <section className="home-minimal-signals">
-        <article className="card home-sparse-signal-card home-reveal">
-          <p className="home-sparse-signal-label">Current Yearn TVL</p>
-          <p className="home-sparse-signal-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
-          <p className="home-sparse-signal-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
+      <section className="home-overview-summary">
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">Current Yearn TVL</p>
+          <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
+          <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
         </article>
-        <article className="card home-sparse-signal-card home-reveal">
-          <p className="home-sparse-signal-label">Total Yearn TVL</p>
-          <p className="home-sparse-signal-value">{formatUsd(overview?.protocol_context?.total_yearn?.tvl_usd ?? null, 0)}</p>
-          <p className="home-sparse-signal-note">{totalYearnNote}. Uses the same deduped accounting rule.</p>
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">Total Yearn TVL</p>
+          <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.total_yearn?.tvl_usd ?? null, 0)}</p>
+          <p className="home-overview-summary-note">{totalYearnNote}. Uses the same deduped accounting rule.</p>
         </article>
-        <article className="card home-sparse-signal-card home-reveal home-freshness-signal-card">
-          <p className="home-sparse-signal-label">Data Freshness</p>
-          <p className="home-sparse-signal-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}</p>
-          <p className="home-sparse-signal-note">Latest PPS in tracked scope. Stale means older than 24 hours.</p>
+        <article className="card home-overview-summary-card home-overview-meter-card">
+          <p className="home-kicker">Data Freshness</p>
+          <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}</p>
+          <p className="home-overview-summary-note">Latest PPS in tracked scope. Stale means older than 24 hours.</p>
           <ShareMeter
             title=""
             embedded
@@ -244,97 +299,100 @@ export default function HomePage() {
             legend="Freshness combines latest PPS age with the share of tracked rows still inside the cutoff."
           />
         </article>
+        <article className="card home-overview-summary-card home-overview-live-card" aria-live="polite">
+          <p className="home-kicker">Latest Shift</p>
+          <p className="home-overview-summary-value">{liveShiftValue}</p>
+          <p className="home-overview-summary-note">{liveShiftNote}</p>
+          <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
+        </article>
       </section>
 
-      <section className="home-minimal-routes">
-        <Link href="/styfi" className="card home-sparse-route-card home-route-clickable home-reveal">
-          <div className="home-route-head">
-            <h2>stYFI</h2>
-          </div>
-          <p className="muted">Track Yearn staking balances, reward epochs, and how the latest completed epoch split across components.</p>
-          <span className="home-route-arrow" aria-hidden="true">→</span>
-        </Link>
-        <Link href="/discover" className="card home-sparse-route-card home-route-clickable home-reveal">
-          <div className="home-route-head">
-            <h2>Discover</h2>
-          </div>
-          <p className="muted">Find opportunities quickly with sortable quality-filtered vault signals.</p>
-          <span className="home-route-arrow" aria-hidden="true">→</span>
-        </Link>
-        <Link href="/composition" className="card home-sparse-route-card home-route-clickable home-reveal">
-          <div className="home-route-head">
-            <h2>Composition</h2>
-          </div>
-          <p className="muted">Understand chain, category, and token concentration before sizing risk.</p>
-          <span className="home-route-arrow" aria-hidden="true">→</span>
-        </Link>
-        <Link href="/regimes" className="card home-sparse-route-card home-route-clickable home-reveal">
-          <div className="home-route-head">
-            <h2>Regimes</h2>
-          </div>
-          <p className="muted">Monitor rising, stable, falling, and choppy behavior transitions.</p>
-          <span className="home-route-arrow" aria-hidden="true">→</span>
-        </Link>
-      </section>
-
-      <section className="card home-live-strip home-reveal" aria-live="polite">
-        <span className="home-live-dot" aria-hidden="true" />
-        <div className="home-live-copy">
-          <p className="home-live-label">Latest shift</p>
-          <p className="home-live-text">{liveNowLine}</p>
-          <p className="home-live-meta">{liveFreshnessLine}</p>
+      <section className="card home-overview-route-section">
+        <div className="home-overview-section-head">
+          <p className="home-kicker">Explore The Suite</p>
+          <h2>Every primary destination is visible from the front door</h2>
+          <p className="card-intro">
+            Pick the page that matches your question: scan, compare, time, inspect concentration, follow behavior, compare chains,
+            or check staking context.
+          </p>
+        </div>
+        <div className="home-overview-route-grid">
+          {HOME_ROUTE_CARDS.map((card) => (
+            <Link key={card.href} href={card.href} className="card home-route-clickable home-overview-route-card">
+              <p className="home-overview-route-eyebrow">{card.eyebrow}</p>
+              <div className="home-route-head">
+                <h2>{card.title}</h2>
+              </div>
+              <p className="muted">{card.description}</p>
+              <p className="home-overview-route-note">{card.note}</p>
+              <span className="home-route-arrow" aria-hidden="true">→</span>
+            </Link>
+          ))}
         </div>
       </section>
 
-      <div className="home-minimal-break home-minimal-break-soft prism-divider prism-divider-alt home-reveal" aria-hidden="true">
-        <Image
-          src="/home-assets-yearn-blender/divider-yearn-blender-coins.png"
-          alt=""
-          fill
-          sizes="100vw"
-          className="home-divider-image"
-          draggable={false}
-        />
-      </div>
+      <section className="card home-overview-playbooks">
+        <div className="home-overview-section-head">
+          <p className="home-kicker">How To Use It</p>
+          <h2>Move from scan to conviction without leaving the dashboard</h2>
+          <p className="card-intro">The fastest path is to scan first, pressure-test second, and monitor behavior last.</p>
+        </div>
+        <div className="home-overview-playbook-grid">
+          {HOME_PLAYBOOKS.map((playbook) => (
+            <article key={playbook.step} className="home-overview-playbook-card">
+              <p className="home-overview-step-index">{playbook.step}</p>
+              <h3>{playbook.title}</h3>
+              <p className="muted">{playbook.body}</p>
+              <div className="home-overview-playbook-links">
+                {playbook.links.map((link) => (
+                  <Link key={link.href} href={link.href} className="home-lite-cta">
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-      <section className="card home-minimal-purpose home-reveal">
-        <div className="home-minimal-purpose-art prism-purpose-art" aria-hidden="true">
+      <section className="card home-overview-context">
+        <div className="home-overview-context-art" aria-hidden="true">
           <Image
             src="/home-assets-yearn-blender/purpose-yearn-blender-coins.png"
             alt=""
             fill
-            sizes="(max-width: 1100px) 100vw, 32vw"
-            className="home-art-image prism-purpose-image"
+            sizes="(max-width: 1100px) 100vw, 34vw"
+            className="home-art-image home-overview-context-image"
             draggable={false}
           />
         </div>
-        <div className="home-minimal-purpose-content">
-          <article className="home-minimal-step step-a">
-            <p className="home-minimal-step-index">01</p>
-            <h2>What It Is</h2>
-            <p className="muted">A compact Yearn intelligence layer for discovery and monitoring.</p>
-          </article>
-          <article className="home-minimal-step step-b">
-            <p className="home-minimal-step-index">02</p>
-            <h2>What It Solves</h2>
-            <p className="muted">Cuts scan time by turning raw vault metrics into directional signals.</p>
-          </article>
-          <article className="home-minimal-step step-c">
-            <p className="home-minimal-step-index">03</p>
-            <h2>How to use</h2>
-            <p className="muted">Discover for scan. Changes for timing. Composition and Regimes for context.</p>
-          </article>
+        <div className="home-overview-context-copy">
+          <p className="home-kicker">Read The Numbers</p>
+          <h2>Start with trust, then drill down</h2>
+          <div className="home-overview-context-list">
+            <article className="home-overview-context-item">
+              <h3>Check freshness before acting</h3>
+              <p className="muted">Use the freshness card and the Changes page to separate real movement from stale data.</p>
+            </article>
+            <article className="home-overview-context-item">
+              <h3>Keep scope comparisons aligned</h3>
+              <p className="muted">The overview TVL cards use deduped Yearn accounting, so compare filtered views against the right scope.</p>
+            </article>
+            <article className="home-overview-context-item">
+              <h3>Use the page built for the question</h3>
+              <p className="muted">Discover and Changes answer &quot;what moved?&quot; Assets, Composition, Regimes, and Chains answer &quot;why should I care?&quot;.</p>
+            </article>
+          </div>
         </div>
       </section>
 
-      <footer className="card home-minimal-footer home-reveal">
+      <footer className="card home-minimal-footer">
         <p className="home-minimal-footer-title">Official channels</p>
         <div className="home-minimal-footer-links">
           <a href="https://yearn.fi" target="_blank" rel="noopener noreferrer">Yearn</a>
           <a href="https://x.com/yearnfi" target="_blank" rel="noopener noreferrer">X / Twitter</a>
         </div>
       </footer>
-
     </main>
   );
 }

@@ -733,6 +733,68 @@ function DiscoverPageContent() {
         filters={
           <div className="inline-controls controls-tight">
             <label>
+              Universe:&nbsp;
+              <select
+                value={query.universe}
+                onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
+              >
+                {UNIVERSE_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {universeLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field-compact">
+              Min TVL (USD):&nbsp;
+              <input
+                type="number"
+                min={0}
+                value={query.minTvl}
+                onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label className="field-compact">
+              Min Points:&nbsp;
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={query.minPoints}
+                onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
+              />
+            </label>
+            <label>
+              Rows:&nbsp;
+              <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
+                <option value={30}>30</option>
+                <option value={60}>60</option>
+                <option value={100}>100</option>
+                <option value={150}>150</option>
+              </select>
+            </label>
+            <label>
+              Sort:&nbsp;
+              <select value={query.serverSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
+                <option value="quality">Quality</option>
+                <option value="tvl">TVL</option>
+                <option value="apy_30d">APY 30d</option>
+                <option value="momentum">Momentum</option>
+                <option value="consistency">Consistency</option>
+              </select>
+            </label>
+            <label>
+              Direction:&nbsp;
+              <select value={query.serverDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
+                <option value="desc">Highest first</option>
+                <option value="asc">Lowest first</option>
+              </select>
+            </label>
+          </div>
+        }
+        secondaryFilters={
+          <div className="inline-controls controls-tight">
+            <label>
               Chain:&nbsp;
               <select
                 value={query.chain ? String(query.chain) : ""}
@@ -772,36 +834,12 @@ function DiscoverPageContent() {
               </select>
             </label>
             <label>
-              Universe:&nbsp;
-              <select
-                value={query.universe}
-                onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}
-              >
-                {UNIVERSE_VALUES.map((value) => (
-                  <option key={value} value={value}>
-                    {universeLabel(value)}
-                  </option>
-                ))}
+              Trend View:&nbsp;
+              <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value })}>
+                <option value="none">Global</option>
+                <option value="chain">By Chain</option>
+                <option value="category">By Category</option>
               </select>
-            </label>
-            <label className="field-compact">
-              Min TVL (USD):&nbsp;
-              <input
-                type="number"
-                min={0}
-                value={query.minTvl}
-                onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
-              />
-            </label>
-            <label className="field-compact">
-              Min Points:&nbsp;
-              <input
-                type="number"
-                min={0}
-                max={365}
-                value={query.minPoints}
-                onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
-              />
             </label>
             <label className="toggle-label">
               <input
@@ -819,42 +857,9 @@ function DiscoverPageContent() {
               />
               <span>Highlighted only</span>
             </label>
-            <label>
-              Rows:&nbsp;
-              <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
-                <option value={30}>30</option>
-                <option value={60}>60</option>
-                <option value={100}>100</option>
-                <option value={150}>150</option>
-              </select>
-            </label>
-            <label>
-              Sort:&nbsp;
-              <select value={query.serverSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
-                <option value="quality">Quality</option>
-                <option value="tvl">TVL</option>
-                <option value="apy_30d">APY 30d</option>
-                <option value="momentum">Momentum</option>
-                <option value="consistency">Consistency</option>
-              </select>
-            </label>
-            <label>
-              Direction:&nbsp;
-              <select value={query.serverDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
-                <option value="desc">Highest first</option>
-                <option value="asc">Lowest first</option>
-              </select>
-            </label>
-            <label>
-              Trend View:&nbsp;
-              <select value={query.trendGroup} onChange={(event) => updateQuery({ trend_group: event.target.value })}>
-                <option value="none">Global</option>
-                <option value="chain">By Chain</option>
-                <option value="category">By Category</option>
-              </select>
-            </label>
           </div>
         }
+        secondaryFiltersTitle="Segmentation Filters"
       />
 
       {error ? <section className="card">{error}</section> : null}

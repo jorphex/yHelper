@@ -571,6 +571,10 @@ function RegimesPageContent() {
                 onChange={(event) => updateQuery({ min_points: Number(event.target.value || 0) })}
               />
             </label>
+          </div>
+        }
+        secondaryFilters={
+          <div className="inline-controls controls-tight">
             <label>
               Movers Limit:&nbsp;
               <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
@@ -608,14 +612,15 @@ function RegimesPageContent() {
             </label>
           </div>
         }
+        secondaryFiltersTitle="Transition Analysis"
         className="regime-transition-matrix"
       />
 
       {error ? <section className="card">{error}</section> : null}
 
       <section className="card regime-summary-card">
-        <h2>Regime Summary</h2>
-        <p className="muted card-intro">Click column headers to sort by size, vault count, or regime name.</p>
+        <h2>Current Regime State</h2>
+        <p className="muted card-intro">Click column headers to sort by size, vault count, or regime name in the current snapshot.</p>
         <div className="regime-summary-layout">
           <div className="regime-summary-main">
             <KpiGrid
@@ -699,156 +704,8 @@ function RegimesPageContent() {
       </section>
 
       <section className="card">
-        <h2>Regime Transition Matrix</h2>
-        <p className="muted card-intro">
-          Transition view compares short-term regime (7d vs 30d APY) against prior baseline regime (30d vs 90d APY).
-        </p>
-        <KpiGrid
-          items={[
-            { label: "Vaults Tracked", value: String(transitionData?.summary?.vaults_total ?? "n/a") },
-            { label: "Changed Vaults", value: String(transitionData?.summary?.changed_vaults ?? "n/a") },
-            { label: "Changed Ratio", value: formatPct(transitionData?.summary?.changed_ratio) },
-            { label: "Changed TVL", value: formatUsd(transitionData?.summary?.changed_tvl_usd) },
-          ]}
-        />
-        <div className="stack">
-          {query.transitionSplit === "none" ? (
-            <>
-              <div className="regime-transition-heat">
-                <HeatGrid
-                  title=""
-                  items={transitionHeat}
-                  valueFormatter={(value) => formatUsd(value)}
-                  embedded
-                  legend="Higher intensity means more TVL moved between regime states."
-                />
-              </div>
-            </>
-          ) : (
-            <div className="changes-stale-grid">
-              <HeatGrid
-                title={`Latest Churn TVL Share by ${query.transitionSplit === "chain" ? "Chain" : "Category"}`}
-                items={groupedLatestChurnHeat}
-                valueFormatter={(value) => formatPct(value, 2)}
-                legend="Each cell is latest-day churn TVL ratio (TVL in changed-regime vaults divided by total cohort TVL)."
-              />
-              <BarList
-                title={`${query.transitionSplit === "chain" ? "Chains" : "Categories"} with Highest Latest Churn`}
-                items={groupedLatestChurnBars}
-                valueFormatter={(value) => formatPct(value, 2)}
-              />
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>Regime Flow Story</h2>
-        <p className="muted card-intro">Visual flow of where TVL moved between prior and current regime states.</p>
-        <div>
-          <RegimeFlowSankey title="" rows={transitionData?.matrix ?? []} />
-        </div>
-      </section>
-
-      <section className="card analyst-only">
-        <h2>{`Regime Transition Trend (Last ${query.transitionDays} Days)`}</h2>
-        <p className="muted card-intro">
-          Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.
-        </p>
-        <TrendStrips
-          title=""
-          items={transitionTrendItems}
-          valueFormatter={(value) => formatPct(value, 2)}
-          deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
-          columns={3}
-          embedded
-          emptyText="Transition trend is unavailable for this filter."
-        />
-        {query.transitionSplit !== "none" ? (
-          <>
-            <TrendStrips
-              title={`Transition Churn by ${query.transitionSplit === "chain" ? "Chain" : "Category"} (Top 6 by latest TVL)`}
-              items={groupedTransitionTrendItems}
-              valueFormatter={(value) => formatPct(value, 2)}
-              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
-              emptyText="Grouped transition churn trend is unavailable for this filter."
-            />
-            <BarList
-              title={`Churn Drift Leaderboard (${query.transitionSplit === "chain" ? "Chains" : "Categories"})`}
-              items={groupedDriftItems}
-              valueFormatter={(value) => formatPct(value, 2)}
-              emptyText="Not enough grouped history yet for drift ranking."
-            />
-            <section>
-              <h3>{`Latest ${query.transitionSplit === "chain" ? "Chain" : "Category"} Snapshot`}</h3>
-              <p className="muted card-intro">Sortable latest-day cohort metrics for quick comparison and sanity checks.</p>
-              <div className="table-wrap">
-                <table className="regimes-split-table">
-                  <thead>
-                    <tr>
-                      <th>
-                        <button
-                          className={`th-button ${splitSnapshotSort.key === "cohort" ? "is-active" : ""}`}
-                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "cohort"))}
-                        >
-                          Cohort <span className="th-indicator">{sortIndicator(splitSnapshotSort, "cohort")}</span>
-                        </button>
-                      </th>
-                      <th className="is-numeric">
-                        <button
-                          className={`th-button ${splitSnapshotSort.key === "churn" ? "is-active" : ""}`}
-                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "churn"))}
-                        >
-                          Churn % <span className="th-indicator">{sortIndicator(splitSnapshotSort, "churn")}</span>
-                        </button>
-                      </th>
-                      <th className="is-numeric">
-                        <button
-                          className={`th-button ${splitSnapshotSort.key === "churn_tvl" ? "is-active" : ""}`}
-                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "churn_tvl"))}
-                        >
-                          Churn TVL % <span className="th-indicator">{sortIndicator(splitSnapshotSort, "churn_tvl")}</span>
-                        </button>
-                      </th>
-                      <th className="is-numeric">
-                        <button
-                          className={`th-button ${splitSnapshotSort.key === "momentum" ? "is-active" : ""}`}
-                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "momentum"))}
-                        >
-                          Momentum Spread <span className="th-indicator">{sortIndicator(splitSnapshotSort, "momentum")}</span>
-                        </button>
-                      </th>
-                      <th className="is-numeric">
-                        <button
-                          className={`th-button ${splitSnapshotSort.key === "tvl" ? "is-active" : ""}`}
-                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "tvl"))}
-                        >
-                          TVL <span className="th-indicator">{sortIndicator(splitSnapshotSort, "tvl")}</span>
-                        </button>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {splitSnapshotRows.map((row) => (
-                      <tr key={`split-latest-${row.group_key}`}>
-                        <td>{row.cohort_label}</td>
-                        <td className="is-numeric">{formatPct(row.changed_ratio, 2)}</td>
-                        <td className="is-numeric">{formatPct(row.changed_tvl_ratio, 2)}</td>
-                        <td className="is-numeric">{formatPct(row.momentum_spread, 2)}</td>
-                        <td className="is-numeric">{formatUsd(row.tvl_total_usd)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </>
-        ) : null}
-      </section>
-
-      <section className="card">
-        <h2>Regime Movers</h2>
-        <p className="muted card-intro">Sort by momentum to spot short-term shifts, or by TVL to focus on size.</p>
+        <h2>Current Regime Movers</h2>
+        <p className="muted card-intro">Sort by momentum to spot short-term shifts, or by TVL to focus on size inside the current regime snapshot.</p>
         <div className="table-wrap">
           <table className="regimes-mover-table">
             <thead>
@@ -971,6 +828,163 @@ function RegimesPageContent() {
           </table>
         </div>
       </section>
+
+      <section className="card regime-transition-callout">
+        <h2>Transition Analysis</h2>
+        <p className="muted card-intro">
+          Use the next sections when the question is not which regime dominates now, but how cohorts are moving between prior and
+          current states.
+        </p>
+      </section>
+
+      <section className="card">
+        <h2>Transition Matrix</h2>
+        <p className="muted card-intro">
+          Transition view compares short-term regime (7d vs 30d APY) against prior baseline regime (30d vs 90d APY).
+        </p>
+        <KpiGrid
+          items={[
+            { label: "Vaults Tracked", value: String(transitionData?.summary?.vaults_total ?? "n/a") },
+            { label: "Changed Vaults", value: String(transitionData?.summary?.changed_vaults ?? "n/a") },
+            { label: "Changed Ratio", value: formatPct(transitionData?.summary?.changed_ratio) },
+            { label: "Changed TVL", value: formatUsd(transitionData?.summary?.changed_tvl_usd) },
+          ]}
+        />
+        <div className="stack">
+          {query.transitionSplit === "none" ? (
+            <>
+              <div className="regime-transition-heat">
+                <HeatGrid
+                  title=""
+                  items={transitionHeat}
+                  valueFormatter={(value) => formatUsd(value)}
+                  embedded
+                  legend="Higher intensity means more TVL moved between regime states."
+                />
+              </div>
+            </>
+          ) : (
+            <div className="changes-stale-grid">
+              <HeatGrid
+                title={`Latest Churn TVL Share by ${query.transitionSplit === "chain" ? "Chain" : "Category"}`}
+                items={groupedLatestChurnHeat}
+                valueFormatter={(value) => formatPct(value, 2)}
+                legend="Each cell is latest-day churn TVL ratio (TVL in changed-regime vaults divided by total cohort TVL)."
+              />
+              <BarList
+                title={`${query.transitionSplit === "chain" ? "Chains" : "Categories"} with Highest Latest Churn`}
+                items={groupedLatestChurnBars}
+                valueFormatter={(value) => formatPct(value, 2)}
+              />
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Transition Flow Story</h2>
+        <p className="muted card-intro">Visual flow of where TVL moved between prior and current regime states.</p>
+        <div>
+          <RegimeFlowSankey title="" rows={transitionData?.matrix ?? []} />
+        </div>
+      </section>
+
+      <section className="card analyst-only">
+        <h2>{`Transition Trend (Last ${query.transitionDays} Days)`}</h2>
+        <p className="muted card-intro">
+          Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.
+        </p>
+        <TrendStrips
+          title=""
+          items={transitionTrendItems}
+          valueFormatter={(value) => formatPct(value, 2)}
+          deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+          columns={3}
+          embedded
+          emptyText="Transition trend is unavailable for this filter."
+        />
+        {query.transitionSplit !== "none" ? (
+          <>
+            <TrendStrips
+              title={`Transition Churn by ${query.transitionSplit === "chain" ? "Chain" : "Category"} (Top 6 by latest TVL)`}
+              items={groupedTransitionTrendItems}
+              valueFormatter={(value) => formatPct(value, 2)}
+              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+              emptyText="Grouped transition churn trend is unavailable for this filter."
+            />
+            <BarList
+              title={`Churn Drift Leaderboard (${query.transitionSplit === "chain" ? "Chains" : "Categories"})`}
+              items={groupedDriftItems}
+              valueFormatter={(value) => formatPct(value, 2)}
+              emptyText="Not enough grouped history yet for drift ranking."
+            />
+            <section>
+              <h3>{`Latest ${query.transitionSplit === "chain" ? "Chain" : "Category"} Snapshot`}</h3>
+              <p className="muted card-intro">Sortable latest-day cohort metrics for quick comparison and sanity checks.</p>
+              <div className="table-wrap">
+                <table className="regimes-split-table">
+                  <thead>
+                    <tr>
+                      <th>
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "cohort" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "cohort"))}
+                        >
+                          Cohort <span className="th-indicator">{sortIndicator(splitSnapshotSort, "cohort")}</span>
+                        </button>
+                      </th>
+                      <th className="is-numeric">
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "churn" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "churn"))}
+                        >
+                          Churn % <span className="th-indicator">{sortIndicator(splitSnapshotSort, "churn")}</span>
+                        </button>
+                      </th>
+                      <th className="is-numeric">
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "churn_tvl" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "churn_tvl"))}
+                        >
+                          Churn TVL % <span className="th-indicator">{sortIndicator(splitSnapshotSort, "churn_tvl")}</span>
+                        </button>
+                      </th>
+                      <th className="is-numeric">
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "momentum" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "momentum"))}
+                        >
+                          Momentum Spread <span className="th-indicator">{sortIndicator(splitSnapshotSort, "momentum")}</span>
+                        </button>
+                      </th>
+                      <th className="is-numeric">
+                        <button
+                          className={`th-button ${splitSnapshotSort.key === "tvl" ? "is-active" : ""}`}
+                          onClick={() => setSplitSnapshotSort((current) => toggleSort(current, "tvl"))}
+                        >
+                          TVL <span className="th-indicator">{sortIndicator(splitSnapshotSort, "tvl")}</span>
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {splitSnapshotRows.map((row) => (
+                      <tr key={`split-latest-${row.group_key}`}>
+                        <td>{row.cohort_label}</td>
+                        <td className="is-numeric">{formatPct(row.changed_ratio, 2)}</td>
+                        <td className="is-numeric">{formatPct(row.changed_tvl_ratio, 2)}</td>
+                        <td className="is-numeric">{formatPct(row.momentum_spread, 2)}</td>
+                        <td className="is-numeric">{formatUsd(row.tvl_total_usd)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        ) : null}
+      </section>
+
     </main>
   );
 }
