@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const FORCE_HTTPS_HOST = "yhelper.seul.one";
+const CANONICAL_HOST = "yhelper.app";
+const BLOCKED_HOSTS = new Set(["yhelper.seul.one", "www.yhelper.app"]);
 
 function visitorScheme(request: NextRequest): "http" | "https" | null {
   const cfVisitor = request.headers.get("cf-visitor");
@@ -38,13 +39,21 @@ function requestHost(request: NextRequest): string | null {
 
 export function middleware(request: NextRequest) {
   const host = requestHost(request);
-  if (host !== FORCE_HTTPS_HOST) {
+  if (!host) {
+    return NextResponse.next();
+  }
+
+  if (BLOCKED_HOSTS.has(host)) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  if (host !== CANONICAL_HOST) {
     return NextResponse.next();
   }
 
   const scheme = visitorScheme(request);
   if (scheme === "http") {
-    const secureUrl = new URL(request.nextUrl.pathname + request.nextUrl.search, `https://${FORCE_HTTPS_HOST}`);
+    const secureUrl = new URL(request.nextUrl.pathname + request.nextUrl.search, `https://${CANONICAL_HOST}`);
     return NextResponse.redirect(secureUrl, 308);
   }
   return NextResponse.next();

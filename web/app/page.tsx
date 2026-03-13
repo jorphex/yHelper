@@ -273,7 +273,6 @@ export default function HomePage() {
     <main className="container home-overview">
       <section className="card home-overview-hero">
         <div className="home-overview-hero-copy">
-          <p className="home-kicker">Yearn Decision Surface</p>
           <h1>Clear signals for faster vault decisions</h1>
           <p>Track yield shifts, spot vault trends, and find your next move.</p>
           <div className="home-overview-hero-highlights" aria-label="Overview highlights">

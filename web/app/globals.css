@@ -260,57 +260,22 @@ body::after {
 .site-brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.68rem;
   text-decoration: none;
   color: var(--ink);
   min-width: 0;
 }
 
-.site-brand-mark {
-  width: 2.28rem;
-  height: 2.28rem;
-  border-radius: 999px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid rgba(121, 161, 238, 0.56);
-  background:
-    radial-gradient(circle at 28% 28%, rgba(145, 184, 255, 0.28), rgba(145, 184, 255, 0) 58%),
-    linear-gradient(180deg, rgba(22, 48, 102, 0.92) 0%, rgba(8, 20, 47, 0.96) 100%);
-  color: var(--ink);
-  font-family: var(--font-fono);
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  box-shadow:
-    inset 0 1px 0 rgba(182, 211, 255, 0.08),
-    0 10px 24px rgba(2, 8, 20, 0.28);
-}
-
-.site-brand-copy {
-  display: grid;
-  gap: 0.08rem;
-  min-width: 0;
-}
-
 .site-brand-name {
-  font-size: 0.96rem;
+  font-size: 1.14rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.018em;
   line-height: 1.02;
+  white-space: nowrap;
 }
 
-.site-brand-tag {
-  color: var(--ink-dim);
-  font-family: var(--font-fono);
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.site-brand:hover .site-brand-mark,
-.site-brand:focus-visible .site-brand-mark {
-  border-color: rgba(152, 191, 255, 0.84);
+.site-brand:hover,
+.site-brand:focus-visible {
+  color: #f4f8ff;
 }
 
 .site-controls {
@@ -389,14 +354,14 @@ body::after {
   border: 1px solid transparent;
   background: transparent;
   border-radius: 12px;
-  padding: 0.42rem 0.64rem;
+  padding: 0.46rem 0.74rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1.18;
-  min-height: 2rem;
-  font-size: 0.78rem;
-  font-weight: 500;
+  min-height: 2.08rem;
+  font-size: 0.86rem;
+  font-weight: 560;
   white-space: nowrap;
   transition:
     border-color var(--motion-fast) var(--ease-standard),
@@ -437,12 +402,12 @@ body::after {
 }
 
 .audience-toggle .audience-label {
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   color: var(--ink-dim);
   font-family: var(--font-fono);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  padding: 0 0.24rem 0 0.42rem;
+  padding: 0 0.26rem 0 0.46rem;
 }
 
 .audience-toggle button {
@@ -450,11 +415,12 @@ body::after {
   background: transparent;
   color: var(--ink-soft);
   border-radius: 999px;
-  padding: 0.3rem 0.62rem;
-  font-size: 0.7rem;
+  padding: 0.34rem 0.7rem;
+  font-size: 0.78rem;
   cursor: pointer;
   line-height: 1.12;
-  min-height: 1.96rem;
+  min-height: 2.04rem;
+  font-weight: 560;
 }
 
 .audience-toggle button:hover {
@@ -473,9 +439,9 @@ body::after {
   gap: 0.32rem;
   border-radius: 999px;
   border: 1px solid rgba(56, 95, 166, 0.52);
-  padding: 0.28rem 0.54rem;
-  min-height: 1.92rem;
-  font-size: 0.66rem;
+  padding: 0.31rem 0.62rem;
+  min-height: 2.04rem;
+  font-size: 0.74rem;
   color: var(--ink-soft);
   background: linear-gradient(180deg, rgba(13, 28, 60, 0.78) 0%, rgba(8, 17, 37, 0.9) 100%);
   box-shadow: inset 0 0 0 1px rgba(150, 190, 255, 0.04);
@@ -3584,10 +3550,6 @@ input:focus-visible {
     grid-area: brand;
   }
 
-  .site-brand-tag {
-    display: none;
-  }
-
   .site-nav-center {
     grid-area: nav;
   }
@@ -3622,21 +3584,21 @@ input:focus-visible {
   }
 
   .site-nav-links a {
-    font-size: 0.78rem;
-    padding: 0.42rem 0.66rem;
+    font-size: 0.8rem;
+    padding: 0.44rem 0.68rem;
   }
 
   .audience-toggle .audience-label {
-    font-size: 0.64rem;
+    font-size: 0.66rem;
   }
 
   .audience-toggle button {
-    font-size: 0.72rem;
+    font-size: 0.74rem;
   }
 
   .freshness-badge {
-    font-size: 0.67rem;
-    padding: 0.24rem 0.5rem;
+    font-size: 0.7rem;
+    padding: 0.26rem 0.54rem;
   }
 
   .freshness-meta {
@@ -3755,18 +3717,11 @@ input:focus-visible {
   }
 
   .site-brand {
-    gap: 0.55rem;
     max-width: min(11rem, 100%);
   }
 
-  .site-brand-mark {
-    width: 2rem;
-    height: 2rem;
-    font-size: 0.66rem;
-  }
-
   .site-brand-name {
-    font-size: 0.92rem;
+    font-size: 0.98rem;
   }
 
   .site-controls {
@@ -3782,7 +3737,7 @@ input:focus-visible {
   .site-nav-links a {
     border-radius: 12px;
     padding: 0.42rem 0.56rem;
-    font-size: 0.74rem;
+    font-size: 0.76rem;
     line-height: 1.12;
     scroll-snap-align: center;
   }
@@ -4455,7 +4410,7 @@ input:focus-visible {
 
 @media (max-width: 380px) {
   .site-brand-name {
-    font-size: 0.86rem;
+    font-size: 0.9rem;
   }
 
   .site-controls {

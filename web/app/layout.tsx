@@ -72,13 +72,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <nav className="site-nav" aria-label="Primary">
             <div className="site-nav-shell">
               <Link href="/" className="site-brand" aria-label="yHelper overview">
-                <span className="site-brand-mark" aria-hidden>
-                  YH
-                </span>
-                <span className="site-brand-copy">
-                  <span className="site-brand-name">yHelper</span>
-                  <span className="site-brand-tag">Vault signal layer</span>
-                </span>
+                <span className="site-brand-name">yHelper</span>
               </Link>
               <div className="site-nav-center">
                 <NavLinks />
