@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatHours, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
+import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
 import { apiUrl } from "./lib/api";
 import { ShareMeter } from "./components/visuals";
 
@@ -55,6 +55,18 @@ type StYfiHomeResponse = {
   } | null;
   current_reward_state?: {
     styfi_current_apr?: number | null;
+  } | null;
+};
+
+type SocialPreviewResponse = {
+  highest_apy_vault?: {
+    vault_address?: string | null;
+    name?: string | null;
+    symbol?: string | null;
+    chain_id?: number | null;
+    tvl_usd?: number | null;
+    current_net_apy?: number | null;
+    safe_apy_30d?: number | null;
   } | null;
 };
 
@@ -203,18 +215,27 @@ function formatUsdCompact(value: number | null | undefined, digits = 1): string 
   }).format(value);
 }
 
+function compactTitle(value: string | null | undefined, max = 18): string {
+  if (!value || value.trim().length === 0) return "Syncing";
+  const text = value.trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(3, max - 1))}…`;
+}
+
 export default function HomePage() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [changes, setChanges] = useState<ChangesResponse | null>(null);
   const [styfi, setStyfi] = useState<StYfiHomeResponse | null>(null);
+  const [socialPreview, setSocialPreview] = useState<SocialPreviewResponse | null>(null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const [overviewResult, moversResult, styfiResult] = await Promise.allSettled([
+      const [overviewResult, moversResult, styfiResult, socialPreviewResult] = await Promise.allSettled([
         fetch(apiUrl("/overview"), { cache: "no-store" }),
         fetch(apiUrl("/changes", { window: "24h", universe: "core", limit: 1 }), { cache: "no-store" }),
         fetch(apiUrl("/styfi", { days: "30", epoch_limit: "4" }), { cache: "no-store" }),
+        fetch(apiUrl("/meta/social-preview"), { cache: "no-store" }),
       ]);
       if (!active) return;
 
@@ -226,6 +247,9 @@ export default function HomePage() {
       }
       if (styfiResult.status === "fulfilled" && styfiResult.value.ok) {
         setStyfi((await styfiResult.value.json()) as StYfiHomeResponse);
+      }
+      if (socialPreviewResult.status === "fulfilled" && socialPreviewResult.value.ok) {
+        setSocialPreview((await socialPreviewResult.value.json()) as SocialPreviewResponse);
       }
     };
 
@@ -268,6 +292,28 @@ export default function HomePage() {
       : "Deduped full Yearn inventory";
   const styfiTotalYfi = formatTokenCompact(styfi?.summary?.combined_staked ?? null, "YFI");
   const styfiApr = formatPct(styfi?.current_reward_state?.styfi_current_apr ?? null, 2);
+  const highestYieldVault = socialPreview?.highest_apy_vault ?? null;
+  const highestYieldHref =
+    highestYieldVault?.vault_address && highestYieldVault?.chain_id !== null && highestYieldVault?.chain_id !== undefined
+      ? yearnVaultUrl(Number(highestYieldVault.chain_id), highestYieldVault.vault_address)
+      : null;
+  const highestYieldName = compactTitle(highestYieldVault?.name ?? highestYieldVault?.symbol ?? null);
+  const highestYieldApy = formatPct(highestYieldVault?.current_net_apy ?? highestYieldVault?.safe_apy_30d ?? null, 1);
+  const highestYieldMeta = highestYieldVault
+    ? `${chainLabel(highestYieldVault.chain_id ?? null)} · Net APY ${highestYieldApy} · TVL ${formatUsdCompact(highestYieldVault.tvl_usd ?? null, 1)}`
+    : "Highest APY syncing";
+  const currentYearnVaultCount =
+    overview?.protocol_context?.current_yearn?.vaults !== null &&
+    overview?.protocol_context?.current_yearn?.vaults !== undefined &&
+    Number.isFinite(overview?.protocol_context?.current_yearn?.vaults)
+      ? `${overview?.protocol_context?.current_yearn?.vaults}`
+      : "n/a";
+  const totalYearnVaultCount =
+    overview?.protocol_context?.total_yearn?.vaults !== null &&
+    overview?.protocol_context?.total_yearn?.vaults !== undefined &&
+    Number.isFinite(overview?.protocol_context?.total_yearn?.vaults)
+      ? `${overview?.protocol_context?.total_yearn?.vaults}`
+      : "n/a";
 
   return (
     <main className="container home-overview">
@@ -345,7 +391,7 @@ export default function HomePage() {
         <div className="home-overview-section-head">
           <p className="home-kicker">Live Analyst View</p>
           <h2>Keep the front door actionable when you already know the workflow</h2>
-          <p className="card-intro">Analyst mode surfaces current movement, coverage quality, and staking context instead of onboarding guidance.</p>
+          <p className="card-intro">Analyst mode surfaces current movement, coverage quality, and yield leadership instead of onboarding guidance.</p>
         </div>
         <div className="home-overview-analyst-grid">
           <article className="home-overview-analyst-card" aria-live="polite">
@@ -391,15 +437,23 @@ export default function HomePage() {
             />
           </article>
           <article className="home-overview-analyst-card">
-            <p className="home-kicker">Staking Context</p>
-            <p className="home-overview-summary-value">{styfiTotalYfi}</p>
-            <p className="home-overview-summary-note">Combined YFI currently staked across stYFI and stYFIx.</p>
-            <p className="home-overview-summary-meta">Current reward run-rate {styfiApr}</p>
+            <p className="home-kicker">Highest Yield</p>
+            <p className="home-overview-summary-value home-overview-name-value">
+              {highestYieldHref ? (
+                <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
+                  {highestYieldName}
+                </a>
+              ) : (
+                highestYieldName
+              )}
+            </p>
+            <p className="home-overview-summary-note">Current highest-yielding live vault in visible multi-strategy v3 scope.</p>
+            <p className="home-overview-summary-meta">{highestYieldMeta}</p>
           </article>
         </div>
       </section>
 
-      <section className="home-overview-summary">
+      <section className="home-overview-summary guide-only">
         <article className="card home-overview-summary-card">
           <p className="home-kicker">Current Yearn TVL</p>
           <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
@@ -451,6 +505,39 @@ export default function HomePage() {
             · 30d APY now {liveShiftApy}
           </p>
           <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
+        </article>
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">stYFI Total YFI</p>
+          <p className="home-overview-summary-value">{styfiTotalYfi}</p>
+          <p className="home-overview-summary-note">Combined YFI currently staked across stYFI and stYFIx.</p>
+        </article>
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">stYFI APR</p>
+          <p className="home-overview-summary-value">{styfiApr}</p>
+          <p className="home-overview-summary-note">Current stYFI reward run-rate from the latest on-chain reward state.</p>
+        </article>
+      </section>
+
+      <section className="home-overview-summary analyst-only">
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">Current Yearn TVL</p>
+          <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
+          <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
+        </article>
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">Total Yearn TVL</p>
+          <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.total_yearn?.tvl_usd ?? null, 0)}</p>
+          <p className="home-overview-summary-note">{totalYearnNote}. Uses the same deduped accounting rule.</p>
+        </article>
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">Current Vaults</p>
+          <p className="home-overview-summary-value">{currentYearnVaultCount}</p>
+          <p className="home-overview-summary-note">Active visible current-scope vaults in the deduped live Yearn universe.</p>
+        </article>
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">Total Vaults</p>
+          <p className="home-overview-summary-value">{totalYearnVaultCount}</p>
+          <p className="home-overview-summary-note">Yearn-wide vault count including hidden, retired, and Fantom inventory.</p>
         </article>
         <article className="card home-overview-summary-card">
           <p className="home-kicker">stYFI Total YFI</p>

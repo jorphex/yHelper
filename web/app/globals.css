@@ -5071,6 +5071,13 @@ input:focus-visible {
   color: var(--ink);
 }
 
+.home-overview-name-value {
+  font-size: clamp(1.34rem, 2vw, 1.68rem);
+  line-height: 0.98;
+  text-wrap: balance;
+  word-break: break-word;
+}
+
 .home-overview-summary-note {
   margin: 0;
   max-width: 44ch;
