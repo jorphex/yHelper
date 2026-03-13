@@ -467,7 +467,6 @@ function CompositionPageContent() {
       />
 
       <section className="card section-card summary-card composition-visuals-card">
-        <p className="section-kicker">Concentration</p>
         <h2>Summary</h2>
         <p className="muted card-intro">HHI concentration runs from near 0 (diversified) toward 1 (highly concentrated).</p>
         <div className="split-grid composition-visual-grid">
@@ -497,7 +496,6 @@ function CompositionPageContent() {
       </section>
 
       <section className="card analyst-only section-card visual-card">
-        <p className="section-kicker">Visuals</p>
         <h2>Crowding Visuals</h2>
         <p className="muted card-intro">
           Scatter highlights APY versus size, while the heatmap shows where TVL share is concentrated in this filtered universe.
@@ -540,7 +538,6 @@ function CompositionPageContent() {
       </section>
 
       <section className="card section-card table-card">
-        <p className="section-kicker">Primary Lens</p>
         <h2>Chain Concentration</h2>
         <p className="muted card-intro">Click headers to sort by share, TVL, or weighted APY.</p>
         <div className="table-wrap">

@@ -328,8 +328,10 @@ export function TrendStrips({
     if (embedded) {
       return (
         <div ref={ref} className={isInView ? "is-in-view" : undefined}>
-          {title ? <h3>{title}</h3> : null}
-          <div className="panel-empty muted">{emptyText}</div>
+          <div className="trend-strip-panel">
+            {title ? <h3>{title}</h3> : null}
+            <div className="panel-empty muted">{emptyText}</div>
+          </div>
         </div>
       );
     }
@@ -342,7 +344,7 @@ export function TrendStrips({
   }
 
   const content = (
-    <>
+    <div className="trend-strip-panel">
       {title ? <h3>{title}</h3> : null}
       <div className={`trend-strip-list trend-strip-cols-${Math.min(4, Math.max(1, columns))}`}>
         {validItems.map((item, index) => {
@@ -390,7 +392,7 @@ export function TrendStrips({
           );
         })}
       </div>
-    </>
+    </div>
   );
 
   if (embedded) return <div ref={ref} className={isInView ? "is-in-view" : undefined}>{content}</div>;

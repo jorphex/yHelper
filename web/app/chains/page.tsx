@@ -187,7 +187,6 @@ function ChainsPageContent() {
       />
 
       <section className="card section-card summary-card">
-        <p className="section-kicker">Snapshot</p>
         <h2>Chain Universe Snapshot</h2>
         <p className="muted card-intro">At-a-glance totals for the current filter set.</p>
         <div className="split-grid chains-snapshot-layout">
