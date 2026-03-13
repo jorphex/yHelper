@@ -13,6 +13,8 @@ const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
 const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
 const BG_TEXTURE_VERSION = process.env.NEXT_PUBLIC_BG_TEXTURE_VERSION || "20260304bg12";
 const BG_TEXTURE_SRC = `/bg/grit-abstract-v1.webp?v=${BG_TEXTURE_VERSION}`;
+const SOCIAL_PREVIEW_SRC = `/social/yhelper-preview.png?v=${SOCIAL_IMAGE_VERSION}`;
+const SOCIAL_PREVIEW_URL = `${siteUrl}${SOCIAL_PREVIEW_SRC}`;
 const AUDIENCE_BOOTSTRAP = `(function(){try{var raw=window.localStorage.getItem("yhelper:audience-mode");var mode=raw==="analyst"?"analyst":"guide";document.documentElement.dataset.audience=mode;}catch(_e){document.documentElement.dataset.audience="guide";}})();`;
 
 export const metadata: Metadata = {
@@ -35,7 +37,7 @@ export const metadata: Metadata = {
     description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
     images: [
       {
-        url: `/opengraph-image?v=${SOCIAL_IMAGE_VERSION}`,
+        url: SOCIAL_PREVIEW_URL,
         width: 1200,
         height: 630,
         alt: `yHelper dashboard preview ${SOCIAL_IMAGE_VERSION}`,
@@ -46,7 +48,11 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "yHelper",
     description: "Yearn dashboard for vault discovery, yield shifts, and deeper composition, regime, and chain analysis.",
-    images: [`/twitter-image?v=${SOCIAL_IMAGE_VERSION}`],
+    images: [SOCIAL_PREVIEW_URL],
+  },
+  other: {
+    "og:image:secure_url": SOCIAL_PREVIEW_URL,
+    "twitter:image:src": SOCIAL_PREVIEW_URL,
   },
 };
 
