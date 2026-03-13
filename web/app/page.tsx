@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatHours, formatPct, formatUsd } from "./lib/format";
+import { formatHours, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
 import { apiUrl } from "./lib/api";
 import { ShareMeter } from "./components/visuals";
 
@@ -25,6 +25,8 @@ type OverviewResponse = {
 };
 
 type ChangeMoverRow = {
+  vault_address?: string | null;
+  chain_id?: number | null;
   symbol?: string | null;
   token_symbol?: string | null;
   delta_apy?: number | null;
@@ -45,6 +47,15 @@ type ChangesResponse = {
     fallers?: ChangeMoverRow[];
     largest_abs_delta?: ChangeMoverRow[];
   };
+};
+
+type StYfiHomeResponse = {
+  summary?: {
+    combined_staked?: number | null;
+  } | null;
+  current_reward_state?: {
+    styfi_current_apr?: number | null;
+  } | null;
 };
 
 const HOME_REFRESH_MS = 60_000;
@@ -174,16 +185,26 @@ function freshnessSummary(ageSeconds: number | null | undefined): string {
   return `Freshness ${value}`;
 }
 
+function formatTokenCompact(value: number | null | undefined, symbol: string, digits = 1): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
+  return `${new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: digits,
+  }).format(value)} ${symbol}`;
+}
+
 export default function HomePage() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [changes, setChanges] = useState<ChangesResponse | null>(null);
+  const [styfi, setStyfi] = useState<StYfiHomeResponse | null>(null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const [overviewResult, moversResult] = await Promise.allSettled([
+      const [overviewResult, moversResult, styfiResult] = await Promise.allSettled([
         fetch(apiUrl("/overview"), { cache: "no-store" }),
         fetch(apiUrl("/changes", { window: "24h", universe: "core", limit: 1 }), { cache: "no-store" }),
+        fetch(apiUrl("/styfi", { days: "30", epoch_limit: "4" }), { cache: "no-store" }),
       ]);
       if (!active) return;
 
@@ -192,6 +213,9 @@ export default function HomePage() {
       }
       if (moversResult.status === "fulfilled" && moversResult.value.ok) {
         setChanges((await moversResult.value.json()) as ChangesResponse);
+      }
+      if (styfiResult.status === "fulfilled" && styfiResult.value.ok) {
+        setStyfi((await styfiResult.value.json()) as StYfiHomeResponse);
       }
     };
 
@@ -212,10 +236,12 @@ export default function HomePage() {
     changes?.freshness?.latest_pps_age_seconds ?? null,
   );
   const topMoverName = topMover ? moverTitle(topMover) : "Syncing";
+  const liveShiftHref =
+    topMover?.vault_address && topMover?.chain_id !== null && topMover?.chain_id !== undefined
+      ? yearnVaultUrl(Number(topMover.chain_id), topMover.vault_address)
+      : null;
   const liveShiftValue = Number.isFinite(topMover?.delta_apy ?? null) ? pctDelta(topMover?.delta_apy, 2) : "n/a";
-  const liveShiftNote = topMover
-    ? `${topMoverName} · 30d APY now ${formatPct(topMover?.safe_apy_30d ?? null, 2)}`
-    : "Largest 24h APY move syncing";
+  const liveShiftApy = topMover ? formatPct(topMover?.safe_apy_30d ?? null, 2) : "n/a";
   const staleRatio = overview?.freshness?.pps_stale_ratio ?? null;
   const freshRatio = staleRatio !== null && staleRatio !== undefined ? Math.max(0, 1 - staleRatio) : null;
   const currentYearnNote =
@@ -230,17 +256,15 @@ export default function HomePage() {
     Number.isFinite(overview?.protocol_context?.total_yearn?.vaults)
       ? `${overview?.protocol_context?.total_yearn?.vaults} active Yearn vaults including hidden, retired, and Fantom`
       : "Deduped full Yearn inventory";
+  const styfiTotalYfi = formatTokenCompact(styfi?.summary?.combined_staked ?? null, "YFI");
+  const styfiApr = formatPct(styfi?.current_reward_state?.styfi_current_apr ?? null, 2);
 
   return (
     <main className="container home-overview">
       <section className="card home-overview-hero">
         <div className="home-overview-hero-copy">
-          <p className="home-kicker">Overview</p>
-          <h1>One dashboard for discovery, timing, and risk context</h1>
-          <p>
-            Check protocol scale, data freshness, and the latest APY shift first. Then jump straight into the page built for the
-            question you are asking.
-          </p>
+          <h1>Clear signals for faster vault decisions</h1>
+          <p>Track yield shifts, spot vault trends, and find your next move.</p>
           <div className="home-minimal-cta-row">
             <Link href="/discover" className="home-lite-cta primary">Start in Discover</Link>
             <Link href="/changes" className="home-lite-cta">Check Changes</Link>
@@ -274,7 +298,7 @@ export default function HomePage() {
         <article className="card home-overview-summary-card home-overview-meter-card">
           <p className="home-kicker">Data Freshness</p>
           <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}</p>
-          <p className="home-overview-summary-note">Latest PPS in tracked scope. Stale means older than 24 hours.</p>
+          <p className="home-overview-summary-note">Latest PPS age in tracked scope.</p>
           <ShareMeter
             title=""
             embedded
@@ -284,26 +308,44 @@ export default function HomePage() {
                 id: "fresh",
                 label: "Fresh",
                 value: freshRatio,
-                note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within the 24h cutoff` : "Latest coverage syncing",
+                note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within 24h cutoff` : "Coverage syncing",
                 tone: "positive",
               },
               {
                 id: "stale",
                 label: "Stale",
                 value: staleRatio,
-                note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} older than the 24h cutoff` : "Stale ratio syncing",
+                note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} past 24h cutoff` : "Stale share syncing",
                 tone: "warning",
               },
             ]}
             valueFormatter={(value) => formatPct(value, 0)}
-            legend="Freshness combines latest PPS age with the share of tracked rows still inside the cutoff."
           />
         </article>
         <article className="card home-overview-summary-card home-overview-live-card" aria-live="polite">
           <p className="home-kicker">Latest Shift</p>
           <p className="home-overview-summary-value">{liveShiftValue}</p>
-          <p className="home-overview-summary-note">{liveShiftNote}</p>
+          <p className="home-overview-summary-note">
+            {liveShiftHref ? (
+              <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
+                {topMoverName}
+              </a>
+            ) : (
+              topMoverName
+            )}{" "}
+            · 30d APY now {liveShiftApy}
+          </p>
           <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
+        </article>
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">stYFI Total YFI</p>
+          <p className="home-overview-summary-value">{styfiTotalYfi}</p>
+          <p className="home-overview-summary-note">Combined YFI currently staked across stYFI and stYFIx.</p>
+        </article>
+        <article className="card home-overview-summary-card">
+          <p className="home-kicker">stYFI APR</p>
+          <p className="home-overview-summary-value">{styfiApr}</p>
+          <p className="home-overview-summary-note">Current stYFI reward run-rate from the latest on-chain reward state.</p>
         </article>
       </section>
 

@@ -256,51 +256,16 @@ body::after {
 .site-brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.8rem;
   text-decoration: none;
   color: var(--ink);
   min-width: 0;
 }
 
-.site-brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
-  border-radius: 14px;
-  border: 1px solid rgba(134, 173, 255, 0.38);
-  background:
-    radial-gradient(circle at 30% 28%, rgba(143, 183, 255, 0.34), rgba(143, 183, 255, 0) 58%),
-    linear-gradient(180deg, rgba(19, 45, 98, 0.98) 0%, rgba(9, 22, 48, 0.96) 100%);
-  color: var(--ink);
-  font-family: var(--font-fono);
-  font-size: 0.74rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  box-shadow:
-    inset 0 0 0 1px rgba(167, 199, 255, 0.06),
-    0 10px 22px rgba(2, 7, 18, 0.28);
-}
-
-.site-brand-copy {
-  display: grid;
-  gap: 0.08rem;
-  min-width: 0;
-}
-
 .site-brand-name {
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 700;
   letter-spacing: 0.01em;
-}
-
-.site-brand-tag {
-  color: var(--ink-dim);
-  font-size: 0.74rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  font-family: var(--font-fono);
+  line-height: 1.1;
 }
 
 .site-controls {
@@ -3287,12 +3252,8 @@ input:focus-visible {
     max-width: min(15rem, 100%);
   }
 
-  .site-brand-tag {
-    display: none;
-  }
-
   .site-brand-name {
-    font-size: 0.94rem;
+    font-size: 1rem;
   }
 
   .site-controls {
@@ -4283,22 +4244,24 @@ input:focus-visible {
 
 .home-overview-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
 }
 
 .home-overview-summary-card {
   display: grid;
-  gap: 0.55rem;
+  align-content: start;
+  gap: 0.46rem;
   min-height: 0;
 }
 
 .home-overview-summary-value {
   margin: 0;
-  font-size: clamp(1.7rem, 3vw, 2.2rem);
-  line-height: 0.98;
-  letter-spacing: -0.04em;
-  font-weight: 700;
+  font-size: clamp(1.62rem, 2.7vw, 2.08rem);
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
@@ -4306,19 +4269,42 @@ input:focus-visible {
   margin: 0;
   max-width: 48ch;
   color: var(--muted);
-  line-height: 1.6;
-  font-size: 0.94rem;
+  line-height: 1.52;
+  font-size: 0.9rem;
 }
 
 .home-overview-summary-meta {
   margin: 0;
   color: var(--ink-dim);
-  line-height: 1.54;
-  font-size: 0.86rem;
+  line-height: 1.48;
+  font-size: 0.82rem;
+}
+
+.home-overview-summary-link {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration-color: rgba(143, 183, 255, 0.62);
+}
+
+.home-overview-summary-link:hover {
+  color: var(--accent-2);
 }
 
 .home-overview-meter-card .meter-panel {
-  gap: 0.58rem;
+  gap: 0.46rem;
+}
+
+.home-overview-meter-card .meter-legend {
+  gap: 0.34rem;
+}
+
+.home-overview-meter-card .meter-note {
+  font-size: 0.72rem;
+}
+
+.home-overview-live-card .home-overview-summary-note,
+.home-overview-live-card .home-overview-summary-meta {
+  max-width: 36ch;
 }
 
 .home-overview-route-section,
@@ -4474,7 +4460,10 @@ input:focus-visible {
     margin-right: 0;
   }
 
-  .home-overview-summary,
+  .home-overview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .home-overview-playbook-grid {
     grid-template-columns: 1fr;
   }
@@ -4517,6 +4506,10 @@ input:focus-visible {
 
   .home-overview-route-card {
     min-height: 0;
+  }
+
+  .home-overview-summary {
+    grid-template-columns: 1fr;
   }
 
   .home-overview-summary-value {
