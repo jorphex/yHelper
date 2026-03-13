@@ -768,6 +768,9 @@ function DiscoverPageContent() {
       </section>
 
       <PageTopPanel
+        introTitle="Ranking Logic"
+        filtersTitle="Scan Controls"
+        tone="discover"
         intro={
           <>
             <p className="muted card-intro">
@@ -816,15 +819,6 @@ function DiscoverPageContent() {
               />
             </label>
             <label>
-              Rows:&nbsp;
-              <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
-                <option value={30}>30</option>
-                <option value={60}>60</option>
-                <option value={100}>100</option>
-                <option value={150}>150</option>
-              </select>
-            </label>
-            <label>
               Sort:&nbsp;
               <select value={query.serverSort} onChange={(event) => updateQuery({ api_sort: event.target.value })}>
                 <option value="quality">Quality</option>
@@ -834,6 +828,19 @@ function DiscoverPageContent() {
                 <option value="consistency">Consistency</option>
               </select>
             </label>
+          </div>
+        }
+        secondaryFilters={
+          <div className="inline-controls controls-tight">
+            <label>
+              Rows:&nbsp;
+              <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
+                <option value={30}>30</option>
+                <option value={60}>60</option>
+                <option value={100}>100</option>
+                <option value={150}>150</option>
+              </select>
+            </label>
             <label>
               Direction:&nbsp;
               <select value={query.serverDir} onChange={(event) => updateQuery({ api_dir: event.target.value })}>
@@ -841,10 +848,6 @@ function DiscoverPageContent() {
                 <option value="asc">Lowest first</option>
               </select>
             </label>
-          </div>
-        }
-        secondaryFilters={
-          <div className="inline-controls controls-tight">
             <label>
               Chain:&nbsp;
               <select
@@ -910,7 +913,7 @@ function DiscoverPageContent() {
             </label>
           </div>
         }
-        secondaryFiltersTitle="Segmentation Filters"
+        secondaryFiltersTitle="Rows + Segmentation"
       />
 
       {trendError ? <section className="card">{trendError}</section> : null}

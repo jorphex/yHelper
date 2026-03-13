@@ -765,6 +765,9 @@ function ChangesPageContent() {
       </section>
 
       <PageTopPanel
+        introTitle="Delta Logic"
+        filtersTitle="Timing Controls"
+        tone="changes"
         intro={
           <>
             <p className="muted card-intro">
@@ -812,14 +815,6 @@ function ChangesPageContent() {
                 ))}
               </select>
             </label>
-            <label>
-              TVL View:&nbsp;
-              <select value={query.tvlView} onChange={(event) => updateQuery({ tvl_view: event.target.value as TvlView })}>
-                <option value="both">Both (Filtered + Yearn Proxy)</option>
-                <option value="filtered">Filtered Universe Only</option>
-                <option value="yearn">Yearn-Aligned Proxy Only</option>
-              </select>
-            </label>
             <label className="field-compact">
               Min TVL (USD):&nbsp;
               <input
@@ -828,6 +823,18 @@ function ChangesPageContent() {
                 value={query.minTvl}
                 onChange={(event) => updateQuery({ min_tvl: Number(event.target.value || 0) })}
               />
+            </label>
+          </div>
+        }
+        secondaryFilters={
+          <div className="inline-controls controls-tight">
+            <label>
+              TVL View:&nbsp;
+              <select value={query.tvlView} onChange={(event) => updateQuery({ tvl_view: event.target.value as TvlView })}>
+                <option value="both">Both (Filtered + Yearn Proxy)</option>
+                <option value="filtered">Filtered Universe Only</option>
+                <option value="yearn">Yearn-Aligned Proxy Only</option>
+              </select>
             </label>
             <label>
               Trend View:&nbsp;
@@ -858,6 +865,7 @@ function ChangesPageContent() {
             </label>
           </div>
         }
+        secondaryFiltersTitle="View + Limits"
       />
 
       {trendError ? <section className="card">{trendError}</section> : null}

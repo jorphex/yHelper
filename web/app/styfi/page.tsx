@@ -454,6 +454,7 @@ function StYfiPageContent() {
         }
         introTitle="What It Tracks"
         filtersTitle="History Coverage"
+        tone="styfi"
         className="styfi-history-panel"
       />
 

@@ -528,6 +528,9 @@ function RegimesPageContent() {
       </section>
 
       <PageTopPanel
+        introTitle="State Rules"
+        filtersTitle="Behavior Controls"
+        tone="regimes"
         intro={
           <>
             <p className="muted card-intro">

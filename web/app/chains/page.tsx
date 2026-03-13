@@ -148,6 +148,9 @@ function ChainsPageContent() {
       </section>
 
       <PageTopPanel
+        introTitle="Readout Method"
+        filtersTitle="Scope Controls"
+        tone="chains"
         intro={
           <>
             <p className="muted card-intro">

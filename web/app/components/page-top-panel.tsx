@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+type PageTopPanelTone = "discover" | "assets" | "composition" | "changes" | "regimes" | "chains" | "styfi";
+
 type PageTopPanelProps = {
   intro: ReactNode;
   filters: ReactNode;
@@ -8,6 +10,7 @@ type PageTopPanelProps = {
   filtersIntro?: ReactNode;
   introTitle?: string;
   filtersTitle?: string;
+  tone?: PageTopPanelTone;
   className?: string;
 };
 
@@ -19,20 +22,25 @@ export function PageTopPanel({
   filtersIntro,
   introTitle = "Read Me First",
   filtersTitle = "Filters",
+  tone = "discover",
   className,
 }: PageTopPanelProps) {
   return (
-    <section className={`card page-top-panel${className ? ` ${className}` : ""}`}>
+    <section className={`card page-top-panel tone-${tone}${className ? ` ${className}` : ""}`}>
       <div className="page-top-panel-copy">
         <div className="page-top-panel-copy-head">
+          <p className="page-top-panel-kicker">Briefing</p>
           <h2>{introTitle}</h2>
         </div>
         <div className="page-top-panel-copy-body">{intro}</div>
       </div>
       <div className="page-top-panel-controls">
         <div className="page-top-panel-controls-head">
-          <h2>{filtersTitle}</h2>
-          {filtersIntro ? <div className="page-top-panel-controls-copy">{filtersIntro}</div> : null}
+          <p className="page-top-panel-kicker">Controls</p>
+          <div className="page-top-panel-controls-copy-block">
+            <h2>{filtersTitle}</h2>
+            {filtersIntro ? <div className="page-top-panel-controls-copy">{filtersIntro}</div> : null}
+          </div>
         </div>
         <div className="page-top-panel-controls-body">
           <div className="page-top-panel-controls-primary">{filters}</div>

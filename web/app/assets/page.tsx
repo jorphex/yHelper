@@ -306,6 +306,9 @@ function AssetsPageContent() {
       </section>
 
       <PageTopPanel
+        introTitle="Comparison Lens"
+        filtersTitle="Primary Filters"
+        tone="assets"
         intro={
           <>
             <p className="muted card-intro">
@@ -318,14 +321,6 @@ function AssetsPageContent() {
         filtersIntro={<p className="muted card-intro">All controls are URL-backed so this comparison view is shareable.</p>}
         filters={
           <div className="inline-controls controls-tight">
-            <label>
-              List:&nbsp;
-              <select value={query.tokenScope} onChange={(event) => updateQuery({ token_scope: event.target.value as TokenScope, token: null })}>
-                <option value="featured">Featured (clean list)</option>
-                <option value="canonical">Canonical only</option>
-                <option value="all">All symbols (incl. LP/structured)</option>
-              </select>
-            </label>
             <label>
               Universe:&nbsp;
               <select
@@ -377,6 +372,14 @@ function AssetsPageContent() {
         secondaryFilters={
           <div className="inline-controls controls-tight">
             <label>
+              List:&nbsp;
+              <select value={query.tokenScope} onChange={(event) => updateQuery({ token_scope: event.target.value as TokenScope, token: null })}>
+                <option value="featured">Featured (clean list)</option>
+                <option value="canonical">Canonical only</option>
+                <option value="all">All symbols (incl. LP/structured)</option>
+              </select>
+            </label>
+            <label>
               Rows:&nbsp;
               <select value={query.limit} onChange={(event) => updateQuery({ limit: Number(event.target.value) })}>
                 <option value={60}>60</option>
@@ -411,7 +414,7 @@ function AssetsPageContent() {
             </label>
           </div>
         }
-        secondaryFiltersTitle="Sort And Search"
+        secondaryFiltersTitle="Search + Sorting"
       />
 
       {detailError ? <section className="card">{detailError}</section> : null}

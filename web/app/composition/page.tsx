@@ -390,6 +390,9 @@ function CompositionPageContent() {
       </section>
 
       <PageTopPanel
+        introTitle="Concentration Lens"
+        filtersTitle="Exposure Controls"
+        tone="composition"
         intro={
           <>
             <p className="muted card-intro">
