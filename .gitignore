@@ -6,6 +6,7 @@
 # Local planning/notes (kept out of git history)
 NOTES.md
 PLAN.md
+DESIGN.md
 plan.md
 reports/
 infra/cloudflared/config.yml.example
