@@ -286,7 +286,7 @@ function AssetsPageContent() {
 
   if (assetsError && !assetData) {
     return (
-      <main className="container">
+      <main className="container route-page">
         <section className="card section-card status-card status-card-error">
           <h2>Asset comparison is temporarily unavailable</h2>
           <p className="card-intro">The token list did not load, so the comparison surface is holding back its KPI and table stack until the feed recovers.</p>
@@ -297,7 +297,7 @@ function AssetsPageContent() {
   }
 
   return (
-    <main className="container">
+    <main className="container route-page">
       <section className="hero hero-assets">
         <p className="hero-kicker">Venue comparison</p>
         <h1>Assets</h1>
@@ -313,13 +313,13 @@ function AssetsPageContent() {
         intro={
           <>
             <p className="muted card-intro">
-              APY spread is best APY minus worst APY for one token. Weighted APY gives more weight to high-TVL venues, so it
-              reflects where most capital sits.
+              APY spread is the gap between the best and worst venue for one token. Weighted APY leans toward high-TVL venues, so
+              it reflects where most capital sits.
             </p>
-            <p className="muted">Use this page to find large tokens where venue differences are meaningful, not just noise.</p>
+            <p className="muted">Use this page when venue differences matter, not just raw yield.</p>
           </>
         }
-        filtersIntro={<p className="muted card-intro">All controls are URL-backed so this comparison view is shareable.</p>}
+        filtersIntro={<p className="muted card-intro">These controls live in the URL, so this comparison is easy to share.</p>}
         filters={
           <div className="inline-controls controls-tight">
             <label>
@@ -423,7 +423,7 @@ function AssetsPageContent() {
       <section className="card section-card table-card assets-venues-card">
         <h2>{detail?.token_symbol || selectedSymbol || "Token"} Venues</h2>
         <p className="muted card-intro">
-          Venue-level detail for the selected token. Sort to compare alternatives quickly. Pro mode adds extra context columns.
+          Sort venue rows to compare the selected token quickly. Pro mode adds deeper context.
         </p>
         <p className="muted">
           Scope: active, non-retired <strong>Multi Strategy v3</strong> vaults only.
@@ -588,16 +588,16 @@ function AssetsPageContent() {
       <section className="card section-card summary-card assets-universe-card">
         <h2>Token Universe</h2>
         <p className="muted card-intro">
-          Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue depth.
-          Canonical shows all plain symbols. All includes LP and structured symbols.
+          Pick a token, then sort by spread, TVL, or weighted APY. Featured focuses on larger canonical tokens with enough venue
+          depth. Canonical shows plain symbols. All includes LP and structured symbols.
         </p>
         <p className="muted card-intro">
-          Current detail view: <strong>{selectedSymbol || "No token selected"}</strong>. Use <strong>Selected Token</strong> in the
-          filter panel above to change the venue detail below.
+          Current detail view: <strong>{selectedSymbol || "No token selected"}</strong>. Change it with <strong>Selected Token</strong>
+          above.
         </p>
         {query.tokenScope === "featured" ? (
           <p className="muted card-intro">
-            Featured criteria: token TVL at least {formatUsd(assetData?.filters?.featured_min_tvl_usd)}, at least{" "}
+            Featured means token TVL at least {formatUsd(assetData?.filters?.featured_min_tvl_usd)}, at least{" "}
             {featuredMinVenues ?? "n/a"} {featuredMinVenues === 1 ? "venue" : "venues"}, and at least {featuredMinChains ?? "n/a"}{" "}
             {featuredMinChains === 1 ? "chain" : "chains"}.
           </p>
@@ -829,7 +829,7 @@ function AssetsPageContent() {
 
 export default function AssetsPage() {
   return (
-    <Suspense fallback={<main className="container"><section className="card">Loading…</section></main>}>
+    <Suspense fallback={<main className="container route-page"><section className="card">Loading…</section></main>}>
       <AssetsPageContent />
     </Suspense>
   );

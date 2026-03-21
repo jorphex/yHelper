@@ -128,7 +128,7 @@ function ChainsPageContent() {
 
   if (error && !data) {
     return (
-      <main className="container">
+      <main className="container route-page">
         <section className="card section-card status-card status-card-error">
           <h2>Chain rollups are temporarily unavailable</h2>
           <p className="card-intro">The chain snapshot failed before any rollup rows loaded, so the route is holding back the KPI and table stack until the data feed recovers.</p>
@@ -139,7 +139,7 @@ function ChainsPageContent() {
   }
 
   return (
-    <main className="container">
+    <main className="container route-page">
       <section className="hero hero-chains">
         <p className="hero-kicker">Network lens</p>
         <h1>Chains</h1>
@@ -155,12 +155,12 @@ function ChainsPageContent() {
         intro={
           <>
             <p className="muted card-intro">
-              Weighted APY uses TVL weights, so larger vaults have more influence on each chain score.
+              Weighted APY is TVL-weighted, so larger vaults carry more influence in each chain score.
             </p>
-            <p className="muted">Coverage ratio means vaults with metrics divided by active vaults.</p>
+            <p className="muted">Use this page when the question is chain context, not individual vault rank.</p>
           </>
         }
-        filtersIntro={<p className="muted card-intro">URL-backed controls keep chain views shareable.</p>}
+        filtersIntro={<p className="muted card-intro">These controls live in the URL, so chain views stay shareable.</p>}
         filters={
           <div className="inline-controls controls-tight">
             <label>
@@ -222,9 +222,7 @@ function ChainsPageContent() {
             valueFormatter={(value) => formatUsd(value)}
           />
         </div>
-        <p className="muted card-intro">
-          Weighted metrics are TVL-weighted across filtered vaults. Click any header to sort.
-        </p>
+        <p className="muted card-intro">Weighted metrics use TVL weights across the filtered vaults. Click any header to sort.</p>
         <div className="table-wrap chains-rollup-wrap">
           <table className="chains-rollup-table">
             <thead>
@@ -341,7 +339,7 @@ function ChainsPageContent() {
 
 export default function ChainsPage() {
   return (
-    <Suspense fallback={<main className="container"><section className="card">Loading…</section></main>}>
+    <Suspense fallback={<main className="container route-page"><section className="card">Loading…</section></main>}>
       <ChainsPageContent />
     </Suspense>
   );

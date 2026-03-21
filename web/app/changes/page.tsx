@@ -187,7 +187,7 @@ function MoverTable({
     <section className="card section-card table-card changes-mover-card">
       <h2>{title}</h2>
       <p className="muted card-intro">
-        Click columns to sort by signal, size, or data staleness. Pro mode adds token/category and previous-APY context columns.
+        Sort by signal, size, or staleness. Pro mode adds token, category, and previous-APY context.
       </p>
       <div className="table-wrap">
         <table className="changes-mover-table">
@@ -746,7 +746,7 @@ function ChangesPageContent() {
 
   if (error && !data) {
     return (
-      <main className="container">
+      <main className="container route-page">
         <section className="card section-card status-card status-card-error">
           <h2>Changes data is temporarily unavailable</h2>
           <p className="card-intro">The change feed failed before any mover rows loaded, so the route is withholding its summary stack until the data source recovers.</p>
@@ -756,7 +756,7 @@ function ChangesPageContent() {
     );
   }
   return (
-    <main className="container">
+    <main className="container route-page">
       <section className="hero hero-changes">
         <p className="hero-kicker">Timing readout</p>
         <h1>Changes</h1>
@@ -772,15 +772,13 @@ function ChangesPageContent() {
         intro={
           <>
             <p className="muted card-intro">
-              Delta is current window APY minus previous window APY. Positive delta means yield is strengthening and negative delta
-              means it is weakening.
+              Delta is current-window APY minus the prior window. Positive delta means yield strengthened. Negative delta means it
+              weakened.
             </p>
-            <p className="muted">
-              Example: in 7d mode, current APY uses the latest 7 days and previous APY uses the 7 days before that.
-            </p>
+            <p className="muted">Freshness checks help you decide whether the move is worth trusting.</p>
           </>
         }
-        filtersIntro={<p className="muted card-intro">All controls are URL-backed so this view stays shareable.</p>}
+        filtersIntro={<p className="muted card-intro">These controls live in the URL, so this view is easy to share.</p>}
         filters={
           <div className="inline-controls controls-tight">
             <label>
@@ -874,7 +872,7 @@ function ChangesPageContent() {
       <section className="card section-card summary-card">
         <h2>Window Summary</h2>
         <p className="muted card-intro">
-          Current APY uses the selected range. Previous APY uses the immediately prior range. Delta is current minus previous.
+          Current APY uses the selected range. Previous APY uses the range right before it. Delta is current minus previous.
         </p>
         <div className="changes-summary-kpis">
           <KpiGrid items={summaryKpiItems} />
@@ -887,7 +885,7 @@ function ChangesPageContent() {
       <section className="card section-card summary-card" id="freshness-panels">
         <h2>Trust Signals</h2>
         <p className="muted card-intro">
-          These metrics show whether recent data is fresh enough to trust changes. Current stale cutoff:{" "}
+          Use these checks to decide whether recent data is fresh enough to trust this move. Current stale cutoff:{" "}
           {staleThresholdLabel(data?.filters?.stale_threshold ?? query.staleThreshold)}.
         </p>
         <div className="changes-trust-layout">
@@ -1248,7 +1246,7 @@ function ChangesPageContent() {
 
 export default function ChangesPage() {
   return (
-    <Suspense fallback={<main className="container"><section className="card">Loading…</section></main>}>
+    <Suspense fallback={<main className="container route-page"><section className="card">Loading…</section></main>}>
       <ChangesPageContent />
     </Suspense>
   );

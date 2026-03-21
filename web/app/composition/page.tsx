@@ -372,7 +372,7 @@ function CompositionPageContent() {
 
   if (error && !data) {
     return (
-      <main className="container">
+      <main className="container route-page">
         <section className="card section-card status-card status-card-error">
           <h2>Composition data is temporarily unavailable</h2>
           <p className="card-intro">The concentration feed failed before any composition rows loaded, so the page is holding back the analysis stack until the data source recovers.</p>
@@ -383,7 +383,7 @@ function CompositionPageContent() {
   }
 
   return (
-    <main className="container">
+    <main className="container route-page">
       <section className="hero hero-composition">
         <p className="hero-kicker">Exposure map</p>
         <h1>Composition</h1>
@@ -397,16 +397,13 @@ function CompositionPageContent() {
         intro={
           <>
             <p className="muted card-intro">
-              Crowding index compares normalized size against normalized yield. Higher values imply vaults that are large for their
-              current yield.
+              Crowding index compares normalized size with normalized yield. Higher values mean a vault is large for its current
+              yield.
             </p>
-            <p className="muted">
-              HHI runs from near 0 when spread out toward 1 when concentrated. It helps detect concentration risk by chain,
-              category, and token.
-            </p>
+            <p className="muted">Use this page to spot concentration by chain, category, and token.</p>
           </>
         }
-        filtersIntro={<p className="muted card-intro">Composition controls are URL-backed for reproducible views.</p>}
+        filtersIntro={<p className="muted card-intro">These controls live in the URL, so this view is easy to share.</p>}
         filters={
           <div className="inline-controls controls-tight">
             <label>
@@ -468,7 +465,7 @@ function CompositionPageContent() {
 
       <section className="card section-card summary-card composition-visuals-card">
         <h2>Summary</h2>
-        <p className="muted card-intro">HHI concentration runs from near 0 (diversified) toward 1 (highly concentrated).</p>
+        <p className="muted card-intro">HHI runs from near 0 for diversified exposure toward 1 for concentrated exposure.</p>
         <div className="split-grid composition-visual-grid">
           <KpiGrid
             items={[
@@ -498,7 +495,7 @@ function CompositionPageContent() {
       <section className="card analyst-only section-card visual-card">
         <h2>Crowding Visuals</h2>
         <p className="muted card-intro">
-          Scatter highlights APY versus size, while the heatmap shows where TVL share is concentrated in this filtered universe.
+          The scatter shows yield versus size. The heatmap shows where TVL share clusters inside this filter set.
         </p>
         <div className="split-grid composition-crowding-grid">
           <ScatterPlot
@@ -539,7 +536,7 @@ function CompositionPageContent() {
 
       <section className="card section-card table-card">
         <h2>Chain Concentration</h2>
-        <p className="muted card-intro">Click headers to sort by share, TVL, or weighted APY.</p>
+        <p className="muted card-intro">Sort by share, TVL, or weighted APY.</p>
         <div className="table-wrap">
           <table className="composition-summary-table">
             <thead>
@@ -1080,7 +1077,7 @@ function CompositionPageContent() {
 
 export default function CompositionPage() {
   return (
-    <Suspense fallback={<main className="container"><section className="card">Loading…</section></main>}>
+    <Suspense fallback={<main className="container route-page"><section className="card">Loading…</section></main>}>
       <CompositionPageContent />
     </Suspense>
   );

@@ -508,7 +508,7 @@ function RegimesPageContent() {
 
   if (error && !data) {
     return (
-      <main className="container">
+      <main className="container route-page">
         <section className="card section-card status-card status-card-error">
           <h2>Regime analysis is temporarily unavailable</h2>
           <p className="card-intro">The regime feed failed before the current-state snapshot loaded, so the route is holding back its behavior tables until the API recovers.</p>
@@ -519,7 +519,7 @@ function RegimesPageContent() {
   }
 
   return (
-    <main className="container">
+    <main className="container route-page">
       <section className="hero hero-regimes">
         <p className="hero-kicker">Behavior map</p>
         <h1>Regimes</h1>
@@ -535,13 +535,13 @@ function RegimesPageContent() {
         intro={
           <>
             <p className="muted card-intro">
-              Regimes are rule based: rising if momentum is at least +1%, falling if momentum is at most -1%, choppy if 30d
-              volatility is at least 20%, otherwise stable.
+              Regimes are rule based: rising = momentum at least +1%, falling = at most -1%, choppy = 30d volatility at least 20%,
+              otherwise stable.
             </p>
-            <p className="muted">This is descriptive, not predictive. It explains what recently happened in yield behavior.</p>
+            <p className="muted">Use this page when the question is behavior, not just rank.</p>
           </>
         }
-        filtersIntro={<p className="muted card-intro">Filters and sort are stored in URL query params for shareable views.</p>}
+        filtersIntro={<p className="muted card-intro">These controls live in the URL, so the view is easy to share.</p>}
         filters={
           <div className="inline-controls controls-tight">
             <label>
@@ -634,7 +634,7 @@ function RegimesPageContent() {
 
       <section className="card section-card summary-card regime-summary-card">
         <h2>Current Regime State</h2>
-        <p className="muted card-intro">Click column headers to sort by size, vault count, or regime name in the current snapshot.</p>
+        <p className="muted card-intro">Sort by size, vault count, or regime.</p>
         <div className="regime-summary-layout">
           <div className="regime-summary-main">
             <KpiGrid
@@ -719,7 +719,7 @@ function RegimesPageContent() {
 
       <section className="card section-card table-card">
         <h2>Current Regime Movers</h2>
-        <p className="muted card-intro">Sort by momentum to spot short-term shifts, or by TVL to focus on size inside the current regime snapshot.</p>
+        <p className="muted card-intro">Sort by momentum for short-term shifts or by TVL for size.</p>
         <div className="table-wrap">
           <table className="regimes-mover-table">
             <thead>
@@ -846,15 +846,15 @@ function RegimesPageContent() {
       <section className="card section-card subtle-card regime-transition-callout">
         <h2>Transition Analysis</h2>
         <p className="muted card-intro">
-          Use the next sections when the question is not which regime dominates now, but how cohorts are moving between prior and
-          current states.
+          Use the next sections when today&apos;s dominant regime matters less than how cohorts are moving between prior and current
+          states.
         </p>
       </section>
 
       <section className="card section-card visual-card">
         <h2>Transition Matrix</h2>
         <p className="muted card-intro">
-          Transition view compares short-term regime (7d vs 30d APY) against prior baseline regime (30d vs 90d APY).
+          Compare the current short-term regime (7d vs 30d APY) with the prior baseline regime (30d vs 90d APY).
         </p>
         <KpiGrid
           items={[
@@ -909,7 +909,7 @@ function RegimesPageContent() {
           <section className="card analyst-only section-card visual-card">
             <h2>{`Transition Trend (Last ${query.transitionDays} Days)`}</h2>
             <p className="muted card-intro">
-              Daily transition trend helps separate one-day noise from persistent regime churn across the vault universe.
+              This daily trend separates one-day noise from sustained regime churn across the vault universe.
             </p>
             <TrendStrips
               title=""
@@ -1010,7 +1010,7 @@ function RegimesPageContent() {
 
 export default function RegimesPage() {
   return (
-    <Suspense fallback={<main className="container"><section className="card">Loading…</section></main>}>
+    <Suspense fallback={<main className="container route-page"><section className="card">Loading…</section></main>}>
       <RegimesPageContent />
     </Suspense>
   );

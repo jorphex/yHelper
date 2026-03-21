@@ -127,7 +127,7 @@ const HOME_PLAYBOOKS = [
   {
     step: "01",
     title: "Find a candidate",
-    body: "Start in Discover to rank the universe, then confirm the latest move in Changes before treating a vault as actionable.",
+    body: "Start in Discover to rank the universe, then confirm the move in Changes before treating it as actionable.",
     links: [
       { href: "/discover", label: "Discover" },
       { href: "/changes", label: "Changes" },
@@ -136,7 +136,7 @@ const HOME_PLAYBOOKS = [
   {
     step: "02",
     title: "Pressure-test the idea",
-    body: "Use Assets, Composition, and Chains to understand spread, concentration, and chain context before sizing up.",
+    body: "Use Assets, Composition, and Chains to check spread, concentration, and chain context before sizing up.",
     links: [
       { href: "/assets", label: "Assets" },
       { href: "/composition", label: "Composition" },
@@ -146,13 +146,15 @@ const HOME_PLAYBOOKS = [
   {
     step: "03",
     title: "Monitor behavior over time",
-    body: "Use Regimes for state changes and stYFI for staking context when you need to monitor behavior rather than just scan once.",
+    body: "Use Regimes for state changes and stYFI when the job shifts from scanning to ongoing monitoring.",
     links: [
       { href: "/regimes", label: "Regimes" },
       { href: "/styfi", label: "stYFI" },
     ],
   },
 ] as const;
+
+const HOME_SUPPORT_ROUTE_CARDS = HOME_ROUTE_CARDS.filter((card) => !["/discover", "/changes"].includes(card.href));
 
 function pctDelta(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
@@ -197,14 +199,6 @@ function freshnessSummary(ageSeconds: number | null | undefined): string {
   return `Freshness ${value}`;
 }
 
-function formatTokenCompact(value: number | null | undefined, symbol: string, digits = 1): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
-  return `${new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: digits,
-  }).format(value)} ${symbol}`;
-}
-
 function formatUsdCompact(value: number | null | undefined, digits = 1): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
   return new Intl.NumberFormat("en-US", {
@@ -227,6 +221,7 @@ export default function HomePage() {
   const [changes, setChanges] = useState<ChangesResponse | null>(null);
   const [styfi, setStyfi] = useState<StYfiHomeResponse | null>(null);
   const [socialPreview, setSocialPreview] = useState<SocialPreviewResponse | null>(null);
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -263,6 +258,15 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setRevealed(true);
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => setRevealed(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   const topMover = featuredMover(changes);
   const liveFreshnessLine = liveMeta(
     changes?.summary?.avg_delta ?? null,
@@ -274,6 +278,7 @@ export default function HomePage() {
     topMover?.vault_address && topMover?.chain_id !== null && topMover?.chain_id !== undefined
       ? yearnVaultUrl(Number(topMover.chain_id), topMover.vault_address)
       : null;
+  const universeMoveValue = Number.isFinite(changes?.summary?.avg_delta ?? null) ? pctDelta(changes?.summary?.avg_delta, 2) : "n/a";
   const liveShiftValue = Number.isFinite(topMover?.delta_apy ?? null) ? pctDelta(topMover?.delta_apy, 2) : "n/a";
   const liveShiftApy = topMover ? formatPct(topMover?.safe_apy_30d ?? null, 2) : "n/a";
   const staleRatio = overview?.freshness?.pps_stale_ratio ?? null;
@@ -284,13 +289,6 @@ export default function HomePage() {
     Number.isFinite(overview?.protocol_context?.current_yearn?.vaults)
       ? `${overview?.protocol_context?.current_yearn?.vaults} active visible current-scope vaults`
       : "Deduped active visible current-scope Yearn inventory";
-  const totalYearnNote =
-    overview?.protocol_context?.total_yearn?.vaults !== null &&
-    overview?.protocol_context?.total_yearn?.vaults !== undefined &&
-    Number.isFinite(overview?.protocol_context?.total_yearn?.vaults)
-      ? `${overview?.protocol_context?.total_yearn?.vaults} active Yearn vaults including hidden, retired, and Fantom`
-      : "Deduped full Yearn inventory";
-  const styfiTotalYfi = formatTokenCompact(styfi?.summary?.combined_staked ?? null, "YFI");
   const styfiApr = formatPct(styfi?.current_reward_state?.styfi_current_apr ?? null, 2);
   const highestYieldVault = socialPreview?.highest_apy_vault ?? null;
   const highestYieldHref =
@@ -308,16 +306,11 @@ export default function HomePage() {
     Number.isFinite(overview?.protocol_context?.current_yearn?.vaults)
       ? `${overview?.protocol_context?.current_yearn?.vaults}`
       : "n/a";
-  const totalYearnVaultCount =
-    overview?.protocol_context?.total_yearn?.vaults !== null &&
-    overview?.protocol_context?.total_yearn?.vaults !== undefined &&
-    Number.isFinite(overview?.protocol_context?.total_yearn?.vaults)
-      ? `${overview?.protocol_context?.total_yearn?.vaults}`
-      : "n/a";
+  const revealClass = revealed ? " home-reveal is-visible" : " home-reveal";
 
   return (
     <main className="container home-overview">
-      <section className="card home-overview-hero">
+      <section className={`card home-overview-hero${revealClass}`}>
         <div className="home-overview-hero-copy">
           <h1>Clear signals for faster vault decisions</h1>
           <p>Move from signal to route without wading through repeated chrome or guesswork.</p>
@@ -335,14 +328,13 @@ export default function HomePage() {
               </span>
             </div>
             <div className="home-overview-hero-highlight">
-              <span className="home-overview-hero-highlight-label">stYFI</span>
-              <span className="home-overview-hero-highlight-value">{styfiTotalYfi}</span>
+              <span className="home-overview-hero-highlight-label">Core 24h Move</span>
+              <span className="home-overview-hero-highlight-value">{universeMoveValue}</span>
             </div>
           </div>
           <div className="home-minimal-cta-row">
             <Link href="/discover" className="home-lite-cta primary">Start in Discover</Link>
             <Link href="/changes" className="home-lite-cta">Check Changes</Link>
-            <Link href="/assets" className="home-lite-cta">Compare Assets</Link>
           </div>
           <p className="home-overview-hero-meta">{liveFreshnessLine}</p>
         </div>
@@ -359,35 +351,55 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="card section-card home-overview-route-section">
+      <section className={`card section-card home-overview-flow-section${revealClass}`}>
         <div className="home-overview-section-head">
-          <p className="home-kicker">Explore The Suite</p>
-          <h2>Every primary destination is visible from the front door</h2>
+          <p className="home-kicker">Default Route</p>
+          <h2>Shortlist first. Pressure-test only when the move looks real.</h2>
           <p className="card-intro">
-            Pick the page that matches your question: scan, compare, time, inspect concentration, follow behavior, compare chains,
-            or check staking context.
+            Discover should answer whether anything deserves attention. Changes should confirm that the move is fresh.
           </p>
         </div>
-        <div className="home-overview-route-grid">
-          {HOME_ROUTE_CARDS.map((card, index) => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className={`card home-route-clickable home-overview-route-card${index === 0 ? " is-featured" : ""}`}
-            >
-              <p className="home-overview-route-eyebrow">{card.eyebrow}</p>
-              <div className="home-route-head">
-                <h2>{card.title}</h2>
-              </div>
-              <p className="muted">{card.description}</p>
-              <p className="home-overview-route-note">{card.note}</p>
-              <span className="home-route-arrow" aria-hidden="true">→</span>
-            </Link>
-          ))}
+        <div className="home-overview-flow-grid">
+          <article className="home-overview-flow-card">
+            <div className="home-overview-flow-card-head">
+              <p className="home-kicker">Use This Order</p>
+              <p className="muted">Keep the first pass narrow. Branch out only when the question changes.</p>
+            </div>
+            <div className="home-overview-flow-steps">
+              {HOME_PLAYBOOKS.map((playbook) => (
+                <article key={playbook.step} className="home-overview-flow-step">
+                  <p className="home-overview-step-index">{playbook.step}</p>
+                  <div className="home-overview-flow-step-copy">
+                    <h3>{playbook.title}</h3>
+                    <p className="muted">{playbook.body}</p>
+                  </div>
+                  <div className="home-overview-flow-step-links">
+                    {playbook.links.map((link) => (
+                      <Link key={link.href} href={link.href} className="home-lite-cta">
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </article>
+          <aside className="home-overview-support-card">
+            <p className="home-kicker">Branch Out When Needed</p>
+            <p className="muted">Open these only when the shortlist already looks worth deeper work.</p>
+            <div className="home-overview-support-links">
+              {HOME_SUPPORT_ROUTE_CARDS.map((card) => (
+                <Link key={card.href} href={card.href} className="home-overview-support-link">
+                  <span className="home-overview-support-link-title">{card.title}</span>
+                  <span className="home-overview-support-link-note">{card.note}</span>
+                </Link>
+              ))}
+            </div>
+          </aside>
         </div>
       </section>
 
-      <section className="card analyst-only section-card home-overview-analyst-section">
+      <section className={`card analyst-only section-card home-overview-analyst-section${revealClass}`}>
         <div className="home-overview-section-head">
           <p className="home-kicker">Live Analyst View</p>
           <h2>Keep the front door actionable when you already know the workflow</h2>
@@ -453,16 +465,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="home-overview-summary guide-only">
+      <section className={`home-overview-summary guide-only${revealClass}`}>
         <article className="card home-overview-summary-card">
           <p className="home-kicker">Current Yearn TVL</p>
           <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
           <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
-        </article>
-        <article className="card home-overview-summary-card">
-          <p className="home-kicker">Total Yearn TVL</p>
-          <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.total_yearn?.tvl_usd ?? null, 0)}</p>
-          <p className="home-overview-summary-note">{totalYearnNote}. Uses the same deduped accounting rule.</p>
         </article>
         <article className="card home-overview-summary-card home-overview-meter-card">
           <p className="home-kicker">Data Freshness</p>
@@ -507,106 +514,26 @@ export default function HomePage() {
           <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
         </article>
         <article className="card home-overview-summary-card">
-          <p className="home-kicker">stYFI Total YFI</p>
-          <p className="home-overview-summary-value">{styfiTotalYfi}</p>
-          <p className="home-overview-summary-note">Combined YFI currently staked across stYFI and stYFIx.</p>
-        </article>
-        <article className="card home-overview-summary-card">
           <p className="home-kicker">stYFI APR</p>
           <p className="home-overview-summary-value">{styfiApr}</p>
           <p className="home-overview-summary-note">Current stYFI reward run-rate from the latest on-chain reward state.</p>
         </article>
       </section>
 
-      <section className="home-overview-summary analyst-only">
+      <section className={`home-overview-summary home-overview-summary-compact analyst-only${revealClass}`}>
         <article className="card home-overview-summary-card">
           <p className="home-kicker">Current Yearn TVL</p>
           <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
           <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
         </article>
         <article className="card home-overview-summary-card">
-          <p className="home-kicker">Total Yearn TVL</p>
-          <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.total_yearn?.tvl_usd ?? null, 0)}</p>
-          <p className="home-overview-summary-note">{totalYearnNote}. Uses the same deduped accounting rule.</p>
-        </article>
-        <article className="card home-overview-summary-card">
           <p className="home-kicker">Current Vaults</p>
           <p className="home-overview-summary-value">{currentYearnVaultCount}</p>
           <p className="home-overview-summary-note">Active visible current-scope vaults in the deduped live Yearn universe.</p>
         </article>
-        <article className="card home-overview-summary-card">
-          <p className="home-kicker">Total Vaults</p>
-          <p className="home-overview-summary-value">{totalYearnVaultCount}</p>
-          <p className="home-overview-summary-note">Yearn-wide vault count including hidden, retired, and Fantom inventory.</p>
-        </article>
-        <article className="card home-overview-summary-card">
-          <p className="home-kicker">stYFI Total YFI</p>
-          <p className="home-overview-summary-value">{styfiTotalYfi}</p>
-          <p className="home-overview-summary-note">Combined YFI currently staked across stYFI and stYFIx.</p>
-        </article>
-        <article className="card home-overview-summary-card">
-          <p className="home-kicker">stYFI APR</p>
-          <p className="home-overview-summary-value">{styfiApr}</p>
-          <p className="home-overview-summary-note">Current stYFI reward run-rate from the latest on-chain reward state.</p>
-        </article>
       </section>
 
-      <section className="card guide-only section-card home-overview-playbooks">
-        <div className="home-overview-section-head">
-          <p className="home-kicker">How To Use It</p>
-          <h2>Move from scan to conviction without leaving the dashboard</h2>
-          <p className="card-intro">The fastest path is to scan first, pressure-test second, and monitor behavior last.</p>
-        </div>
-        <div className="home-overview-playbook-grid">
-          {HOME_PLAYBOOKS.map((playbook) => (
-            <article key={playbook.step} className="home-overview-playbook-card">
-              <p className="home-overview-step-index">{playbook.step}</p>
-              <h3>{playbook.title}</h3>
-              <p className="muted">{playbook.body}</p>
-              <div className="home-overview-playbook-links">
-                {playbook.links.map((link) => (
-                  <Link key={link.href} href={link.href} className="home-lite-cta">
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="card section-card home-overview-context">
-        <div className="home-overview-context-art" aria-hidden="true">
-          <Image
-            src="/home-assets-yearn-blender/purpose-yearn-blender-coins.png"
-            alt=""
-            fill
-            sizes="(max-width: 1100px) 100vw, 34vw"
-            className="home-art-image home-overview-context-image"
-            draggable={false}
-          />
-        </div>
-        <div className="home-overview-context-copy">
-          <p className="home-kicker">Read The Numbers</p>
-          <h2>Start with trust, then drill down</h2>
-          <div className="home-overview-context-list">
-            <article className="home-overview-context-item">
-              <h3>Check freshness before acting</h3>
-              <p className="muted">Use the freshness card and the Changes page to separate real movement from stale data.</p>
-            </article>
-            <article className="home-overview-context-item">
-              <h3>Keep scope comparisons aligned</h3>
-              <p className="muted">The overview TVL cards use deduped Yearn accounting, so compare filtered views against the right scope.</p>
-            </article>
-            <article className="home-overview-context-item">
-              <h3>Use the page built for the question</h3>
-              <p className="muted">Discover and Changes answer &quot;what moved?&quot; Assets, Composition, Regimes, and Chains answer &quot;why should I care?&quot;.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <footer className="card home-minimal-footer">
+      <footer className={`card home-minimal-footer${revealClass}`}>
         <p className="home-minimal-footer-title">Official channels</p>
         <div className="home-minimal-footer-links">
           <a href="https://yearn.fi" target="_blank" rel="noopener noreferrer">Yearn</a>

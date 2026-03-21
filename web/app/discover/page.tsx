@@ -748,7 +748,7 @@ function DiscoverPageContent() {
 
   if (error && !data) {
     return (
-      <main className="container">
+      <main className="container route-page">
         <section className="card section-card status-card status-card-error">
           <h2>Discover data is temporarily unavailable</h2>
           <p className="card-intro">The route loaded without any vault rows, so the page is holding back its ranking cards until the feed recovers.</p>
@@ -759,7 +759,7 @@ function DiscoverPageContent() {
   }
 
   return (
-    <main className="container">
+    <main className="container route-page">
       <section className="hero hero-discover">
         <p className="hero-kicker">Opportunity scan</p>
         <h1>Discover</h1>
@@ -775,16 +775,16 @@ function DiscoverPageContent() {
         intro={
           <>
             <p className="muted card-intro">
-              APY here is an estimate from Price Per Share history, not a guaranteed forward rate. Momentum means 7-day APY minus
-              30-day APY, so positive momentum means yield improved recently.
+              APY here is estimated from Price Per Share history, so treat it as a backward-looking signal. Momentum is 7-day APY
+              minus 30-day APY, so positive values mean yield improved recently.
             </p>
             <p className="muted">
-              Lifecycle flags come from yDaemon metadata: highlighted means promoted, migration ready means a newer vault target
-              exists, and retired means legacy or phasing out.
+              Lifecycle flags come from yDaemon metadata: highlighted = promoted, migration ready = newer vault target exists,
+              retired = legacy or winding down.
             </p>
           </>
         }
-        filtersIntro={<p className="muted card-intro">All controls are encoded in the URL, so this exact view is shareable.</p>}
+        filtersIntro={<p className="muted card-intro">These controls live in the URL, so you can share this exact view.</p>}
         filters={
           <div className="inline-controls controls-tight">
             <label>
@@ -923,69 +923,20 @@ function DiscoverPageContent() {
         <section className="card section-card empty-state-card">
           <h2>No Vaults Match This Filter Yet</h2>
           <p className="muted card-intro">
-            This usually means current filters are too strict for the latest ingestion cycle, not that the protocol has no vaults.
+            These filters are stricter than the latest ingest, not proof that Yearn has no vaults.
           </p>
           <p className="muted">
-            Try lowering <strong>Min TVL</strong>, lowering <strong>Min Points</strong>, or changing <strong>Universe</strong>.
-            If most cards still show n/a after that, wait for the next ingestion cycle.
+            Lower <strong>Min TVL</strong>, lower <strong>Min Points</strong>, or change <strong>Universe</strong>. If most cards
+            still show n/a after that, wait for the next ingest.
           </p>
         </section>
       ) : null}
 
-      <section className="card section-card summary-card discover-universe-card">
-        <h2>Universe Snapshot</h2>
-        <p className="muted card-intro">
-          Current size and quality profile for the filtered vault universe. Coverage below separates vaults with enough PPS history
-          from visible vaults that are still missing or too thin for APY scoring.
-        </p>
-        <div className="discover-universe-layout">
-          <div className="discover-kpis">
-            <KpiGrid items={discoverSnapshotItems} />
-          </div>
-          <div className="discover-mix-grid">
-            <BarList
-              title="APY Bucket Count"
-              items={[
-                { id: "neg", label: "Negative APY", value: data?.summary?.apy_negative_vaults ?? null },
-                { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
-                { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
-                { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
-                {
-                  id: "unknown",
-                  label: "Unknown / thin history",
-                  value: data?.coverage?.missing_or_low_points ?? null,
-                  note: "Visible vaults missing metrics or still below the point threshold",
-                },
-              ]}
-              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
-              emptyText="No APY bucket counts for this filter yet."
-            />
-            <div className="analyst-only">
-              <BarList
-                title="Risk Level Mix (TVL)"
-                items={(data?.risk_mix ?? []).map((row) => ({
-                  id: String(row.risk_level),
-                  label: riskLevelLabel(row.risk_level),
-                  value: row.tvl_usd,
-                  note: `${row.vaults} vaults`,
-                }))}
-                valueFormatter={(value) => formatUsd(value)}
-                emptyText="No risk mix for this filter yet."
-              />
-            </div>
-          </div>
-        </div>
-        <p className="muted card-intro">
-          Unknown APY means the vault is visible in scope but still missing enough PPS history to score. Regime mix is shown on the
-          Regimes page to avoid duplicated charts.
-        </p>
-      </section>
-
       <section className="card section-card table-card discover-table-card">
         <h2>Vault Universe</h2>
         <p className="muted card-intro">
-          Filtered vaults with enough TVL and data history to reduce noisy outliers. Sort order follows the API sort controls above.
-          Switch to Pro mode for extra context columns. Rows:{" "}
+          Filtered vaults with enough TVL and PPS history to reduce noisy outliers. Switch to Pro mode for extra context columns.
+          Rows:{" "}
           {data?.pagination.total ?? "loading..."}
         </p>
         <div className="table-wrap">
@@ -1049,10 +1000,58 @@ function DiscoverPageContent() {
         </div>
       </section>
 
+      <section className="card section-card subtle-card discover-universe-card">
+        <h2>Universe Snapshot</h2>
+        <p className="muted card-intro">
+          Coverage and mix for the current filter after the shortlist is set.
+        </p>
+        <div className="discover-universe-layout">
+          <div className="discover-kpis">
+            <KpiGrid items={discoverSnapshotItems} />
+          </div>
+          <div className="discover-mix-grid">
+            <BarList
+              title="APY Bucket Count"
+              items={[
+                { id: "neg", label: "Negative APY", value: data?.summary?.apy_negative_vaults ?? null },
+                { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
+                { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
+                { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
+                {
+                  id: "unknown",
+                  label: "Unknown / thin history",
+                  value: data?.coverage?.missing_or_low_points ?? null,
+                  note: "Visible vaults missing metrics or still below the point threshold",
+                },
+              ]}
+              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+              emptyText="No APY bucket counts for this filter yet."
+            />
+            <div className="analyst-only">
+              <BarList
+                title="Risk Level Mix (TVL)"
+                items={(data?.risk_mix ?? []).map((row) => ({
+                  id: String(row.risk_level),
+                  label: riskLevelLabel(row.risk_level),
+                  value: row.tvl_usd,
+                  note: `${row.vaults} vaults`,
+                }))}
+                valueFormatter={(value) => formatUsd(value)}
+                emptyText="No risk mix for this filter yet."
+              />
+            </div>
+          </div>
+        </div>
+        <p className="muted card-intro">
+          Unknown APY means the vault is visible in scope but still missing enough PPS history to score. Regime mix stays on the
+          Regimes page to avoid duplicating the same story here.
+        </p>
+      </section>
+
       <section className="card section-card visual-card discover-analytics-card">
         <h2>Yield Structure and Trend Maps</h2>
         <p className="muted card-intro">
-          Visual view of yield level, momentum direction, and concentration patterns in the current filtered universe.
+          Visual read on yield level, momentum direction, and concentration in the current filtered universe.
         </p>
         <div className="discover-visual-grid">
           <ScatterPlot
@@ -1138,7 +1137,7 @@ function DiscoverPageContent() {
 
 export default function DiscoverPage() {
   return (
-    <Suspense fallback={<main className="container"><section className="card">Loading…</section></main>}>
+    <Suspense fallback={<main className="container route-page"><section className="card">Loading…</section></main>}>
       <DiscoverPageContent />
     </Suspense>
   );

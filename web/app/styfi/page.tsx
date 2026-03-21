@@ -385,7 +385,7 @@ function StYfiPageContent() {
 
   if (error && !data) {
     return (
-      <main className="container">
+      <main className="container route-page">
         <section className="card section-card status-card status-card-error">
           <h2>stYFI data is temporarily unavailable</h2>
           <p className="card-intro">The staking snapshot endpoint failed before any page data loaded. The layout is intact, but the live protocol cards are intentionally withheld until the feed recovers.</p>
@@ -396,13 +396,13 @@ function StYfiPageContent() {
   }
 
   return (
-    <main className="container">
+    <main className="container route-page">
       <section className="hero hero-styfi">
         <p className="hero-kicker">Staking surface</p>
         <h1>stYFI</h1>
         <p className="muted">
-          Track Yearn staking balance, reward epochs, and legacy carryover at the protocol level. This page stays out of
-          wallet-level views and focuses on the shared staking surface.
+          Track Yearn staking balance, reward epochs, and legacy carryover at the protocol level. This page stays focused on the
+          shared staking surface, not wallet-level views.
         </p>
         <div className="home-minimal-cta-row">
           <a href="https://styfi.yearn.fi" target="_blank" rel="noreferrer noopener" className="home-lite-cta primary">
@@ -414,9 +414,9 @@ function StYfiPageContent() {
       <section className="card section-card summary-card styfi-summary-card">
         <h2>Protocol Snapshot</h2>
         <p className="muted card-intro">
-          The reward token is currently {rewardSymbol}. Rolling history is capped at {data?.data_policy?.retention_days ?? "n/a"} days,
-          with higher-frequency snapshots capped at {data?.data_policy?.snapshot_retention_days ?? "n/a"} days. Net-flow cards appear
-          only once enough history exists to make them meaningful.
+          Current reward token: {rewardSymbol}. History is kept for {data?.data_policy?.retention_days ?? "n/a"} days, with
+          higher-frequency snapshots kept for {data?.data_policy?.snapshot_retention_days ?? "n/a"} days. Net-flow cards appear once
+          enough recent history exists.
         </p>
         <KpiGrid items={summaryItems} />
       </section>
@@ -425,16 +425,13 @@ function StYfiPageContent() {
         intro={
           <>
             <p className="muted card-intro">
-              stYFI is Yearn&apos;s staking layer. This page tracks stake balance, epoch reward pots, and how the latest completed
-              epoch distribution compares with the current reward run-rate across stYFI and stYFIx.
+              stYFI is Yearn&apos;s staking layer. This page tracks total stake, reward pots, and how the latest completed epoch
+              compares with the current run rate across stYFI and stYFIx.
             </p>
-            <p className="muted analyst-only">
-              Net flow is derived from rolling snapshots, not from gross deposit and withdrawal logs. Current epochs can show a
-              reward run-rate before the completed-epoch allocation below is finalized.
-            </p>
+            <p className="muted analyst-only">Use it for protocol context, not wallet-level balances or claims.</p>
           </>
         }
-        filtersIntro={<p className="muted card-intro">The page uses the full retained snapshot history and the latest stored reward epochs.</p>}
+        filtersIntro={<p className="muted card-intro">This page uses the retained snapshot history and the latest stored reward epochs.</p>}
         filters={
           <div className="inline-controls controls-tight">
             <label>
@@ -494,8 +491,8 @@ function StYfiPageContent() {
       <section className="card section-card table-card">
         <h2>Epoch Detail</h2>
         <p className="muted card-intro">
-          Epochs start at 00:00:00 UTC. Current epochs can show a funded reward pot before splits are fully synced. Component columns
-          below are completed-epoch protocol allocations, not user claim totals.
+          Epochs start at 00:00:00 UTC. Current epochs can show a funded pot before splits fully sync. Component columns below are
+          completed-epoch protocol allocations, not user claim totals.
         </p>
         <div className="mobile-only styfi-epoch-mobile-list">
           {[...epochSeries].reverse().map((row) => {
@@ -588,7 +585,7 @@ function StYfiPageContent() {
 
 export default function StYfiPage() {
   return (
-    <Suspense fallback={<main className="container"><section className="card">Loading…</section></main>}>
+    <Suspense fallback={<main className="container route-page"><section className="card">Loading…</section></main>}>
       <StYfiPageContent />
     </Suspense>
   );
