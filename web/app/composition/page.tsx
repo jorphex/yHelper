@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { apiUrl } from "../lib/api";
 import { chainLabel, compactChainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
@@ -11,6 +10,8 @@ import { BarList, HeatGrid, KpiGrid, ScatterPlot, useInViewOnce } from "../compo
 import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
+import { useCompositionData } from "../hooks/use-composition-data";
+import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 
 type BreakdownRow = {
   chain_id?: number;
@@ -176,8 +177,6 @@ function CompositionPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [data, setData] = useState<CompositionResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [chainSort, setChainSort] = useState<SortState<ChainSortKey>>({ key: "tvl", direction: "desc" });
   const [categorySort, setCategorySort] = useState<SortState<CategorySortKey>>({ key: "tvl", direction: "desc" });
   const [tokenSort, setTokenSort] = useState<SortState<TokenSortKey>>({ key: "tvl", direction: "desc" });
@@ -252,36 +251,11 @@ function CompositionPageContent() {
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
 
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const params = new URLSearchParams({
-          universe: query.universe,
-          min_tvl_usd: String(query.minTvl),
-          min_points: String(query.minPoints),
-          top_n: String(query.topN),
-          crowding_limit: String(query.crowdingLimit),
-        });
-        const res = await fetch(apiUrl("/composition", params), { cache: "no-store" });
-        if (!res.ok) {
-          if (active) setError(`API error: ${res.status}`);
-          return;
-        }
-        const payload = (await res.json()) as CompositionResponse;
-        if (active) {
-          setData(payload);
-          setError(null);
-        }
-      } catch (err) {
-        if (active) setError(`Load failed: ${String(err)}`);
-      }
-    };
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [query.universe, query.minTvl, query.minPoints, query.topN, query.crowdingLimit]);
+  // React Query data fetching
+  const { data, isLoading, error } = useCompositionData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+  });
 
   const chainRows = sortRows(data?.chains ?? [], chainSort, {
     chain: (row) => chainLabel(row.chain_id),
@@ -466,16 +440,19 @@ function CompositionPageContent() {
       <section className="card section-card summary-card composition-visuals-card">
         <h2>Summary</h2>
         <p className="muted card-intro">HHI runs from near 0 for diversified exposure toward 1 for concentrated exposure.</p>
-        <div className="split-grid composition-visual-grid">
-          <KpiGrid
-            items={[
-              { label: "Eligible Vaults", value: String(data?.summary.vaults ?? "n/a") },
-              { label: "Average APY 30d", value: formatPct(data?.summary.avg_safe_apy_30d) },
-              { label: "Universe Chain HHI", value: data?.concentration.chain_hhi?.toFixed(3) ?? "n/a" },
-              { label: "Universe Category HHI", value: data?.concentration.category_hhi?.toFixed(3) ?? "n/a" },
-              { label: "Universe Token HHI", value: data?.concentration.token_hhi?.toFixed(3) ?? "n/a" },
-            ]}
-          />
+        {isLoading ? (
+          <KpiGridSkeleton count={5} />
+        ) : (
+          <div className="split-grid composition-visual-grid">
+            <KpiGrid
+              items={[
+                { label: "Eligible Vaults", value: String(data?.summary.vaults ?? "n/a") },
+                { label: "Average APY 30d", value: formatPct(data?.summary.avg_safe_apy_30d) },
+                { label: "Universe Chain HHI", value: data?.concentration.chain_hhi?.toFixed(3) ?? "n/a" },
+                { label: "Universe Category HHI", value: data?.concentration.category_hhi?.toFixed(3) ?? "n/a" },
+                { label: "Universe Token HHI", value: data?.concentration.token_hhi?.toFixed(3) ?? "n/a" },
+              ]}
+            />
           <BarList
             title="Top Chains by TVL Share"
             items={chainRows.slice(0, 8).map((row) => ({
@@ -487,6 +464,7 @@ function CompositionPageContent() {
             valueFormatter={(value) => formatPct(value)}
           />
         </div>
+        )}
         <div className="composition-treemap-panel">
           <TvlTreemap title="TVL Treemap (Chain → Category → Token Lens)" chains={chainRows} categories={categoryRows} tokens={tokenRows} />
         </div>
@@ -537,6 +515,9 @@ function CompositionPageContent() {
       <section className="card section-card table-card">
         <h2>Chain Concentration</h2>
         <p className="muted card-intro">Sort by share, TVL, or weighted APY.</p>
+        {isLoading ? (
+          <TableSkeleton rows={6} columns={5} />
+        ) : (
         <div className="table-wrap">
           <table className="composition-summary-table">
             <thead>
@@ -622,10 +603,14 @@ function CompositionPageContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       <section className="card section-card table-card">
         <h2>Category Concentration</h2>
+        {isLoading ? (
+          <TableSkeleton rows={6} columns={5} />
+        ) : (
         <div className="table-wrap">
           <table className="composition-summary-table">
             <thead>
@@ -715,10 +700,14 @@ function CompositionPageContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       <section className="card analyst-only section-card table-card">
         <h2>Top Tokens by TVL</h2>
+        {isLoading ? (
+          <TableSkeleton rows={6} columns={5} />
+        ) : (
         <div className="table-wrap">
           <table className="composition-summary-table">
             <thead>
@@ -808,11 +797,15 @@ function CompositionPageContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       <section className="card section-card table-card">
         <h2>Most Crowded</h2>
         <p className="muted">High TVL relative to APY versus peers in the same filtered universe.</p>
+        {isLoading ? (
+          <TableSkeleton rows={6} columns={7} />
+        ) : (
         <div className="table-wrap">
           <table className="composition-crowding-table">
             <thead>
@@ -934,11 +927,15 @@ function CompositionPageContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       <section className="card analyst-only section-card table-card">
         <h2>Least Crowded</h2>
         <p className="muted">Lower TVL relative to APY versus peers in the same filtered universe.</p>
+        {isLoading ? (
+          <TableSkeleton rows={6} columns={7} />
+        ) : (
         <div className="table-wrap">
           <table className="composition-crowding-table">
             <thead>
@@ -1060,6 +1057,7 @@ function CompositionPageContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
     </main>
   );
