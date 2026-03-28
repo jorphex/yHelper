@@ -381,34 +381,41 @@ function AssetsPageContent() {
           Scope: active, non-retired <strong>Multi Strategy v3</strong> vaults only.
         </p>
         {!selectedSymbol ? <p className="muted">Select a token above to load venue-level details.</p> : null}
-        <div className="split-grid">
-          <KpiGrid
-            items={[
-              { label: "Venues", value: String(detail?.summary.venues ?? "n/a") },
-              { label: "Chains", value: String(detail?.summary.chains ?? "n/a") },
-              { label: "Total TVL", value: formatUsd(detail?.summary.total_tvl_usd) },
-              { label: "Best APY 30d", value: formatPct(detail?.summary.best_safe_apy_30d) },
-              { label: "Median APY 30d", value: formatPct(detail?.summary.median_safe_apy_30d) },
-              { label: "Weighted APY 30d", value: formatPct(detail?.summary.weighted_safe_apy_30d) },
-              { label: "Median Momentum", value: formatPct(detail?.summary.median_momentum_7d_30d) },
-              { label: "APY Spread", value: formatPct(detail?.summary.spread_safe_apy_30d) },
-            ]}
-          />
-          <div className="analyst-only">
-            <BarList
-              title="Regime Count (Selected Token)"
-              items={(detail?.summary.regime_counts ?? []).map((row) => ({
-                id: row.regime,
-                label: compactRegimeLabel(row.regime),
-                value: row.vaults,
-              }))}
-              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+        {isLoadingDetail && selectedSymbol ? (
+          <KpiGridSkeleton count={8} />
+        ) : selectedSymbol ? (
+          <div className="split-grid">
+            <KpiGrid
+              items={[
+                { label: "Venues", value: String(detail?.summary.venues ?? "n/a") },
+                { label: "Chains", value: String(detail?.summary.chains ?? "n/a") },
+                { label: "Total TVL", value: formatUsd(detail?.summary.total_tvl_usd) },
+                { label: "Best APY 30d", value: formatPct(detail?.summary.best_safe_apy_30d) },
+                { label: "Median APY 30d", value: formatPct(detail?.summary.median_safe_apy_30d) },
+                { label: "Weighted APY 30d", value: formatPct(detail?.summary.weighted_safe_apy_30d) },
+                { label: "Median Momentum", value: formatPct(detail?.summary.median_momentum_7d_30d) },
+                { label: "APY Spread", value: formatPct(detail?.summary.spread_safe_apy_30d) },
+              ]}
             />
+            <div className="analyst-only">
+              <BarList
+                title="Regime Count (Selected Token)"
+                items={(detail?.summary.regime_counts ?? []).map((row) => ({
+                  id: row.regime,
+                  label: compactRegimeLabel(row.regime),
+                  value: row.vaults,
+                }))}
+                valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        <div className="table-wrap">
-          <table className="assets-venues-table">
+        {isLoadingDetail && selectedSymbol ? (
+          <TableSkeleton rows={6} columns={6} />
+        ) : selectedSymbol ? (
+          <div className="table-wrap">
+            <table className="assets-venues-table">
             <thead>
               <tr>
                 <th className="col-vault">
@@ -535,6 +542,7 @@ function AssetsPageContent() {
             </tbody>
           </table>
         </div>
+        ) : null}
       </section>
 
       <section className="card section-card summary-card assets-universe-card">
@@ -559,7 +567,10 @@ function AssetsPageContent() {
             No tokens matched this filter set. Lower <strong>Min TVL</strong>, lower <strong>Min Points</strong>, or switch list mode.
           </p>
         ) : null}
-        <div className="split-grid assets-universe-top">
+        {isLoadingAssets ? (
+          <KpiGridSkeleton count={7} />
+        ) : (
+          <div className="split-grid assets-universe-top">
           <KpiGrid
             items={[
               { label: "Tokens", value: String(assetData?.summary?.tokens ?? tokenRows.length) },
@@ -608,6 +619,7 @@ function AssetsPageContent() {
             />
           </div>
         </div>
+        )}
         <details className="section-details analyst-only">
           <summary>Token spread outliers</summary>
           <div className="section-details-body">
@@ -658,7 +670,9 @@ function AssetsPageContent() {
             </section>
           </div>
         </details>
-        {filteredTokenRows.length === 0 ? (
+        {isLoadingAssets ? (
+          <TableSkeleton rows={8} columns={7} />
+        ) : filteredTokenRows.length === 0 ? (
           <p className="muted">No tokens match these filters. Try lower Min TVL, lower Min Points, or switch List mode.</p>
         ) : (
           <div className="table-wrap">

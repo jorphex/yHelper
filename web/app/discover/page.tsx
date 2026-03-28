@@ -885,10 +885,13 @@ function DiscoverPageContent() {
         <p className="muted card-intro">
           Filtered vaults with enough TVL and PPS history to reduce noisy outliers. Switch to Pro mode for extra context columns.
           Rows:{" "}
-          {data?.pagination.total ?? "loading..."}
+          {isLoading ? "loading..." : data?.pagination.total ?? "0"}
         </p>
-        <div className="table-wrap">
-          <table className="discover-table">
+        {isLoading ? (
+          <TableSkeleton rows={8} columns={10} />
+        ) : (
+          <div className="table-wrap">
+            <table className="discover-table">
             <thead>
               <tr>
                 <th className="col-vault">Vault</th>
@@ -946,6 +949,7 @@ function DiscoverPageContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       <section className="card section-card subtle-card discover-universe-card">
@@ -953,43 +957,47 @@ function DiscoverPageContent() {
         <p className="muted card-intro">
           Coverage and mix for the current filter after the shortlist is set.
         </p>
-        <div className="discover-universe-layout">
-          <div className="discover-kpis">
-            <KpiGrid items={discoverSnapshotItems} />
-          </div>
-          <div className="discover-mix-grid">
-            <BarList
-              title="APY Bucket Count"
-              items={[
-                { id: "neg", label: "Negative APY", value: data?.summary?.apy_negative_vaults ?? null },
-                { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
-                { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
-                { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
-                {
-                  id: "unknown",
-                  label: "Unknown / thin history",
-                  value: data?.coverage?.missing_or_low_points ?? null,
-                  note: "Visible vaults missing metrics or still below the point threshold",
-                },
-              ]}
-              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
-              emptyText="No APY bucket counts for this filter yet."
-            />
-            <div className="analyst-only">
+        {isLoading ? (
+          <KpiGridSkeleton count={6} />
+        ) : (
+          <div className="discover-universe-layout">
+            <div className="discover-kpis">
+              <KpiGrid items={discoverSnapshotItems} />
+            </div>
+            <div className="discover-mix-grid">
               <BarList
-                title="Risk Level Mix (TVL)"
-                items={(data?.risk_mix ?? []).map((row) => ({
-                  id: String(row.risk_level),
-                  label: riskLevelLabel(row.risk_level),
-                  value: row.tvl_usd,
-                  note: `${row.vaults} vaults`,
-                }))}
-                valueFormatter={(value) => formatUsd(value)}
-                emptyText="No risk mix for this filter yet."
+                title="APY Bucket Count"
+                items={[
+                  { id: "neg", label: "Negative APY", value: data?.summary?.apy_negative_vaults ?? null },
+                  { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
+                  { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
+                  { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
+                  {
+                    id: "unknown",
+                    label: "Unknown / thin history",
+                    value: data?.coverage?.missing_or_low_points ?? null,
+                    note: "Visible vaults missing metrics or still below the point threshold",
+                  },
+                ]}
+                valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+                emptyText="No APY bucket counts for this filter yet."
               />
+              <div className="analyst-only">
+                <BarList
+                  title="Risk Level Mix (TVL)"
+                  items={(data?.risk_mix ?? []).map((row) => ({
+                    id: String(row.risk_level),
+                    label: riskLevelLabel(row.risk_level),
+                    value: row.tvl_usd,
+                    note: `${row.vaults} vaults`,
+                  }))}
+                  valueFormatter={(value) => formatUsd(value)}
+                  emptyText="No risk mix for this filter yet."
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <p className="muted card-intro">
           Unknown APY means the vault is visible in scope but still missing enough PPS history to score. Regime mix stays on the
           Regimes page to avoid duplicating the same story here.

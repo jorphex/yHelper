@@ -852,9 +852,13 @@ function ChangesPageContent() {
         <p className="muted card-intro">
           Current APY uses the selected range. Previous APY uses the range right before it. Delta is current minus previous.
         </p>
-        <div className="changes-summary-kpis">
-          <KpiGrid items={summaryKpiItems} />
-        </div>
+        {isLoading ? (
+          <KpiGridSkeleton count={6} />
+        ) : (
+          <div className="changes-summary-kpis">
+            <KpiGrid items={summaryKpiItems} />
+          </div>
+        )}
         <p className="muted">
           TVL View controls the scope shown above: dashboard-filtered totals from yDaemon, Yearn-aligned proxy scope, or both.
         </p>
@@ -894,44 +898,55 @@ function ChangesPageContent() {
         </div>
       </section>
 
-      <MoverTable
-        title="Top Risers"
-        rows={data?.movers?.risers ?? []}
-        universe={query.universe}
-        minTvl={query.minTvl}
-        minPoints={query.minPoints}
-        compact={isCompactViewport}
-      />
-      <div className="changes-mover-tables">
-        <MoverTable
-          title="Top Fallers"
-          rows={data?.movers?.fallers ?? []}
-          universe={query.universe}
-          minTvl={query.minTvl}
-          minPoints={query.minPoints}
-          compact={isCompactViewport}
-        />
-        <div className="analyst-only">
+      {isLoading ? (
+        <>
+          <TableSkeleton rows={6} columns={8} />
+          <div className="changes-mover-tables">
+            <TableSkeleton rows={6} columns={8} />
+          </div>
+        </>
+      ) : (
+        <>
           <MoverTable
-            title="Largest Absolute Changes"
-            rows={data?.movers?.largest_abs_delta ?? []}
+            title="Top Risers"
+            rows={data?.movers?.risers ?? []}
             universe={query.universe}
             minTvl={query.minTvl}
             minPoints={query.minPoints}
             compact={isCompactViewport}
           />
-        </div>
-        <div className="analyst-only">
-          <MoverTable
-            title="Stalest Series"
-            rows={data?.stale ?? []}
-            universe={query.universe}
-            minTvl={query.minTvl}
-            minPoints={query.minPoints}
-            compact={isCompactViewport}
-          />
-        </div>
-      </div>
+          <div className="changes-mover-tables">
+            <MoverTable
+              title="Top Fallers"
+              rows={data?.movers?.fallers ?? []}
+              universe={query.universe}
+              minTvl={query.minTvl}
+              minPoints={query.minPoints}
+              compact={isCompactViewport}
+            />
+            <div className="analyst-only">
+              <MoverTable
+                title="Largest Absolute Changes"
+                rows={data?.movers?.largest_abs_delta ?? []}
+                universe={query.universe}
+                minTvl={query.minTvl}
+                minPoints={query.minPoints}
+                compact={isCompactViewport}
+              />
+            </div>
+            <div className="analyst-only">
+              <MoverTable
+                title="Stalest Series"
+                rows={data?.stale ?? []}
+                universe={query.universe}
+                minTvl={query.minTvl}
+                minPoints={query.minPoints}
+                compact={isCompactViewport}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       <section className="card analyst-only section-card visual-card changes-visuals-card">
         <h2>Delta Visuals and Freshness Heatmaps</h2>
@@ -1025,8 +1040,11 @@ function ChangesPageContent() {
 
       <section className="card section-card table-card">
         <h2>Freshness by Chain</h2>
-        <div className="table-wrap">
-          <table className="changes-stale-table">
+        {isLoading ? (
+          <TableSkeleton rows={6} columns={6} />
+        ) : (
+          <div className="table-wrap">
+            <table className="changes-stale-table">
             <thead>
               <tr>
                 <th>
@@ -1117,12 +1135,16 @@ function ChangesPageContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       <section className="card analyst-only section-card table-card">
         <h2>Freshness by Category</h2>
-        <div className="table-wrap">
-          <table className="changes-stale-table">
+        {isLoading ? (
+          <TableSkeleton rows={6} columns={6} />
+        ) : (
+          <div className="table-wrap">
+            <table className="changes-stale-table">
             <thead>
               <tr>
                 <th>
@@ -1213,6 +1235,7 @@ function ChangesPageContent() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
     </main>
