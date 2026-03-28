@@ -4,9 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
-import { apiUrl } from "./lib/api";
 import { ShareMeter } from "./components/visuals";
-import { KpiCardSkeleton, Skeleton } from "./components/skeleton";
+import { KpiCardSkeleton } from "./components/skeleton";
+import { useHomeData } from "./hooks/use-home-data";
 
 type OverviewResponse = {
   freshness?: {
@@ -71,7 +71,6 @@ type SocialPreviewResponse = {
   } | null;
 };
 
-const HOME_REFRESH_MS = 60_000;
 const HOME_ROUTE_CARDS = [
   {
     href: "/discover",
@@ -218,49 +217,14 @@ function compactTitle(value: string | null | undefined, max = 18): string {
 }
 
 export default function HomePage() {
-  const [overview, setOverview] = useState<OverviewResponse | null>(null);
-  const [changes, setChanges] = useState<ChangesResponse | null>(null);
-  const [styfi, setStyfi] = useState<StYfiHomeResponse | null>(null);
-  const [socialPreview, setSocialPreview] = useState<SocialPreviewResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data, isLoading, error, refetch } = useHomeData();
   const [revealed, setRevealed] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setIsLoading(true);
-      const [overviewResult, moversResult, styfiResult, socialPreviewResult] = await Promise.allSettled([
-        fetch(apiUrl("/overview"), { cache: "no-store" }),
-        fetch(apiUrl("/changes", { window: "24h", universe: "core", limit: 1 }), { cache: "no-store" }),
-        fetch(apiUrl("/styfi", { days: "30", epoch_limit: "4" }), { cache: "no-store" }),
-        fetch(apiUrl("/meta/social-preview"), { cache: "no-store" }),
-      ]);
-      if (!active) return;
-
-      if (overviewResult.status === "fulfilled" && overviewResult.value.ok) {
-        setOverview((await overviewResult.value.json()) as OverviewResponse);
-      }
-      if (moversResult.status === "fulfilled" && moversResult.value.ok) {
-        setChanges((await moversResult.value.json()) as ChangesResponse);
-      }
-      if (styfiResult.status === "fulfilled" && styfiResult.value.ok) {
-        setStyfi((await styfiResult.value.json()) as StYfiHomeResponse);
-      }
-      if (socialPreviewResult.status === "fulfilled" && socialPreviewResult.value.ok) {
-        setSocialPreview((await socialPreviewResult.value.json()) as SocialPreviewResponse);
-      }
-      setIsLoading(false);
-    };
-
-    void load();
-    const timer = window.setInterval(() => {
-      void load();
-    }, HOME_REFRESH_MS);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, []);
+  
+  // Destructure data for easier access
+  const overview = data?.overview ?? null;
+  const changes = data?.changes ?? null;
+  const styfi = data?.styfi ?? null;
+  const socialPreview = data?.socialPreview ?? null;
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {

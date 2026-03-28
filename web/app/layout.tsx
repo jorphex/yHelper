@@ -7,6 +7,7 @@ import { AudienceToggle } from "./components/audience-toggle";
 import { ChunkRecovery } from "./components/chunk-recovery";
 import { FreshnessBadge } from "./components/freshness-badge";
 import { NavLinks } from "./components/nav-links";
+import { Providers } from "./providers";
 import { SOCIAL_IMAGE_VERSION } from "./lib/social-image-version";
 
 const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
@@ -99,9 +100,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </div>
           </nav>
         </header>
-        <main id="main-content" tabIndex={-1}>
-          {children}
-        </main>
+        <Providers>
+          <main id="main-content" tabIndex={-1}>
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );
