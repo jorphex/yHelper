@@ -11,6 +11,8 @@ import { BarList, HeatGrid, KpiGrid, ScatterPlot, ShareMeter, TrendStrips } from
 import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
+import { useChangesData } from "../hooks/use-changes-data";
+import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 
 type WindowKey = "24h" | "7d" | "30d";
 type StaleThresholdKey = "auto" | "24h" | "7d" | "30d";
@@ -290,13 +292,11 @@ function ChangesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [data, setData] = useState<ChangesResponse | null>(null);
   const [trends, setTrends] = useState<DailyTrendRow[]>([]);
   const [chainTrendLatest, setChainTrendLatest] = useState<GroupedTrendRow[]>([]);
   const [categoryTrendLatest, setCategoryTrendLatest] = useState<GroupedTrendRow[]>([]);
   const [chainTrendSeries, setChainTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
   const [categoryTrendSeries, setCategoryTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
-  const [error, setError] = useState<string | null>(null);
   const [trendError, setTrendError] = useState<string | null>(null);
   const [staleChainSort, setStaleChainSort] = useState<SortState<StaleChainSortKey>>({
     key: "stale_ratio",
@@ -358,37 +358,15 @@ function ChangesPageContent() {
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
 
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const params = new URLSearchParams({
-          window: query.window,
-          stale_threshold: query.staleThreshold,
-          limit: String(query.limit),
-          universe: query.universe,
-          min_tvl_usd: String(query.minTvl),
-          min_points: String(query.minPoints),
-        });
-        const res = await fetch(apiUrl("/changes", params), { cache: "no-store" });
-        if (!res.ok) {
-          if (active) setError(`API error: ${res.status}`);
-          return;
-        }
-        const payload = (await res.json()) as ChangesResponse;
-        if (active) {
-          setData(payload);
-          setError(null);
-        }
-      } catch (err) {
-        if (active) setError(`Load failed: ${String(err)}`);
-      }
-    };
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [query.window, query.staleThreshold, query.limit, query.universe, query.minTvl, query.minPoints]);
+  // React Query data fetching
+  const { data, isLoading, error, refetch } = useChangesData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    window: query.window,
+    staleThreshold: query.staleThreshold,
+  });
+
+
 
   useEffect(() => {
     let active = true;
@@ -918,7 +896,7 @@ function ChangesPageContent() {
 
       <MoverTable
         title="Top Risers"
-        rows={data?.movers.risers ?? []}
+        rows={data?.movers?.risers ?? []}
         universe={query.universe}
         minTvl={query.minTvl}
         minPoints={query.minPoints}
@@ -927,7 +905,7 @@ function ChangesPageContent() {
       <div className="changes-mover-tables">
         <MoverTable
           title="Top Fallers"
-          rows={data?.movers.fallers ?? []}
+          rows={data?.movers?.fallers ?? []}
           universe={query.universe}
           minTvl={query.minTvl}
           minPoints={query.minPoints}
@@ -936,7 +914,7 @@ function ChangesPageContent() {
         <div className="analyst-only">
           <MoverTable
             title="Largest Absolute Changes"
-            rows={data?.movers.largest_abs_delta ?? []}
+            rows={data?.movers?.largest_abs_delta ?? []}
             universe={query.universe}
             minTvl={query.minTvl}
             minPoints={query.minPoints}

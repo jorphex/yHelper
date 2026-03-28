@@ -4,66 +4,103 @@ import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
 import { UniverseKind } from "../lib/universe";
 
-type ChangesRow = {
+type WindowKey = "24h" | "7d" | "30d";
+type StaleThresholdKey = "auto" | "24h" | "7d" | "30d";
+
+type Summary = {
+  vaults_eligible: number;
+  vaults_with_change: number;
+  stale_vaults: number;
+  total_tvl_usd: number | null;
+  tracked_tvl_usd: number | null;
+  avg_safe_apy_window: number | null;
+  avg_safe_apy_prev_window: number | null;
+  avg_delta: number | null;
+};
+
+type ChangeRow = {
   vault_address: string;
   chain_id: number;
   symbol: string | null;
   token_symbol: string | null;
   category: string | null;
   tvl_usd: number | null;
-  previous_apy: number | null;
-  current_apy: number | null;
+  safe_apy_window: number | null;
+  safe_apy_prev_window: number | null;
   delta_apy: number | null;
-  pps_timestamp: string | null;
-  previous_pps_timestamp: string | null;
+  age_seconds: number | null;
+};
+
+type StaleByChain = {
+  chain_id: number;
+  vaults: number;
+  stale_vaults: number;
+  stale_ratio: number;
+  tvl_usd: number | null;
+  stale_tvl_usd: number | null;
+};
+
+type StaleByCategory = {
+  category: string;
+  vaults: number;
+  stale_vaults: number;
+  stale_ratio: number;
+  tvl_usd: number | null;
+  stale_tvl_usd: number | null;
 };
 
 type ChangesResponse = {
-  filters: {
-    window: string;
-    stale_threshold: string;
-    universe: string;
-    min_tvl_usd: number;
+  filters?: {
+    stale_threshold?: StaleThresholdKey;
+    stale_threshold_seconds?: number;
   };
-  summary: {
-    vaults: number;
-    with_change: number;
-    stale_vaults: number;
-    total_tvl: number | null;
-    tracked_tvl: number | null;
-    yearn_aligned_proxy_tvl: number | null;
-    yearn_aligned_vaults: number;
-    filtered_vs_yearn_gap: number | null;
-    filtered_vs_yearn_ratio: number | null;
-    avg_delta: number | null;
+  summary: Summary;
+  reference_tvl?: {
+    yearn_aligned_proxy?: {
+      vaults?: number;
+      tvl_usd?: number | null;
+      comparison_to_filtered_universe?: {
+        filtered_total_tvl_usd?: number | null;
+        gap_usd?: number | null;
+        ratio?: number | null;
+      };
+    };
   };
-  freshness: {
-    latest_pps_age_seconds: number | null;
-    window_fresh_vaults: number;
-    window_stale_vaults: number;
-    window_missing_vaults: number;
-    fresh_tracked_tvl: number | null;
-    stale_tracked_tvl: number | null;
-    missing_tracked_tvl: number | null;
+  freshness?: {
+    latest_pps_age_seconds?: number | null;
+    pps_stale_ratio?: number | null;
+    metrics_newest_age_seconds?: number | null;
+    window_stale_vaults?: number | null;
+    window_tracked_vaults?: number | null;
+    window_stale_ratio?: number | null;
+    stale_by_chain?: StaleByChain[];
+    stale_by_category?: StaleByCategory[];
   };
-  risers: ChangesRow[];
-  fallers: ChangesRow[];
-  stale: ChangesRow[];
+  movers?: {
+    risers: ChangeRow[];
+    fallers: ChangeRow[];
+    largest_abs_delta: ChangeRow[];
+  };
+  risers?: ChangeRow[];
+  fallers?: ChangeRow[];
+  stale?: ChangeRow[];
 };
 
 interface UseChangesDataParams {
   universe: UniverseKind;
   minTvl: number;
-  window: string;
-  staleThreshold: string;
+  window: WindowKey;
+  staleThreshold: StaleThresholdKey;
 }
 
 async function fetchChangesData(params: UseChangesDataParams): Promise<ChangesResponse> {
   const searchParams = new URLSearchParams({
-    universe: params.universe,
-    min_tvl_usd: String(params.minTvl),
     window: params.window,
     stale_threshold: params.staleThreshold,
+    universe: params.universe,
+    min_tvl_usd: String(params.minTvl),
+    min_points: "45",
+    limit: "60",
   });
 
   const res = await fetch(apiUrl("/changes", searchParams), { cache: "no-store" });
