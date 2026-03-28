@@ -1,0 +1,81 @@
+"use client";
+
+import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { chainLabel, compactChainLabel, formatPct, formatUsd } from "../lib/format";
+import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
+import { queryChoice, queryFloat, replaceQuery } from "../lib/url";
+import { PageTopPanel } from "../components/page-top-panel";
+import { BarList, KpiGrid } from "../components/visuals";
+import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
+import { useChainsData } from "../hooks/use-chains-data";
+import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
+
+type ChainRow = {
+  chain_id: number;
+  active_vaults: number;
+  with_metrics: number;
+  total_tvl_usd: number | null;
+  weighted_apy_30d: number | null;
+  avg_momentum_7d_30d: number | null;
+  avg_consistency: number | null;
+};
+
+type ChainsResponse = {
+  summary?: {
+    chains?: number;
+    total_tvl_usd?: number;
+    active_vaults?: number;
+    with_metrics?: number;
+    metrics_coverage_ratio?: number | null;
+    tvl_weighted_apy_30d?: number | null;
+    median_chain_apy_30d?: number | null;
+    tvl_hhi?: number | null;
+    top_chain_id?: number | null;
+    top_chain_tvl_share?: number | null;
+  };
+  rows: ChainRow[];
+};
+
+type ChainSortKey = "chain" | "active" | "metrics" | "tvl" | "apy" | "momentum" | "consistency";
+
+function ChainsPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
+  const [sort, setSort] = useState<SortState<ChainSortKey>>({ key: "tvl", direction: "desc" });
+
+  const query = useMemo(() => {
+    const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
+    const defaults = universeDefaults(universe);
+    return {
+      universe,
+      minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
+      sort: queryChoice<ChainSortKey>(
+        searchParams,
+        "sort",
+        ["chain", "active", "metrics", "tvl", "apy", "momentum", "consistency"] as const,
+        "tvl",
+      ),
+      dir: queryChoice(searchParams, "dir", ["asc", "desc"] as const, "desc"),
+    };
+  }, [searchParams]);
+
+  useEffect(() => {
+    setSort({ key: query.sort, direction: query.dir });
+  }, [query.sort, query.dir]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const onChange = () => setIsCompactViewport(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
+    replaceQuery(router, pathname, searchParams, updates);
+
