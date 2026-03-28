@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { apiUrl } from "../lib/api";
 import { chainLabel, compactCategoryLabel, compactChainLabel, formatPct, formatUsd } from "../lib/format";
 import { useAssetsData, useAssetVenues } from "../hooks/use-assets-data";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
@@ -102,10 +103,7 @@ function AssetsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [assetData, setAssetData] = useState<AssetsResponse | null>(null);
-  const [assetsError, setAssetsError] = useState<string | null>(null);
-  const [detail, setDetail] = useState<AssetVenuesResponse | null>(null);
-  const [detailError, setDetailError] = useState<string | null>(null);
+
   const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [tokenSort, setTokenSort] = useState<SortState<TokenSortKey>>({ key: "tvl", direction: "desc" });
   const [venueSort, setVenueSort] = useState<SortState<VenueSortKey>>({ key: "apy", direction: "desc" });
@@ -156,74 +154,27 @@ function AssetsPageContent() {
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
 
-  useEffect(() => {
-    let active = true;
-    const loadAssets = async () => {
-      try {
-        const params = new URLSearchParams({
-          universe: query.universe,
-          min_tvl_usd: String(query.minTvl),
-          min_points: String(query.minPoints),
-          limit: String(query.limit),
-          token_scope: query.tokenScope,
-          sort_by: query.apiSort,
-          direction: query.apiDir,
-        });
-        const res = await fetch(apiUrl("/assets", params), { cache: "no-store" });
-        if (!res.ok) {
-          if (active) setAssetsError(`API error: ${res.status}`);
-          return;
-        }
-        const payload = (await res.json()) as AssetsResponse;
-        if (!active) return;
-        setAssetData(payload);
-        setAssetsError(null);
-      } catch (err) {
-        if (active) setAssetsError(`Load failed: ${String(err)}`);
-      }
-    };
-    void loadAssets();
-    return () => {
-      active = false;
-    };
-  }, [query.universe, query.minTvl, query.minPoints, query.limit, query.tokenScope, query.apiSort, query.apiDir]);
+  // React Query data fetching
+  const { data: assetData, isLoading: isLoadingAssets, error: assetsError } = useAssetsData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: query.minPoints,
+    limit: query.limit,
+    tokenScope: query.tokenScope,
+    apiSort: query.apiSort,
+    apiDir: query.apiDir,
+  });
 
   const selectedSymbol = query.token || "";
 
-  useEffect(() => {
-    if (!selectedSymbol) {
-      setDetail(null);
-      return;
+  const { data: detail, isLoading: isLoadingDetail, error: detailError } = useAssetVenues(
+    selectedSymbol,
+    {
+      universe: query.universe,
+      minTvl: query.minTvl,
+      minPoints: query.minPoints,
     }
-    let active = true;
-    const loadDetail = async () => {
-      try {
-        const params = new URLSearchParams({
-          universe: query.universe,
-          min_tvl_usd: String(query.minTvl),
-          min_points: String(query.minPoints),
-          limit: String(query.limit),
-        });
-        const path = apiUrl(`/assets/${encodeURIComponent(selectedSymbol)}/venues`, params);
-        const res = await fetch(path, { cache: "no-store" });
-        if (!res.ok) {
-          if (active) setDetailError(`API error: ${res.status}`);
-          return;
-        }
-        const payload = (await res.json()) as AssetVenuesResponse;
-        if (active) {
-          setDetail(payload);
-          setDetailError(null);
-        }
-      } catch (err) {
-        if (active) setDetailError(`Load failed: ${String(err)}`);
-      }
-    };
-    void loadDetail();
-    return () => {
-      active = false;
-    };
-  }, [selectedSymbol, query.universe, query.minTvl, query.minPoints, query.limit]);
+  );
 
   const tokenRows = sortRows(assetData?.rows ?? [], tokenSort, {
     token: (row) => row.token_symbol,
@@ -419,7 +370,7 @@ function AssetsPageContent() {
         secondaryFiltersTitle="Search + Sorting"
       />
 
-      {detailError ? <section className="card">{detailError}</section> : null}
+      {detailError ? <section className="card">{String(detailError)}</section> : null}
 
       <section className="card section-card table-card assets-venues-card">
         <h2>{detail?.token_symbol || selectedSymbol || "Token"} Venues</h2>
