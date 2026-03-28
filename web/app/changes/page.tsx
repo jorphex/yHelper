@@ -924,39 +924,36 @@ function ChangesPageContent() {
         minPoints={query.minPoints}
         compact={isCompactViewport}
       />
-      <details className="section-details" open={!isCompactViewport}>
-        <summary>More mover tables</summary>
-        <div className="section-details-body">
+      <div className="changes-mover-tables">
+        <MoverTable
+          title="Top Fallers"
+          rows={data?.movers.fallers ?? []}
+          universe={query.universe}
+          minTvl={query.minTvl}
+          minPoints={query.minPoints}
+          compact={isCompactViewport}
+        />
+        <div className="analyst-only">
           <MoverTable
-            title="Top Fallers"
-            rows={data?.movers.fallers ?? []}
+            title="Largest Absolute Changes"
+            rows={data?.movers.largest_abs_delta ?? []}
             universe={query.universe}
             minTvl={query.minTvl}
             minPoints={query.minPoints}
             compact={isCompactViewport}
           />
-          <div className="analyst-only">
-            <MoverTable
-              title="Largest Absolute Changes"
-              rows={data?.movers.largest_abs_delta ?? []}
-              universe={query.universe}
-              minTvl={query.minTvl}
-              minPoints={query.minPoints}
-              compact={isCompactViewport}
-            />
-          </div>
-          <div className="analyst-only">
-            <MoverTable
-              title="Stalest Series"
-              rows={data?.stale ?? []}
-              universe={query.universe}
-              minTvl={query.minTvl}
-              minPoints={query.minPoints}
-              compact={isCompactViewport}
-            />
-          </div>
         </div>
-      </details>
+        <div className="analyst-only">
+          <MoverTable
+            title="Stalest Series"
+            rows={data?.stale ?? []}
+            universe={query.universe}
+            minTvl={query.minTvl}
+            minPoints={query.minPoints}
+            compact={isCompactViewport}
+          />
+        </div>
+      </div>
 
       <section className="card analyst-only section-card visual-card changes-visuals-card">
         <h2>Delta Visuals and Freshness Heatmaps</h2>

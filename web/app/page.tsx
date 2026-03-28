@@ -310,10 +310,16 @@ export default function HomePage() {
 
   return (
     <main className="container home-overview">
-      <section className={`card home-overview-hero${revealClass}`}>
+      <section className={`home-overview-hero${revealClass}`}>
         <div className="home-overview-hero-copy">
-          <h1>Clear signals for faster vault decisions</h1>
-          <p>Move from signal to route without wading through repeated chrome or guesswork.</p>
+          <div className="home-overview-hero-eyebrow">Yearn Vault Analytics</div>
+          <h1>
+            Clear signals for <span className="highlight">faster</span> vault decisions
+          </h1>
+          <p className="home-overview-hero-lead">
+            Move from signal to route without wading through repeated chrome or guesswork. 
+            Purpose-built analytics for Yearn vault discovery, yield shifts, and strategic decisions.
+          </p>
           <div className="home-overview-hero-highlights" aria-label="Overview highlights">
             <div className="home-overview-hero-highlight">
               <span className="home-overview-hero-highlight-label">Current TVL</span>
@@ -344,7 +350,7 @@ export default function HomePage() {
             alt=""
             fill
             priority
-            sizes="(max-width: 1100px) 100vw, 46vw"
+            sizes="(max-width: 1100px) 100vw, 40vw"
             className="home-art-image home-overview-hero-image"
             draggable={false}
           />
@@ -353,10 +359,10 @@ export default function HomePage() {
 
       <section className={`card section-card home-overview-flow-section${revealClass}`}>
         <div className="home-overview-section-head">
-          <p className="home-kicker">Default Route</p>
-          <h2>Shortlist first. Pressure-test only when the move looks real.</h2>
+          <p className="home-kicker">How to use</p>
+          <h2>Shortlist first. Then pressure-test when the move looks real.</h2>
           <p className="card-intro">
-            Discover should answer whether anything deserves attention. Changes should confirm that the move is fresh.
+            Discover answers whether anything deserves attention. Changes confirms that the move is fresh and actionable.
           </p>
         </div>
         <div className="home-overview-flow-grid">
@@ -401,9 +407,9 @@ export default function HomePage() {
 
       <section className={`card analyst-only section-card home-overview-analyst-section${revealClass}`}>
         <div className="home-overview-section-head">
-          <p className="home-kicker">Live Analyst View</p>
-          <h2>Keep the front door actionable when you already know the workflow</h2>
-          <p className="card-intro">Analyst mode surfaces current movement, coverage quality, and yield leadership instead of onboarding guidance.</p>
+          <p className="home-kicker">Live Data</p>
+          <h2>Real-time signals for informed decisions</h2>
+          <p className="card-intro">Current movement, coverage quality, and yield leadership at a glance. For analysts who know the workflow.</p>
         </div>
         <div className="home-overview-analyst-grid">
           <article className="home-overview-analyst-card" aria-live="polite">

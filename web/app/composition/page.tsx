@@ -624,9 +624,6 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <details className="section-details" open={!isCompactViewport}>
-        <summary>Secondary concentration lenses</summary>
-        <div className="section-details-body">
       <section className="card section-card table-card">
         <h2>Category Concentration</h2>
         <div className="table-wrap">
@@ -812,8 +809,6 @@ function CompositionPageContent() {
           </table>
         </div>
       </section>
-        </div>
-      </details>
 
       <section className="card section-card table-card">
         <h2>Most Crowded</h2>
@@ -941,9 +936,6 @@ function CompositionPageContent() {
         </div>
       </section>
 
-      <details className="section-details analyst-only" open={!isCompactViewport}>
-        <summary>Least crowded vaults</summary>
-        <div className="section-details-body">
       <section className="card analyst-only section-card table-card">
         <h2>Least Crowded</h2>
         <p className="muted">Lower TVL relative to APY versus peers in the same filtered universe.</p>
@@ -1069,8 +1061,6 @@ function CompositionPageContent() {
           </table>
         </div>
       </section>
-        </div>
-      </details>
     </main>
   );
 }

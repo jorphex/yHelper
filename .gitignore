@@ -4,6 +4,7 @@
 !.env.example
 
 # Local planning/notes (kept out of git history)
+AGENTS.md
 NOTES.md
 PLAN.md
 DESIGN.md

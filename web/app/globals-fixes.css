@@ -1,0 +1,671 @@
+/* --------------------------------------------------------------------------
+   COMPREHENSIVE FIXES - Spacing, alignment, layout, contrast
+   -------------------------------------------------------------------------- */
+
+/* REMOVE ALL CARD HOVER LIFT EFFECTS */
+.card:hover,
+.section-card:hover,
+.summary-card:hover,
+.visual-card:hover,
+.table-card:hover {
+  transform: none !important;
+}
+
+/* Ensure consistent gap between ALL cards on ALL pages */
+.route-page {
+  gap: var(--space-6) !important;
+}
+
+.route-page > .card,
+.route-page > .section-card {
+  margin-bottom: 0 !important;
+}
+
+/* Card margin fixes - ensure cards don't touch tables or each other */
+.card + .card,
+.section-card + .section-card,
+.card + .section-card,
+.section-card + .card {
+  margin-top: var(--space-6) !important;
+}
+
+/* KPI Grid spacing fixes */
+.kpi-grid {
+  margin-bottom: var(--space-5) !important;
+}
+
+.kpi-grid + .table-wrap,
+.kpi-grid + table {
+  margin-top: var(--space-5) !important;
+}
+
+/* ==========================================================================
+   HEADER FIXES
+   ========================================================================== */
+
+/* Data freshness badge - single line, compact */
+.freshness-badge,
+[data-freshness] {
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--space-1) !important;
+  flex-wrap: nowrap !important;
+  min-width: 0 !important;
+  padding: var(--space-1) var(--space-2) !important;
+}
+
+.freshness-badge .freshness-label,
+.freshness-badge .freshness-age,
+.freshness-badge .freshness-meta {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.freshness-badge .freshness-label {
+  display: none !important;
+}
+
+.freshness-badge .freshness-dot {
+  flex-shrink: 0 !important;
+}
+
+/* View switcher alignment */
+.view-switch-wrapper,
+.view-toggle,
+.audience-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--space-2);
+}
+
+.view-switch-wrapper span,
+.view-toggle span,
+.audience-toggle .audience-label {
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  font-size: var(--text-xs) !important;
+  color: var(--ink-dim) !important;
+  margin-right: var(--space-1) !important;
+}
+
+.audience-toggle button {
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 28px !important;
+  padding: 0 var(--space-3) !important;
+}
+
+/* ==========================================================================
+   HOMEPAGE FIXES
+   ========================================================================== */
+
+/* Move "How to use" card closer to hero */
+.hero + .card,
+.hero + .section-card,
+.hero + section.card {
+  margin-top: var(--space-6) !important;
+}
+
+/* Reduce spacing after hero */
+.hero {
+  margin-bottom: var(--space-4) !important;
+  padding-bottom: var(--space-4) !important;
+}
+
+/* Align "Use This Order" and "Branch Out When Needed" kickers */
+.home-overview-flow-card .home-kicker,
+.home-overview-support-card .home-kicker {
+  font-size: var(--text-xs) !important;
+  letter-spacing: var(--tracking-wider) !important;
+  text-transform: uppercase !important;
+  margin-bottom: var(--space-2) !important;
+}
+
+/* Support card text sizing - slightly larger */
+.home-overview-support-link-title {
+  font-size: var(--text-base) !important;
+}
+
+.home-overview-support-link-note {
+  font-size: var(--text-sm) !important;
+}
+
+/* Ensure flow card and support card align at top */
+.home-overview-flow-card,
+.home-overview-support-card {
+  padding-top: var(--space-5) !important;
+}
+
+.home-overview-flow-card-head {
+  margin-bottom: var(--space-2) !important;
+}
+
+.home-overview-support-card > .muted:first-of-type {
+  margin-bottom: var(--space-2) !important;
+}
+
+/* Reduce footer height */
+.site-footer,
+footer {
+  padding-top: var(--space-5) !important;
+  padding-bottom: var(--space-5) !important;
+  min-height: auto !important;
+  margin-top: var(--space-6) !important;
+}
+
+.site-footer .footer-content,
+footer .footer-content {
+  gap: var(--space-3) !important;
+}
+
+.site-footer .footer-links,
+footer .footer-links {
+  gap: var(--space-4) !important;
+}
+
+.site-footer p,
+footer p {
+  margin: 0 !important;
+}
+
+/* Branch out cards text size */
+.branch-card .card-title,
+.branch-card h3,
+.branch-card h4 {
+  font-size: var(--text-sm) !important;
+}
+
+.branch-card p,
+.branch-card .card-text {
+  font-size: var(--text-xs) !important;
+}
+
+/* Align "Use this order" and "Branch out when needed" */
+.use-order-section,
+.branch-out-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.use-order-section h3,
+.branch-out-section h3 {
+  margin-bottom: var(--space-4);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--ink-dim);
+}
+
+/* ==========================================================================
+   STYFI PAGE FIXES
+   ========================================================================== */
+
+/* Protocol snapshot - 4+4 grid instead of 5+3 */
+.styfi-summary-card .kpi-grid,
+.protocol-snapshot .kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: var(--space-3);
+}
+
+@media (max-width: 900px) {
+  .styfi-summary-card .kpi-grid,
+  .protocol-snapshot .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Epoch detail cards - compress vertically */
+.styfi-epoch-mobile-card {
+  padding: var(--space-4) !important;
+  margin-bottom: var(--space-3) !important;
+  gap: var(--space-3) !important;
+}
+
+.styfi-epoch-mobile-grid {
+  gap: var(--space-3) !important;
+}
+
+.styfi-epoch-mobile-grid > div {
+  gap: var(--space-1) !important;
+}
+
+.styfi-epoch-table td,
+.styfi-epoch-table th {
+  padding: var(--space-3) var(--space-4) !important;
+}
+
+/* ==========================================================================
+   DISCOVER PAGE FIXES
+   ========================================================================== */
+
+/* Discover visual grid - better layout */
+.discover-visual-grid {
+  display: grid !important;
+  grid-template-columns: 1.2fr 0.8fr !important;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .discover-visual-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Scatter plot sizing */
+.discover-main-scatter {
+  max-width: 100%;
+  width: 100%;
+}
+
+.discover-main-scatter svg {
+  max-height: 320px !important;
+  width: 100% !important;
+}
+
+/* Quadrants grid on right */
+.discover-quadrants-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-4);
+}
+
+.discover-quadrants-grid > * {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Scatter plot point hover */
+.viz-point {
+  transition: all 0.2s ease-out !important;
+  cursor: pointer !important;
+}
+
+.viz-point-link:hover circle.viz-point,
+.viz-point-link:hover .viz-point,
+.viz-point:hover {
+  r: 10 !important;
+  filter: drop-shadow(0 0 8px currentColor) !important;
+  stroke: var(--ink) !important;
+  stroke-width: 2px !important;
+}
+
+.viz-point-link {
+  cursor: pointer !important;
+}
+
+.viz-point-link:hover {
+  filter: drop-shadow(0 0 12px var(--accent-glow)) !important;
+}
+
+/* ==========================================================================
+   ASSETS PAGE FIXES
+   ========================================================================== */
+
+/* Venues panel - 4+4 grid instead of mixed */
+.assets-venues-card .kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5) !important;
+}
+
+@media (max-width: 1100px) {
+  .assets-venues-card .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .assets-venues-card .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Token universe - 4+3 grid */
+.assets-universe-card .kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5) !important;
+}
+
+.assets-universe-card .kpi-grid > *:nth-child(n+5) {
+  grid-column: span 1;
+}
+
+@media (max-width: 1100px) {
+  .assets-universe-card .kpi-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .assets-universe-card .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Ensure cards don't touch tables */
+.assets-venues-card .kpi-grid + .table-wrap,
+.assets-universe-card .kpi-grid + .table-wrap,
+.assets-venues-card .split-grid + .table-wrap {
+  margin-top: var(--space-6) !important;
+}
+
+.assets-venues-card .kpi-card,
+.assets-universe-card .kpi-card {
+  padding: var(--space-3) var(--space-4) !important;
+  min-height: auto !important;
+}
+
+.assets-venues-card .kpi-value,
+.assets-universe-card .kpi-value {
+  font-size: var(--text-base) !important;
+  overflow-wrap: break-word;
+}
+
+/* ==========================================================================
+   COMPOSITION PAGE FIXES
+   ========================================================================== */
+
+/* Summary cards spacing */
+.composition-layout > .card,
+.composition-layout > .section-card {
+  margin-bottom: var(--space-6) !important;
+}
+
+.composition-layout .kpi-grid {
+  margin-bottom: var(--space-5) !important;
+}
+
+.composition-layout .kpi-grid + .bar-list,
+.composition-layout .kpi-grid + .treemap-wrap,
+.composition-layout .kpi-grid + [class*="treemap"] {
+  margin-top: var(--space-5) !important;
+}
+
+/* Treemap contrast fix */
+.composition-treemap-viz .treemap-cell text,
+.treemap-cell text,
+.treemap-label,
+[class*="treemap"] text {
+  fill: var(--ink) !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+.composition-treemap-viz .treemap-cell:hover rect,
+.treemap-cell:hover rect {
+  filter: brightness(1.3);
+}
+
+.composition-treemap-viz .treemap-cell:hover text,
+.treemap-cell:hover text {
+  fill: var(--ink) !important;
+}
+
+/* Ensure treemap labels are readable */
+.treemap-wrap text,
+svg[class*="treemap"] text,
+.treemap-cell text {
+  fill: white !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* ==========================================================================
+   CHANGES PAGE FIXES
+   ========================================================================== */
+
+/* Trust signals layout - use space better */
+.changes-trust-layout {
+  display: grid !important;
+  grid-template-columns: auto 1fr 1fr !important;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .changes-trust-layout {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .changes-trust-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Small trust cards sizing - more compact */
+.changes-trust-layout .trust-metric-card {
+  min-width: 100px !important;
+  max-width: 140px !important;
+}
+
+.changes-mover-tables {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Ensure mover tables have proper spacing */
+.changes-mover-tables .table-card {
+  margin-bottom: var(--space-6) !important;
+}
+
+/* ==========================================================================
+   REGIMES PAGE FIXES
+   ========================================================================== */
+
+/* Current regime state spacing */
+.regimes-page .kpi-grid {
+  margin-bottom: var(--space-5) !important;
+}
+
+.regimes-page .kpi-grid + .table-wrap,
+.regimes-page .kpi-grid + table {
+  margin-top: var(--space-5) !important;
+}
+
+/* Transition matrix card spacing */
+.regimes-page .transition-matrix .kpi-grid {
+  gap: var(--space-3) !important;
+  margin-bottom: var(--space-5) !important;
+}
+
+.regimes-page .transition-matrix .kpi-card {
+  padding: var(--space-3) var(--space-4) !important;
+}
+
+/* Transition flow contrast fix - improved readability */
+.regimes-transition-flow text,
+.transition-flow text,
+.regime-flow text,
+svg[class*="flow"] text,
+svg[class*="transition"] text,
+[class*="transition-flow"] text {
+  fill: white !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
+}
+
+.regimes-transition-flow line,
+.regimes-transition-flow path,
+.transition-flow line,
+.transition-flow path,
+.regime-flow line,
+.regime-flow path,
+[class*="transition-flow"] line,
+[class*="transition-flow"] path {
+  stroke: var(--accent) !important;
+  stroke-width: 2px !important;
+  opacity: 0.7 !important;
+}
+
+.regimes-transition-flow rect,
+.regimes-transition-flow [class*="node"] rect,
+.transition-flow rect,
+[class*="transition-flow"] rect,
+[class*="sankey"] rect {
+  fill: var(--surface-secondary) !important;
+  stroke: var(--border-accent) !important;
+  stroke-width: 1px !important;
+}
+
+/* Flow node labels */
+.regimes-transition-flow [class*="node"] text,
+.transition-flow [class*="node"] text,
+[class*="sankey"] text {
+  fill: white !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+}
+
+/* ==========================================================================
+   CHAINS PAGE FIXES
+   ========================================================================== */
+
+/* Chain universe snapshot - 3+3 grid - target the specific container */
+.chains-snapshot-kpis .kpi-grid,
+.chains-page .chains-snapshot-kpis .kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: var(--space-3) !important;
+  margin-bottom: 0 !important;
+}
+
+/* Ensure spacing after KPI grid before BarList */
+.chains-snapshot-kpis {
+  margin-bottom: var(--space-5) !important;
+}
+
+/* Force each item to span 1 column */
+.chains-snapshot-kpis .kpi-grid > *,
+.chains-page .chains-snapshot-kpis .kpi-grid > * {
+  grid-column: span 1 !important;
+}
+
+@media (max-width: 900px) {
+  .chains-snapshot-kpis .kpi-grid,
+  .chains-page .chains-snapshot-kpis .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .chains-snapshot-kpis .kpi-grid,
+  .chains-page .chains-snapshot-kpis .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Ensure cards don't touch */
+.chains-page .card + .card,
+.chains-page .section-card + .section-card {
+  margin-top: var(--space-6) !important;
+}
+
+.chains-page .kpi-grid + .bar-list,
+.chains-page .kpi-grid + .table-wrap {
+  margin-top: var(--space-5) !important;
+}
+
+/* ==========================================================================
+   GLOBAL SPACING FIXES
+   ========================================================================== */
+
+/* Remove expander styling globally */
+details.section-details {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+details.section-details > summary {
+  display: none !important;
+}
+
+details.section-details > .section-details-body {
+  display: flex !important;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: 0 !important;
+}
+
+/* Navigation Fixes */
+.site-nav-links a {
+  min-width: 64px;
+  text-align: center;
+}
+
+.audience-toggle {
+  margin-left: var(--space-2);
+}
+
+/* Loading skeleton - enhanced */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-secondary) 25%, var(--surface-primary) 50%, var(--surface-secondary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Page load animation for all pages */
+.route-page {
+  animation: page-fade-in 0.4s ease-out forwards;
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fix card hover - only shadow, no lift */
+.card {
+  transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.card:hover {
+  transform: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(6, 87, 233, 0.1);
+}
+
+/* Table spacing fixes */
+.table-wrap {
+  margin-top: var(--space-4);
+}
+
+.card .table-wrap:first-child {
+  margin-top: 0;
+}
+
+/* Bar list spacing */
+.bar-list,
+[class*="bar-list"] {
+  margin-top: var(--space-4);
+}
+
+.kpi-grid + .bar-list {
+  margin-top: var(--space-5);
+}
