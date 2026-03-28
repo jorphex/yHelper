@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
 import { apiUrl } from "./lib/api";
 import { ShareMeter } from "./components/visuals";
+import { KpiCardSkeleton, Skeleton } from "./components/skeleton";
 
 type OverviewResponse = {
   freshness?: {
@@ -221,11 +222,13 @@ export default function HomePage() {
   const [changes, setChanges] = useState<ChangesResponse | null>(null);
   const [styfi, setStyfi] = useState<StYfiHomeResponse | null>(null);
   const [socialPreview, setSocialPreview] = useState<SocialPreviewResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
+      setIsLoading(true);
       const [overviewResult, moversResult, styfiResult, socialPreviewResult] = await Promise.allSettled([
         fetch(apiUrl("/overview"), { cache: "no-store" }),
         fetch(apiUrl("/changes", { window: "24h", universe: "core", limit: 1 }), { cache: "no-store" }),
@@ -246,6 +249,7 @@ export default function HomePage() {
       if (socialPreviewResult.status === "fulfilled" && socialPreviewResult.value.ok) {
         setSocialPreview((await socialPreviewResult.value.json()) as SocialPreviewResponse);
       }
+      setIsLoading(false);
     };
 
     void load();
@@ -412,131 +416,161 @@ export default function HomePage() {
           <p className="card-intro">Current movement, coverage quality, and yield leadership at a glance. For analysts who know the workflow.</p>
         </div>
         <div className="home-overview-analyst-grid">
-          <article className="home-overview-analyst-card" aria-live="polite">
-            <p className="home-kicker">Latest Shift</p>
-            <p className="home-overview-summary-value">{liveShiftValue}</p>
-            <p className="home-overview-summary-note">
-              {liveShiftHref ? (
-                <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
-                  {topMoverName}
-                </a>
-              ) : (
-                topMoverName
-              )}{" "}
-              · 30d APY now {liveShiftApy}
-            </p>
-            <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
-          </article>
-          <article className="home-overview-analyst-card">
-            <p className="home-kicker">Coverage Quality</p>
-            <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}</p>
-            <p className="home-overview-summary-note">Latest PPS age in tracked scope.</p>
-            <ShareMeter
-              title=""
-              embedded
-              total={1}
-              segments={[
-                {
-                  id: "fresh",
-                  label: "Fresh",
-                  value: freshRatio,
-                  note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within 24h cutoff` : "Coverage syncing",
-                  tone: "positive",
-                },
-                {
-                  id: "stale",
-                  label: "Stale",
-                  value: staleRatio,
-                  note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} past 24h cutoff` : "Stale share syncing",
-                  tone: "warning",
-                },
-              ]}
-              valueFormatter={(value) => formatPct(value, 0)}
-            />
-          </article>
-          <article className="home-overview-analyst-card">
-            <p className="home-kicker">Highest Yield</p>
-            <p className="home-overview-summary-value home-overview-name-value">
-              {highestYieldHref ? (
-                <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
-                  {highestYieldName}
-                </a>
-              ) : (
-                highestYieldName
-              )}
-            </p>
-            <p className="home-overview-summary-note">Current highest-yielding live vault in visible multi-strategy v3 scope.</p>
-            <p className="home-overview-summary-meta">{highestYieldMeta}</p>
-          </article>
+          {isLoading ? (
+            <>
+              <KpiCardSkeleton />
+              <KpiCardSkeleton />
+              <KpiCardSkeleton />
+            </>
+          ) : (
+            <>
+              <article className="home-overview-analyst-card" aria-live="polite">
+                <p className="home-kicker">Latest Shift</p>
+                <p className="home-overview-summary-value">{liveShiftValue}</p>
+                <p className="home-overview-summary-note">
+                  {liveShiftHref ? (
+                    <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
+                      {topMoverName}
+                    </a>
+                  ) : (
+                    topMoverName
+                  )}{" "}
+                  · 30d APY now {liveShiftApy}
+                </p>
+                <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
+              </article>
+              <article className="home-overview-analyst-card">
+                <p className="home-kicker">Coverage Quality</p>
+                <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1, false)}</p>
+                <p className="home-overview-summary-note">Latest PPS age in tracked scope.</p>
+                <ShareMeter
+                  title=""
+                  embedded
+                  total={1}
+                  segments={[
+                    {
+                      id: "fresh",
+                      label: "Fresh",
+                      value: freshRatio,
+                      note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within 24h cutoff` : "Coverage syncing",
+                      tone: "positive",
+                    },
+                    {
+                      id: "stale",
+                      label: "Stale",
+                      value: staleRatio,
+                      note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} past 24h cutoff` : "Stale share syncing",
+                      tone: "warning",
+                    },
+                  ]}
+                  valueFormatter={(value) => formatPct(value, 0)}
+                />
+              </article>
+              <article className="home-overview-analyst-card">
+                <p className="home-kicker">Highest Yield</p>
+                <p className="home-overview-summary-value home-overview-name-value">
+                  {highestYieldHref ? (
+                    <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
+                      {highestYieldName}
+                    </a>
+                  ) : (
+                    highestYieldName
+                  )}
+                </p>
+                <p className="home-overview-summary-note">Current highest-yielding live vault in visible multi-strategy v3 scope.</p>
+                <p className="home-overview-summary-meta">{highestYieldMeta}</p>
+              </article>
+            </>
+          )}
         </div>
       </section>
 
       <section className={`home-overview-summary guide-only${revealClass}`}>
-        <article className="card home-overview-summary-card">
-          <p className="home-kicker">Current Yearn TVL</p>
-          <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
-          <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
-        </article>
-        <article className="card home-overview-summary-card home-overview-meter-card">
-          <p className="home-kicker">Data Freshness</p>
-          <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}</p>
-          <p className="home-overview-summary-note">Latest PPS age in tracked scope.</p>
-          <ShareMeter
-            title=""
-            embedded
-            total={1}
-            segments={[
-              {
-                id: "fresh",
-                label: "Fresh",
-                value: freshRatio,
-                note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within 24h cutoff` : "Coverage syncing",
-                tone: "positive",
-              },
-              {
-                id: "stale",
-                label: "Stale",
-                value: staleRatio,
-                note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} past 24h cutoff` : "Stale share syncing",
-                tone: "warning",
-              },
-            ]}
-            valueFormatter={(value) => formatPct(value, 0)}
-          />
-        </article>
-        <article className="card home-overview-summary-card home-overview-live-card" aria-live="polite">
-          <p className="home-kicker">Latest Shift</p>
-          <p className="home-overview-summary-value">{liveShiftValue}</p>
-          <p className="home-overview-summary-note">
-            {liveShiftHref ? (
-              <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
-                {topMoverName}
-              </a>
-            ) : (
-              topMoverName
-            )}{" "}
-            · 30d APY now {liveShiftApy}
-          </p>
-          <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
-        </article>
-        <article className="card home-overview-summary-card">
-          <p className="home-kicker">stYFI APR</p>
-          <p className="home-overview-summary-value">{styfiApr}</p>
-          <p className="home-overview-summary-note">Current stYFI reward run-rate from the latest on-chain reward state.</p>
-        </article>
+        {isLoading ? (
+          <>
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+          </>
+        ) : (
+          <>
+            <article className="card home-overview-summary-card">
+              <p className="home-kicker">Current Yearn TVL</p>
+              <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0, false)}</p>
+              <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
+            </article>
+            <article className="card home-overview-summary-card home-overview-meter-card">
+              <p className="home-kicker">Data Freshness</p>
+              <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1, false)}</p>
+              <p className="home-overview-summary-note">Latest PPS age in tracked scope.</p>
+              <ShareMeter
+                title=""
+                embedded
+                total={1}
+                segments={[
+                  {
+                    id: "fresh",
+                    label: "Fresh",
+                    value: freshRatio,
+                    note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within 24h cutoff` : "Coverage syncing",
+                    tone: "positive",
+                  },
+                  {
+                    id: "stale",
+                    label: "Stale",
+                    value: staleRatio,
+                    note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} past 24h cutoff` : "Stale share syncing",
+                    tone: "warning",
+                  },
+                ]}
+                valueFormatter={(value) => formatPct(value, 0)}
+              />
+            </article>
+            <article className="card home-overview-summary-card home-overview-live-card" aria-live="polite">
+              <p className="home-kicker">Latest Shift</p>
+              <p className="home-overview-summary-value">{liveShiftValue}</p>
+              <p className="home-overview-summary-note">
+                {liveShiftHref ? (
+                  <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
+                    {topMoverName}
+                  </a>
+                ) : (
+                  topMoverName
+                )}{" "}
+                · 30d APY now {liveShiftApy}
+              </p>
+              <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
+            </article>
+            <article className="card home-overview-summary-card">
+              <p className="home-kicker">stYFI APR</p>
+              <p className="home-overview-summary-value">{styfiApr}</p>
+              <p className="home-overview-summary-note">Current stYFI reward run-rate from the latest on-chain reward state.</p>
+            </article>
+          </>
+        )}
       </section>
 
       <section className={`home-overview-summary home-overview-summary-compact analyst-only${revealClass}`}>
-        <article className="card home-overview-summary-card">
-          <p className="home-kicker">Current Yearn TVL</p>
-          <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0)}</p>
-          <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
-        </article>
-        <article className="card home-overview-summary-card">
-          <p className="home-kicker">Current Vaults</p>
-          <p className="home-overview-summary-value">{currentYearnVaultCount}</p>
-          <p className="home-overview-summary-note">Active visible current-scope vaults in the deduped live Yearn universe.</p>
-        </article>
+        {isLoading ? (
+          <>
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+          </>
+        ) : (
+          <>
+            <article className="card home-overview-summary-card">
+              <p className="home-kicker">Current Yearn TVL</p>
+              <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0, false)}</p>
+              <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
+            </article>
+            <article className="card home-overview-summary-card">
+              <p className="home-kicker">Current Vaults</p>
+              <p className="home-overview-summary-value">{currentYearnVaultCount}</p>
+              <p className="home-overview-summary-note">Active visible current-scope vaults in the deduped live Yearn universe.</p>
+            </article>
+          </>
+        )}
       </section>
 
       <footer className={`card home-minimal-footer${revealClass}`}>

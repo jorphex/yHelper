@@ -50,14 +50,20 @@ export function compactChainLabel(chainId: number | null | undefined, compact = 
   return CHAIN_COMPACT_NAMES[chainId] ?? label;
 }
 
-export function formatPct(value: number | null | undefined, digits = 2): string {
+export function formatPct(value: number | null | undefined, digits = 2, isLoading = false): string {
+  if (isLoading) {
+    return "—";
+  }
   if (value === null || value === undefined) {
     return "n/a";
   }
   return `${(value * 100).toFixed(digits)}%`;
 }
 
-export function formatUsd(value: number | null | undefined, digits = 0): string {
+export function formatUsd(value: number | null | undefined, digits = 0, isLoading = false): string {
+  if (isLoading) {
+    return "—";
+  }
   if (value === null || value === undefined) {
     return "n/a";
   }
@@ -68,7 +74,10 @@ export function formatUsd(value: number | null | undefined, digits = 0): string 
   }).format(value);
 }
 
-export function formatHours(seconds: number | null | undefined, digits = 1): string {
+export function formatHours(seconds: number | null | undefined, digits = 1, isLoading = false): string {
+  if (isLoading) {
+    return "—";
+  }
   if (seconds === null || seconds === undefined) {
     return "n/a";
   }
@@ -86,7 +95,10 @@ const UTC_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-export function formatUtcDateTime(value: Date | number | string | null | undefined): string {
+export function formatUtcDateTime(value: Date | number | string | null | undefined, isLoading = false): string {
+  if (isLoading) {
+    return "—";
+  }
   if (value === null || value === undefined) {
     return "n/a";
   }
