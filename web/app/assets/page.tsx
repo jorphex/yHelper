@@ -3,8 +3,9 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { apiUrl } from "../lib/api";
 import { chainLabel, compactCategoryLabel, compactChainLabel, formatPct, formatUsd } from "../lib/format";
+import { useAssetsData, useAssetVenues } from "../hooks/use-assets-data";
+import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
 import { BarList, KpiGrid } from "../components/visuals";
