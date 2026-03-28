@@ -580,6 +580,161 @@ svg[class*="transition"] text,
 }
 
 /* ==========================================================================
+   TABLE HEADER STYLING - Better visual hierarchy
+   ========================================================================== */
+
+table thead th {
+  background: var(--surface-secondary) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  border-bottom: 2px solid var(--border-medium) !important;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+table tbody tr:hover {
+  background: var(--surface-secondary);
+}
+
+/* ==========================================================================
+   KPI CARD TYPOGRAPHY - Better number readability
+   ========================================================================== */
+
+.kpi-value {
+  font-size: var(--text-xl) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.2 !important;
+}
+
+/* Compact format for large currency values */
+.kpi-card:has(.kpi-value[data-format="currency"]) .kpi-value {
+  font-size: var(--text-lg) !important;
+}
+
+.kpi-label {
+  font-size: var(--text-xs) !important;
+  letter-spacing: var(--tracking-wider) !important;
+  text-transform: uppercase !important;
+}
+
+.kpi-hint {
+  font-size: var(--text-xs) !important;
+  color: var(--ink-dim) !important;
+  margin-top: var(--space-1) !important;
+}
+
+/* ==========================================================================
+   SECTION TITLE HIERARCHY
+   ========================================================================== */
+
+.section-card h2 {
+  font-size: var(--text-2xl) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: var(--space-3) !important;
+}
+
+.section-card .card-intro {
+  font-size: var(--text-base) !important;
+  color: var(--ink-dim) !important;
+  margin-bottom: var(--space-5) !important;
+  max-width: 70ch;
+}
+
+/* Kicker styling with accent underline */
+.home-kicker {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--space-2) !important;
+  font-size: var(--text-xs) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--tracking-wider) !important;
+  text-transform: uppercase !important;
+  color: var(--accent) !important;
+}
+
+.home-kicker::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+/* ==========================================================================
+   FOCUS STATES - Accessibility improvement
+   ========================================================================== */
+
+*:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(6, 87, 233, 0.2) !important;
+}
+
+/* Remove default outline, use focus-visible instead */
+*:focus {
+  outline: none;
+}
+
+/* ==========================================================================
+   TABLE ROW HOVER - Micro-interaction
+   ========================================================================== */
+
+table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+table tbody tr:hover {
+  background: var(--surface-secondary);
+}
+
+/* ==========================================================================
+   CARD MICRO-LIFT - Subtle hover effect
+   ========================================================================== */
+
+.card {
+  transition: transform 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-lg), 0 0 30px rgba(6, 87, 233, 0.08);
+}
+
+/* ==========================================================================
+   LINK TRANSITIONS - Smooth color change
+   ========================================================================== */
+
+a {
+  transition: color 0.15s ease;
+}
+
+/* ==========================================================================
+   BUTTON PRESS EFFECT - Tactile feedback
+   ========================================================================== */
+
+button:active,
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* ==========================================================================
    GLOBAL SPACING FIXES
    ========================================================================== */
 
