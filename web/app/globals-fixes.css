@@ -824,3 +824,55 @@ details.section-details > .section-details-body {
 .kpi-grid + .bar-list {
   margin-top: var(--space-5);
 }
+
+/* Footer enhancements */
+.home-minimal-footer {
+  border-top: 1px solid var(--border-subtle);
+  background: linear-gradient(to bottom, var(--surface-primary), var(--surface-secondary));
+  position: relative;
+}
+
+.home-minimal-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.5;
+}
+
+.home-minimal-footer-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+
+.home-minimal-footer-links {
+  display: flex;
+  gap: var(--space-6);
+  justify-content: center;
+}
+
+.home-minimal-footer-links a {
+  position: relative;
+  padding: var(--space-1) 0;
+  transition: color 0.2s ease;
+}
+
+.home-minimal-footer-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.home-minimal-footer-links a:hover::after {
+  width: 100%;
+}

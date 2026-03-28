@@ -12,6 +12,8 @@ import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 import { useDiscoverData } from "../hooks/use-discover-data";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
+import { NoVaultsEmptyState } from "../components/empty-state";
+import { DataLoadError } from "../components/error-state";
 
 type DiscoverRow = {
   vault_address: string;
@@ -693,15 +695,10 @@ function DiscoverPageContent() {
           },
         ]),
   ];
-
   if (error && !data) {
     return (
       <main className="container route-page">
-        <section className="card section-card status-card status-card-error">
-          <h2>Discover data is temporarily unavailable</h2>
-          <p className="card-intro">The route loaded without any vault rows, so the page is holding back its ranking cards until the feed recovers.</p>
-          <p className="muted">Try again after the next ingestion run or lower filters once the API is healthy again.</p>
-        </section>
+        <DataLoadError onRetry={() => refetch()} />
       </main>
     );
   }
@@ -868,17 +865,11 @@ function DiscoverPageContent() {
       {trendError ? <section className="card">{trendError}</section> : null}
 
       {!error && !data?.rows?.length ? (
-        <section className="card section-card empty-state-card">
-          <h2>No Vaults Match This Filter Yet</h2>
-          <p className="muted card-intro">
-            These filters are stricter than the latest ingest, not proof that Yearn has no vaults.
-          </p>
-          <p className="muted">
-            Lower <strong>Min TVL</strong>, lower <strong>Min Points</strong>, or change <strong>Universe</strong>. If most cards
-            still show n/a after that, wait for the next ingest.
-          </p>
+        <section className="card section-card">
+          <NoVaultsEmptyState onReset={() => updateQuery({ min_tvl: 0, min_points: 0, chain: null, category: null, token: null, migration_only: null, highlighted_only: null })} />
         </section>
       ) : null}
+
 
       <section className="card section-card table-card discover-table-card">
         <h2>Vault Universe</h2>
