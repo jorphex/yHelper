@@ -10,6 +10,8 @@ import { BarList, HeatGrid, KpiGrid, ScatterPlot, TrendStrips, useInViewOnce } f
 import { PageTopPanel } from "../components/page-top-panel";
 import { VaultLink } from "../components/vault-link";
 import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
+import { useDiscoverData } from "../hooks/use-discover-data";
+import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 
 type DiscoverRow = {
   vault_address: string;
@@ -353,10 +355,8 @@ function DiscoverPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [data, setData] = useState<DiscoverResponse | null>(null);
   const [trends, setTrends] = useState<DailyTrendRow[]>([]);
   const [trendGrouped, setTrendGrouped] = useState<DailyTrendResponse["grouped"] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [trendError, setTrendError] = useState<string | null>(null);
   const [isCompactViewport, setIsCompactViewport] = useState(false);
 
@@ -387,6 +387,16 @@ function DiscoverPageContent() {
     };
   }, [searchParams]);
 
+  // React Query data fetching
+  const { data, isLoading, error, refetch } = useDiscoverData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: query.minPoints,
+    limit: query.limit,
+    sort: query.serverSort,
+    dir: query.serverDir,
+  });
+
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");
     const onChange = () => setIsCompactViewport(media.matches);
@@ -395,69 +405,7 @@ function DiscoverPageContent() {
     return () => media.removeEventListener("change", onChange);
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    const run = async () => {
-      try {
-        const params = new URLSearchParams({
-          universe: query.universe,
-          limit: String(query.limit),
-          min_tvl_usd: String(query.minTvl),
-          min_points: String(query.minPoints),
-          sort_by: query.serverSort,
-          direction: query.serverDir,
-        });
-        if (query.chain) params.set("chain_id", String(query.chain));
-        if (query.category) params.set("category", query.category);
-        if (query.token) params.set("token_symbol", query.token);
-        if (query.migrationOnly) params.set("migration_only", "true");
-        if (query.highlightedOnly) params.set("highlighted_only", "true");
-        const res = await fetch(apiUrl("/discover", params), { cache: "no-store" });
-        if (!res.ok) {
-          if (active) setError(`API error: ${res.status}`);
-          return;
-        }
-        const raw = (await res.json()) as Partial<DiscoverResponse>;
-        const normalizedRows = Array.isArray(raw.rows) ? raw.rows.map(normalizeDiscoverRow).filter((row): row is DiscoverRow => row !== null) : [];
-        const paginationRaw = raw.pagination;
-        const safePagination =
-          paginationRaw && typeof paginationRaw === "object"
-            ? {
-                total:
-                  typeof paginationRaw.total === "number" && Number.isFinite(paginationRaw.total)
-                    ? paginationRaw.total
-                    : normalizedRows.length,
-                limit:
-                  typeof paginationRaw.limit === "number" && Number.isFinite(paginationRaw.limit)
-                    ? paginationRaw.limit
-                    : query.limit,
-                offset:
-                  typeof paginationRaw.offset === "number" && Number.isFinite(paginationRaw.offset)
-                    ? paginationRaw.offset
-                    : 0,
-              }
-            : { total: normalizedRows.length, limit: query.limit, offset: 0 };
-        const payload: DiscoverResponse = {
-          pagination: safePagination,
-          rows: normalizedRows,
-          summary: normalizeSummary(raw.summary),
-          coverage: normalizeCoverage(raw.coverage),
-          risk_mix: normalizeRiskMix(raw.risk_mix),
-        };
-        if (active) {
-          setData(payload);
-          setError(null);
-        }
-      } catch (err) {
-        if (active) setError(`Load failed: ${String(err)}`);
-      }
-    };
-    void run();
-    return () => {
-      active = false;
-    };
-  }, [query]);
-
+  // Trends data fetching (keep as legacy for now)
   useEffect(() => {
     let active = true;
     const run = async () => {
