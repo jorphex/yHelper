@@ -2057,3 +2057,79 @@ table.changes-mover-table thead tr th.col-previous,
   overflow-x: auto !important;
   max-width: 100% !important;
 }
+/* ============================================
+   FINAL TABLE COLUMN FIXES - Direct Overrides
+   ============================================ */
+
+/* Discover Table - Fixed Column Layout */
+.discover-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+.discover-table th,
+.discover-table td {
+  padding: 8px 6px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.discover-table .col-vault { width: 180px !important; min-width: 180px !important; }
+.discover-table .col-chain { width: 70px !important; min-width: 70px !important; text-align: center !important; }
+.discover-table .col-token { width: 90px !important; min-width: 90px !important; }
+.discover-table .col-category { width: 100px !important; min-width: 100px !important; text-align: center !important; }
+.discover-table .col-tvl { width: 100px !important; min-width: 100px !important; text-align: right !important; }
+.discover-table .col-apy { width: 80px !important; min-width: 80px !important; text-align: right !important; }
+.discover-table .col-momentum { width: 90px !important; min-width: 90px !important; text-align: right !important; }
+.discover-table .col-consistency { width: 80px !important; min-width: 80px !important; text-align: center !important; }
+.discover-table .col-risk { width: 70px !important; min-width: 70px !important; text-align: center !important; }
+.discover-table .col-regime { width: 90px !important; min-width: 90px !important; text-align: center !important; }
+
+/* Assets Table - Fixed Column Layout */
+.assets-venues-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+.assets-venues-table th,
+.assets-venues-table td {
+  padding: 8px 6px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.assets-venues-table .col-vault { width: 180px !important; min-width: 180px !important; }
+.assets-venues-table .col-chain { width: 80px !important; min-width: 80px !important; text-align: center !important; }
+.assets-venues-table .col-token { width: 90px !important; min-width: 90px !important; }
+.assets-venues-table .col-category { width: 100px !important; min-width: 100px !important; text-align: center !important; }
+.assets-venues-table .col-tvl { width: 110px !important; min-width: 110px !important; text-align: right !important; }
+.assets-venues-table .col-apy { width: 90px !important; min-width: 90px !important; text-align: right !important; }
+.assets-venues-table .col-momentum { width: 90px !important; min-width: 90px !important; text-align: right !important; }
+.assets-venues-table .col-consistency { width: 80px !important; min-width: 80px !important; text-align: center !important; }
+.assets-venues-table .col-regime { width: 90px !important; min-width: 90px !important; text-align: center !important; }
+
+/* Changes Table - Fixed Column Layout */
+.changes-mover-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+.changes-mover-table th,
+.changes-mover-table td {
+  padding: 8px 6px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.changes-mover-table .col-vault { width: 160px !important; min-width: 160px !important; }
+.changes-mover-table .col-chain { width: 70px !important; min-width: 70px !important; text-align: center !important; }
+.changes-mover-table .col-token { width: 90px !important; min-width: 90px !important; }
+.changes-mover-table .col-category { width: 100px !important; min-width: 100px !important; text-align: center !important; }
+.changes-mover-table .col-tvl { width: 100px !important; min-width: 100px !important; text-align: right !important; }
+.changes-mover-table .col-current { width: 90px !important; min-width: 90px !important; text-align: right !important; }
+.changes-mover-table .col-previous { width: 90px !important; min-width: 90px !important; text-align: right !important; }
+.changes-mover-table .col-delta { width: 80px !important; min-width: 80px !important; text-align: right !important; }
+.changes-mover-table .col-freshness { width: 80px !important; min-width: 80px !important; text-align: center !important; }
