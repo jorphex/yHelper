@@ -843,15 +843,7 @@ function RegimesPageContent() {
         </div>
       </section>
 
-      <section className="card section-card subtle-card regime-transition-callout">
-        <h2>Transition Analysis</h2>
-        <p className="muted card-intro">
-          Use the next sections when today&apos;s dominant regime matters less than how cohorts are moving between prior and current
-          states.
-        </p>
-      </section>
-
-      <section className="card section-card visual-card">
+      <section className="card section-card visual-card regime-transition-matrix">
         <h2>Transition Matrix</h2>
         <p className="muted card-intro">
           Compare the current short-term regime (7d vs 30d APY) with the prior baseline regime (30d vs 90d APY).

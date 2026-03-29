@@ -505,31 +505,33 @@ function StYfiPageContent() {
             return (
               <article key={`mobile-${row.epoch ?? row.epoch_start ?? "epoch"}`} className="styfi-epoch-mobile-card">
                 <div className="styfi-epoch-mobile-head">
-                  <p className="home-kicker">Epoch {row.epoch ?? "n/a"}</p>
-                  <span className="pill">{isCurrentEpoch ? "Ongoing" : "Completed"}</span>
+                  <div className="styfi-epoch-title">
+                    <span className="styfi-epoch-number">Epoch {row.epoch ?? "n/a"}</span>
+                    <span className="pill">{isCurrentEpoch ? "Ongoing" : "Completed"}</span>
+                  </div>
                 </div>
                 <div className="styfi-epoch-mobile-grid">
-                  <div>
+                  <div className="styfi-epoch-item">
                     <span>Start</span>
                     <strong>{formatUtcDate(row.epoch_start ?? null)}</strong>
                   </div>
-                  <div>
+                  <div className="styfi-epoch-item">
                     <span>Reward Pot</span>
                     <strong>{formatToken(row.reward_total ?? null, rewardSymbol, 2)}</strong>
                   </div>
-                  <div>
+                  <div className="styfi-epoch-item">
                     <span>stYFI</span>
                     <strong>{formatToken(row.reward_styfi ?? null, rewardSymbol, 2)}</strong>
                   </div>
-                  <div>
+                  <div className="styfi-epoch-item analyst-only">
                     <span>stYFIx</span>
                     <strong>{formatToken(row.reward_styfix ?? null, rewardSymbol, 2)}</strong>
                   </div>
-                  <div>
+                  <div className="styfi-epoch-item">
                     <span>Migrated veYFI</span>
                     <strong>{formatToken(row.reward_veyfi ?? null, rewardSymbol, 2)}</strong>
                   </div>
-                  <div>
+                  <div className="styfi-epoch-item">
                     <span>Liquid Lockers</span>
                     <strong>{formatToken(row.reward_liquid_lockers ?? null, rewardSymbol, 2)}</strong>
                   </div>
