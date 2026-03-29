@@ -248,7 +248,7 @@ footer p {
   display: grid !important;
   grid-template-columns: 1.2fr 0.8fr !important;
   gap: var(--space-5);
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 1000px) {
@@ -1051,7 +1051,7 @@ details.section-details > .section-details-body {
   display: grid;
   grid-template-columns: auto 1fr 1fr;
   gap: var(--space-5);
-  align-items: start;
+  align-items: stretch;
 }
 
 .changes-trust-ages {
@@ -1084,4 +1084,373 @@ details.section-details > .section-details-body {
   .changes-delta-scatter {
     grid-row: span 1;
   }
+}
+/* stYFI Epoch Detail Card Layout Fix */
+.styfi-epoch-mobile-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: var(--space-2) var(--space-3) !important;
+  margin-top: var(--space-3) !important;
+}
+
+.styfi-epoch-mobile-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.styfi-epoch-mobile-grid span {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  line-height: 1.2;
+}
+
+.styfi-epoch-mobile-grid strong {
+  font-family: var(--font-data);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+/* Reduce card padding further */
+.styfi-epoch-mobile-card {
+  padding: var(--space-3) !important;
+  margin-bottom: var(--space-2) !important;
+}
+
+/* Compact header */
+.styfi-epoch-mobile-head {
+  margin-bottom: 0 !important;
+}
+/* Improved Discover table column layout */
+.discover-table .col-category {
+  min-width: 140px !important;
+  max-width: 180px !important;
+  width: 160px;
+}
+
+.discover-table .col-consistency,
+.discover-table .col-risk,
+.discover-table .col-regime {
+  min-width: 100px !important;
+  max-width: 120px !important;
+  width: 110px;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.discover-table th.col-consistency,
+.discover-table th.col-risk,
+.discover-table th.col-regime,
+.discover-table td.col-consistency,
+.discover-table td.col-risk,
+.discover-table td.col-regime {
+  text-align: center !important;
+}
+
+/* Prevent stacking by enforcing horizontal layout */
+.discover-table {
+  table-layout: auto !important;
+}
+
+/* Improved Assets table column layout */
+.assets-venues-table .col-category {
+  min-width: 140px !important;
+  max-width: 180px !important;
+  width: 160px;
+}
+
+.assets-venues-table .col-consistency,
+.assets-venues-table .col-regime {
+  min-width: 100px !important;
+  max-width: 120px !important;
+  width: 110px;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.assets-venues-table {
+  table-layout: auto !important;
+}
+
+/* Improved Changes table column layout */
+.changes-mover-table .col-category {
+  min-width: 140px !important;
+  max-width: 180px !important;
+  width: 160px;
+}
+
+.changes-mover-table .col-token {
+  min-width: 120px !important;
+  white-space: nowrap !important;
+}
+
+.changes-mover-table .col-previous {
+  min-width: 110px !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+}
+
+.changes-mover-table {
+  table-layout: auto !important;
+}
+/* Discover Yield Structure layout improvements */
+.discover-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+/* Scatter plot takes full width but with better aspect ratio */
+.discover-main-scatter {
+  grid-column: 1 / -1;
+  min-height: 400px;
+}
+
+/* Quadrants grid - 2 columns side by side */
+.discover-quadrants-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+/* Individual heatmap cards */
+.discover-chain-heatmap {
+  grid-column: span 6;
+}
+
+/* Trend cards side by side */
+.discover-trend-card {
+  grid-column: span 6;
+}
+
+/* Ridgeline at bottom */
+.discover-ridgeline {
+  grid-column: 1 / -1;
+}
+
+/* Reduce card internal padding for tighter layout */
+.discover-visual-grid .heat-grid,
+.discover-visual-grid .trend-strips {
+  padding: var(--space-4);
+}
+
+.discover-visual-grid .scatter-wrap {
+  padding: var(--space-4);
+}
+
+/* Tablet responsive */
+@media (max-width: 960px) {
+  .discover-visual-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .discover-main-scatter,
+  .discover-quadrants-grid,
+  .discover-chain-heatmap,
+  .discover-trend-card,
+  .discover-ridgeline {
+    grid-column: 1 / -1;
+  }
+  
+  .discover-quadrants-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* Composition Treemap label size fixes */
+.treemap-group-label {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  fill: var(--ink-muted) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.treemap-cell-label {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+/* Scatter chart sizing fix */
+.composition-crowding-scatter {
+  max-height: 450px;
+}
+
+.composition-crowding-scatter svg {
+  max-height: 400px;
+}
+
+/* Add spacing between scatter and heatmap */
+.composition-crowding-scatter {
+  margin-bottom: var(--space-5);
+}
+
+/* Concentration heatmap redistribution - 4+4 layout instead of 8 */
+.composition-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 1200px) {
+  .composition-heatmap-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .composition-heatmap-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Reduce heatmap card padding */
+.composition-heatmap-grid .mini-heat {
+  padding: var(--space-3);
+}
+/* Changes trust signals equal height fix */
+.changes-trust-layout .trust-metric-card,
+.changes-trust-layout [class*="trust-metric"] {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.changes-trust-layout .trust-metric-card > *,
+.changes-trust-layout [class*="trust-metric"] > * {
+  flex: 0 0 auto;
+}
+
+.changes-trust-layout .trust-metric-card > .trust-metric-body,
+.changes-trust-layout [class*="trust-metric"] > [class*="body"] {
+  flex: 1 1 auto;
+}
+
+/* Changes table column alignment fixes */
+.changes-mover-table .col-token {
+  min-width: 130px !important;
+  width: 140px;
+}
+
+.changes-mover-table .col-category {
+  min-width: 140px !important;
+  width: 150px;
+}
+
+.changes-mover-table .col-previous {
+  min-width: 120px !important;
+  width: 130px;
+  text-align: right !important;
+}
+
+/* Delta visuals heatmap alignment fix */
+.changes-delta-grid {
+  grid-template-columns: 3fr 2fr !important;
+  align-items: start !important;
+}
+
+.changes-delta-scatter {
+  grid-row: span 1 !important;
+}
+
+.changes-delta-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.changes-delta-sidebar .heat-grid {
+  flex: 1;
+}
+/* Regimes page layout fixes */
+
+/* Add spacing between Current Regime State table and Regime TVL Mix */
+.regime-current-table + .bar-list,
+.regime-current-table + [class*="bar-list"],
+[class*="regime-table"] + [class*="bar-list"] {
+  margin-top: var(--space-5);
+}
+
+/* Transition Analysis callout improvements */
+.regime-transition-callout {
+  background: linear-gradient(135deg, var(--surface-secondary) 0%, var(--surface-tertiary) 100%);
+  border-left: 3px solid var(--accent);
+  padding-left: var(--space-5);
+}
+
+.regime-transition-callout h2 {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-2);
+}
+
+/* Transition Flow Story improvements */
+.regimes-transition-flow {
+  padding: var(--space-4);
+  background: var(--surface-secondary);
+  border-radius: var(--radius-lg);
+}
+
+.regimes-transition-flow svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Flow node improvements */
+.regimes-transition-flow .flow-node rect {
+  stroke: var(--border-accent);
+  stroke-width: 1.5;
+  rx: 6;
+}
+
+.regimes-transition-flow .flow-node:hover rect {
+  filter: brightness(1.2);
+  stroke: var(--accent);
+}
+
+.regimes-transition-flow .flow-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.regimes-transition-flow .flow-value {
+  font-size: 11px;
+  fill: var(--ink-muted);
+}
+
+/* Transition Trend tooltips */
+.trend-strips [class*="strip"],
+.trend-strip {
+  position: relative;
+}
+
+.trend-strip:hover [class*="tooltip"],
+.trend-strip:hover .tooltip,
+.trend-strips [class*="strip"]:hover [class*="tooltip"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Ensure trend strips have hover feedback */
+.trend-strips [class*="strip"],
+.trend-strip {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.trend-strips [class*="strip"]:hover,
+.trend-strip:hover {
+  background-color: var(--surface-tertiary);
+}
+
+/* Better spacing between regime sections */
+.regime-current-section + .regime-transition-callout {
+  margin-top: var(--space-6);
+}
+
+.regime-transition-callout + .visual-card {
+  margin-top: var(--space-5);
 }

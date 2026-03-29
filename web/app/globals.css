@@ -1726,7 +1726,7 @@ select:focus-visible {
 
 .home-overview-summary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: var(--space-5);
 }
 
@@ -1805,8 +1805,9 @@ select:focus-visible {
   transform: translateY(0);
 }
 
+/* Merged into home-overview-summary as 5-card grid */
 .home-overview-summary-compact {
-  grid-template-columns: repeat(2, 1fr);
+  display: none;
 }
 
 @media (max-width: 1100px) {
@@ -1860,6 +1861,10 @@ select:focus-visible {
   
   .home-overview-summary-compact {
     grid-template-columns: 1fr;
+  }
+  
+  .home-overview-summary-compact .home-overview-summary-card {
+    grid-column: span 1;
   }
   
   .home-overview-hero-highlights {

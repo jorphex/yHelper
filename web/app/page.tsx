@@ -449,9 +449,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className={`home-overview-summary${revealClass}`}>
+      <section className={`home-overview-summary home-overview-summary-five${revealClass}`}>
         {isLoading ? (
           <>
+            <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
@@ -463,6 +464,11 @@ export default function HomePage() {
               <p className="home-kicker">Current Yearn TVL</p>
               <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0, false)}</p>
               <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
+            </article>
+            <article className="card home-overview-summary-card">
+              <p className="home-kicker">Current Vaults</p>
+              <p className="home-overview-summary-value">{currentYearnVaultCount}</p>
+              <p className="home-overview-summary-note">Active visible current-scope vaults in the deduped live Yearn universe.</p>
             </article>
             <article className="card home-overview-summary-card home-overview-meter-card">
               <p className="home-kicker">Data Freshness</p>
@@ -510,28 +516,6 @@ export default function HomePage() {
               <p className="home-kicker">stYFI APR</p>
               <p className="home-overview-summary-value">{styfiApr}</p>
               <p className="home-overview-summary-note">Current stYFI reward run-rate from the latest on-chain reward state.</p>
-            </article>
-          </>
-        )}
-      </section>
-
-      <section className={`home-overview-summary-compact${revealClass}`}>
-        {isLoading ? (
-          <>
-            <KpiCardSkeleton />
-            <KpiCardSkeleton />
-          </>
-        ) : (
-          <>
-            <article className="card home-overview-summary-card">
-              <p className="home-kicker">Current Yearn TVL</p>
-              <p className="home-overview-summary-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0, false)}</p>
-              <p className="home-overview-summary-note">{currentYearnNote}. Deduped across multi/single overlap.</p>
-            </article>
-            <article className="card home-overview-summary-card">
-              <p className="home-kicker">Current Vaults</p>
-              <p className="home-overview-summary-value">{currentYearnVaultCount}</p>
-              <p className="home-overview-summary-note">Active visible current-scope vaults in the deduped live Yearn universe.</p>
             </article>
           </>
         )}
