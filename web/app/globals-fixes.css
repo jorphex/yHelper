@@ -1896,3 +1896,164 @@ section.regime-transition-callout {
   width: 9% !important;
   text-align: center !important;
 }
+/* ============================================
+   TABLE COLUMN WIDTH FIXES - MAX SPECIFICITY
+   ============================================ */
+
+/* Force all tables to fixed layout */
+[class*="table"] {
+  table-layout: fixed !important;
+}
+
+/* Discover table columns - using parent selector for higher specificity */
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-vault,
+table.discover-table thead tr th.col-vault,
+.discover-table th.col-vault {
+  width: 200px !important;
+  min-width: 200px !important;
+  max-width: 200px !important;
+}
+
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-category,
+table.discover-table thead tr th.col-category,
+.discover-table th.col-category {
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+  text-align: center !important;
+}
+
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-consistency,
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-risk,
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-regime,
+table.discover-table thead tr th.col-consistency,
+table.discover-table thead tr th.col-risk,
+table.discover-table thead tr th.col-regime,
+.discover-table th.col-consistency,
+.discover-table th.col-risk,
+.discover-table th.col-regime {
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  text-align: center !important;
+}
+
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-chain,
+table.discover-table thead tr th.col-chain,
+.discover-table th.col-chain {
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+}
+
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-token,
+table.discover-table thead tr th.col-token,
+.discover-table th.col-token {
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+}
+
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-tvl,
+table.discover-table thead tr th.col-tvl,
+.discover-table th.col-tvl {
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+  text-align: right !important;
+}
+
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-apy,
+table.discover-table thead tr th.col-apy,
+.discover-table th.col-apy {
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  text-align: right !important;
+}
+
+section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-momentum,
+table.discover-table thead tr th.col-momentum,
+.discover-table th.col-momentum {
+  width: 90px !important;
+  min-width: 90px !important;
+  max-width: 90px !important;
+  text-align: right !important;
+}
+
+/* Assets table columns */
+table.assets-venues-table thead tr th.col-vault,
+.assets-venues-table th.col-vault {
+  width: 200px !important;
+  min-width: 200px !important;
+  max-width: 200px !important;
+}
+
+table.assets-venues-table thead tr th.col-category,
+.assets-venues-table th.col-category {
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: 110px !important;
+  text-align: center !important;
+}
+
+table.assets-venues-table thead tr th.col-consistency,
+table.assets-venues-table thead tr th.col-regime,
+.assets-venues-table th.col-consistency,
+.assets-venues-table th.col-regime {
+  width: 90px !important;
+  min-width: 90px !important;
+  max-width: 90px !important;
+  text-align: center !important;
+}
+
+/* Changes table columns */
+table.changes-mover-table thead tr th.col-vault,
+.changes-mover-table th.col-vault {
+  width: 180px !important;
+  min-width: 180px !important;
+  max-width: 180px !important;
+}
+
+table.changes-mover-table thead tr th.col-token,
+.changes-mover-table th.col-token {
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+}
+
+table.changes-mover-table thead tr th.col-category,
+.changes-mover-table th.col-category {
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: 110px !important;
+  text-align: center !important;
+}
+
+table.changes-mover-table thead tr th.col-previous,
+.changes-mover-table th.col-previous {
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+  text-align: right !important;
+}
+
+/* Table cells should match headers */
+.discover-table td.col-category,
+.discover-table td.col-consistency,
+.discover-table td.col-risk,
+.discover-table td.col-regime,
+.assets-venues-table td.col-category,
+.assets-venues-table td.col-consistency,
+.assets-venues-table td.col-regime,
+.changes-mover-table td.col-category,
+.changes-mover-table td.col-consistency,
+.changes-mover-table td.col-regime {
+  text-align: center !important;
+}
+
+/* Table wrap should scroll horizontally if needed */
+.table-wrap {
+  overflow-x: auto !important;
+  max-width: 100% !important;
+}
