@@ -882,19 +882,19 @@ function DiscoverPageContent() {
           <TableSkeleton rows={8} columns={10} />
         ) : (
           <div className="table-wrap">
-            <table className="discover-table">
+            <table className="discover-table" style={{ tableLayout: "fixed", width: "100%" }} >
             <thead>
               <tr>
-                <th className="col-vault">Vault</th>
-                <th className="col-chain">Chain</th>
-                <th className="col-token">Token</th>
-                <th className="analyst-only col-category">Category</th>
-                <th className="is-numeric col-tvl">TVL</th>
-                <th className="is-numeric col-apy">APY 30d</th>
-                <th className="is-numeric col-momentum">Momentum</th>
-                <th className="is-numeric tablet-hide analyst-only col-consistency">Consistency</th>
-                <th className="tablet-hide analyst-only col-risk">Risk</th>
-                <th className="analyst-only col-regime">Regime</th>
+                <th className="col-vault" style={{ width: "22%" }}>Vault</th>
+                <th className="col-chain" style={{ width: "9%" }}>Chain</th>
+                <th className="col-token" style={{ width: "11%" }}>Token</th>
+                <th className="analyst-only col-category" style={{ width: "12%", textAlign: "center" }}>Category</th>
+                <th className="is-numeric col-tvl" style={{ width: "11%" }}>TVL</th>
+                <th className="is-numeric col-apy" style={{ width: "9%" }}>APY 30d</th>
+                <th className="is-numeric col-momentum" style={{ width: "10%" }}>Momentum</th>
+                <th className="is-numeric tablet-hide analyst-only col-consistency" style={{ width: "8%", textAlign: "center" }}>Consistency</th>
+                <th className="tablet-hide analyst-only col-risk" style={{ width: "8%", textAlign: "center" }}>Risk</th>
+                <th className="analyst-only col-regime" style={{ width: "10%", textAlign: "center" }}>Regime</th>
               </tr>
             </thead>
             <tbody>

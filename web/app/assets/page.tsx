@@ -415,10 +415,10 @@ function AssetsPageContent() {
           <TableSkeleton rows={6} columns={6} />
         ) : selectedSymbol ? (
           <div className="table-wrap">
-            <table className="assets-venues-table">
+            <table className="assets-venues-table" style={{ tableLayout: "fixed", width: "100%" }} >
             <thead>
               <tr>
-                <th className="col-vault">
+                <th className="col-vault" style={{ width: "25%" }}>
                   <button
                     className={`th-button ${venueSort.key === "vault" ? "is-active" : ""}`}
                     onClick={() => {
@@ -430,7 +430,7 @@ function AssetsPageContent() {
                     Vault <span className="th-indicator">{sortIndicator(venueSort, "vault")}</span>
                   </button>
                 </th>
-                <th className="col-chain">
+                <th className="col-chain" style={{ width: "11%" }}>
                   <button
                     className={`th-button ${venueSort.key === "chain" ? "is-active" : ""}`}
                     onClick={() => {
@@ -442,7 +442,7 @@ function AssetsPageContent() {
                     Chain <span className="th-indicator">{sortIndicator(venueSort, "chain")}</span>
                   </button>
                 </th>
-                <th className="tablet-hide analyst-only col-category">
+                <th className="tablet-hide analyst-only col-category" style={{ width: "13%", textAlign: "center" }}>
                   <button
                     className={`th-button ${venueSort.key === "category" ? "is-active" : ""}`}
                     onClick={() => {
@@ -454,7 +454,7 @@ function AssetsPageContent() {
                     Category <span className="th-indicator">{sortIndicator(venueSort, "category")}</span>
                   </button>
                 </th>
-                <th className="is-numeric col-tvl">
+                <th className="is-numeric col-tvl" style={{ width: "13%" }}>
                   <button
                     className={`th-button ${venueSort.key === "tvl" ? "is-active" : ""}`}
                     onClick={() => {
@@ -466,7 +466,7 @@ function AssetsPageContent() {
                     TVL <span className="th-indicator">{sortIndicator(venueSort, "tvl")}</span>
                   </button>
                 </th>
-                <th className="is-numeric col-apy">
+                <th className="is-numeric col-apy" style={{ width: "11%" }}>
                   <button
                     className={`th-button ${venueSort.key === "apy" ? "is-active" : ""}`}
                     onClick={() => {
@@ -478,7 +478,7 @@ function AssetsPageContent() {
                     APY 30d <span className="th-indicator">{sortIndicator(venueSort, "apy")}</span>
                   </button>
                 </th>
-                <th className="is-numeric col-momentum">
+                <th className="is-numeric col-momentum" style={{ width: "10%" }}>
                   <button
                     className={`th-button ${venueSort.key === "momentum" ? "is-active" : ""}`}
                     onClick={() => {
@@ -490,7 +490,7 @@ function AssetsPageContent() {
                     Momentum <span className="th-indicator">{sortIndicator(venueSort, "momentum")}</span>
                   </button>
                 </th>
-                <th className="is-numeric analyst-only col-consistency">
+                <th className="is-numeric analyst-only col-consistency" style={{ width: "9%", textAlign: "center" }}>
                   <button
                     className={`th-button ${venueSort.key === "consistency" ? "is-active" : ""}`}
                     onClick={() => {
@@ -502,7 +502,7 @@ function AssetsPageContent() {
                     Consistency <span className="th-indicator">{sortIndicator(venueSort, "consistency")}</span>
                   </button>
                 </th>
-                <th className="analyst-only col-regime">
+                <th className="analyst-only col-regime" style={{ width: "10%", textAlign: "center" }}>
                   <button
                     className={`th-button ${venueSort.key === "regime" ? "is-active" : ""}`}
                     onClick={() => {
@@ -716,7 +716,7 @@ function AssetsPageContent() {
                       Chains <span className="th-indicator">{sortIndicator(tokenSort, "chains")}</span>
                     </button>
                   </th>
-                  <th className="is-numeric col-tvl">
+                  <th className="is-numeric col-tvl" style={{ width: "13%" }}>
                     <button
                       className={`th-button ${tokenSort.key === "tvl" ? "is-active" : ""}`}
                       onClick={() => {
