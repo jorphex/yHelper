@@ -1193,9 +1193,9 @@ input::placeholder {
 .bg-negative { background: var(--negative-soft); }
 .bg-warning { background: var(--warning-soft); }
 
-.analyst-only { display: none; }
-:root[data-audience="analyst"] .analyst-only { display: block; }
-:root[data-audience="analyst"] .guide-only { display: none; }
+/* View modes consolidated - all content visible */
+.analyst-only { display: block; }
+.guide-only { display: block; }
 
 /* --------------------------------------------------------------------------
    22. Responsive Styles

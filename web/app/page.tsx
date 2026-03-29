@@ -373,7 +373,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className={`card analyst-only section-card home-overview-analyst-section${revealClass}`}>
+      <section className={`card section-card home-overview-analyst-section${revealClass}`}>
         <div className="home-overview-section-head">
           <p className="home-kicker">Live Data</p>
           <h2>Real-time signals for informed decisions</h2>
@@ -449,7 +449,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className={`home-overview-summary guide-only${revealClass}`}>
+      <section className={`home-overview-summary${revealClass}`}>
         {isLoading ? (
           <>
             <KpiCardSkeleton />
@@ -515,7 +515,7 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className={`home-overview-summary home-overview-summary-compact analyst-only${revealClass}`}>
+      <section className={`home-overview-summary-compact${revealClass}`}>
         {isLoading ? (
           <>
             <KpiCardSkeleton />

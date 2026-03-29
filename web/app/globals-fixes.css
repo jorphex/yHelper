@@ -876,3 +876,56 @@ details.section-details > .section-details-body {
 .home-minimal-footer-links a:hover::after {
   width: 100%;
 }
+
+/* Consolidated homepage data section */
+.home-overview-data-section {
+  margin-top: var(--space-8);
+}
+
+.home-overview-data-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.home-overview-data-card {
+  padding: var(--space-4);
+  background: var(--surface-primary);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+}
+
+.home-overview-data-card .home-kicker {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+
+.home-overview-data-card .home-overview-summary-value {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+}
+
+.home-overview-data-card .home-overview-summary-note {
+  font-size: var(--text-sm);
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+/* Responsive: 2 columns on tablet, 1 on mobile */
+@media (max-width: 1100px) {
+  .home-overview-data-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .home-overview-data-grid {
+    grid-template-columns: 1fr;
+  }
+}

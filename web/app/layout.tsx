@@ -3,7 +3,6 @@ import "./globals-fixes.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
 import Link from "next/link";
-import { AudienceToggle } from "./components/audience-toggle";
 import { ChunkRecovery } from "./components/chunk-recovery";
 import { FreshnessBadge } from "./components/freshness-badge";
 import { NavLinks } from "./components/nav-links";
@@ -14,7 +13,6 @@ const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
 const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
 const SOCIAL_PREVIEW_SRC = `/social/yhelper-preview-${SOCIAL_IMAGE_VERSION}.png`;
 const SOCIAL_PREVIEW_URL = `${siteUrl}${SOCIAL_PREVIEW_SRC}`;
-const AUDIENCE_BOOTSTRAP = `(function(){try{var raw=window.localStorage.getItem("yhelper:audience-mode");var mode=raw==="analyst"?"analyst":"guide";document.documentElement.dataset.audience=mode;}catch(_e){document.documentElement.dataset.audience="guide";}})();`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -78,10 +76,7 @@ function AmbientBackground() {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" data-audience="guide">
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: AUDIENCE_BOOTSTRAP }} />
-      </head>
+    <html lang="en">
       <body>
         <AmbientBackground />
         <ChunkRecovery />
@@ -96,7 +91,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <NavLinks />
             <div className="site-controls">
               <FreshnessBadge />
-              <AudienceToggle />
             </div>
           </nav>
         </header>
