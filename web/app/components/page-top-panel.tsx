@@ -27,6 +27,21 @@ export function PageTopPanel({
 }: PageTopPanelProps) {
   return (
     <section className={`card page-top-panel tone-${tone}${className ? ` ${className}` : ""}`}>
+      <div className="page-top-panel-copy-shell">
+        <div className="page-top-panel-copy">
+          <div className="page-top-panel-copy-head">
+            <h2>{introTitle}</h2>
+          </div>
+          <div className="page-top-panel-copy-body">{intro}</div>
+        </div>
+        <details className="page-top-panel-details page-top-panel-copy-details">
+          <summary>
+            <span className="page-top-panel-details-label">{introTitle}</span>
+            <span aria-hidden="true" className="page-top-panel-details-indicator" />
+          </summary>
+          <div className="page-top-panel-copy-body">{intro}</div>
+        </details>
+      </div>
       <div className="page-top-panel-controls">
         <div className="page-top-panel-controls-head">
           <div className="page-top-panel-controls-copy-block">
@@ -46,21 +61,6 @@ export function PageTopPanel({
             </details>
           ) : null}
         </div>
-      </div>
-      <div className="page-top-panel-copy-shell">
-        <div className="page-top-panel-copy">
-          <div className="page-top-panel-copy-head">
-            <h2>{introTitle}</h2>
-          </div>
-          <div className="page-top-panel-copy-body">{intro}</div>
-        </div>
-        <details className="page-top-panel-details page-top-panel-copy-details">
-          <summary>
-            <span className="page-top-panel-details-label">{introTitle}</span>
-            <span aria-hidden="true" className="page-top-panel-details-indicator" />
-          </summary>
-          <div className="page-top-panel-copy-body">{intro}</div>
-        </details>
       </div>
     </section>
   );

@@ -1,2728 +1,661 @@
-/* --------------------------------------------------------------------------
-   COMPREHENSIVE FIXES - Spacing, alignment, layout, contrast
-   -------------------------------------------------------------------------- */
+/* ==========================================================================
+   COMPREHENSIVE UI FIXES - March 29, 2026 (Round 3)
+   ========================================================================== */
 
-/* REMOVE ALL CARD HOVER LIFT EFFECTS */
-.card:hover,
-.section-card:hover,
-.summary-card:hover,
-.visual-card:hover,
-.table-card:hover {
-  transform: none !important;
-}
+/* ==========================================================================
+   0. GLOBAL - Make analyst-only always visible
+   ========================================================================== */
 
-/* Ensure consistent gap between ALL cards on ALL pages */
-.route-page {
-  gap: var(--space-6) !important;
-}
-
-.route-page > .card,
-.route-page > .section-card {
-  margin-bottom: 0 !important;
-}
-
-/* Card margin fixes - ensure cards don't touch tables or each other */
-.card + .card,
-.section-card + .section-card,
-.card + .section-card,
-.section-card + .card {
-  margin-top: var(--space-6) !important;
-}
-
-/* KPI Grid spacing fixes */
-.kpi-grid {
-  margin-bottom: var(--space-5) !important;
-}
-
-.kpi-grid + .table-wrap,
-.kpi-grid + table {
-  margin-top: var(--space-5) !important;
+.analyst-only {
+  display: block !important;
 }
 
 /* ==========================================================================
-   HEADER FIXES
+   1. OVERVIEW - Hero tighter, more elegant
    ========================================================================== */
 
-/* Data freshness badge - single line, compact */
-.freshness-badge,
-[data-freshness] {
-  white-space: nowrap !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: var(--space-1) !important;
-  flex-wrap: nowrap !important;
-  min-width: 0 !important;
-  padding: var(--space-1) var(--space-2) !important;
-}
+/* Hero spacing - let inline styles handle it */
 
-.freshness-badge .freshness-label,
-.freshness-badge .freshness-age,
-.freshness-badge .freshness-meta {
-  white-space: nowrap !important;
-  flex-shrink: 0 !important;
-}
-
-.freshness-badge .freshness-label {
-  display: none !important;
-}
-
-.freshness-badge .freshness-dot {
-  flex-shrink: 0 !important;
-}
-
-/* View switcher alignment */
-.view-switch-wrapper,
-.view-toggle,
-.audience-toggle {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: var(--space-2);
-}
-
-.view-switch-wrapper span,
-.view-toggle span,
-.audience-toggle .audience-label {
-  line-height: 1 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  font-size: var(--text-xs) !important;
-  color: var(--ink-dim) !important;
-  margin-right: var(--space-1) !important;
-}
-
-.audience-toggle button {
-  line-height: 1 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  height: 28px !important;
-  padding: 0 var(--space-3) !important;
-}
-
-/* ==========================================================================
-   HOMEPAGE FIXES
-   ========================================================================== */
-
-/* Move "How to use" card closer to hero */
-.hero + .card,
-.hero + .section-card,
-.hero + section.card {
-  margin-top: var(--space-6) !important;
-}
-
-/* Reduce spacing after hero */
-.hero {
-  margin-bottom: var(--space-4) !important;
-  padding-bottom: var(--space-4) !important;
-}
-
-/* Align "Use This Order" and "Branch Out When Needed" kickers */
-.home-overview-flow-card .home-kicker,
-.home-overview-support-card .home-kicker {
-  font-size: var(--text-xs) !important;
-  letter-spacing: var(--tracking-wider) !important;
-  text-transform: uppercase !important;
-  margin-bottom: var(--space-2) !important;
-}
-
-/* Support card text sizing - slightly larger */
-.home-overview-support-link-title {
-  font-size: var(--text-base) !important;
-}
-
-.home-overview-support-link-note {
-  font-size: var(--text-sm) !important;
-}
-
-/* Ensure flow card and support card align at top */
-.home-overview-flow-card,
-.home-overview-support-card {
-  padding-top: var(--space-5) !important;
-}
-
-.home-overview-flow-card-head {
-  margin-bottom: var(--space-2) !important;
-}
-
-.home-overview-support-card > .muted:first-of-type {
-  margin-bottom: var(--space-2) !important;
-}
-
-/* Reduce footer height */
-.site-footer,
-footer {
-  padding-top: var(--space-5) !important;
-  padding-bottom: var(--space-5) !important;
-  min-height: auto !important;
-  margin-top: var(--space-6) !important;
-}
-
-.site-footer .footer-content,
-footer .footer-content {
-  gap: var(--space-3) !important;
-}
-
-.site-footer .footer-links,
-footer .footer-links {
+.home-overview-hero-copy {
   gap: var(--space-4) !important;
 }
 
-.site-footer p,
-footer p {
-  margin: 0 !important;
+.home-overview-hero-copy h1 {
+  font-size: clamp(2.25rem, 5vw, 3.25rem) !important;
+  line-height: 1.1 !important;
+  margin-bottom: var(--space-2) !important;
 }
 
-/* Branch out cards text size */
-.branch-card .card-title,
-.branch-card h3,
-.branch-card h4 {
-  font-size: var(--text-sm) !important;
-}
-
-.branch-card p,
-.branch-card .card-text {
-  font-size: var(--text-xs) !important;
-}
-
-/* Align "Use this order" and "Branch out when needed" */
-.use-order-section,
-.branch-out-section {
-  display: flex;
-  flex-direction: column;
-}
-
-.use-order-section h3,
-.branch-out-section h3 {
-  margin-bottom: var(--space-4);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  color: var(--ink-dim);
-}
-
-/* ==========================================================================
-   STYFI PAGE FIXES
-   ========================================================================== */
-
-/* Protocol snapshot - 4+4 grid instead of 5+3 */
-.styfi-summary-card .kpi-grid,
-.protocol-snapshot .kpi-grid {
-  display: grid !important;
-  grid-template-columns: repeat(4, 1fr) !important;
-  gap: var(--space-3);
-}
-
-@media (max-width: 900px) {
-  .styfi-summary-card .kpi-grid,
-  .protocol-snapshot .kpi-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-/* Epoch detail cards - compress vertically */
-.styfi-epoch-mobile-card {
-  padding: var(--space-4) !important;
+.home-overview-hero-lead {
+  font-size: var(--text-lg) !important;
+  max-width: 42ch !important;
   margin-bottom: var(--space-3) !important;
-  gap: var(--space-3) !important;
 }
 
-.styfi-epoch-mobile-grid {
-  gap: var(--space-3) !important;
+.home-minimal-cta-row {
+  margin-top: var(--space-2) !important;
 }
 
-.styfi-epoch-mobile-grid > div {
-  gap: var(--space-1) !important;
-}
-
-.styfi-epoch-table td,
-.styfi-epoch-table th {
-  padding: var(--space-3) var(--space-4) !important;
-}
-
-/* ==========================================================================
-   DISCOVER PAGE FIXES
-   ========================================================================== */
-
-/* Discover visual grid - better layout */
-.discover-visual-grid {
-  display: grid !important;
-  grid-template-columns: 1.2fr 0.8fr !important;
-  gap: var(--space-5);
-  align-items: stretch;
-}
-
-@media (max-width: 1000px) {
-  .discover-visual-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* Scatter plot sizing */
-.discover-main-scatter {
-  max-width: 100%;
-  width: 100%;
-}
-
-.discover-main-scatter svg {
-  max-height: 320px !important;
-  width: 100% !important;
-}
-
-/* Quadrants grid on right */
-.discover-quadrants-grid {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: var(--space-4);
-}
-
-.discover-quadrants-grid > * {
-  width: 100%;
-  min-width: 0;
-}
-
-/* Scatter plot point hover */
-.viz-point {
-  transition: all 0.2s ease-out !important;
-  cursor: pointer !important;
-}
-
-.viz-point-link:hover circle.viz-point,
-.viz-point-link:hover .viz-point,
-.viz-point:hover {
-  r: 10 !important;
-  filter: drop-shadow(0 0 8px currentColor) !important;
-  stroke: var(--ink) !important;
-  stroke-width: 2px !important;
-}
-
-.viz-point-link {
-  cursor: pointer !important;
-}
-
-.viz-point-link:hover {
-  filter: drop-shadow(0 0 12px var(--accent-glow)) !important;
-}
-
-/* ==========================================================================
-   ASSETS PAGE FIXES
-   ========================================================================== */
-
-/* Venues panel - 4+4 grid instead of mixed */
-.assets-venues-card .kpi-grid {
+.home-overview-summary {
   display: grid !important;
   grid-template-columns: repeat(4, 1fr) !important;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5) !important;
+  gap: 20px !important;
+  align-items: stretch !important;
 }
 
 @media (max-width: 1100px) {
-  .assets-venues-card .kpi-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-@media (max-width: 640px) {
-  .assets-venues-card .kpi-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* Token universe - 4+3 grid */
-.assets-universe-card .kpi-grid {
-  display: grid !important;
-  grid-template-columns: repeat(4, 1fr) !important;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5) !important;
-}
-
-.assets-universe-card .kpi-grid > *:nth-child(n+5) {
-  grid-column: span 1;
-}
-
-@media (max-width: 1100px) {
-  .assets-universe-card .kpi-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-}
-
-@media (max-width: 768px) {
-  .assets-universe-card .kpi-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-/* Ensure cards don't touch tables */
-.assets-venues-card .kpi-grid + .table-wrap,
-.assets-universe-card .kpi-grid + .table-wrap,
-.assets-venues-card .split-grid + .table-wrap {
-  margin-top: var(--space-6) !important;
-}
-
-.assets-venues-card .kpi-card,
-.assets-universe-card .kpi-card {
-  padding: var(--space-3) var(--space-4) !important;
-  min-height: auto !important;
-}
-
-.assets-venues-card .kpi-value,
-.assets-universe-card .kpi-value {
-  font-size: var(--text-base) !important;
-  overflow-wrap: break-word;
-}
-
-/* ==========================================================================
-   COMPOSITION PAGE FIXES
-   ========================================================================== */
-
-/* Summary cards spacing */
-.composition-layout > .card,
-.composition-layout > .section-card {
-  margin-bottom: var(--space-6) !important;
-}
-
-.composition-layout .kpi-grid {
-  margin-bottom: var(--space-5) !important;
-}
-
-.composition-layout .kpi-grid + .bar-list,
-.composition-layout .kpi-grid + .treemap-wrap,
-.composition-layout .kpi-grid + [class*="treemap"] {
-  margin-top: var(--space-5) !important;
-}
-
-/* Treemap contrast fix */
-.composition-treemap-viz .treemap-cell text,
-.treemap-cell text,
-.treemap-label,
-[class*="treemap"] text {
-  fill: var(--ink) !important;
-  font-weight: 600 !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
-}
-
-.composition-treemap-viz .treemap-cell:hover rect,
-.treemap-cell:hover rect {
-  filter: brightness(1.3);
-}
-
-.composition-treemap-viz .treemap-cell:hover text,
-.treemap-cell:hover text {
-  fill: var(--ink) !important;
-}
-
-/* Ensure treemap labels are readable */
-.treemap-wrap text,
-svg[class*="treemap"] text,
-.treemap-cell text {
-  fill: white !important;
-  font-weight: 600 !important;
-  font-size: 12px !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
-}
-
-/* ==========================================================================
-   CHANGES PAGE FIXES
-   ========================================================================== */
-
-/* Trust signals layout - use space better */
-.changes-trust-layout {
-  display: grid !important;
-  grid-template-columns: auto 1fr 1fr !important;
-  gap: var(--space-4);
-  align-items: stretch;
-}
-
-@media (max-width: 1100px) {
-  .changes-trust-layout {
-    grid-template-columns: 1fr 1fr !important;
-  }
-}
-
-@media (max-width: 768px) {
-  .changes-trust-layout {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* Small trust cards sizing - more compact */
-.changes-trust-layout .trust-metric-card {
-  min-width: 100px !important;
-  max-width: 140px !important;
-}
-
-.changes-mover-tables {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-/* Ensure mover tables have proper spacing */
-.changes-mover-tables .table-card {
-  margin-bottom: var(--space-6) !important;
-}
-
-/* ==========================================================================
-   REGIMES PAGE FIXES
-   ========================================================================== */
-
-/* Current regime state spacing */
-.regimes-page .kpi-grid {
-  margin-bottom: var(--space-5) !important;
-}
-
-.regimes-page .kpi-grid + .table-wrap,
-.regimes-page .kpi-grid + table {
-  margin-top: var(--space-5) !important;
-}
-
-/* Transition matrix card spacing */
-.regimes-page .transition-matrix .kpi-grid {
-  gap: var(--space-3) !important;
-  margin-bottom: var(--space-5) !important;
-}
-
-.regimes-page .transition-matrix .kpi-card {
-  padding: var(--space-3) var(--space-4) !important;
-}
-
-/* Transition flow contrast fix - improved readability */
-.regimes-transition-flow text,
-.transition-flow text,
-.regime-flow text,
-svg[class*="flow"] text,
-svg[class*="transition"] text,
-[class*="transition-flow"] text {
-  fill: white !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
-}
-
-.regimes-transition-flow line,
-.regimes-transition-flow path,
-.transition-flow line,
-.transition-flow path,
-.regime-flow line,
-.regime-flow path,
-[class*="transition-flow"] line,
-[class*="transition-flow"] path {
-  stroke: var(--accent) !important;
-  stroke-width: 2px !important;
-  opacity: 0.7 !important;
-}
-
-.regimes-transition-flow rect,
-.regimes-transition-flow [class*="node"] rect,
-.transition-flow rect,
-[class*="transition-flow"] rect,
-[class*="sankey"] rect {
-  fill: var(--surface-secondary) !important;
-  stroke: var(--border-accent) !important;
-  stroke-width: 1px !important;
-}
-
-/* Flow node labels */
-.regimes-transition-flow [class*="node"] text,
-.transition-flow [class*="node"] text,
-[class*="sankey"] text {
-  fill: white !important;
-  font-weight: 600 !important;
-  font-size: 11px !important;
-}
-
-/* ==========================================================================
-   CHAINS PAGE FIXES
-   ========================================================================== */
-
-/* Chain universe snapshot - 3+3 grid - target the specific container */
-.chains-snapshot-kpis .kpi-grid,
-.chains-page .chains-snapshot-kpis .kpi-grid {
-  display: grid !important;
-  grid-template-columns: repeat(3, 1fr) !important;
-  gap: var(--space-3) !important;
-  margin-bottom: 0 !important;
-}
-
-/* Ensure spacing after KPI grid before BarList */
-.chains-snapshot-kpis {
-  margin-bottom: var(--space-5) !important;
-}
-
-/* Force each item to span 1 column */
-.chains-snapshot-kpis .kpi-grid > *,
-.chains-page .chains-snapshot-kpis .kpi-grid > * {
-  grid-column: span 1 !important;
-}
-
-@media (max-width: 900px) {
-  .chains-snapshot-kpis .kpi-grid,
-  .chains-page .chains-snapshot-kpis .kpi-grid {
+  .home-overview-summary {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
 @media (max-width: 600px) {
-  .chains-snapshot-kpis .kpi-grid,
-  .chains-page .chains-snapshot-kpis .kpi-grid {
+  .home-overview-summary {
     grid-template-columns: 1fr !important;
   }
 }
 
-/* Ensure cards don't touch */
-.chains-page .card + .card,
-.chains-page .section-card + .section-card {
-  margin-top: var(--space-6) !important;
-}
-
-.chains-page .kpi-grid + .bar-list,
-.chains-page .kpi-grid + .table-wrap {
-  margin-top: var(--space-5) !important;
-}
-
 /* ==========================================================================
-   TABLE HEADER STYLING - Better visual hierarchy
+   2. STYFI PAGE
    ========================================================================== */
 
-table thead th {
-  background: var(--surface-secondary) !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.02em !important;
-  border-bottom: 2px solid var(--border-medium) !important;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+/* Stake Trend - horizontal row */
+.styfi-trend-card .trend-strip-list {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 16px !important;
 }
 
-table tbody tr {
-  transition: background-color 0.15s ease;
+.styfi-trend-card .trend-strip {
+  min-height: 120px !important;
 }
 
-table tbody tr:hover {
-  background: var(--surface-secondary);
+@media (max-width: 900px) {
+  .styfi-trend-card .trend-strip-list {
+    grid-template-columns: 1fr !important;
+  }
 }
 
-/* ==========================================================================
-   KPI CARD TYPOGRAPHY - Better number readability
-   ========================================================================== */
-
-.kpi-value {
-  font-size: var(--text-xl) !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.02em !important;
-  line-height: 1.2 !important;
-}
-
-/* Compact format for large currency values */
-.kpi-card:has(.kpi-value[data-format="currency"]) .kpi-value {
-  font-size: var(--text-lg) !important;
-}
-
-.kpi-label {
-  font-size: var(--text-xs) !important;
-  letter-spacing: var(--tracking-wider) !important;
-  text-transform: uppercase !important;
-}
-
-.kpi-hint {
-  font-size: var(--text-xs) !important;
-  color: var(--ink-dim) !important;
-  margin-top: var(--space-1) !important;
-}
-
-/* ==========================================================================
-   SECTION TITLE HIERARCHY
-   ========================================================================== */
-
-.section-card h2 {
-  font-size: var(--text-2xl) !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.01em !important;
-  margin-bottom: var(--space-3) !important;
-}
-
-.section-card .card-intro {
-  font-size: var(--text-base) !important;
-  color: var(--ink-dim) !important;
-  margin-bottom: var(--space-5) !important;
-  max-width: 70ch;
-}
-
-/* Kicker styling with accent underline */
-.home-kicker {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: var(--space-2) !important;
-  font-size: var(--text-xs) !important;
-  font-weight: 600 !important;
-  letter-spacing: var(--tracking-wider) !important;
-  text-transform: uppercase !important;
-  color: var(--accent) !important;
-}
-
-.home-kicker::before {
-  content: "";
-  display: inline-block;
-  width: 12px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 1px;
-}
-
-/* ==========================================================================
-   FOCUS STATES - Accessibility improvement
-   ========================================================================== */
-
-*:focus-visible {
-  outline: 2px solid var(--accent) !important;
-  outline-offset: 2px !important;
-}
-
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--accent) !important;
-  outline-offset: 2px !important;
-  box-shadow: 0 0 0 4px rgba(6, 87, 233, 0.2) !important;
-}
-
-/* Remove default outline, use focus-visible instead */
-*:focus {
-  outline: none;
-}
-
-/* ==========================================================================
-   TABLE ROW HOVER - Micro-interaction
-   ========================================================================== */
-
-table tbody tr {
-  transition: background-color 0.15s ease;
-}
-
-table tbody tr:hover {
-  background: var(--surface-secondary);
-}
-
-/* ==========================================================================
-   CARD MICRO-LIFT - Subtle hover effect
-   ========================================================================== */
-
-.card {
-  transition: transform 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out;
-}
-
-.card:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-accent);
-  box-shadow: var(--shadow-lg), 0 0 30px rgba(6, 87, 233, 0.08);
-}
-
-/* ==========================================================================
-   LINK TRANSITIONS - Smooth color change
-   ========================================================================== */
-
-a {
-  transition: color 0.15s ease;
-}
-
-/* ==========================================================================
-   BUTTON PRESS EFFECT - Tactile feedback
-   ========================================================================== */
-
-button:active,
-.btn:active {
-  transform: translateY(1px);
-}
-
-/* ==========================================================================
-   GLOBAL SPACING FIXES
-   ========================================================================== */
-
-/* Remove expander styling globally */
-details.section-details {
-  border: none !important;
-  background: transparent !important;
-  padding: 0 !important;
-}
-
-details.section-details > summary {
-  display: none !important;
-}
-
-details.section-details > .section-details-body {
+/* Epoch Detail - fix text overlap */
+.styfi-epoch-mobile-head {
   display: flex !important;
-  flex-direction: column;
-  gap: var(--space-6);
-  padding: 0 !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-bottom: 12px !important;
 }
 
-/* Navigation Fixes */
-.site-nav-links a {
-  min-width: 64px;
-  text-align: center;
+.styfi-epoch-number {
+  font-weight: 600 !important;
+  font-size: 14px !important;
 }
 
-.audience-toggle {
-  margin-left: var(--space-2);
+.styfi-epoch-mobile-card .pill {
+  font-size: 11px !important;
+  padding: 2px 8px !important;
+  flex-shrink: 0 !important;
 }
 
-/* Loading skeleton - enhanced */
-.skeleton {
-  background: linear-gradient(90deg, var(--surface-secondary) 25%, var(--surface-primary) 50%, var(--surface-secondary) 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--radius-md);
-}
-
-@keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* Page load animation for all pages */
-.route-page {
-  animation: page-fade-in 0.4s ease-out forwards;
-}
-
-@keyframes page-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Fix card hover - only shadow, no lift */
-.card {
-  transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
-}
-
-.card:hover {
-  transform: none;
-  border-color: var(--border-accent);
-  box-shadow: var(--shadow-lg), 0 0 30px rgba(6, 87, 233, 0.1);
-}
-
-/* Table spacing fixes */
-.table-wrap {
-  margin-top: var(--space-4);
-}
-
-.card .table-wrap:first-child {
-  margin-top: 0;
-}
-
-/* Bar list spacing */
-.bar-list,
-[class*="bar-list"] {
-  margin-top: var(--space-4);
-}
-
-.kpi-grid + .bar-list {
-  margin-top: var(--space-5);
-}
-
-/* Footer enhancements */
-.home-minimal-footer {
-  border-top: 1px solid var(--border-subtle);
-  background: linear-gradient(to bottom, var(--surface-primary), var(--surface-secondary));
-  position: relative;
-}
-
-.home-minimal-footer::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0.5;
-}
-
-.home-minimal-footer-title {
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ink-soft);
-}
-
-.home-minimal-footer-links {
-  display: flex;
-  gap: var(--space-6);
-  justify-content: center;
-}
-
-.home-minimal-footer-links a {
-  position: relative;
-  padding: var(--space-1) 0;
-  transition: color 0.2s ease;
-}
-
-.home-minimal-footer-links a::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 1px;
-  background: var(--accent);
-  transition: width 0.2s ease;
-}
-
-.home-minimal-footer-links a:hover::after {
-  width: 100%;
-}
-
-/* Consolidated homepage data section */
-.home-overview-data-section {
-  margin-top: var(--space-8);
-}
-
-.home-overview-data-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-}
-
-.home-overview-data-card {
-  padding: var(--space-4);
-  background: var(--surface-primary);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
-}
-
-.home-overview-data-card .home-kicker {
-  font-size: var(--text-xs);
-  color: var(--ink-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--space-2);
-}
-
-.home-overview-data-card .home-overview-summary-value {
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: var(--space-2);
-}
-
-.home-overview-data-card .home-overview-summary-note {
-  font-size: var(--text-sm);
-  color: var(--ink-dim);
-  line-height: 1.5;
-}
-
-/* Responsive: 2 columns on tablet, 1 on mobile */
-@media (max-width: 1100px) {
-  .home-overview-data-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .home-overview-data-grid {
-    grid-template-columns: 1fr;
-  }
-}
-/* Discover page expander indicator enhancement */
-.page-top-panel-details summary {
-  background: var(--surface-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  transition: all 0.2s ease;
-}
-
-.page-top-panel-details summary:hover {
-  background: var(--surface-tertiary);
-  border-color: var(--border-accent);
-}
-
-.page-top-panel-details-indicator::before {
-  content: "▸";
-  color: var(--accent);
-  font-weight: 700;
-  margin-left: var(--space-2);
-}
-
-/* stYFI Epoch card compression */
-.styfi-epoch-mobile-card {
-  padding: var(--space-3) var(--space-4) !important;
-  margin-bottom: var(--space-3) !important;
-}
-
-.styfi-epoch-mobile-grid {
-  gap: var(--space-3) !important;
-  margin-top: var(--space-3) !important;
+/* Epoch Table - proper columns */
+.styfi-epoch-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  font-size: 13px !important;
 }
 
 .styfi-epoch-table th,
 .styfi-epoch-table td {
-  padding: var(--space-3) var(--space-4) !important;
-}
-/* Discover table column alignment fixes */
-.discover-table .col-category {
-  min-width: 120px;
-  max-width: 150px;
-}
-
-.discover-table .col-consistency,
-.discover-table .col-risk,
-.discover-table .col-regime {
-  min-width: 90px;
-  max-width: 110px;
-  text-align: center;
-}
-
-/* Assets table column alignment fixes */
-.assets-venues-table .col-category {
-  min-width: 120px;
-  max-width: 150px;
-}
-
-.assets-venues-table .col-consistency,
-.assets-venues-table .col-regime {
-  min-width: 90px;
-  max-width: 110px;
-  text-align: center;
-}
-
-/* Changes table column alignment fixes */
-.changes-mover-table .col-category {
-  min-width: 120px;
-  max-width: 150px;
-}
-
-.changes-mover-table .col-previous {
-  min-width: 100px;
-  text-align: right;
-}
-
-.changes-mover-table .col-token {
-  min-width: 100px;
-}
-
-/* Prevent columns from bunching up on large screens */
-@media (min-width: 1200px) {
-  .discover-table,
-  .assets-venues-table,
-  .changes-mover-table {
-    table-layout: fixed;
-  }
-}
-/* Discover scatter chart width fix */
-.discover-visual-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-5);
-}
-
-.discover-main-scatter {
-  grid-column: 1;
-  width: 100%;
-  max-width: 100%;
-}
-
-.discover-main-scatter .scatter-wrap {
-  width: 100%;
-}
-
-.discover-main-scatter svg {
-  width: 100%;
-  height: auto;
-}
-
-/* Composition treemap spacing fix */
-.composition-treemap-panel {
-  margin-top: var(--space-5);
-}
-
-.composition-visual-grid {
-  gap: var(--space-5);
-}
-
-/* Changes trust signals layout fix */
-.changes-trust-layout {
-  display: grid;
-  grid-template-columns: auto 1fr 1fr;
-  gap: var(--space-5);
-  align-items: stretch;
-}
-
-.changes-trust-ages {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* Changes delta visuals layout fix */
-.changes-delta-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  grid-template-rows: auto auto;
-  gap: var(--space-5);
-}
-
-.changes-delta-scatter {
-  grid-row: span 2;
-}
-
-@media (max-width: 960px) {
-  .changes-trust-layout {
-    grid-template-columns: 1fr;
-  }
-  
-  .changes-delta-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .changes-delta-scatter {
-    grid-row: span 1;
-  }
-}
-/* stYFI Epoch Detail Card Layout Fix */
-.styfi-epoch-mobile-grid {
-  display: grid !important;
-  grid-template-columns: repeat(3, 1fr) !important;
-  gap: var(--space-2) var(--space-3) !important;
-  margin-top: var(--space-3) !important;
-}
-
-.styfi-epoch-mobile-grid > div {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.styfi-epoch-mobile-grid span {
-  font-size: var(--text-xs);
-  color: var(--ink-muted);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  line-height: 1.2;
-}
-
-.styfi-epoch-mobile-grid strong {
-  font-family: var(--font-data);
-  font-size: var(--text-sm);
-  color: var(--ink);
-  line-height: 1.3;
-}
-
-/* Reduce card padding further */
-.styfi-epoch-mobile-card {
-  padding: var(--space-3) !important;
-  margin-bottom: var(--space-2) !important;
-}
-
-/* Compact header */
-.styfi-epoch-mobile-head {
-  margin-bottom: 0 !important;
-}
-/* Improved Discover table column layout */
-.discover-table .col-category {
-  min-width: 140px !important;
-  max-width: 180px !important;
-  width: 160px;
-}
-
-.discover-table .col-consistency,
-.discover-table .col-risk,
-.discover-table .col-regime {
-  min-width: 100px !important;
-  max-width: 120px !important;
-  width: 110px;
-  text-align: center !important;
-  white-space: nowrap !important;
-}
-
-.discover-table th.col-consistency,
-.discover-table th.col-risk,
-.discover-table th.col-regime,
-.discover-table td.col-consistency,
-.discover-table td.col-risk,
-.discover-table td.col-regime {
-  text-align: center !important;
-}
-
-/* Prevent stacking by enforcing horizontal layout */
-.discover-table {
-  table-layout: auto !important;
-}
-
-/* Improved Assets table column layout */
-.assets-venues-table .col-category {
-  min-width: 140px !important;
-  max-width: 180px !important;
-  width: 160px;
-}
-
-.assets-venues-table .col-consistency,
-.assets-venues-table .col-regime {
-  min-width: 100px !important;
-  max-width: 120px !important;
-  width: 110px;
-  text-align: center !important;
-  white-space: nowrap !important;
-}
-
-.assets-venues-table {
-  table-layout: auto !important;
-}
-
-/* Improved Changes table column layout */
-.changes-mover-table .col-category {
-  min-width: 140px !important;
-  max-width: 180px !important;
-  width: 160px;
-}
-
-.changes-mover-table .col-token {
-  min-width: 120px !important;
-  white-space: nowrap !important;
-}
-
-.changes-mover-table .col-previous {
-  min-width: 110px !important;
-  text-align: right !important;
-  white-space: nowrap !important;
-}
-
-.changes-mover-table {
-  table-layout: auto !important;
-}
-/* Discover Yield Structure layout improvements */
-.discover-visual-grid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: var(--space-4);
-  align-items: stretch;
-}
-
-/* Scatter plot takes full width but with better aspect ratio */
-.discover-main-scatter {
-  grid-column: 1 / -1;
-  min-height: 400px;
-}
-
-/* Quadrants grid - 2 columns side by side */
-.discover-quadrants-grid {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-4);
-}
-
-/* Individual heatmap cards */
-.discover-chain-heatmap {
-  grid-column: span 6;
-}
-
-/* Trend cards side by side */
-.discover-trend-card {
-  grid-column: span 6;
-}
-
-/* Ridgeline at bottom */
-.discover-ridgeline {
-  grid-column: 1 / -1;
-}
-
-/* Reduce card internal padding for tighter layout */
-.discover-visual-grid .heat-grid,
-.discover-visual-grid .trend-strips {
-  padding: var(--space-4);
-}
-
-.discover-visual-grid .scatter-wrap {
-  padding: var(--space-4);
-}
-
-/* Tablet responsive */
-@media (max-width: 960px) {
-  .discover-visual-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .discover-main-scatter,
-  .discover-quadrants-grid,
-  .discover-chain-heatmap,
-  .discover-trend-card,
-  .discover-ridgeline {
-    grid-column: 1 / -1;
-  }
-  
-  .discover-quadrants-grid {
-    grid-template-columns: 1fr;
-  }
-}
-/* Composition Treemap label size fixes */
-.treemap-group-label {
-  font-size: 10px !important;
-  font-weight: 500 !important;
-  fill: var(--ink-muted) !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.treemap-cell-label {
-  font-size: 11px !important;
-  font-weight: 500 !important;
-}
-
-/* Scatter chart sizing fix */
-.composition-crowding-scatter {
-  max-height: 450px;
-}
-
-.composition-crowding-scatter svg {
-  max-height: 400px;
-}
-
-/* Add spacing between scatter and heatmap */
-.composition-crowding-scatter {
-  margin-bottom: var(--space-5);
-}
-
-/* Concentration heatmap redistribution - 4+4 layout instead of 8 */
-.composition-heatmap-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
-}
-
-@media (max-width: 1200px) {
-  .composition-heatmap-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .composition-heatmap-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Reduce heatmap card padding */
-.composition-heatmap-grid .mini-heat {
-  padding: var(--space-3);
-}
-/* Changes trust signals equal height fix */
-.changes-trust-layout .trust-metric-card,
-.changes-trust-layout [class*="trust-metric"] {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.changes-trust-layout .trust-metric-card > *,
-.changes-trust-layout [class*="trust-metric"] > * {
-  flex: 0 0 auto;
-}
-
-.changes-trust-layout .trust-metric-card > .trust-metric-body,
-.changes-trust-layout [class*="trust-metric"] > [class*="body"] {
-  flex: 1 1 auto;
-}
-
-/* Changes table column alignment fixes */
-.changes-mover-table .col-token {
-  min-width: 130px !important;
-  width: 140px;
-}
-
-.changes-mover-table .col-category {
-  min-width: 140px !important;
-  width: 150px;
-}
-
-.changes-mover-table .col-previous {
-  min-width: 120px !important;
-  width: 130px;
-  text-align: right !important;
-}
-
-/* Delta visuals heatmap alignment fix */
-.changes-delta-grid {
-  grid-template-columns: 3fr 2fr !important;
-  align-items: start !important;
-}
-
-.changes-delta-scatter {
-  grid-row: span 1 !important;
-}
-
-.changes-delta-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.changes-delta-sidebar .heat-grid {
-  flex: 1;
-}
-/* Regimes page layout fixes */
-
-/* Add spacing between Current Regime State table and Regime TVL Mix */
-.regime-current-table + .bar-list,
-.regime-current-table + [class*="bar-list"],
-[class*="regime-table"] + [class*="bar-list"] {
-  margin-top: var(--space-5);
-}
-
-/* Transition Analysis callout improvements */
-.regime-transition-callout {
-  background: linear-gradient(135deg, var(--surface-secondary) 0%, var(--surface-tertiary) 100%);
-  border-left: 3px solid var(--accent);
-  padding-left: var(--space-5);
-}
-
-.regime-transition-callout h2 {
-  font-size: var(--text-lg);
-  margin-bottom: var(--space-2);
-}
-
-/* Transition Flow Story improvements */
-.regimes-transition-flow {
-  padding: var(--space-4);
-  background: var(--surface-secondary);
-  border-radius: var(--radius-lg);
-}
-
-.regimes-transition-flow svg {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Flow node improvements */
-.regimes-transition-flow .flow-node rect {
-  stroke: var(--border-accent);
-  stroke-width: 1.5;
-  rx: 6;
-}
-
-.regimes-transition-flow .flow-node:hover rect {
-  filter: brightness(1.2);
-  stroke: var(--accent);
-}
-
-.regimes-transition-flow .flow-label {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.regimes-transition-flow .flow-value {
-  font-size: 11px;
-  fill: var(--ink-muted);
-}
-
-/* Transition Trend tooltips */
-.trend-strips [class*="strip"],
-.trend-strip {
-  position: relative;
-}
-
-.trend-strip:hover [class*="tooltip"],
-.trend-strip:hover .tooltip,
-.trend-strips [class*="strip"]:hover [class*="tooltip"] {
-  opacity: 1;
-  visibility: visible;
-}
-
-/* Ensure trend strips have hover feedback */
-.trend-strips [class*="strip"],
-.trend-strip {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.trend-strips [class*="strip"]:hover,
-.trend-strip:hover {
-  background-color: var(--surface-tertiary);
-}
-
-/* Better spacing between regime sections */
-.regime-current-section + .regime-transition-callout {
-  margin-top: var(--space-6);
-}
-
-.regime-transition-callout + .visual-card {
-  margin-top: var(--space-5);
-}
-/* ============================================
-   FINAL LAYOUT FIXES - High Specificity
-   ============================================ */
-
-/* --------------------------------------------
-   OVERVIEW - Equal Height Cards
-   -------------------------------------------- */
-main.home-overview .home-overview-summary {
-  display: grid !important;
-  grid-template-columns: repeat(5, 1fr) !important;
-  gap: var(--space-4) !important;
-  align-items: stretch !important;
-}
-
-main.home-overview .home-overview-summary-card {
-  display: flex !important;
-  flex-direction: column !important;
-  height: auto !important;
-  min-height: 180px !important;
-  max-height: 220px !important;
-  overflow: hidden !important;
-}
-
-main.home-overview .home-overview-summary-card .home-overview-summary-note {
-  margin-top: auto !important;
-  font-size: var(--text-xs) !important;
-  line-height: 1.4 !important;
-}
-
-main.home-overview .home-overview-summary-card .share-meter {
-  margin-top: var(--space-2) !important;
-  flex-shrink: 0 !important;
-}
-
-/* --------------------------------------------
-   STYFI - Epoch Cards Single Row
-   -------------------------------------------- */
-.styfi-epoch-mobile-card {
-  padding: var(--space-2) var(--space-3) !important;
-  margin-bottom: var(--space-2) !important;
-}
-
-.styfi-epoch-mobile-head {
-  margin-bottom: var(--space-2) !important;
-}
-
-.styfi-epoch-title {
-  display: flex !important;
-  align-items: center !important;
-  gap: var(--space-2) !important;
-}
-
-.styfi-epoch-number {
-  font-family: var(--font-brand) !important;
-  font-size: var(--text-sm) !important;
-  font-weight: 600 !important;
-  color: var(--accent) !important;
-  white-space: nowrap !important;
-}
-
-.styfi-epoch-mobile-grid {
-  display: grid !important;
-  grid-template-columns: repeat(6, 1fr) !important;
-  gap: var(--space-2) var(--space-3) !important;
-  margin-top: 0 !important;
-}
-
-.styfi-epoch-item {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 2px !important;
-  min-width: 0 !important;
-}
-
-.styfi-epoch-item span {
-  font-size: 10px !important;
-  color: var(--ink-muted) !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.03em !important;
-  white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }
 
-.styfi-epoch-item strong {
-  font-family: var(--font-data) !important;
-  font-size: 11px !important;
-  color: var(--ink) !important;
-  font-weight: 500 !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-@media (max-width: 1100px) {
-  .styfi-epoch-mobile-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-}
-
-@media (max-width: 640px) {
-  .styfi-epoch-mobile-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-/* --------------------------------------------
-   DISCOVER - Table Column Layout
-   -------------------------------------------- */
-table.discover-table {
-  table-layout: fixed !important;
-  width: 100% !important;
-}
-
-table.discover-table th,
-table.discover-table td {
-  padding: var(--space-2) var(--space-2) !important;
-  vertical-align: middle !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-
-table.discover-table th.col-vault,
-table.discover-table td.col-vault {
-  width: 22% !important;
-}
-
-table.discover-table th.col-chain,
-table.discover-table td.col-chain {
-  width: 9% !important;
-}
-
-table.discover-table th.col-token,
-table.discover-table td.col-token {
-  width: 11% !important;
-}
-
-table.discover-table th.col-category,
-table.discover-table td.col-category {
-  width: 12% !important;
-  text-align: center !important;
-}
-
-table.discover-table th.col-tvl,
-table.discover-table td.col-tvl {
-  width: 11% !important;
-  text-align: right !important;
-}
-
-table.discover-table th.col-apy,
-table.discover-table td.col-apy {
-  width: 9% !important;
-  text-align: right !important;
-}
-
-table.discover-table th.col-momentum,
-table.discover-table td.col-momentum {
-  width: 10% !important;
-  text-align: right !important;
-}
-
-table.discover-table th.col-consistency,
-table.discover-table td.col-consistency {
-  width: 8% !important;
-  text-align: center !important;
-}
-
-table.discover-table th.col-risk,
-table.discover-table td.col-risk {
-  width: 8% !important;
-  text-align: center !important;
-}
-
-table.discover-table th.col-regime,
-table.discover-table td.col-regime {
-  width: 10% !important;
-  text-align: center !important;
-}
-
-/* --------------------------------------------
-   ASSETS - Table Column Layout
-   -------------------------------------------- */
-table.assets-venues-table {
-  table-layout: fixed !important;
-  width: 100% !important;
-}
-
-table.assets-venues-table th,
-table.assets-venues-table td {
-  padding: var(--space-2) var(--space-2) !important;
-  vertical-align: middle !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-
-table.assets-venues-table th.col-vault,
-table.assets-venues-table td.col-vault {
-  width: 25% !important;
-}
-
-table.assets-venues-table th.col-chain,
-table.assets-venues-table td.col-chain {
-  width: 11% !important;
-}
-
-table.assets-venues-table th.col-token,
-table.assets-venues-table td.col-token {
-  width: 11% !important;
-}
-
-table.assets-venues-table th.col-category,
-table.assets-venues-table td.col-category {
-  width: 13% !important;
-  text-align: center !important;
-}
-
-table.assets-venues-table th.col-tvl,
-table.assets-venues-table td.col-tvl {
-  width: 13% !important;
-  text-align: right !important;
-}
-
-table.assets-venues-table th.col-apy,
-table.assets-venues-table td.col-apy {
-  width: 11% !important;
-  text-align: right !important;
-}
-
-table.assets-venues-table th.col-consistency,
-table.assets-venues-table td.col-consistency {
-  width: 9% !important;
-  text-align: center !important;
-}
-
-table.assets-venues-table th.col-regime,
-table.assets-venues-table td.col-regime {
-  width: 10% !important;
-  text-align: center !important;
-}
-
-/* --------------------------------------------
-   CHANGES - Table Column Layout
-   -------------------------------------------- */
-table.changes-mover-table {
-  table-layout: fixed !important;
-  width: 100% !important;
-}
-
-table.changes-mover-table th,
-table.changes-mover-table td {
-  padding: var(--space-2) var(--space-2) !important;
-  vertical-align: middle !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-
-table.changes-mover-table th.col-vault,
-table.changes-mover-table td.col-vault {
-  width: 20% !important;
-}
-
-table.changes-mover-table th.col-chain,
-table.changes-mover-table td.col-chain {
-  width: 9% !important;
-}
-
-table.changes-mover-table th.col-token,
-table.changes-mover-table td.col-token {
-  width: 11% !important;
-  text-align: left !important;
-}
-
-table.changes-mover-table th.col-category,
-table.changes-mover-table td.col-category {
-  width: 12% !important;
-  text-align: center !important;
-}
-
-table.changes-mover-table th.col-previous,
-table.changes-mover-table td.col-previous {
-  width: 10% !important;
-  text-align: right !important;
-}
-
-table.changes-mover-table th.col-current,
-table.changes-mover-table td.col-current {
-  width: 10% !important;
-  text-align: right !important;
-}
-
-table.changes-mover-table th.col-delta,
-table.changes-mover-table td.col-delta {
-  width: 10% !important;
-  text-align: right !important;
-}
-
-table.changes-mover-table th.col-tvl,
-table.changes-mover-table td.col-tvl {
-  width: 10% !important;
-  text-align: right !important;
-}
-
-table.changes-mover-table th.col-freshness,
-table.changes-mover-table td.col-freshness {
-  width: 9% !important;
-  text-align: center !important;
-}
-
-/* --------------------------------------------
-   COMPOSITION - Scatter Chart Sizing
-   -------------------------------------------- */
-.composition-crowding-scatter {
-  max-height: 300px !important;
-}
-
-.composition-crowding-scatter svg {
-  max-height: 260px !important;
-}
-
-/* Concentration heatmap better distribution */
-.composition-concentration-grid {
-  display: grid !important;
-  grid-template-columns: repeat(4, 1fr) !important;
-  gap: var(--space-4) !important;
-}
-
-@media (max-width: 1200px) {
-  .composition-concentration-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-@media (max-width: 640px) {
-  .composition-concentration-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* --------------------------------------------
-   CHANGES - Delta Visuals Grid
-   -------------------------------------------- */
-.changes-delta-panels {
-  display: grid !important;
-  grid-template-columns: 1.5fr 1fr !important;
-  grid-template-rows: auto auto !important;
-  gap: var(--space-4) !important;
-}
-
-.changes-delta-panels .changes-main-scatter-slot {
-  grid-row: 1 / 3 !important;
-  grid-column: 1 !important;
-}
-
-.changes-delta-panels .changes-delta-distribution-slot {
-  grid-row: 1 !important;
-  grid-column: 2 !important;
-}
-
-.changes-delta-panels .changes-stale-category-slot {
-  grid-row: 2 !important;
-  grid-column: 2 !important;
-}
-
-.changes-delta-panels .changes-stale-chain-slot {
-  grid-row: 3 !important;
-  grid-column: 2 !important;
-}
-
-@media (max-width: 960px) {
-  .changes-delta-panels {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .changes-delta-panels .changes-main-scatter-slot,
-  .changes-delta-panels .changes-delta-distribution-slot,
-  .changes-delta-panels .changes-stale-category-slot,
-  .changes-delta-panels .changes-stale-chain-slot {
-    grid-row: auto !important;
-    grid-column: 1 !important;
-  }
-}
-
-/* --------------------------------------------
-   REGIMES - Fixes
-   -------------------------------------------- */
-section.regime-transition-callout {
-  display: none !important;
-}
-
-.regimes-transition-flow {
-  max-height: 280px !important;
-}
-
-.regimes-transition-flow svg {
-  max-height: 240px !important;
-}
-
-/* Remove hand cursor from trend strips */
-.trend-strip,
-[class*="trend-strip"] {
-  cursor: default !important;
-}
-
-.trend-strip:hover,
-[class*="trend-strip"]:hover {
-  background-color: transparent !important;
-}
-/* Emergency table column width overrides */
-.discover-table,
-.assets-venues-table,
-.changes-mover-table {
-  table-layout: fixed !important;
-  width: 100% !important;
-}
-
-.discover-table .col-vault,
-.assets-venues-table .col-vault,
-.changes-mover-table .col-vault {
-  width: 20% !important;
-  min-width: 180px !important;
-}
-
-.discover-table .col-category,
-.assets-venues-table .col-category,
-.changes-mover-table .col-category {
-  width: 12% !important;
-  text-align: center !important;
-}
-
-.discover-table .col-consistency,
-.discover-table .col-risk,
-.discover-table .col-regime,
-.assets-venues-table .col-consistency,
-.assets-venues-table .col-regime,
-.changes-mover-table .col-consistency,
-.changes-mover-table .col-regime {
-  width: 9% !important;
-  text-align: center !important;
-}
-/* ============================================
-   TABLE COLUMN WIDTH FIXES - MAX SPECIFICITY
-   ============================================ */
-
-/* Force all tables to fixed layout */
-[class*="table"] {
-  table-layout: fixed !important;
-}
-
-/* Discover table columns - using parent selector for higher specificity */
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-vault,
-table.discover-table thead tr th.col-vault,
-.discover-table th.col-vault {
-  width: 200px !important;
-  min-width: 200px !important;
-  max-width: 200px !important;
-}
-
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-category,
-table.discover-table thead tr th.col-category,
-.discover-table th.col-category {
-  width: 100px !important;
-  min-width: 100px !important;
-  max-width: 100px !important;
-  text-align: center !important;
-}
-
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-consistency,
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-risk,
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-regime,
-table.discover-table thead tr th.col-consistency,
-table.discover-table thead tr th.col-risk,
-table.discover-table thead tr th.col-regime,
-.discover-table th.col-consistency,
-.discover-table th.col-risk,
-.discover-table th.col-regime {
-  width: 80px !important;
-  min-width: 80px !important;
-  max-width: 80px !important;
-  text-align: center !important;
-}
-
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-chain,
-table.discover-table thead tr th.col-chain,
-.discover-table th.col-chain {
-  width: 80px !important;
-  min-width: 80px !important;
-  max-width: 80px !important;
-}
-
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-token,
-table.discover-table thead tr th.col-token,
-.discover-table th.col-token {
-  width: 100px !important;
-  min-width: 100px !important;
-  max-width: 100px !important;
-}
-
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-tvl,
-table.discover-table thead tr th.col-tvl,
-.discover-table th.col-tvl {
-  width: 100px !important;
-  min-width: 100px !important;
-  max-width: 100px !important;
-  text-align: right !important;
-}
-
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-apy,
-table.discover-table thead tr th.col-apy,
-.discover-table th.col-apy {
-  width: 80px !important;
-  min-width: 80px !important;
-  max-width: 80px !important;
-  text-align: right !important;
-}
-
-section.card.section-card.table-card.discover-table-card table.discover-table thead tr th.col-momentum,
-table.discover-table thead tr th.col-momentum,
-.discover-table th.col-momentum {
-  width: 90px !important;
-  min-width: 90px !important;
-  max-width: 90px !important;
-  text-align: right !important;
-}
-
-/* Assets table columns */
-table.assets-venues-table thead tr th.col-vault,
-.assets-venues-table th.col-vault {
-  width: 200px !important;
-  min-width: 200px !important;
-  max-width: 200px !important;
-}
-
-table.assets-venues-table thead tr th.col-category,
-.assets-venues-table th.col-category {
-  width: 110px !important;
-  min-width: 110px !important;
-  max-width: 110px !important;
-  text-align: center !important;
-}
-
-table.assets-venues-table thead tr th.col-consistency,
-table.assets-venues-table thead tr th.col-regime,
-.assets-venues-table th.col-consistency,
-.assets-venues-table th.col-regime {
-  width: 90px !important;
-  min-width: 90px !important;
-  max-width: 90px !important;
-  text-align: center !important;
-}
-
-/* Changes table columns */
-table.changes-mover-table thead tr th.col-vault,
-.changes-mover-table th.col-vault {
-  width: 180px !important;
-  min-width: 180px !important;
-  max-width: 180px !important;
-}
-
-table.changes-mover-table thead tr th.col-token,
-.changes-mover-table th.col-token {
-  width: 100px !important;
-  min-width: 100px !important;
-  max-width: 100px !important;
-}
-
-table.changes-mover-table thead tr th.col-category,
-.changes-mover-table th.col-category {
-  width: 110px !important;
-  min-width: 110px !important;
-  max-width: 110px !important;
-  text-align: center !important;
-}
-
-table.changes-mover-table thead tr th.col-previous,
-.changes-mover-table th.col-previous {
-  width: 100px !important;
-  min-width: 100px !important;
-  max-width: 100px !important;
-  text-align: right !important;
-}
-
-/* Table cells should match headers */
-.discover-table td.col-category,
-.discover-table td.col-consistency,
-.discover-table td.col-risk,
-.discover-table td.col-regime,
-.assets-venues-table td.col-category,
-.assets-venues-table td.col-consistency,
-.assets-venues-table td.col-regime,
-.changes-mover-table td.col-category,
-.changes-mover-table td.col-consistency,
-.changes-mover-table td.col-regime {
-  text-align: center !important;
-}
-
-/* Table wrap should scroll horizontally if needed */
-.table-wrap {
-  overflow-x: auto !important;
-  max-width: 100% !important;
-}
-/* ============================================
-   FINAL TABLE COLUMN FIXES - Direct Overrides
-   ============================================ */
-
-/* Discover Table - Fixed Column Layout */
+.styfi-epoch-table th { padding: 10px 8px !important; }
+.styfi-epoch-table td { padding: 8px 8px !important; }
+
+/* Custom column padding for proper spacing */
+.styfi-epoch-table th:nth-child(5),
+.styfi-epoch-table td:nth-child(5) { padding-right: 16px !important; }
+
+.styfi-epoch-table th:nth-child(6),
+.styfi-epoch-table td:nth-child(6) { padding-left: 16px !important; padding-right: 16px !important; }
+
+.styfi-epoch-table th:nth-child(7),
+.styfi-epoch-table td:nth-child(7) { padding-left: 16px !important; }
+
+.styfi-epoch-table .col-epoch { width: 8% !important; text-align: center !important; }
+.styfi-epoch-table .col-status { width: 10% !important; text-align: center !important; }
+.styfi-epoch-table .col-start { width: 13% !important; }
+.styfi-epoch-table .col-total { width: 14% !important; text-align: right !important; }
+.styfi-epoch-table .col-styfi { width: 14% !important; text-align: right !important; }
+.styfi-epoch-table .col-styfix { width: 14% !important; text-align: right !important; }
+.styfi-epoch-table .col-veyfi { width: 14% !important; text-align: right !important; }
+.styfi-epoch-table .col-lockers { width: 13% !important; text-align: right !important; }
+
+/* ==========================================================================
+   3. DISCOVER PAGE
+   ========================================================================== */
+
+/* Vault Universe Table - match styfi 13px font */
 .discover-table {
   table-layout: fixed !important;
   width: 100% !important;
+  font-size: 13px !important;
 }
 
 .discover-table th,
 .discover-table td {
-  padding: 8px 6px !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-
-.discover-table .col-vault { width: 180px !important; min-width: 180px !important; }
-.discover-table .col-chain { width: 70px !important; min-width: 70px !important; text-align: center !important; }
-.discover-table .col-token { width: 90px !important; min-width: 90px !important; }
-.discover-table .col-category { width: 100px !important; min-width: 100px !important; text-align: center !important; }
-.discover-table .col-tvl { width: 100px !important; min-width: 100px !important; text-align: right !important; }
-.discover-table .col-apy { width: 80px !important; min-width: 80px !important; text-align: right !important; }
-.discover-table .col-momentum { width: 90px !important; min-width: 90px !important; text-align: right !important; }
-.discover-table .col-consistency { width: 80px !important; min-width: 80px !important; text-align: center !important; }
-.discover-table .col-risk { width: 70px !important; min-width: 70px !important; text-align: center !important; }
-.discover-table .col-regime { width: 90px !important; min-width: 90px !important; text-align: center !important; }
-
-/* Assets Table - Fixed Column Layout */
-.assets-venues-table {
-  table-layout: fixed !important;
-  width: 100% !important;
-}
-
-.assets-venues-table th,
-.assets-venues-table td {
-  padding: 8px 6px !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-
-.assets-venues-table .col-vault { width: 180px !important; min-width: 180px !important; }
-.assets-venues-table .col-chain { width: 80px !important; min-width: 80px !important; text-align: center !important; }
-.assets-venues-table .col-token { width: 90px !important; min-width: 90px !important; }
-.assets-venues-table .col-category { width: 100px !important; min-width: 100px !important; text-align: center !important; }
-.assets-venues-table .col-tvl { width: 110px !important; min-width: 110px !important; text-align: right !important; }
-.assets-venues-table .col-apy { width: 90px !important; min-width: 90px !important; text-align: right !important; }
-.assets-venues-table .col-momentum { width: 90px !important; min-width: 90px !important; text-align: right !important; }
-.assets-venues-table .col-consistency { width: 80px !important; min-width: 80px !important; text-align: center !important; }
-.assets-venues-table .col-regime { width: 90px !important; min-width: 90px !important; text-align: center !important; }
-
-/* Changes Table - Fixed Column Layout */
-.changes-mover-table {
-  table-layout: fixed !important;
-  width: 100% !important;
-}
-
-.changes-mover-table th,
-.changes-mover-table td {
-  padding: 8px 6px !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-
-.changes-mover-table .col-vault { width: 160px !important; min-width: 160px !important; }
-.changes-mover-table .col-chain { width: 70px !important; min-width: 70px !important; text-align: center !important; }
-.changes-mover-table .col-token { width: 90px !important; min-width: 90px !important; }
-.changes-mover-table .col-category { width: 100px !important; min-width: 100px !important; text-align: center !important; }
-.changes-mover-table .col-tvl { width: 100px !important; min-width: 100px !important; text-align: right !important; }
-.changes-mover-table .col-current { width: 90px !important; min-width: 90px !important; text-align: right !important; }
-.changes-mover-table .col-previous { width: 90px !important; min-width: 90px !important; text-align: right !important; }
-.changes-mover-table .col-delta { width: 80px !important; min-width: 80px !important; text-align: right !important; }
-.changes-mover-table .col-freshness { width: 80px !important; min-width: 80px !important; text-align: center !important; }
-/* ============================================
-   EMERGENCY LAYOUT FIXES - Direct Overrides
-   ============================================ */
-
-/* Force ALL tables to have minimum width and scroll */
-.table-wrap {
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-}
-
-.table-wrap table {
-  min-width: 1200px !important;
-}
-
-/* Compress table cells globally */
-table th,
-table td {
-  padding: 6px 4px !important;
-  font-size: 12px !important;
-  line-height: 1.3 !important;
-}
-
-/* Make vault links not wrap */
-table .col-vault a,
-table td:first-child a {
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  max-width: 150px !important;
-  display: inline-block !important;
-}
-
-/* Center-align the category/consistency/risk/regime columns */
-table .col-category,
-table .col-consistency,
-table .col-risk,
-table .col-regime,
-table td:nth-child(4),
-table td:nth-child(8),
-table td:nth-child(9),
-table td:nth-child(10) {
-  text-align: center !important;
-  width: 70px !important;
-  min-width: 70px !important;
-  max-width: 90px !important;
-}
-
-/* Right-align numeric columns */
-table .col-tvl,
-table .col-apy,
-table .col-momentum,
-table .col-current,
-table .col-previous,
-table .col-delta,
-table td:nth-child(5),
-table td:nth-child(6),
-table td:nth-child(7) {
-  text-align: right !important;
-}
-
-/* Compress stYFI epoch cards */
-.styfi-epoch-mobile-card {
-  padding: 8px 12px !important;
-  margin-bottom: 6px !important;
-}
-
-.styfi-epoch-mobile-head {
-  margin-bottom: 4px !important;
-}
-
-.styfi-epoch-title {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-}
-
-.styfi-epoch-number {
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  color: var(--accent) !important;
-}
-
-.styfi-epoch-mobile-grid {
-  display: grid !important;
-  grid-template-columns: repeat(6, 1fr) !important;
-  gap: 4px 8px !important;
-  margin-top: 4px !important;
-}
-
-.styfi-epoch-item {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 0 !important;
-}
-
-.styfi-epoch-item span {
-  font-size: 9px !important;
-  color: var(--ink-muted) !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.02em !important;
-}
-
-.styfi-epoch-item strong {
-  font-size: 10px !important;
-  font-weight: 500 !important;
-}
-
-/* Compress Discover visual grid */
-.discover-visual-grid {
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  gap: 16px !important;
-}
-
-.discover-main-scatter {
-  max-height: 280px !important;
-  min-height: 200px !important;
-}
-
-.discover-quadrants-grid {
-  display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 16px !important;
-}
-
-.discover-chain-heatmap,
-.discover-trend-card {
-  max-height: 200px !important;
-  overflow: hidden !important;
-}
-
-.discover-ridgeline {
-  max-height: 300px !important;
-  overflow: hidden !important;
-}
-
-/* Compress Composition scatter chart */
-.composition-crowding-scatter {
-  max-height: 260px !important;
-  min-height: 200px !important;
-}
-
-.composition-crowding-scatter svg {
-  max-height: 220px !important;
-}
-
-/* Compress concentration heatmap */
-.composition-concentration-grid {
-  display: grid !important;
-  grid-template-columns: repeat(4, 1fr) !important;
-  gap: 8px !important;
-}
-
-.composition-concentration-grid > * {
-  padding: 8px !important;
-}
-
-/* Make all heatmap cards more compact */
-.heat-grid,
-.mini-heat {
-  padding: 8px !important;
-}
-
-.heat-grid .heat-grid-title,
-.mini-heat .mini-heat-title {
-  font-size: 11px !important;
-  margin-bottom: 4px !important;
-}
-
-/* Compress bar lists */
-.bar-list {
-  gap: 2px !important;
-}
-
-.bar-row {
-  padding: 4px 6px !important;
-}
-
-.bar-row-label {
-  font-size: 11px !important;
-}
-
-/* Make KPI cards more compact */
-.kpi-grid {
-  gap: 12px !important;
-}
-
-.kpi-card {
-  padding: 12px !important;
-  min-height: auto !important;
-}
-
-.kpi-value {
-  font-size: 20px !important;
-}
-
-/* Responsive - on smaller screens, tables scroll */
-@media (max-width: 1200px) {
-  .table-wrap table {
-    min-width: 1000px !important;
-  }
-}
-
-@media (max-width: 768px) {
-  .table-wrap table {
-    min-width: 900px !important;
-  }
-  
-  table th,
-  table td {
-    padding: 4px 3px !important;
-    font-size: 11px !important;
-  }
-}
-/* ============================================
-   COMPREHENSIVE LAYOUT FIXES - Round 2
-   ============================================ */
-
-/* --------------------------------------------
-   OVERVIEW - Equal Height Cards & Text
-   -------------------------------------------- */
-.home-overview-summary {
-  display: grid !important;
-  grid-template-columns: repeat(5, 1fr) !important;
-  gap: 16px !important;
-  align-items: stretch !important;
-}
-
-.home-overview-summary-card {
-  display: flex !important;
-  flex-direction: column !important;
-  height: auto !important;
-  min-height: 160px !important;
-  max-height: 180px !important;
-  padding: 16px !important;
-  overflow: hidden !important;
-}
-
-.home-overview-summary-card .home-overview-summary-note {
-  margin-top: auto !important;
-  font-size: 11px !important;
-  line-height: 1.4 !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  display: -webkit-box !important;
-  -webkit-line-clamp: 2 !important;
-  -webkit-box-orient: vertical !important;
-}
-
-/* --------------------------------------------
-   STYFI - Epoch Cards Text Size
-   -------------------------------------------- */
-.styfi-epoch-item span {
-  font-size: 11px !important;
-}
-
-.styfi-epoch-item strong {
-  font-size: 13px !important;
-  font-weight: 500 !important;
-}
-
-/* --------------------------------------------
-   TABLES - Global Fixes
-   -------------------------------------------- */
-.table-wrap {
-  overflow-x: auto !important;
-  width: 100% !important;
-}
-
-.table-wrap table {
-  min-width: 1100px !important;
-  table-layout: fixed !important;
-}
-
-/* Reset table cell styles */
-table th,
-table td {
   padding: 10px 8px !important;
-  font-size: 13px !important;
-  line-height: 1.4 !important;
-  vertical-align: middle !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
 
-/* Vault column - wider */
-table .col-vault,
-table th:first-child,
-table td:first-child {
-  width: 220px !important;
-  min-width: 220px !important;
-  text-align: left !important;
-}
+.discover-table .col-vault { width: 21% !important; }
+.discover-table .col-chain { width: 10% !important; text-align: center !important; }
+.discover-table .col-token { width: 9% !important; }
+.discover-table .col-category { width: 11% !important; text-align: center !important; }
+.discover-table .col-tvl { width: 11% !important; text-align: right !important; }
+.discover-table .col-apy { width: 10% !important; text-align: right !important; }
+.discover-table .col-momentum { width: 11% !important; text-align: right !important; }
+.discover-table .col-consistency { width: 11% !important; text-align: center !important; }
+.discover-table .col-risk { width: 10% !important; text-align: center !important; }
+.discover-table .col-regime { width: 10% !important; text-align: center !important; }
 
-/* Chain column */
-table .col-chain,
-table th:nth-child(2),
-table td:nth-child(2) {
-  width: 80px !important;
-  min-width: 80px !important;
-  text-align: center !important;
-}
-
-/* Token column */
-table .col-token,
-table th:nth-child(3),
-table td:nth-child(3) {
-  width: 100px !important;
-  min-width: 100px !important;
-  text-align: left !important;
-}
-
-/* Category column */
-table .col-category,
-table th:nth-child(4),
-table td:nth-child(4) {
-  width: 100px !important;
-  min-width: 100px !important;
-  text-align: center !important;
-}
-
-/* Numeric columns */
-table .col-tvl,
-table td:nth-child(5) {
-  width: 120px !important;
-  min-width: 120px !important;
-  text-align: right !important;
-}
-
-table .col-apy,
-table .col-current,
-table td:nth-child(6) {
-  width: 90px !important;
-  min-width: 90px !important;
-  text-align: right !important;
-}
-
-table .col-momentum,
-table .col-previous,
-table td:nth-child(7) {
-  width: 90px !important;
-  min-width: 90px !important;
-  text-align: right !important;
-}
-
-table .col-delta,
-table td:nth-child(8) {
-  width: 80px !important;
-  min-width: 80px !important;
-  text-align: right !important;
-}
-
-/* Consistency, Risk, Regime columns */
-table .col-consistency,
-table .col-risk,
-table .col-regime,
-table td:nth-child(8),
-table td:nth-child(9),
-table td:nth-child(10) {
-  width: 85px !important;
-  min-width: 85px !important;
-  text-align: center !important;
-}
-
-/* --------------------------------------------
-   DISCOVER - Visual Grid Fixes
-   -------------------------------------------- */
-.discover-visual-grid {
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  gap: 24px !important;
-  width: 100% !important;
-}
-
-/* Scatter plot - fix overflow */
+/* Scatter chart - remove side margins */
 .discover-main-scatter {
-  grid-column: 1 / -1 !important;
   width: 100% !important;
   max-width: 100% !important;
-  height: auto !important;
-  min-height: 280px !important;
-  max-height: 320px !important;
-  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+/* Discover visual layout - single column stack */
+.discover-visual-layout {
+  display: block !important;
+}
+
+/* Scatter plot - force full width, remove all margins */
+.discover-scatter-section {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.discover-scatter-section .viz-panel,
+.discover-main-scatter.viz-panel {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.discover-scatter-section h3,
+.discover-main-scatter h3 {
+  padding: 16px 16px 12px !important;
+  margin-bottom: 0 !important;
+}
+
+.discover-scatter-section .scatter-wrap,
+.discover-main-scatter .scatter-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .discover-main-scatter svg {
   width: 100% !important;
-  height: 100% !important;
-  max-height: 300px !important;
+  max-width: 100% !important;
+  height: 420px !important;
+  display: block !important;
 }
 
-/* Quadrants grid - 2x2 layout */
-.discover-quadrants-grid {
+/* Scatter plot labels - larger text */
+.discover-main-scatter .viz-tick,
+.viz-panel .viz-tick {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.discover-main-scatter .viz-axis-label,
+.viz-panel .viz-axis-label {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+/* Universe Snapshot KPIs - smaller values like Protocol Snapshot */
+.discover-universe-layout .kpi-card .kpi-value,
+.discover-kpis .kpi-value {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+}
+
+/* Remove viz-legend border and extra padding from scatter */
+.discover-scatter-section .viz-legend {
+  border-top: none !important;
+  margin-top: 12px !important;
+  padding: 0 16px !important;
+}
+
+
+
+/* Table column widths adjusted */
+.discover-table .col-vault { width: 23% !important; }
+.discover-table .col-chain { width: 8% !important; text-align: center !important; }
+.discover-table .col-token { width: 10% !important; }
+.discover-table .col-category { width: 10% !important; text-align: center !important; }
+.discover-table .col-tvl { width: 12% !important; text-align: right !important; }
+.discover-table .col-apy { width: 10% !important; text-align: right !important; }
+.discover-table .col-momentum { width: 11% !important; text-align: right !important; }
+.discover-table .col-consistency { width: 10% !important; text-align: center !important; }
+.discover-table .col-risk { width: 9% !important; text-align: center !important; }
+.discover-table .col-regime { width: 10% !important; text-align: center !important; }
+
+/* Token APY Dispersion, Yield-Momentum Quadrants, Chain Momentum - 4 columns */
+.discover-visual-layout .heat-grid {
   display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 20px !important;
-  width: 100% !important;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+  gap: 16px !important;
 }
 
-.discover-quadrants-grid > * {
-  width: 100% !important;
-  min-width: 0 !important;
+/* Ensure at least 4 columns on wide screens */
+@media (min-width: 1200px) {
+  .discover-visual-layout .heat-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
 }
 
-/* Chain heatmap */
-.discover-chain-heatmap {
+/* On medium screens, show 2 columns */
+@media (max-width: 1199px) and (min-width: 768px) {
+  .discover-visual-layout .heat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+.discover-main-scatter {
   width: 100% !important;
-  max-height: 220px !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.discover-main-scatter .scatter-wrap {
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.discover-main-scatter svg {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 360px !important;
+  display: block !important;
+}
+
+/* ==========================================================================
+   4. ASSETS PAGE
+   ========================================================================== */
+
+/* Venues table */
+.assets-venues-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  font-size: 13px !important;
+}
+
+.assets-venues-table th,
+.assets-venues-table td {
+  padding: 10px 8px !important;
   overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
-/* Trend cards - side by side */
-.discover-trend-card {
-  width: 100% !important;
-  max-height: 250px !important;
-  overflow: hidden !important;
+.assets-venues-table .col-vault { width: 24% !important; }
+.assets-venues-table .col-chain { width: 10% !important; text-align: center !important; }
+.assets-venues-table .col-category { width: 12% !important; text-align: center !important; }
+.assets-venues-table .col-tvl { width: 14% !important; text-align: right !important; }
+.assets-venues-table .col-apy { width: 12% !important; text-align: right !important; }
+.assets-venues-table .col-momentum { width: 12% !important; text-align: right !important; }
+.assets-venues-table .col-consistency { width: 12% !important; text-align: center !important; }
+.assets-venues-table .col-regime { width: 12% !important; text-align: center !important; }
+
+/* Token Universe cards - 4-3 distribution */
+.assets-universe-top .kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 16px !important;
 }
 
-/* Ridgeline */
-.discover-ridgeline {
-  width: 100% !important;
-  max-height: 350px !important;
-  overflow: hidden !important;
+@media (max-width: 1100px) {
+  .assets-universe-top .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 
-/* --------------------------------------------
-   COMPOSITION - Scatter & Heatmap
-   -------------------------------------------- */
-.composition-crowding-scatter {
-  max-height: 280px !important;
-  min-height: 240px !important;
+@media (max-width: 600px) {
+  .assets-universe-top .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Spacing between cards and top tokens */
+.assets-universe-top {
   margin-bottom: 24px !important;
 }
 
-.composition-crowding-scatter svg {
-  max-height: 260px !important;
+.assets-spread-cards {
+  margin-top: 24px !important;
+  margin-bottom: 24px !important;
 }
 
-/* Concentration heatmap - 4 columns */
-.composition-concentration-grid {
+/* Token table */
+.assets-token-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  font-size: 13px !important;
+}
+
+.assets-token-table th,
+.assets-token-table td {
+  padding: 10px 8px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.assets-token-table .col-token { width: 18% !important; }
+.assets-token-table .col-venues { width: 10% !important; text-align: right !important; }
+.assets-token-table .col-chains { width: 10% !important; text-align: right !important; }
+.assets-token-table .col-tvl { width: 20% !important; text-align: right !important; }
+.assets-token-table .col-best { width: 14% !important; text-align: right !important; }
+.assets-token-table .col-weighted { width: 14% !important; text-align: right !important; }
+.assets-token-table .col-spread { width: 14% !important; text-align: right !important; }
+
+/* ==========================================================================
+   5. COMPOSITION PAGE
+   ========================================================================== */
+
+/* Treemap smaller text */
+.composition-treemap-viz .treemap-cell-label {
+  font-size: 11px !important;
+}
+
+.composition-treemap-viz .treemap-group-label {
+  font-size: 12px !important;
+}
+
+/* Crowding visuals - taller scatter */
+.composition-crowding-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 24px !important;
+  align-items: stretch !important;
+}
+
+.composition-main-scatter {
+  min-height: 500px !important;
+  height: 500px !important;
+}
+
+.composition-main-scatter svg {
+  height: 460px !important;
+}
+
+@media (max-width: 900px) {
+  .composition-crowding-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .composition-main-scatter {
+    min-height: 400px !important;
+    height: auto !important;
+  }
+}
+
+/* ==========================================================================
+   6. CHANGES PAGE
+   ========================================================================== */
+
+/* Window Summary - horizontal */
+.changes-summary-kpis {
   display: grid !important;
   grid-template-columns: repeat(4, 1fr) !important;
-  gap: 12px !important;
-  margin-top: 24px !important;
-}
-
-.composition-concentration-grid > * {
-  padding: 12px !important;
-}
-
-@media (max-width: 1200px) {
-  .composition-concentration-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
-
-@media (max-width: 640px) {
-  .composition-concentration-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* --------------------------------------------
-   CHANGES - Delta Visuals Grid
-   -------------------------------------------- */
-.changes-delta-panels {
-  display: grid !important;
-  grid-template-columns: 1.5fr 1fr !important;
-  gap: 20px !important;
-  align-items: start !important;
-}
-
-.changes-main-scatter-slot {
-  grid-row: span 2 !important;
-}
-
-/* Move stale ratio heatmap up */
-.changes-stale-chain-slot {
-  margin-top: 0 !important;
-}
-
-/* --------------------------------------------
-   REGIMES - Spacing Fixes
-   -------------------------------------------- */
-/* Add spacing between table and bar list */
-.regime-current-section .table-wrap {
-  margin-bottom: 20px !important;
-}
-
-/* Compress transition flow */
-.regimes-transition-flow {
-  max-height: 240px !important;
-  padding: 12px !important;
-}
-
-.regimes-transition-flow svg {
-  max-height: 220px !important;
-}
-
-/* Align trend cards */
-.regimes-trend-grid {
-  display: grid !important;
-  grid-template-columns: repeat(3, 1fr) !important;
   gap: 16px !important;
+}
+
+@media (max-width: 1100px) {
+  .changes-summary-kpis {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .changes-summary-kpis {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Trust signals - fix dead space */
+.changes-trust-layout {
+  display: grid !important;
+  grid-template-columns: 0.6fr 1fr 1fr !important;
+  gap: 20px !important;
   align-items: start !important;
 }
 
-.regimes-trend-grid > * {
-  min-height: 120px !important;
-}
-
-/* --------------------------------------------
-   Heatmap & Bar List Text Sizes
-   -------------------------------------------- */
-.heat-grid,
-.mini-heat {
-  padding: 12px !important;
-}
-
-.heat-grid-title,
-.mini-heat-title {
-  font-size: 13px !important;
-  margin-bottom: 8px !important;
-}
-
-.heat-cell,
-.mini-heat-cell {
-  font-size: 12px !important;
-}
-
-.bar-row {
-  padding: 6px 8px !important;
-}
-
-.bar-row-label {
-  font-size: 12px !important;
-}
-
-/* --------------------------------------------
-   Responsive Adjustments
-   -------------------------------------------- */
-@media (max-width: 1100px) {
-  .home-overview-summary {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
-  
-  .discover-quadrants-grid {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .changes-delta-panels {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .changes-main-scatter-slot {
-    grid-row: auto !important;
-  }
-  
-  .regimes-trend-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-@media (max-width: 768px) {
-  .home-overview-summary {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  
-  .table-wrap table {
-    min-width: 900px !important;
-  }
-  
-  table th,
-  table td {
-    padding: 8px 6px !important;
-    font-size: 12px !important;
-  }
-}
-
-/* Discover trends grid - side by side */
-.discover-trends-grid {
+.changes-trust-ages {
   display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 20px !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+@media (max-width: 1100px) {
+  .changes-trust-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Tables */
+.changes-mover-table {
+  table-layout: fixed !important;
   width: 100% !important;
+  font-size: 13px !important;
+}
+
+.changes-mover-table th,
+.changes-mover-table td {
+  padding: 10px 8px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.changes-mover-table .col-vault { width: 18% !important; }
+.changes-mover-table .col-chain { width: 9% !important; text-align: center !important; }
+.changes-mover-table .col-token { width: 10% !important; }
+.changes-mover-table .col-category { width: 11% !important; text-align: center !important; }
+.changes-mover-table .col-tvl { width: 11% !important; text-align: right !important; }
+.changes-mover-table .col-current { width: 10% !important; text-align: right !important; }
+.changes-mover-table .col-previous { width: 10% !important; text-align: right !important; }
+.changes-mover-table .col-delta { width: 9% !important; text-align: right !important; }
+.changes-mover-table .col-age { width: 8% !important; text-align: right !important; }
+
+/* Delta visuals - taller scatter */
+.changes-main-scatter-slot {
+  min-height: 500px !important;
+}
+
+.changes-main-scatter-slot svg {
+  height: 460px !important;
 }
 
 @media (max-width: 960px) {
-  .discover-trends-grid {
+  .changes-main-scatter-slot {
+    min-height: auto !important;
+  }
+}
+
+/* ==========================================================================
+   7. REGIMES PAGE
+   ========================================================================== */
+
+/* Current Regime State spacing */
+.regime-summary-card {
+  margin-bottom: 0 !important;
+}
+
+.regime-summary-card + .section-card {
+  margin-top: 24px !important;
+}
+
+/* Regime summary table */
+.regimes-summary-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  font-size: 13px !important;
+}
+
+.regimes-summary-table th,
+.regimes-summary-table td {
+  padding: 10px 8px !important;
+}
+
+.regimes-summary-table th:first-child,
+.regimes-summary-table td:first-child { 
+  width: 40% !important; 
+  text-align: left !important; 
+}
+
+.regimes-summary-table th:not(:first-child),
+.regimes-summary-table td:not(:first-child) { 
+  text-align: right !important; 
+}
+
+/* Movers table */
+.regimes-mover-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  font-size: 13px !important;
+}
+
+.regimes-mover-table th,
+.regimes-mover-table td {
+  padding: 10px 8px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.regimes-mover-table .col-vault { width: 22% !important; }
+.regimes-mover-table .col-chain { width: 10% !important; text-align: center !important; }
+.regimes-mover-table .col-token { width: 10% !important; }
+.regimes-mover-table .col-tvl { width: 14% !important; text-align: right !important; }
+.regimes-mover-table .col-apy { width: 12% !important; text-align: right !important; }
+.regimes-mover-table .col-momentum { width: 12% !important; text-align: right !important; }
+.regimes-mover-table .col-regime { width: 12% !important; text-align: center !important; }
+
+/* Transition Flow - reduce side margins, readable text */
+.regime-sankey-panel {
+  height: 320px !important;
+  max-height: 320px !important;
+  padding: 16px 0 !important;
+}
+
+.regime-sankey-panel .scatter-wrap {
+  height: 280px !important;
+  max-height: 280px !important;
+  padding: 0 10px !important;
+}
+
+.regime-sankey-panel svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.regime-sankey-panel .sankey-label {
+  fill: var(--ink-soft) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.regime-sankey-panel .sankey-value {
+  fill: var(--ink) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+.regime-sankey-panel .sankey-axis-label {
+  fill: var(--ink-muted) !important;
+  font-size: 11px !important;
+}
+
+/* ==========================================================================
+   8. GENERAL SPACING
+   ========================================================================== */
+
+.section-card {
+  margin-bottom: 0 !important;
+}
+
+.section-card + .section-card {
+  margin-top: 24px !important;
+}
+
+.page-top-panel + .section-card {
+  margin-top: 24px !important;
+}
+
+.route-page .hero + .section-card,
+.route-page .hero + .page-top-panel {
+  margin-top: 24px !important;
+}
+
+/* Home footer - reduce padding */
+.home-minimal-footer {
+  padding: var(--space-4) var(--space-8) !important;
+  gap: var(--space-2) !important;
+}
+
+/* How to use section - single column since Branch Out removed */
+.home-overview-flow-grid {
+  display: block !important;
+}
+
+.home-overview-flow-card {
+  max-width: 100% !important;
+}
+
+/* Flow steps horizontal layout */
+.home-overview-flow-steps {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: var(--space-4) !important;
+}
+
+.home-overview-flow-step {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-4) !important;
+  height: 100% !important;
+}
+
+.home-overview-flow-step-copy {
+  flex: 1 !important;
+}
+
+.home-overview-flow-step-links {
+  margin-top: auto !important;
+}
+
+@media (max-width: 900px) {
+  .home-overview-flow-steps {
     grid-template-columns: 1fr !important;
   }
+}
+
+/* Coverage Quality card - remove meter and legend */
+.home-overview-analyst-card .meter-track,
+.home-overview-analyst-card .meter-legend,
+.home-overview-analyst-card .viz-legend {
+  display: none !important;
+}
+
+.home-overview-analyst-card {
+  min-height: auto !important;
 }

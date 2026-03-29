@@ -418,7 +418,15 @@ function StYfiPageContent() {
           higher-frequency snapshots kept for {data?.data_policy?.snapshot_retention_days ?? "n/a"} days. Net-flow cards appear once
           enough recent history exists.
         </p>
-        <KpiGrid items={summaryItems} />
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px'}}>
+          {summaryItems.map((item) => (
+            <article className="kpi-card" key={item.label} style={{display: 'flex', flexDirection: 'column', gap: '4px', padding: '16px', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)'}}>
+              <p className="kpi-label" style={{fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-widest)', color: 'var(--ink-muted)'}}>{item.label}</p>
+              <p className="kpi-value" style={{fontFamily: 'var(--font-data)', fontSize: 'var(--text-xl)', fontWeight: 600, color: 'var(--ink)'}}>{item.value}</p>
+              {item.hint ? <p className="kpi-hint" style={{fontSize: 'var(--text-sm)', color: 'var(--ink-dim)'}}>{item.hint}</p> : null}
+            </article>
+          ))}
+        </div>
       </section>
 
       <PageTopPanel
@@ -482,7 +490,7 @@ function StYfiPageContent() {
           items={stakeTrendItems}
           valueFormatter={(value) => formatTokenCompact(value, "YFI")}
           deltaFormatter={(value) => formatSignedToken(value, "YFI", 2)}
-          columns={1}
+          columns={3}
           embedded
           emptyText="Snapshot history is still warming up."
         />
@@ -510,30 +518,30 @@ function StYfiPageContent() {
                     <span className="pill">{isCurrentEpoch ? "Ongoing" : "Completed"}</span>
                   </div>
                 </div>
-                <div className="styfi-epoch-mobile-grid">
-                  <div className="styfi-epoch-item">
-                    <span>Start</span>
-                    <strong>{formatUtcDate(row.epoch_start ?? null)}</strong>
+                <div style={{display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px'}}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <span style={{fontSize: '11px', color: 'var(--ink-muted)', textTransform: 'uppercase'}}>Start</span>
+                    <strong style={{fontSize: '13px', color: 'var(--ink)'}}>{formatUtcDate(row.epoch_start ?? null)}</strong>
                   </div>
-                  <div className="styfi-epoch-item">
-                    <span>Reward Pot</span>
-                    <strong>{formatToken(row.reward_total ?? null, rewardSymbol, 2)}</strong>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <span style={{fontSize: '11px', color: 'var(--ink-muted)', textTransform: 'uppercase'}}>Reward Pot</span>
+                    <strong style={{fontSize: '13px', color: 'var(--ink)'}}>{formatToken(row.reward_total ?? null, rewardSymbol, 2)}</strong>
                   </div>
-                  <div className="styfi-epoch-item">
-                    <span>stYFI</span>
-                    <strong>{formatToken(row.reward_styfi ?? null, rewardSymbol, 2)}</strong>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <span style={{fontSize: '11px', color: 'var(--ink-muted)', textTransform: 'uppercase'}}>stYFI</span>
+                    <strong style={{fontSize: '13px', color: 'var(--ink)'}}>{formatToken(row.reward_styfi ?? null, rewardSymbol, 2)}</strong>
                   </div>
-                  <div className="styfi-epoch-item analyst-only">
-                    <span>stYFIx</span>
-                    <strong>{formatToken(row.reward_styfix ?? null, rewardSymbol, 2)}</strong>
+                  <div className="analyst-only" style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <span style={{fontSize: '11px', color: 'var(--ink-muted)', textTransform: 'uppercase'}}>stYFIx</span>
+                    <strong style={{fontSize: '13px', color: 'var(--ink)'}}>{formatToken(row.reward_styfix ?? null, rewardSymbol, 2)}</strong>
                   </div>
-                  <div className="styfi-epoch-item">
-                    <span>Migrated veYFI</span>
-                    <strong>{formatToken(row.reward_veyfi ?? null, rewardSymbol, 2)}</strong>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <span style={{fontSize: '11px', color: 'var(--ink-muted)', textTransform: 'uppercase'}}>Mig. veYFI</span>
+                    <strong style={{fontSize: '13px', color: 'var(--ink)'}}>{formatToken(row.reward_veyfi ?? null, rewardSymbol, 2)}</strong>
                   </div>
-                  <div className="styfi-epoch-item">
-                    <span>Liquid Lockers</span>
-                    <strong>{formatToken(row.reward_liquid_lockers ?? null, rewardSymbol, 2)}</strong>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                    <span style={{fontSize: '11px', color: 'var(--ink-muted)', textTransform: 'uppercase'}}>Lockers</span>
+                    <strong style={{fontSize: '13px', color: 'var(--ink)'}}>{formatToken(row.reward_liquid_lockers ?? null, rewardSymbol, 2)}</strong>
                   </div>
                 </div>
               </article>
@@ -541,17 +549,17 @@ function StYfiPageContent() {
           })}
         </div>
         <div className="table-wrap styfi-epoch-wrap desktop-only">
-          <table className="styfi-epoch-table">
+          <table className="styfi-epoch-table" style={{tableLayout: 'fixed', width: '100%', fontSize: '12px'}}>
             <thead>
               <tr>
-                <th className="col-epoch">Epoch</th>
-                <th className="col-status">Status</th>
-                <th className="col-start">Start</th>
-                <th className="is-numeric col-total">Reward Pot</th>
-                <th className="is-numeric col-styfi">stYFI</th>
-                <th className="is-numeric analyst-only col-styfix">stYFIx</th>
-                <th className="is-numeric col-veyfi">Migrated veYFI</th>
-                <th className="is-numeric col-lockers">Liquid Lockers</th>
+                <th style={{width: '6%', padding: '8px 4px', textAlign: 'center'}}>Ep</th>
+                <th style={{width: '9%', padding: '8px 4px', textAlign: 'center'}}>Status</th>
+                <th style={{width: '11%', padding: '8px 4px'}}>Start</th>
+                <th style={{width: '12%', padding: '8px 4px', textAlign: 'right'}}>Pot</th>
+                <th style={{width: '12%', padding: '8px 20px 8px 4px', textAlign: 'right'}}>stYFI</th>
+                <th style={{width: '15%', padding: '8px 16px 8px 16px', textAlign: 'right'}}>stYFIx</th>
+                <th style={{width: '12%', padding: '8px 4px 8px 20px', textAlign: 'right'}}>veYFI</th>
+                <th style={{width: '12%', padding: '8px 4px', textAlign: 'right'}}>Lockers</th>
               </tr>
             </thead>
             <tbody>
@@ -564,16 +572,16 @@ function StYfiPageContent() {
                   row.epoch === currentEpoch;
                 return (
                   <tr key={row.epoch ?? row.epoch_start ?? "epoch"}>
-                    <td className="col-epoch">{row.epoch ?? "n/a"}</td>
-                    <td className="col-status">
+                    <td style={{padding: '8px 4px', textAlign: 'center'}}>{row.epoch ?? "n/a"}</td>
+                    <td style={{padding: '8px 4px', textAlign: 'center'}}>
                       <span className="pill">{isCurrentEpoch ? "Ongoing" : "Completed"}</span>
                     </td>
-                    <td className="col-start">{formatUtcDate(row.epoch_start ?? null)}</td>
-                    <td className="is-numeric col-total">{formatToken(row.reward_total ?? null, rewardSymbol, 2)}</td>
-                    <td className="is-numeric col-styfi">{formatToken(row.reward_styfi ?? null, rewardSymbol, 2)}</td>
-                    <td className="is-numeric analyst-only col-styfix">{formatToken(row.reward_styfix ?? null, rewardSymbol, 2)}</td>
-                    <td className="is-numeric col-veyfi">{formatToken(row.reward_veyfi ?? null, rewardSymbol, 2)}</td>
-                    <td className="is-numeric col-lockers">{formatToken(row.reward_liquid_lockers ?? null, rewardSymbol, 2)}</td>
+                    <td style={{padding: '8px 4px'}}>{formatUtcDate(row.epoch_start ?? null)}</td>
+                    <td style={{padding: '8px 4px', textAlign: 'right', fontFamily: 'var(--font-data)'}}>{formatToken(row.reward_total ?? null, rewardSymbol, 2)}</td>
+                    <td style={{padding: '8px 20px 8px 4px', textAlign: 'right', fontFamily: 'var(--font-data)'}}>{formatToken(row.reward_styfi ?? null, rewardSymbol, 2)}</td>
+                    <td style={{padding: '8px 16px 8px 16px', textAlign: 'right', fontFamily: 'var(--font-data)'}}>{formatToken(row.reward_styfix ?? null, rewardSymbol, 2)}</td>
+                    <td style={{padding: '8px 4px 8px 20px', textAlign: 'right', fontFamily: 'var(--font-data)'}}>{formatToken(row.reward_veyfi ?? null, rewardSymbol, 2)}</td>
+                    <td style={{padding: '8px 4px', textAlign: 'right', fontFamily: 'var(--font-data)'}}>{formatToken(row.reward_liquid_lockers ?? null, rewardSymbol, 2)}</td>
                   </tr>
                 );
               })}

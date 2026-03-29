@@ -192,25 +192,25 @@ function MoverTable({
         Sort by signal, size, or staleness. Pro mode adds token, category, and previous-APY context.
       </p>
       <div className="table-wrap">
-        <table className="changes-mover-table" style={{ tableLayout: "fixed", width: "100%" }} >
+        <table className="changes-mover-table">
           <thead>
             <tr>
-              <th className="col-vault" style={{ width: "20%" }}>
+              <th className="col-vault">
                 <button className={`th-button ${sort.key === "vault" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "vault"))}>
                   Vault <span className="th-indicator">{sortIndicator(sort, "vault")}</span>
                 </button>
               </th>
-              <th className="col-chain" style={{ width: "9%" }}>
+              <th className="col-chain">
                 <button className={`th-button ${sort.key === "chain" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "chain"))}>
                   Chain <span className="th-indicator">{sortIndicator(sort, "chain")}</span>
                 </button>
               </th>
-              <th className="tablet-hide analyst-only col-token" style={{ width: "11%" }}>
+              <th className="tablet-hide analyst-only col-token">
                 <button className={`th-button ${sort.key === "token" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "token"))}>
                   Token <span className="th-indicator">{sortIndicator(sort, "token")}</span>
                 </button>
               </th>
-              <th className="mobile-hide analyst-only col-category" style={{ width: "12%", textAlign: "center" }}>
+              <th className="mobile-hide analyst-only col-category col-center">
                 <button
                   className={`th-button ${sort.key === "category" ? "is-active" : ""}`}
                   onClick={() => setSort((current) => toggleSort(current, "category"))}
@@ -218,12 +218,12 @@ function MoverTable({
                   Category <span className="th-indicator">{sortIndicator(sort, "category")}</span>
                 </button>
               </th>
-              <th className="is-numeric col-tvl" style={{ width: "10%" }}>
+              <th className="is-numeric col-tvl">
                 <button className={`th-button ${sort.key === "tvl" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "tvl"))}>
                   TVL <span className="th-indicator">{sortIndicator(sort, "tvl")}</span>
                 </button>
               </th>
-              <th className="is-numeric col-current" style={{ width: "10%" }}>
+              <th className="is-numeric col-current">
                 <button
                   className={`th-button ${sort.key === "current" ? "is-active" : ""}`}
                   onClick={() => setSort((current) => toggleSort(current, "current"))}
@@ -239,7 +239,7 @@ function MoverTable({
                   Previous APY <span className="th-indicator">{sortIndicator(sort, "previous")}</span>
                 </button>
               </th>
-              <th className="is-numeric col-delta" style={{ width: "10%" }}>
+              <th className="is-numeric col-delta">
                 <button className={`th-button ${sort.key === "delta" ? "is-active" : ""}`} onClick={() => setSort((current) => toggleSort(current, "delta"))}>
                   Delta <span className="th-indicator">{sortIndicator(sort, "delta")}</span>
                 </button>
@@ -271,7 +271,7 @@ function MoverTable({
                       "unknown"
                     )}
                   </td>
-                <td className="mobile-hide analyst-only col-category">
+                <td className="mobile-hide analyst-only col-category col-center">
                   <span className="cell-truncate" title={row.category || "unknown"}>{row.category || "unknown"}</span>
                 </td>
                 <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
-import { ShareMeter } from "./components/visuals";
+
 import { KpiCardSkeleton } from "./components/skeleton";
 import { useHomeData } from "./hooks/use-home-data";
 
@@ -127,7 +127,7 @@ const HOME_PLAYBOOKS = [
   {
     step: "01",
     title: "Find a candidate",
-    body: "Start in Discover to rank the universe, then confirm the move in Changes before treating it as actionable.",
+    body: "Start in Discover,\nthen confirm in Changes.",
     links: [
       { href: "/discover", label: "Discover" },
       { href: "/changes", label: "Changes" },
@@ -136,7 +136,7 @@ const HOME_PLAYBOOKS = [
   {
     step: "02",
     title: "Pressure-test the idea",
-    body: "Use Assets, Composition, and Chains to check spread, concentration, and chain context before sizing up.",
+    body: "Use Assets, Composition, and Chains to check spread, concentration, and chain context.",
     links: [
       { href: "/assets", label: "Assets" },
       { href: "/composition", label: "Composition" },
@@ -146,7 +146,7 @@ const HOME_PLAYBOOKS = [
   {
     step: "03",
     title: "Monitor behavior over time",
-    body: "Use Regimes for state changes and stYFI when the job shifts from scanning to ongoing monitoring.",
+    body: "Use Regimes for state changes. Check stYFI for governance context.",
     links: [
       { href: "/regimes", label: "Regimes" },
       { href: "/styfi", label: "stYFI" },
@@ -249,8 +249,7 @@ export default function HomePage() {
   const universeMoveValue = Number.isFinite(changes?.summary?.avg_delta ?? null) ? pctDelta(changes?.summary?.avg_delta, 2) : "n/a";
   const liveShiftValue = Number.isFinite(topMover?.delta_apy ?? null) ? pctDelta(topMover?.delta_apy, 2) : "n/a";
   const liveShiftApy = topMover ? formatPct(topMover?.safe_apy_30d ?? null, 2) : "n/a";
-  const staleRatio = overview?.freshness?.pps_stale_ratio ?? null;
-  const freshRatio = staleRatio !== null && staleRatio !== undefined ? Math.max(0, 1 - staleRatio) : null;
+
   const currentYearnNote =
     overview?.protocol_context?.current_yearn?.vaults !== null &&
     overview?.protocol_context?.current_yearn?.vaults !== undefined &&
@@ -278,39 +277,18 @@ export default function HomePage() {
 
   return (
     <main className="container home-overview">
-      <section className={`home-overview-hero${revealClass}`}>
+      <section className={`home-overview-hero${revealClass}`} style={{padding: '8rem 0', marginTop: '2rem', marginBottom: '3rem'}}>
         <div className="home-overview-hero-copy">
-          <div className="home-overview-hero-eyebrow">Yearn Vault Analytics</div>
           <h1>
-            Clear signals for <span className="highlight">faster</span> vault decisions
+            Clear patterns<br />for <span className="highlight">faster</span> vault decisions
           </h1>
           <p className="home-overview-hero-lead">
-            Move from signal to route without wading through repeated chrome or guesswork. 
-            Purpose-built analytics for Yearn vault discovery, yield shifts, and strategic decisions.
+            Find vaults without wading through repeated guesswork. Purpose-built analytics for Yearn vault discovery, yield shifts, and strategic decisions.
           </p>
-          <div className="home-overview-hero-highlights" aria-label="Overview highlights">
-            <div className="home-overview-hero-highlight">
-              <span className="home-overview-hero-highlight-label">Current TVL</span>
-              <span className="home-overview-hero-highlight-value">
-                {formatUsdCompact(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 1)}
-              </span>
-            </div>
-            <div className="home-overview-hero-highlight">
-              <span className="home-overview-hero-highlight-label">Freshness</span>
-              <span className="home-overview-hero-highlight-value">
-                {formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1)}
-              </span>
-            </div>
-            <div className="home-overview-hero-highlight">
-              <span className="home-overview-hero-highlight-label">Core 24h Move</span>
-              <span className="home-overview-hero-highlight-value">{universeMoveValue}</span>
-            </div>
-          </div>
           <div className="home-minimal-cta-row">
             <Link href="/discover" className="home-lite-cta primary">Start in Discover</Link>
             <Link href="/changes" className="home-lite-cta">Check Changes</Link>
           </div>
-          <p className="home-overview-hero-meta">{liveFreshnessLine}</p>
         </div>
         <div className="home-overview-hero-art" aria-hidden="true">
           <Image
@@ -328,17 +306,13 @@ export default function HomePage() {
       <section className={`card section-card home-overview-flow-section${revealClass}`}>
         <div className="home-overview-section-head">
           <p className="home-kicker">How to use</p>
-          <h2>Shortlist first. Then pressure-test when the move looks real.</h2>
+          <h2>Shortlist and verify</h2>
           <p className="card-intro">
-            Discover answers whether anything deserves attention. Changes confirms that the move is fresh and actionable.
+            Discover finds opportunities. Changes checks if the signal still holds.
           </p>
         </div>
         <div className="home-overview-flow-grid">
           <article className="home-overview-flow-card">
-            <div className="home-overview-flow-card-head">
-              <p className="home-kicker">Use This Order</p>
-              <p className="muted">Keep the first pass narrow. Branch out only when the question changes.</p>
-            </div>
             <div className="home-overview-flow-steps">
               {HOME_PLAYBOOKS.map((playbook) => (
                 <article key={playbook.step} className="home-overview-flow-step">
@@ -358,26 +332,14 @@ export default function HomePage() {
               ))}
             </div>
           </article>
-          <aside className="home-overview-support-card">
-            <p className="home-kicker">Branch Out When Needed</p>
-            <p className="muted">Open these only when the shortlist already looks worth deeper work.</p>
-            <div className="home-overview-support-links">
-              {HOME_SUPPORT_ROUTE_CARDS.map((card) => (
-                <Link key={card.href} href={card.href} className="home-overview-support-link">
-                  <span className="home-overview-support-link-title">{card.title}</span>
-                  <span className="home-overview-support-link-note">{card.note}</span>
-                </Link>
-              ))}
-            </div>
-          </aside>
         </div>
       </section>
 
       <section className={`card section-card home-overview-analyst-section${revealClass}`}>
         <div className="home-overview-section-head">
           <p className="home-kicker">Live Data</p>
-          <h2>Real-time signals for informed decisions</h2>
-          <p className="card-intro">Current movement, coverage quality, and yield leadership at a glance. For analysts who know the workflow.</p>
+          <h2>Data for informed decisions</h2>
+          <p className="card-intro">Current movement, coverage quality, and yield leadership at a glance.</p>
         </div>
         <div className="home-overview-analyst-grid">
           {isLoading ? (
@@ -393,7 +355,7 @@ export default function HomePage() {
                 <p className="home-overview-summary-value">{liveShiftValue}</p>
                 <p className="home-overview-summary-note">
                   {liveShiftHref ? (
-                    <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
+                    <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link external-link">
                       {topMoverName}
                     </a>
                   ) : (
@@ -401,40 +363,17 @@ export default function HomePage() {
                   )}{" "}
                   · 30d APY now {liveShiftApy}
                 </p>
-                <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
               </article>
               <article className="home-overview-analyst-card">
                 <p className="home-kicker">Coverage Quality</p>
                 <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1, false)}</p>
                 <p className="home-overview-summary-note">Latest PPS age in tracked scope.</p>
-                <ShareMeter
-                  title=""
-                  embedded
-                  total={1}
-                  segments={[
-                    {
-                      id: "fresh",
-                      label: "Fresh",
-                      value: freshRatio,
-                      note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within 24h cutoff` : "Coverage syncing",
-                      tone: "positive",
-                    },
-                    {
-                      id: "stale",
-                      label: "Stale",
-                      value: staleRatio,
-                      note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} past 24h cutoff` : "Stale share syncing",
-                      tone: "warning",
-                    },
-                  ]}
-                  valueFormatter={(value) => formatPct(value, 0)}
-                />
               </article>
               <article className="home-overview-analyst-card">
                 <p className="home-kicker">Highest Yield</p>
                 <p className="home-overview-summary-value home-overview-name-value">
                   {highestYieldHref ? (
-                    <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
+                    <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link external-link">
                       {highestYieldName}
                     </a>
                   ) : (
@@ -449,10 +388,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className={`home-overview-summary home-overview-summary-five${revealClass}`}>
+      <section className={`home-overview-summary home-overview-summary-four${revealClass}`}>
         {isLoading ? (
           <>
-            <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
@@ -470,52 +408,21 @@ export default function HomePage() {
               <p className="home-overview-summary-value">{currentYearnVaultCount}</p>
               <p className="home-overview-summary-note">Active visible current-scope vaults in the deduped live Yearn universe.</p>
             </article>
-            <article className="card home-overview-summary-card home-overview-meter-card">
-              <p className="home-kicker">Data Freshness</p>
-              <p className="home-overview-summary-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1, false)}</p>
-              <p className="home-overview-summary-note">Latest PPS age in tracked scope.</p>
-              <ShareMeter
-                title=""
-                embedded
-                total={1}
-                segments={[
-                  {
-                    id: "fresh",
-                    label: "Fresh",
-                    value: freshRatio,
-                    note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(freshRatio, 0)} within 24h cutoff` : "Coverage syncing",
-                    tone: "positive",
-                  },
-                  {
-                    id: "stale",
-                    label: "Stale",
-                    value: staleRatio,
-                    note: staleRatio !== null && staleRatio !== undefined ? `${formatPct(staleRatio, 0)} past 24h cutoff` : "Stale share syncing",
-                    tone: "warning",
-                  },
-                ]}
-                valueFormatter={(value) => formatPct(value, 0)}
-              />
-            </article>
-            <article className="card home-overview-summary-card home-overview-live-card" aria-live="polite">
-              <p className="home-kicker">Latest Shift</p>
-              <p className="home-overview-summary-value">{liveShiftValue}</p>
+            <article className="card home-overview-summary-card">
+              <p className="home-kicker">Core 24h Move</p>
+              <p className="home-overview-summary-value">{universeMoveValue}</p>
               <p className="home-overview-summary-note">
-                {liveShiftHref ? (
-                  <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="home-overview-summary-link">
-                    {topMoverName}
-                  </a>
-                ) : (
-                  topMoverName
-                )}{" "}
-                · 30d APY now {liveShiftApy}
+                {Number.isFinite(changes?.summary?.vaults_with_change ?? null)
+                  ? `${changes?.summary?.vaults_with_change} vaults with change`
+                  : "Vault change count syncing"}
+                {". "}
+                Average APY delta across the tracked universe.
               </p>
-              <p className="home-overview-summary-meta">{liveFreshnessLine}</p>
             </article>
             <article className="card home-overview-summary-card">
               <p className="home-kicker">stYFI APR</p>
               <p className="home-overview-summary-value">{styfiApr}</p>
-              <p className="home-overview-summary-note">Current stYFI reward run-rate from the latest on-chain reward state.</p>
+              <p className="home-overview-summary-note">Current stYFI rewards rate.</p>
             </article>
           </>
         )}

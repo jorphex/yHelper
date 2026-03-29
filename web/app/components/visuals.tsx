@@ -440,8 +440,8 @@ export function ScatterPlot({
     );
   }
 
-  const width = 520;
-  const height = 252;
+  const width = 900;
+  const height = 360;
   const xValues = finiteValues(valid.map((point) => point.x));
   const yValues = finiteValues(valid.map((point) => point.y));
   const sizeValues = finiteValues(valid.map((point) => point.size));
@@ -455,10 +455,10 @@ export function ScatterPlot({
   const yMid = (yMin + yMax) / 2;
   const yTickLabels = [yFormatter(yMin), yFormatter(yMid), yFormatter(yMax)];
   const widestYTick = yTickLabels.reduce((max, label) => Math.max(max, label.length), 0);
-  const paddingLeft = Math.min(78, Math.max(48, 14 + widestYTick * 6));
-  const paddingRight = 12;
-  const paddingTop = 16;
-  const paddingBottom = 48;
+  const paddingLeft = Math.min(90, Math.max(56, 16 + widestYTick * 7));
+  const paddingRight = 16;
+  const paddingTop = 20;
+  const paddingBottom = 56;
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
   const densityBins = new Map<string, number>();
@@ -600,9 +600,6 @@ export function ScatterPlot({
           </text>
         </svg>
       </div>
-      <p className="muted viz-legend">
-        Desktop hover reveals exact values. Linked points open the vault on Yearn. Dot size scales with TVL when available.
-      </p>
     </section>
   );
 }

@@ -688,11 +688,6 @@ function DiscoverPageContent() {
             value: formatFixed(data?.summary?.avg_strategies_per_vault, 2),
             hint: "Average number of strategy slots per vault",
           },
-          {
-            label: "Needs More History",
-            value: String(data?.coverage?.missing_or_low_points ?? "n/a"),
-            hint: "Visible vaults missing metrics or still below the point threshold",
-          },
         ]),
   ];
   if (error && !data) {
@@ -882,26 +877,26 @@ function DiscoverPageContent() {
           <TableSkeleton rows={8} columns={10} />
         ) : (
           <div className="table-wrap">
-            <table className="discover-table" style={{ tableLayout: "fixed", width: "100%" }} >
+            <table className="discover-table" style={{tableLayout: 'fixed', width: '100%', fontSize: '12px'}}>
             <thead>
               <tr>
-                <th className="col-vault" style={{ width: "22%" }}>Vault</th>
-                <th className="col-chain" style={{ width: "9%" }}>Chain</th>
-                <th className="col-token" style={{ width: "11%" }}>Token</th>
-                <th className="analyst-only col-category" style={{ width: "12%", textAlign: "center" }}>Category</th>
-                <th className="is-numeric col-tvl" style={{ width: "11%" }}>TVL</th>
-                <th className="is-numeric col-apy" style={{ width: "9%" }}>APY 30d</th>
-                <th className="is-numeric col-momentum" style={{ width: "10%" }}>Momentum</th>
-                <th className="is-numeric tablet-hide analyst-only col-consistency" style={{ width: "8%", textAlign: "center" }}>Consistency</th>
-                <th className="tablet-hide analyst-only col-risk" style={{ width: "8%", textAlign: "center" }}>Risk</th>
-                <th className="analyst-only col-regime" style={{ width: "10%", textAlign: "center" }}>Regime</th>
+                <th style={{width: '23%', textAlign: 'left', padding: '10px 8px'}}>Vault</th>
+                <th style={{width: '8%', textAlign: 'center', padding: '10px 8px'}}>Chain</th>
+                <th style={{width: '10%', textAlign: 'left', padding: '10px 8px'}}>Token</th>
+                <th style={{width: '10%', textAlign: 'center', padding: '10px 8px'}}>Category</th>
+                <th style={{width: '12%', textAlign: 'right', padding: '10px 8px'}}>TVL</th>
+                <th style={{width: '10%', textAlign: 'right', padding: '10px 8px'}}>APY 30d</th>
+                <th style={{width: '11%', textAlign: 'right', padding: '10px 8px'}}>Momentum</th>
+                <th className="tablet-hide" style={{width: '10%', textAlign: 'center', padding: '10px 8px'}}>Consistency</th>
+                <th className="tablet-hide" style={{width: '9%', textAlign: 'center', padding: '10px 8px'}}>Risk</th>
+                <th style={{width: '10%', textAlign: 'center', padding: '10px 8px'}}>Regime</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.vault_address}>
-                  <td className="col-vault"><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td className="col-chain" title={chainLabel(row.chain_id)}>
+                  <td style={{padding: '10px 8px', overflow: 'hidden', textOverflow: 'ellipsis'}}><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
+                  <td style={{textAlign: 'center', padding: '10px 8px'}} title={chainLabel(row.chain_id)}>
                     <Link
                       href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
                       scroll={false}
@@ -909,7 +904,7 @@ function DiscoverPageContent() {
                       {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
-                  <td className="col-token">
+                  <td style={{padding: '10px 8px', overflow: 'hidden', textOverflow: 'ellipsis'}}>
                     {row.token_symbol ? (
                       <Link
                         href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}
@@ -921,20 +916,20 @@ function DiscoverPageContent() {
                       "n/a"
                     )}
                   </td>
-                  <td className="analyst-only col-category" title={row.category || "n/a"}>
+                  <td style={{textAlign: 'center', padding: '10px 8px'}} title={row.category || "n/a"}>
                     {compactCategoryLabel(row.category, isCompactViewport)}
                   </td>
-                  <td className="is-numeric col-tvl">{formatUsd(row.tvl_usd)}</td>
-                  <td className="is-numeric col-apy">{formatPct(row.safe_apy_30d)}</td>
-                  <td className="is-numeric col-momentum">{formatPct(row.momentum_7d_30d)}</td>
-                  <td className="is-numeric tablet-hide analyst-only col-consistency">{formatPct(row.consistency_score)}</td>
-                  <td
-                    className="tablet-hide analyst-only col-risk"
+                  <td style={{textAlign: 'right', padding: '10px 8px', fontFamily: 'var(--font-data)'}}>{formatUsd(row.tvl_usd)}</td>
+                  <td style={{textAlign: 'right', padding: '10px 8px', fontFamily: 'var(--font-data)'}}>{formatPct(row.safe_apy_30d)}</td>
+                  <td style={{textAlign: 'right', padding: '10px 8px', fontFamily: 'var(--font-data)'}}>{formatPct(row.momentum_7d_30d)}</td>
+                  <td className="tablet-hide" style={{textAlign: 'center', padding: '10px 8px', fontFamily: 'var(--font-data)'}}>{formatPct(row.consistency_score)}</td>
+                  <td className="tablet-hide"
+                    style={{textAlign: 'center', padding: '10px 8px'}}
                     title={`${riskLevelLabel(row.risk_level)}${row.strategies_count > 0 ? ` · ${row.strategies_count} strat` : ""}${row.migration_available ? " · Migr" : ""}${row.is_highlighted ? " · High" : ""}${row.is_retired ? " · Ret" : ""}`}
                   >
                     {compactRiskCellLabel(row, isCompactViewport)}
                   </td>
-                  <td className="analyst-only col-regime" title={compactRegimeLabel(row.regime)}>{compactRegimeLabel(row.regime)}</td>
+                  <td style={{textAlign: 'center', padding: '10px 8px'}} title={compactRegimeLabel(row.regime)}>{compactRegimeLabel(row.regime)}</td>
                 </tr>
               ))}
             </tbody>
@@ -959,40 +954,27 @@ function DiscoverPageContent() {
               <BarList
                 title="APY Bucket Count"
                 items={[
-                  { id: "neg", label: "Negative APY", value: data?.summary?.apy_negative_vaults ?? null },
-                  { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
-                  { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
                   { id: "high", label: "15% and above", value: data?.summary?.apy_high_vaults ?? null },
-                  {
-                    id: "unknown",
-                    label: "Unknown / thin history",
-                    value: data?.coverage?.missing_or_low_points ?? null,
-                    note: "Visible vaults missing metrics or still below the point threshold",
-                  },
+                  { id: "mid", label: "5% to <15%", value: data?.summary?.apy_mid_vaults ?? null },
+                  { id: "low", label: "0% to <5%", value: data?.summary?.apy_low_vaults ?? null },
                 ]}
                 valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
                 emptyText="No APY bucket counts for this filter yet."
               />
-              <div className="analyst-only">
-                <BarList
-                  title="Risk Level Mix (TVL)"
-                  items={(data?.risk_mix ?? []).map((row) => ({
-                    id: String(row.risk_level),
-                    label: riskLevelLabel(row.risk_level),
-                    value: row.tvl_usd,
-                    note: `${row.vaults} vaults`,
-                  }))}
-                  valueFormatter={(value) => formatUsd(value)}
-                  emptyText="No risk mix for this filter yet."
-                />
-              </div>
+              <BarList
+                title="Risk Level Mix (TVL)"
+                items={(data?.risk_mix ?? []).map((row) => ({
+                  id: String(row.risk_level),
+                  label: riskLevelLabel(row.risk_level),
+                  value: row.tvl_usd,
+                  note: `${row.vaults} vaults`,
+                }))}
+                valueFormatter={(value) => formatUsd(value)}
+                emptyText="No risk mix for this filter yet."
+              />
             </div>
           </div>
         )}
-        <p className="muted card-intro">
-          Unknown APY means the vault is visible in scope but still missing enough PPS history to score. Regime mix stays on the
-          Regimes page to avoid duplicating the same story here.
-        </p>
       </section>
 
       <section className="card section-card visual-card discover-analytics-card">
@@ -1000,45 +982,57 @@ function DiscoverPageContent() {
         <p className="muted card-intro">
           Visual read on yield level, momentum direction, and concentration in the current filtered universe.
         </p>
-        <div className="discover-visual-grid">
-          <ScatterPlot
-            className="discover-main-scatter"
-            title="APY vs Momentum Map (Top TVL Vaults)"
-            xLabel="Momentum (percentage points: 7-day APY minus 30-day APY)"
-            yLabel="APY over last 30 days (percent)"
-            points={scatterRows.map((row) => ({
-              id: row.vault_address,
-              x: row.momentum_7d_30d,
-              y: row.safe_apy_30d,
-              size: row.tvl_usd,
-              href: yearnVaultUrl(row.chain_id, row.vault_address),
-              tooltip:
-                `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
-                `APY 30d: ${formatPct(row.safe_apy_30d)}\nMomentum: ${formatPct(row.momentum_7d_30d)}\nTVL: ${formatUsd(row.tvl_usd)}`,
-              tone:
-                row.momentum_7d_30d !== null && row.momentum_7d_30d !== undefined
-                  ? row.momentum_7d_30d >= 0
-                    ? "positive"
-                    : "negative"
-                  : "neutral",
-            }))}
-            xFormatter={(value) => formatPct(value, 1)}
-            yFormatter={(value) => formatPct(value, 1)}
-          />
-          <div className="discover-quadrants-grid">
-            <HeatGrid
-              title="Yield-Momentum Quadrants"
-              items={momentumQuadrantHeat}
-              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+        <div className="discover-visual-layout">
+          {/* Row 1: Scatter plot full width */}
+          <div className="discover-scatter-section" style={{marginBottom: '48px'}}>
+            <ScatterPlot
+              className="discover-main-scatter"
+              title="APY vs Momentum Map (Top TVL Vaults)"
+              xLabel="Momentum (7d APY minus 30d APY)"
+              yLabel="APY 30d"
+              points={scatterRows.map((row) => ({
+                id: row.vault_address,
+                x: row.momentum_7d_30d,
+                y: row.safe_apy_30d,
+                size: row.tvl_usd,
+                href: yearnVaultUrl(row.chain_id, row.vault_address),
+                tooltip:
+                  `${row.symbol || row.vault_address}\n${chainLabel(row.chain_id)}\n` +
+                  `APY 30d: ${formatPct(row.safe_apy_30d)}\nMomentum: ${formatPct(row.momentum_7d_30d)}\nTVL: ${formatUsd(row.tvl_usd)}`,
+                tone:
+                  row.momentum_7d_30d !== null && row.momentum_7d_30d !== undefined
+                    ? row.momentum_7d_30d >= 0
+                      ? "positive"
+                      : "negative"
+                    : "neutral",
+              }))}
+              xFormatter={(value) => formatPct(value, 1)}
+              yFormatter={(value) => formatPct(value, 1)}
             />
+          </div>
+          
+          {/* Row 2: Token APY Dispersion full width */}
+          <div style={{marginBottom: '24px'}}>
             <HeatGrid
-              title="Token APY Dispersion Heatmap"
+              title="Token APY Dispersion"
               items={tokenSpreadHeat}
               valueFormatter={(value) => formatPct(value)}
               emptyText="Need at least two venues per token to compute APY spread."
             />
           </div>
-          <div className="discover-chain-heatmap analyst-only">
+          
+          {/* Row 3: Yield-Momentum Quadrants full width */}
+          <div style={{marginBottom: '24px'}}>
+            <HeatGrid
+              title="Yield-Momentum Quadrants"
+              items={momentumQuadrantHeat}
+              valueFormatter={(value) => (value === null || value === undefined ? "n/a" : value.toLocaleString("en-US"))}
+            />
+          </div>
+
+          
+          {/* Row 2: Chain Momentum full width */}
+          <div style={{marginBottom: '24px'}}>
             <HeatGrid
               title="Chain Momentum Heatmap"
               items={chainMomentumHeat}
@@ -1046,8 +1040,10 @@ function DiscoverPageContent() {
               emptyText="No chain momentum values for this filter yet."
             />
           </div>
-          <div className="discover-trends-grid">
-            <div className="discover-trend-card analyst-only">
+          
+          {/* Row 3: Trend strips side by side */}
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px'}}>
+            <div className="discover-trend-card">
               <TrendStrips
                 title="APY Bucket Drift (Last 60 Days)"
                 items={apyBucketTrendItems}
@@ -1056,7 +1052,7 @@ function DiscoverPageContent() {
                 emptyText="Trend rows unavailable for this filter."
               />
             </div>
-            <div className="discover-trend-card analyst-only">
+            <div className="discover-trend-card">
               <TrendStrips
                 title={
                   query.trendGroup === "none"
@@ -1074,11 +1070,12 @@ function DiscoverPageContent() {
               />
             </div>
           </div>
-          <div className="discover-ridgeline analyst-only">
+          
+          {/* Row 4: Ridgeline full width */}
+          <div className="discover-ridgeline">
             <DiscoverRidgeline title="APY Distribution Ridgelines (Top Chains by TVL)" series={chainRidgelineSeries} />
           </div>
         </div>
-        <p className="muted discover-analytics-note">Delta compares the latest point against the previous day.</p>
       </section>
     </main>
   );

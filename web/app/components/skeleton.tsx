@@ -94,14 +94,19 @@ interface KpiGridSkeletonProps {
   columns?: number;
 }
 
-export function KpiGridSkeleton({ count = 8, columns = 4 }: KpiGridSkeletonProps) {
+export function KpiGridSkeleton({ count = 8, columns }: KpiGridSkeletonProps) {
+  // Use auto-fit like the real KpiGrid unless specific columns provided
+  const gridTemplate = columns
+    ? `repeat(${columns}, 1fr)`
+    : "repeat(auto-fit, minmax(200px, 1fr))";
+
   return (
     <div
       className="kpi-grid-skeleton"
       style={{
         display: "grid",
-        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-        gap: "var(--space-3)",
+        gridTemplateColumns: gridTemplate,
+        gap: "var(--space-4)",
         marginBottom: "var(--space-5)",
       }}
     >
