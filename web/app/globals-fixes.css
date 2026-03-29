@@ -2347,3 +2347,382 @@ table td:nth-child(7) {
     font-size: 11px !important;
   }
 }
+/* ============================================
+   COMPREHENSIVE LAYOUT FIXES - Round 2
+   ============================================ */
+
+/* --------------------------------------------
+   OVERVIEW - Equal Height Cards & Text
+   -------------------------------------------- */
+.home-overview-summary {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 16px !important;
+  align-items: stretch !important;
+}
+
+.home-overview-summary-card {
+  display: flex !important;
+  flex-direction: column !important;
+  height: auto !important;
+  min-height: 160px !important;
+  max-height: 180px !important;
+  padding: 16px !important;
+  overflow: hidden !important;
+}
+
+.home-overview-summary-card .home-overview-summary-note {
+  margin-top: auto !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+}
+
+/* --------------------------------------------
+   STYFI - Epoch Cards Text Size
+   -------------------------------------------- */
+.styfi-epoch-item span {
+  font-size: 11px !important;
+}
+
+.styfi-epoch-item strong {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+/* --------------------------------------------
+   TABLES - Global Fixes
+   -------------------------------------------- */
+.table-wrap {
+  overflow-x: auto !important;
+  width: 100% !important;
+}
+
+.table-wrap table {
+  min-width: 1100px !important;
+  table-layout: fixed !important;
+}
+
+/* Reset table cell styles */
+table th,
+table td {
+  padding: 10px 8px !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  vertical-align: middle !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Vault column - wider */
+table .col-vault,
+table th:first-child,
+table td:first-child {
+  width: 220px !important;
+  min-width: 220px !important;
+  text-align: left !important;
+}
+
+/* Chain column */
+table .col-chain,
+table th:nth-child(2),
+table td:nth-child(2) {
+  width: 80px !important;
+  min-width: 80px !important;
+  text-align: center !important;
+}
+
+/* Token column */
+table .col-token,
+table th:nth-child(3),
+table td:nth-child(3) {
+  width: 100px !important;
+  min-width: 100px !important;
+  text-align: left !important;
+}
+
+/* Category column */
+table .col-category,
+table th:nth-child(4),
+table td:nth-child(4) {
+  width: 100px !important;
+  min-width: 100px !important;
+  text-align: center !important;
+}
+
+/* Numeric columns */
+table .col-tvl,
+table td:nth-child(5) {
+  width: 120px !important;
+  min-width: 120px !important;
+  text-align: right !important;
+}
+
+table .col-apy,
+table .col-current,
+table td:nth-child(6) {
+  width: 90px !important;
+  min-width: 90px !important;
+  text-align: right !important;
+}
+
+table .col-momentum,
+table .col-previous,
+table td:nth-child(7) {
+  width: 90px !important;
+  min-width: 90px !important;
+  text-align: right !important;
+}
+
+table .col-delta,
+table td:nth-child(8) {
+  width: 80px !important;
+  min-width: 80px !important;
+  text-align: right !important;
+}
+
+/* Consistency, Risk, Regime columns */
+table .col-consistency,
+table .col-risk,
+table .col-regime,
+table td:nth-child(8),
+table td:nth-child(9),
+table td:nth-child(10) {
+  width: 85px !important;
+  min-width: 85px !important;
+  text-align: center !important;
+}
+
+/* --------------------------------------------
+   DISCOVER - Visual Grid Fixes
+   -------------------------------------------- */
+.discover-visual-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 24px !important;
+  width: 100% !important;
+}
+
+/* Scatter plot - fix overflow */
+.discover-main-scatter {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 280px !important;
+  max-height: 320px !important;
+  overflow: hidden !important;
+}
+
+.discover-main-scatter svg {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 300px !important;
+}
+
+/* Quadrants grid - 2x2 layout */
+.discover-quadrants-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 20px !important;
+  width: 100% !important;
+}
+
+.discover-quadrants-grid > * {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Chain heatmap */
+.discover-chain-heatmap {
+  width: 100% !important;
+  max-height: 220px !important;
+  overflow: hidden !important;
+}
+
+/* Trend cards - side by side */
+.discover-trend-card {
+  width: 100% !important;
+  max-height: 250px !important;
+  overflow: hidden !important;
+}
+
+/* Ridgeline */
+.discover-ridgeline {
+  width: 100% !important;
+  max-height: 350px !important;
+  overflow: hidden !important;
+}
+
+/* --------------------------------------------
+   COMPOSITION - Scatter & Heatmap
+   -------------------------------------------- */
+.composition-crowding-scatter {
+  max-height: 280px !important;
+  min-height: 240px !important;
+  margin-bottom: 24px !important;
+}
+
+.composition-crowding-scatter svg {
+  max-height: 260px !important;
+}
+
+/* Concentration heatmap - 4 columns */
+.composition-concentration-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 12px !important;
+  margin-top: 24px !important;
+}
+
+.composition-concentration-grid > * {
+  padding: 12px !important;
+}
+
+@media (max-width: 1200px) {
+  .composition-concentration-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .composition-concentration-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* --------------------------------------------
+   CHANGES - Delta Visuals Grid
+   -------------------------------------------- */
+.changes-delta-panels {
+  display: grid !important;
+  grid-template-columns: 1.5fr 1fr !important;
+  gap: 20px !important;
+  align-items: start !important;
+}
+
+.changes-main-scatter-slot {
+  grid-row: span 2 !important;
+}
+
+/* Move stale ratio heatmap up */
+.changes-stale-chain-slot {
+  margin-top: 0 !important;
+}
+
+/* --------------------------------------------
+   REGIMES - Spacing Fixes
+   -------------------------------------------- */
+/* Add spacing between table and bar list */
+.regime-current-section .table-wrap {
+  margin-bottom: 20px !important;
+}
+
+/* Compress transition flow */
+.regimes-transition-flow {
+  max-height: 240px !important;
+  padding: 12px !important;
+}
+
+.regimes-transition-flow svg {
+  max-height: 220px !important;
+}
+
+/* Align trend cards */
+.regimes-trend-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 16px !important;
+  align-items: start !important;
+}
+
+.regimes-trend-grid > * {
+  min-height: 120px !important;
+}
+
+/* --------------------------------------------
+   Heatmap & Bar List Text Sizes
+   -------------------------------------------- */
+.heat-grid,
+.mini-heat {
+  padding: 12px !important;
+}
+
+.heat-grid-title,
+.mini-heat-title {
+  font-size: 13px !important;
+  margin-bottom: 8px !important;
+}
+
+.heat-cell,
+.mini-heat-cell {
+  font-size: 12px !important;
+}
+
+.bar-row {
+  padding: 6px 8px !important;
+}
+
+.bar-row-label {
+  font-size: 12px !important;
+}
+
+/* --------------------------------------------
+   Responsive Adjustments
+   -------------------------------------------- */
+@media (max-width: 1100px) {
+  .home-overview-summary {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  
+  .discover-quadrants-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .changes-delta-panels {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .changes-main-scatter-slot {
+    grid-row: auto !important;
+  }
+  
+  .regimes-trend-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-overview-summary {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  .table-wrap table {
+    min-width: 900px !important;
+  }
+  
+  table th,
+  table td {
+    padding: 8px 6px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* Discover trends grid - side by side */
+.discover-trends-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 20px !important;
+  width: 100% !important;
+}
+
+@media (max-width: 960px) {
+  .discover-trends-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

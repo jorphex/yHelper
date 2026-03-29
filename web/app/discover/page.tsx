@@ -1046,31 +1046,33 @@ function DiscoverPageContent() {
               emptyText="No chain momentum values for this filter yet."
             />
           </div>
-          <div className="discover-trend-card analyst-only">
-            <TrendStrips
-              title="APY Bucket Drift (Last 60 Days)"
-              items={apyBucketTrendItems}
-              valueFormatter={(value) => formatPct(value, 1)}
-              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 1)}`}
-              emptyText="Trend rows unavailable for this filter."
-            />
-          </div>
-          <div className="discover-trend-card analyst-only">
-            <TrendStrips
-              title={
-                query.trendGroup === "none"
-                  ? "Weighted APY Trend (7d / 30d / 90d)"
-                  : `Weighted APY 30d Trend (${query.trendGroup === "chain" ? "By Chain" : "By Category"})`
-              }
-              items={query.trendGroup === "none" ? weightedApyTrendItems : groupedWeightedApyTrendItems}
-              valueFormatter={(value) => formatPct(value, 2)}
-              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
-              emptyText={
-                query.trendGroup === "none"
-                  ? "Weighted APY trend unavailable for this filter."
-                  : "Grouped APY trend unavailable for this filter."
-              }
-            />
+          <div className="discover-trends-grid">
+            <div className="discover-trend-card analyst-only">
+              <TrendStrips
+                title="APY Bucket Drift (Last 60 Days)"
+                items={apyBucketTrendItems}
+                valueFormatter={(value) => formatPct(value, 1)}
+                deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 1)}`}
+                emptyText="Trend rows unavailable for this filter."
+              />
+            </div>
+            <div className="discover-trend-card analyst-only">
+              <TrendStrips
+                title={
+                  query.trendGroup === "none"
+                    ? "Weighted APY Trend (7d / 30d / 90d)"
+                    : `Weighted APY 30d Trend (${query.trendGroup === "chain" ? "By Chain" : "By Category"})`
+                }
+                items={query.trendGroup === "none" ? weightedApyTrendItems : groupedWeightedApyTrendItems}
+                valueFormatter={(value) => formatPct(value, 2)}
+                deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+                emptyText={
+                  query.trendGroup === "none"
+                    ? "Weighted APY trend unavailable for this filter."
+                    : "Grouped APY trend unavailable for this filter."
+                }
+              />
+            </div>
           </div>
           <div className="discover-ridgeline analyst-only">
             <DiscoverRidgeline title="APY Distribution Ridgelines (Top Chains by TVL)" series={chainRidgelineSeries} />
