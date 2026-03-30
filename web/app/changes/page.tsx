@@ -514,7 +514,6 @@ function ChangesPageContent() {
   }, [moverScatterRows]);
   const summaryKpiItems = [
     { label: "Eligible Vaults", value: String(data?.summary.vaults_eligible ?? "n/a") },
-    { label: "With Change Data", value: String(data?.summary.vaults_with_change ?? "n/a") },
     { label: "Stale Vaults", value: String(data?.summary.stale_vaults ?? "n/a") },
     ...(query.tvlView !== "yearn"
       ? [

@@ -87,11 +87,11 @@ export default function HomePage() {
       {/* Hero Section with Yearn Logo */}
       <section className="page-header" style={{ borderBottom: 'none', display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '48px', alignItems: 'center' }}>
         <div>
-          <h1 className="page-title" style={{ marginBottom: '24px' }}>
+          <h1 className="page-title">
             Clear signals.<br />
             <em className="page-title-accent">Faster decisions.</em>
           </h1>
-          <p className="page-description" style={{ maxWidth: '480px', marginBottom: '32px' }}>
+          <p className="page-description">
             Purpose-built analytics for Yearn vault discovery, yield shifts, and strategic decisions. 
             Find opportunities without wading through repeated guesswork.
           </p>
