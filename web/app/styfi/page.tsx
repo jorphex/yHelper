@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
-import { formatHours, formatPct } from "../lib/format";
+import { formatHours, formatPct, formatUtcDateTime } from "../lib/format";
 import { BarList, ShareMeter, TrendStrips } from "../components/visuals";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 
@@ -36,6 +36,8 @@ type StYfiResponse = {
     net_flow_24h?: number | null;
     net_flow_7d?: number | null;
     snapshots_count?: number | null;
+    first_snapshot_at?: string | null;
+    latest_snapshot_at?: string | null;
   };
   reward_token?: { symbol?: string | null };
   current_reward_state?: {
@@ -52,23 +54,42 @@ type StYfiResponse = {
   freshness?: {
     latest_snapshot_age_seconds?: number | null;
     latest_snapshot_at?: string | null;
+    snapshots_count?: number | null;
+  };
+  data_policy?: {
+    retention_days?: number | null;
+    snapshot_retention_days?: number | null;
   };
 };
 
-function formatTokenCompact(value: number | null | undefined, digits = 1): string {
+function formatTokenCompact(value: number | null | undefined, symbol: string, digits = 1): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: digits }).format(value);
+  return `${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: digits }).format(value)} ${symbol}`;
 }
 
-function formatToken(value: number | null | undefined, digits = 2): string {
+function formatToken(value: number | null | undefined, symbol: string, digits = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value);
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value)} ${symbol}`;
 }
 
-function formatSignedToken(value: number | null | undefined, digits = 2): string {
+function formatSignedToken(value: number | null | undefined, symbol: string, digits = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
   const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatToken(value, digits)}`;
+  return `${prefix}${formatToken(value, symbol, digits)}`;
+}
+
+function percentShare(value: number | null | undefined, total: number | null | undefined): string {
+  if (!value || !total || !Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return "Share syncing";
+  return `${formatPct(value / total, 0)} of total`;
+}
+
+function formatRollingSpan(start: string | null | undefined, end: string | null | undefined): string {
+  if (!start || !end) return "n/a";
+  const diffMs = new Date(end).getTime() - new Date(start).getTime();
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return "n/a";
+  const diffHours = diffMs / (1000 * 60 * 60);
+  if (diffHours < 24) return `${diffHours.toFixed(1)}h`;
+  return `${(diffHours / 24).toFixed(1)}d`;
 }
 
 function formatUtcDate(value: string | null | undefined): string {
@@ -78,7 +99,7 @@ function formatUtcDate(value: string | null | undefined): string {
   return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" }).format(date);
 }
 
-function StYfiPageContent() {
+export default function StYfiPage() {
   const [data, setData] = useState<StYfiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -107,21 +128,93 @@ function StYfiPageContent() {
   const epochSeries = data?.series?.epochs ?? [];
   const snapshotSeries = data?.series?.snapshots ?? [];
   const currentEpoch = summary?.reward_epoch ?? null;
+  const historySpan = formatRollingSpan(summary?.first_snapshot_at ?? null, summary?.latest_snapshot_at ?? null);
+  const snapshotCountValue = summary?.snapshots_count ?? "n/a";
+  const hasNetFlow24h = summary?.net_flow_24h !== null && summary?.net_flow_24h !== undefined && Number.isFinite(summary.net_flow_24h);
+  const hasNetFlow7d = summary?.net_flow_7d !== null && summary?.net_flow_7d !== undefined && Number.isFinite(summary.net_flow_7d);
+
+  const summaryItems = useMemo(() => {
+    const items = [
+      {
+        label: "stYFI Staked",
+        value: formatTokenCompact(summary?.styfi_staked ?? null, "YFI"),
+        hint: "Matches the public stYFI site headline.",
+      },
+      {
+        label: "stYFIx Staked", 
+        value: formatTokenCompact(summary?.styfix_staked ?? null, "YFI"),
+        hint: "Additional YFI staked through stYFIx.",
+      },
+      {
+        label: "Combined Staked",
+        value: formatTokenCompact(summary?.combined_staked ?? null, "YFI"),
+        hint: "Combined stYFI plus stYFIx.",
+      },
+      {
+        label: "Share of Supply",
+        value: formatPct(summary?.staked_share_supply ?? null, 2),
+        hint: `${formatToken(summary?.yfi_total_supply ?? null, "YFI", 0)} total supply`,
+      },
+      {
+        label: "Current Reward APR",
+        value: formatPct(data?.current_reward_state?.styfi_current_apr ?? null, 2),
+        hint: `Current run-rate from ${rewardSymbol} rewards`,
+      },
+      {
+        label: "Snapshot Freshness",
+        value: formatHours(data?.freshness?.latest_snapshot_age_seconds ?? null, 1),
+        hint: formatUtcDateTime(data?.freshness?.latest_snapshot_at ?? null),
+      },
+      hasNetFlow24h ? {
+        label: "Net Flow 24h",
+        value: formatSignedToken(summary?.net_flow_24h ?? null, "YFI"),
+        hint: "Snapshot derived, not gross stake/unstake",
+      } : {
+        label: "History Warm-Up",
+        value: `${snapshotCountValue} captures`,
+        hint: "Protocol stake balances and reward epoch state.",
+      },
+      hasNetFlow7d ? {
+        label: "Net Flow 7d",
+        value: formatSignedToken(summary?.net_flow_7d ?? null, "YFI"),
+        hint: "Compared with snapshot seven days back",
+      } : {
+        label: "History Span",
+        value: historySpan,
+        hint: "Rolling snapshot history available",
+      },
+    ];
+    return items;
+  }, [summary, data?.current_reward_state, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue]);
 
   const stakeSplitSegments = useMemo(() => [
-    { id: "styfi", label: "stYFI", value: summary?.styfi_staked ?? null, tone: "primary" as const },
-    { id: "styfix", label: "stYFIx", value: summary?.styfix_staked ?? null, tone: "positive" as const },
-  ], [summary?.styfi_staked, summary?.styfix_staked]);
+    { id: "styfi", label: "stYFI", value: summary?.styfi_staked ?? null, note: percentShare(summary?.styfi_staked ?? null, summary?.combined_staked ?? null), tone: "primary" as const },
+    { id: "styfix", label: "stYFIx", value: summary?.styfix_staked ?? null, note: percentShare(summary?.styfix_staked ?? null, summary?.combined_staked ?? null), tone: "positive" as const },
+  ], [summary]);
 
   const stakeTrendItems = useMemo(() => [
-    { id: "combined", label: "Combined", points: snapshotSeries.map((r) => r.combined_staked) },
-    { id: "styfi", label: "stYFI", points: snapshotSeries.map((r) => r.styfi_staked) },
-    { id: "styfix", label: "stYFIx", points: snapshotSeries.map((r) => r.styfix_staked) },
+    { id: "combined", label: "Combined staked", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest combined balance vs previous snapshot" },
+    { id: "styfi", label: "stYFI", points: snapshotSeries.map((r) => r.styfi_staked), note: "Latest stYFI balance vs previous snapshot" },
+    { id: "styfix", label: "stYFIx", points: snapshotSeries.map((r) => r.styfix_staked), note: "Latest stYFIx balance vs previous snapshot" },
   ], [snapshotSeries]);
 
   const rewardBars = useMemo(() => [
-    { id: "styfi", label: "stYFI", value: data?.current_reward_state?.styfi_current_reward ?? null },
-    { id: "styfix", label: "stYFIx", value: data?.current_reward_state?.styfix_current_reward ?? null },
+    { 
+      id: "styfi", 
+      label: "stYFI", 
+      value: data?.current_reward_state?.styfi_current_reward ?? null,
+      note: data?.current_reward_state?.styfi_current_apr 
+        ? `${formatPct(data.current_reward_state.styfi_current_apr, 2)} APR • ${percentShare(data.current_reward_state.styfi_current_reward, (data.current_reward_state.styfi_current_reward ?? 0) + (data.current_reward_state.styfix_current_reward ?? 0))}`
+        : percentShare(data?.current_reward_state?.styfi_current_reward ?? null, (data?.current_reward_state?.styfi_current_reward ?? 0) + (data?.current_reward_state?.styfix_current_reward ?? 0)),
+    },
+    { 
+      id: "styfix", 
+      label: "stYFIx", 
+      value: data?.current_reward_state?.styfix_current_reward ?? null,
+      note: data?.current_reward_state?.styfix_current_apr 
+        ? `${formatPct(data.current_reward_state.styfix_current_apr, 2)} APR • ${percentShare(data.current_reward_state.styfix_current_reward, (data.current_reward_state.styfi_current_reward ?? 0) + (data.current_reward_state.styfix_current_reward ?? 0))}`
+        : percentShare(data?.current_reward_state?.styfix_current_reward ?? null, (data?.current_reward_state?.styfi_current_reward ?? 0) + (data?.current_reward_state?.styfix_current_reward ?? 0)),
+    },
   ], [data?.current_reward_state]);
 
   return (
@@ -134,88 +227,92 @@ function StYfiPageContent() {
           <em className="page-title-accent">Staking surface.</em>
         </h1>
         <p className="page-description">
-          Track Yearn staking balance, reward epochs, and protocol-level yield. Focused on the shared staking surface.
+          Track Yearn staking balance, reward epochs, and protocol-level yield. 
+          Current reward token: <strong>{rewardSymbol}</strong>. 
+          History retained for {data?.data_policy?.retention_days ?? "—"} days.
         </p>
       </section>
 
-      {/* Summary KPIs */}
+      {/* Summary KPIs - 8 cards */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
           <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-            {Array(4).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
+            {Array(8).fill(null).map((_, i) => (
+              <div key={i} className="kpi-card" style={{ height: "100px" }}>
+                <div className="skeleton" style={{ height: "12px", width: "60%", marginBottom: "12px" }} />
+                <div className="skeleton" style={{ height: "24px", width: "80%" }} />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-            <div className="kpi-card">
-              <div className="kpi-label">stYFI Staked</div>
-              <div className="kpi-value">{formatTokenCompact(summary?.styfi_staked)} YFI</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">stYFIx Staked</div>
-              <div className="kpi-value">{formatTokenCompact(summary?.styfix_staked)} YFI</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Combined</div>
-              <div className="kpi-value">{formatTokenCompact(summary?.combined_staked)} YFI</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Current APR</div>
-              <div className="kpi-value">{formatPct(data?.current_reward_state?.styfi_current_apr)}</div>
-            </div>
+            {summaryItems.map((item) => (
+              <div key={item.label} className="kpi-card">
+                <div className="kpi-label">{item.label}</div>
+                <div className="kpi-value">{item.value}</div>
+                {item.hint && <div className="kpi-hint" style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "4px" }}>{item.hint}</div>}
+              </div>
+            ))}
           </div>
         )}
       </section>
 
-      {/* Visualizations */}
+      {/* Visualizations Grid */}
       <section className="section">
-        <div className="card-header">
-          <h2 className="card-title">Stake Split</h2>
-        </div>
-        
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "48px" }}>
           <ShareMeter
-            title="By Type"
+            title="Stake Split Now"
             segments={stakeSplitSegments}
             total={summary?.combined_staked ?? null}
-            valueFormatter={(value) => `${formatTokenCompact(value)} YFI`}
+            valueFormatter={(value) => formatTokenCompact(value, "YFI")}
+            legend="Combined stake mix across stYFI and stYFIx."
           />
           <BarList
             title={`Current Reward Split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
             items={rewardBars}
-            valueFormatter={(value) => formatToken(value)}
+            valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
+            emptyText="Current reward split syncing."
           />
         </div>
+      </section>
 
+      {/* Stake Trend */}
+      <section className="section" style={{ marginBottom: "48px" }}>
         <div className="card-header">
           <h2 className="card-title">Stake Trend</h2>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{snapshotSeries.length} snapshots across {historySpan}</p>
         </div>
-        
         <TrendStrips
-          title="History"
+          title=""
           items={stakeTrendItems}
-          valueFormatter={(value) => `${formatTokenCompact(value)} YFI`}
-          deltaFormatter={(value) => formatSignedToken(value)}
+          valueFormatter={(value) => formatTokenCompact(value, "YFI")}
+          deltaFormatter={(value) => formatSignedToken(value, "YFI", 2)}
+          columns={3}
+          emptyText="Snapshot history is still warming up."
         />
       </section>
 
-      {/* Epoch Table */}
+      {/* Epoch Detail Table */}
       <section className="section">
         <div className="card-header">
           <h2 className="card-title">Epoch Detail</h2>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+            Epochs start at 00:00:00 UTC. Component columns are protocol allocations.
+          </p>
         </div>
         
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Epoch</th>
-                <th>Status</th>
-                <th>Start</th>
-                <th style={{ textAlign: "right" }}>Pot</th>
-                <th style={{ textAlign: "right" }}>stYFI</th>
-                <th style={{ textAlign: "right" }}>stYFIx</th>
-                <th style={{ textAlign: "right" }}>veYFI</th>
-                <th style={{ textAlign: "right" }}>Lockers</th>
+                <th style={{ width: "8%" }}>Epoch</th>
+                <th style={{ width: "10%" }}>Status</th>
+                <th style={{ width: "14%" }}>Start</th>
+                <th style={{ width: "16%", textAlign: "right" }}>Pot</th>
+                <th style={{ width: "16%", textAlign: "right" }}>stYFI</th>
+                <th style={{ width: "16%", textAlign: "right" }}>stYFIx</th>
+                <th style={{ width: "10%", textAlign: "right" }}>veYFI</th>
+                <th style={{ width: "10%", textAlign: "right" }}>Lockers</th>
               </tr>
             </thead>
             <tbody>
@@ -239,11 +336,11 @@ function StYfiPageContent() {
                         </span>
                       </td>
                       <td>{formatUtcDate(row.epoch_start ?? null)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_total)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_styfi)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_styfix)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_veyfi)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_liquid_lockers)}</td>
+                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_total, rewardSymbol, 2)}</td>
+                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_styfi, rewardSymbol, 2)}</td>
+                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_styfix, rewardSymbol, 2)}</td>
+                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_veyfi, rewardSymbol, 2)}</td>
+                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_liquid_lockers, rewardSymbol, 2)}</td>
                     </tr>
                   );
                 })
@@ -253,13 +350,5 @@ function StYfiPageContent() {
         </div>
       </section>
     </div>
-  );
-}
-
-export default function StYfiPage() {
-  return (
-    <Suspense fallback={<div className="card" style={{ padding: "48px" }}>Loading...</div>}>
-      <StYfiPageContent />
-    </Suspense>
   );
 }

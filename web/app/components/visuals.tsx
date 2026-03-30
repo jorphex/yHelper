@@ -671,10 +671,10 @@ export function Ridgeline({
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
   const ridgelinePalette = [
-    { stroke: "var(--viz-line-2)", fill: "rgba(var(--accent-rgb), 0.24)" },
-    { stroke: "var(--viz-line-5)", fill: "rgba(var(--accent-teal-rgb), 0.22)" },
-    { stroke: "var(--viz-line-4)", fill: "rgba(var(--accent-purple-rgb), 0.22)" },
-    { stroke: "var(--viz-line-3)", fill: "rgba(var(--accent-2-rgb), 0.2)" },
+    { stroke: "var(--viz-line-1)", fill: "rgba(6, 87, 233, 0.22)" },      // Yearn Blue
+    { stroke: "var(--viz-line-3)", fill: "rgba(168, 85, 247, 0.2)" },      // Purple
+    { stroke: "var(--viz-line-4)", fill: "rgba(245, 158, 11, 0.2)" },      // Amber
+    { stroke: "var(--viz-line-2)", fill: "rgba(45, 212, 191, 0.2)" },      // Teal
   ];
   const valid = series.filter((row) => row.values.length >= 4).slice(0, 6);
   if (valid.length === 0) {
