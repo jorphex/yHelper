@@ -250,14 +250,15 @@ h4 { font-size: var(--text-xl); }
   min-height: 100vh;
 }
 
-/* Sidebar */
+/* Sidebar - Editorial */
 .sidebar {
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  background: var(--bg-elevated);
+  background: rgba(17, 17, 17, 0.8);
+  backdrop-filter: blur(20px);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
@@ -275,10 +276,22 @@ h4 { font-size: var(--text-xl); }
 }
 
 .sidebar-logo {
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: var(--tracking-tight);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sidebar-logo::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .sidebar-nav {
@@ -297,18 +310,21 @@ h4 { font-size: var(--text-xl); }
   color: var(--text-secondary);
   border-radius: var(--radius-md);
   text-decoration: none;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: all var(--duration-base) var(--ease-out);
   position: relative;
+  margin-left: calc(-1 * var(--space-2));
+  padding-left: var(--space-4);
 }
 
 .sidebar-link:hover {
   color: var(--text-primary);
-  background: var(--bg-surface);
+  background: rgba(255, 255, 255, 0.03);
+  transform: translateX(4px);
 }
 
 .sidebar-link.is-active {
   color: var(--text-primary);
-  background: var(--bg-surface);
+  background: rgba(6, 87, 233, 0.08);
 }
 
 .sidebar-link.is-active::before {
@@ -317,10 +333,11 @@ h4 { font-size: var(--text-xl); }
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
+  width: 2px;
+  height: 16px;
   background: var(--accent);
   border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .sidebar-footer {
@@ -429,38 +446,62 @@ h4 { font-size: var(--text-xl); }
   border: 1px solid var(--border-subtle);
 }
 
+/* Tables - Editorial */
 table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--text-sm);
 }
 
 th, td {
-  padding: var(--space-3) var(--space-4);
+  padding: 14px 16px;
   text-align: left;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 th {
-  font-weight: 500;
-  color: var(--text-tertiary);
+  font-weight: 600;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  font-size: var(--text-xs);
-  background: var(--bg-surface);
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  background: var(--bg-elevated);
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+th:first-child {
+  border-top-left-radius: var(--radius-md);
+}
+
+th:last-child {
+  border-top-right-radius: var(--radius-md);
 }
 
 tbody tr {
-  transition: background var(--duration-fast) var(--ease-out);
+  transition: all var(--duration-base) var(--ease-out);
+  cursor: default;
 }
 
 tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(6, 87, 233, 0.04);
+  transform: translateX(2px);
 }
 
 tbody tr:last-child td {
   border-bottom: none;
+}
+
+tbody tr:last-child td:first-child {
+  border-bottom-left-radius: var(--radius-md);
+}
+
+tbody tr:last-child td:last-child {
+  border-bottom-right-radius: var(--radius-md);
 }
 
 /* Numeric alignment */
@@ -471,7 +512,7 @@ td.numeric, th.numeric {
 }
 
 /* --------------------------------------------------------------------------
-   11. KPI Cards
+   11. KPI Cards - Editorial with Hover Effects
    -------------------------------------------------------------------------- */
 .kpi-grid {
   display: grid;
@@ -484,6 +525,33 @@ td.numeric, th.numeric {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
+  transition: all var(--duration-base) var(--ease-out);
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.kpi-card:hover {
+  border-color: var(--border-soft);
+  background: rgba(255, 255, 255, 0.02);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.kpi-card:hover::before {
+  opacity: 1;
 }
 
 .kpi-label {
@@ -492,6 +560,11 @@ td.numeric, th.numeric {
   letter-spacing: var(--tracking-wider);
   color: var(--text-tertiary);
   margin-bottom: var(--space-2);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.kpi-card:hover .kpi-label {
+  color: var(--text-secondary);
 }
 
 .kpi-value {
@@ -501,6 +574,11 @@ td.numeric, th.numeric {
   color: var(--text-primary);
   letter-spacing: -0.02em;
   margin-bottom: var(--space-2);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.kpi-card:hover .kpi-value {
+  transform: scale(1.02);
 }
 
 .kpi-hint {
@@ -575,10 +653,32 @@ td.numeric, th.numeric {
   border-top: 1px solid var(--border-subtle);
 }
 
-/* Hover card effect */
+/* Hover card effect - Editorial */
+.hover-card {
+  transition: all var(--duration-base) var(--ease-out);
+  position: relative;
+  overflow: hidden;
+}
+
+.hover-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(6, 87, 233, 0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+  pointer-events: none;
+}
+
 .hover-card:hover {
   border-color: var(--border-soft);
-  background: var(--bg-surface);
+  background: rgba(255, 255, 255, 0.02);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.hover-card:hover::after {
+  opacity: 1;
 }
 
 /* --------------------------------------------------------------------------
@@ -798,7 +898,64 @@ select:focus {
 }
 
 /* --------------------------------------------------------------------------
-   20. Skeleton Loading States
+   20. Animations
+   -------------------------------------------------------------------------- */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--accent-glow), 0 0 30px rgba(6, 87, 233, 0.2);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s var(--ease-out) forwards;
+}
+
+.animate-count-up {
+  animation: count-up 0.4s var(--ease-out) forwards;
+}
+
+/* Stagger animations for grids */
+.stagger-children > * {
+  opacity: 0;
+  animation: fade-in-up 0.5s var(--ease-out) forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 420ms; }
+
+/* --------------------------------------------------------------------------
+   21. Skeleton Loading States
    -------------------------------------------------------------------------- */
 .skeleton {
   background: linear-gradient(
