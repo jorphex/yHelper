@@ -1,6 +1,6 @@
 import "./globals-editorial.css";
 import type { Metadata, Viewport } from "next";
-import { ReactNode } from "react";
+import { ReactNode, Suspense } from "react";
 import { Sidebar } from "./components/sidebar";
 import { ChunkRecovery } from "./components/chunk-recovery";
 import { Providers } from "./providers";
@@ -84,10 +84,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div className="app-shell">
           <Sidebar />
           
-          <main id="main-content" className="main-content" tabIndex={-1}>
+          <main id="main-content" className="main-content animate-fade-in-up" tabIndex={-1}>
             <Providers>
               <div className="content-area">
-                {children}
+                <Suspense fallback={null}>
+                  {children}
+                </Suspense>
               </div>
             </Providers>
           </main>
