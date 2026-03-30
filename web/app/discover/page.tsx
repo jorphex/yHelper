@@ -90,7 +90,6 @@ function DiscoverPageContent() {
 
   // KPI items
   const kpiItems = useMemo(() => [
-    { label: "Vaults", value: String(summary?.vaults ?? data?.pagination?.total ?? "n/a") },
     { label: "Chains", value: String(summary?.chains ?? "n/a") },
     { label: "Tokens", value: String(summary?.tokens ?? "n/a") },
     { label: "Median APY", value: formatPct(summary?.median_safe_apy_30d) },
@@ -272,13 +271,13 @@ function DiscoverPageContent() {
       {/* KPIs */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
-            {Array(6).fill(null).map((_, i) => (
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+            {Array(5).fill(null).map((_, i) => (
               <div key={i} className="kpi-card"><KpiGridSkeleton count={1} /></div>
             ))}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
             {kpiItems.map((item) => (
               <div key={item.label} className="kpi-card">
                 <div className="kpi-label">{item.label}</div>

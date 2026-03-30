@@ -381,23 +381,6 @@ function CompositionPageContent() {
         />
       </section>
 
-      {/* Top Chains Bar Chart */}
-      <section className="section" style={{ marginBottom: "48px" }}>
-        <div className="card-header">
-          <h2 className="card-title">Top Chains by TVL Share</h2>
-        </div>
-        <BarList
-          title=""
-          items={chainRows.slice(0, 8).map((row) => ({
-            id: `chain-${row.chain_id}`,
-            label: chainLabel(row.chain_id),
-            value: row.share_tvl,
-            note: formatUsd(row.tvl_usd),
-          }))}
-          valueFormatter={(value) => formatPct(value)}
-        />
-      </section>
-
       {/* APY vs TVL Scatter Plot */}
       <section className="section" style={{ marginBottom: "48px" }}>
         <div className="card-header">

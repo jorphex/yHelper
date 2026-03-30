@@ -69,7 +69,6 @@ export default function HomePage() {
     : null;
   const liveShiftValue = Number.isFinite(topMover?.delta_apy ?? null) ? pctDelta(topMover?.delta_apy, 2) : "n/a";
   const liveShiftApy = topMover ? formatPct(topMover?.safe_apy_30d ?? null, 2) : "n/a";
-  const universeMoveValue = Number.isFinite(changes?.summary?.avg_delta ?? null) ? pctDelta(changes?.summary?.avg_delta, 2) : "n/a";
 
   const highestYieldVault = socialPreview?.highest_apy_vault ?? null;
   const highestYieldHref = highestYieldVault?.vault_address && highestYieldVault?.chain_id != null
@@ -119,14 +118,13 @@ export default function HomePage() {
       {/* Quick Stats Row */}
       <section className="section" style={{ marginBottom: '48px' }}>
         {isLoading ? (
-          <div className="kpi-grid">
-            <KpiCardSkeleton />
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="kpi-card">
               <div className="kpi-label">Latest Shift</div>
               <div className="kpi-value" style={{ color: (topMover?.delta_apy ?? 0) >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
@@ -157,16 +155,6 @@ export default function HomePage() {
                 ) : highestYieldName}
               </div>
               <div className="kpi-hint">{highestYieldApy} · {chainLabel(highestYieldVault?.chain_id ?? null)}</div>
-            </div>
-
-            <div className="kpi-card">
-              <div className="kpi-label">Core 24h Move</div>
-              <div className="kpi-value">{universeMoveValue}</div>
-              <div className="kpi-hint">
-                {Number.isFinite(changes?.summary?.vaults_with_change ?? null)
-                  ? `${changes?.summary?.vaults_with_change} vaults with change`
-                  : "Change count syncing"}
-              </div>
             </div>
           </div>
         )}

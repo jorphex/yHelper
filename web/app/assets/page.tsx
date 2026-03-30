@@ -221,11 +221,11 @@ function AssetsPageContent() {
         </div>
 
         {isLoadingDetail ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "24px" }}>
-            {Array(4).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "24px" }}>
+            {Array(3).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : selectedSymbol ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "24px" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "24px" }}>
             <div className="kpi-card">
               <div className="kpi-label">Venues</div>
               <div className="kpi-value">{detail?.summary.venues ?? "n/a"}</div>
@@ -233,14 +233,6 @@ function AssetsPageContent() {
             <div className="kpi-card">
               <div className="kpi-label">Chains</div>
               <div className="kpi-value">{detail?.summary.chains ?? "n/a"}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Total TVL</div>
-              <div className="kpi-value">{formatUsd(detail?.summary.total_tvl_usd)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Best APY</div>
-              <div className="kpi-value">{formatPct(detail?.summary.best_safe_apy_30d)}</div>
             </div>
             <div className="kpi-card">
               <div className="kpi-label">Spread</div>
