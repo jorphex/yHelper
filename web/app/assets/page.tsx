@@ -294,11 +294,7 @@ function AssetsPageContent() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px", marginBottom: "32px" }}>
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-            <div className="kpi-card">
-              <div className="kpi-label">Tokens</div>
-              <div className="kpi-value">{assetData?.summary?.tokens ?? filteredTokenRows.length}</div>
-            </div>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
             <div className="kpi-card">
               <div className="kpi-label">Multi-Chain</div>
               <div className="kpi-value">{assetData?.summary?.multi_chain_tokens ?? "n/a"}</div>
@@ -306,10 +302,6 @@ function AssetsPageContent() {
             <div className="kpi-card">
               <div className="kpi-label">Median Spread</div>
               <div className="kpi-value">{formatPct(assetData?.summary?.median_spread_safe_apy_30d)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Total TVL</div>
-              <div className="kpi-value">{formatUsd(assetData?.summary?.total_tvl_usd)}</div>
             </div>
           </div>
 

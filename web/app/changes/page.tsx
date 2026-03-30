@@ -57,18 +57,9 @@ type StaleByChain = {
   stale_tvl_usd: number | null;
 };
 
-type StaleByCategory = {
-  category: string;
-  vaults: number;
-  stale_vaults: number;
-  stale_ratio: number;
-  tvl_usd: number | null;
-  stale_tvl_usd: number | null;
-};
 
 type MoverSortKey = "vault" | "chain" | "tvl" | "current" | "previous" | "delta" | "age";
 type StaleSortKey = "chain" | "vaults" | "stale" | "ratio" | "tvl" | "stale_tvl";
-type StaleCatSortKey = "category" | "vaults" | "stale" | "ratio" | "tvl" | "stale_tvl";
 
 function MoverTable({
   title,
@@ -183,7 +174,6 @@ function ChangesPageContent() {
   const [trendError, setTrendError] = useState<string | null>(null);
   const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [staleSort, setStaleSort] = useState<SortState<StaleSortKey>>({ key: "ratio", direction: "desc" });
-  const [staleCatSort, setStaleCatSort] = useState<SortState<StaleCatSortKey>>({ key: "ratio", direction: "desc" });
 
   const query = useMemo(() => {
     const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
@@ -419,15 +409,6 @@ function ChangesPageContent() {
 
   const staleChainRows = sortRows(staleByChain, staleSort, {
     chain: (row) => chainLabel(row.chain_id),
-    vaults: (row) => row.vaults,
-    stale: (row) => row.stale_vaults,
-    ratio: (row) => row.stale_ratio,
-    tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    stale_tvl: (row) => row.stale_tvl_usd ?? Number.NEGATIVE_INFINITY,
-  });
-
-  const staleCategoryRows = sortRows(staleByCategory, staleCatSort, {
-    category: (row) => row.category,
     vaults: (row) => row.vaults,
     stale: (row) => row.stale_vaults,
     ratio: (row) => row.stale_ratio,
@@ -799,65 +780,6 @@ function ChangesPageContent() {
               ) : staleChainRows.map((row) => (
                 <tr key={`stale-chain-${row.chain_id}`}>
                   <td>{chainLabel(row.chain_id)}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{row.stale_vaults}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.stale_ratio)}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.stale_tvl_usd)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Freshness by Category Table */}
-      <section className="section" style={{ marginBottom: "48px" }}>
-        <div className="card-header">
-          <h2 className="card-title">Freshness by Category</h2>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "category"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                    Category {sortIndicator(staleCatSort, "category")}
-                  </button>
-                </th>
-                <th style={{ textAlign: "right" }}>
-                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                    Vaults {sortIndicator(staleCatSort, "vaults")}
-                  </button>
-                </th>
-                <th style={{ textAlign: "right" }}>
-                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "stale"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                    Stale {sortIndicator(staleCatSort, "stale")}
-                  </button>
-                </th>
-                <th style={{ textAlign: "right" }}>
-                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "ratio"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                    Stale % {sortIndicator(staleCatSort, "ratio")}
-                  </button>
-                </th>
-                <th style={{ textAlign: "right" }}>
-                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                    TVL {sortIndicator(staleCatSort, "tvl")}
-                  </button>
-                </th>
-                <th style={{ textAlign: "right" }}>
-                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "stale_tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                    Stale TVL {sortIndicator(staleCatSort, "stale_tvl")}
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <TableSkeleton rows={5} columns={6} />
-              ) : staleCategoryRows.map((row) => (
-                <tr key={`stale-cat-${row.category}`}>
-                  <td>{row.category}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{row.stale_vaults}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.stale_ratio)}</td>

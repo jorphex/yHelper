@@ -719,17 +719,7 @@ function RegimesPageContent() {
           <h2 className="card-title">Regime Distribution</h2>
         </div>
         
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "48px" }}>
-          <HeatGrid
-            title="By Regime"
-            items={regimes.map((row) => ({
-              id: row.regime,
-              label: row.regime.charAt(0).toUpperCase() + row.regime.slice(1),
-              value: row.vaults,
-              note: formatUsd(row.tvl_usd),
-            }))}
-            valueFormatter={(v) => String(v ?? "n/a")}
-          />
+        <div style={{ marginBottom: "48px" }}>
           <BarList
             title="Regime TVL Mix"
             items={summaryRows.map((row) => ({

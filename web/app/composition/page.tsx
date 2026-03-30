@@ -342,18 +342,14 @@ function CompositionPageContent() {
       {/* Summary KPIs */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
-            {Array(6).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+            {Array(5).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
             <div className="kpi-card">
               <div className="kpi-label">Vaults</div>
               <div className="kpi-value">{data?.summary.vaults ?? "n/a"}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Total TVL</div>
-              <div className="kpi-value">{formatUsd(data?.summary.total_tvl_usd)}</div>
             </div>
             <div className="kpi-card">
               <div className="kpi-label">Average APY 30d</div>

@@ -145,36 +145,14 @@ function StYfiPageContent() {
   const summaryItems = useMemo(() => {
     const items = [
       {
-        label: "Current Epoch",
-        value: currentEpoch ?? "n/a",
-        hint: "Active reward epoch",
-      },
-      {
-        label: "stYFI Staked",
-        value: formatTokenCompact(summary?.styfi_staked ?? null, "YFI"),
-        hint: "Matches the public stYFI site headline.",
-      },
-      {
-        label: "stYFIx Staked", 
-        value: formatTokenCompact(summary?.styfix_staked ?? null, "YFI"),
-        hint: "Additional YFI staked through stYFIx.",
-      },
-      {
         label: "Combined Staked",
         value: formatTokenCompact(summary?.combined_staked ?? null, "YFI"),
-        hint: "Combined stYFI plus stYFIx.",
+        hint: "Total stYFI plus stYFIx balance.",
       },
       {
         label: "Share of Supply",
         value: formatPct(summary?.staked_share_supply ?? null, 2),
         hint: `${formatToken(summary?.yfi_total_supply ?? null, "YFI", 0)} total supply`,
-      },
-      {
-        label: "Current Reward APR",
-        value: formatPct(data?.current_reward_state?.styfi_current_apr ?? null, 2),
-        hint: data?.current_reward_state?.styfix_current_apr 
-          ? `stYFI ${formatPct(data.current_reward_state.styfi_current_apr, 2)} • stYFIx ${formatPct(data.current_reward_state.styfix_current_apr, 2)}`
-          : `Current run-rate from ${rewardSymbol} rewards`,
       },
       showRewardTokenFallback ? {
         label: "Reward Token",
@@ -205,7 +183,7 @@ function StYfiPageContent() {
       },
     ];
     return items;
-  }, [summary, data?.current_reward_state, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue, currentEpoch, showRewardTokenFallback]);
+  }, [summary, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue, showRewardTokenFallback]);
 
   const stakeSplitSegments = useMemo(() => [
     { id: "styfi", label: "stYFI", value: summary?.styfi_staked ?? null, note: percentShare(summary?.styfi_staked ?? null, summary?.combined_staked ?? null), tone: "primary" as const },
@@ -283,16 +261,16 @@ function StYfiPageContent() {
         </a>
       </section>
 
-      {/* Summary KPIs - 9 cards */}
+      {/* Summary KPIs - 5 cards */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-            {Array(9).fill(null).map((_, i) => (
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+            {Array(5).fill(null).map((_, i) => (
               <KpiGridSkeleton key={i} count={1} />
             ))}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
             {summaryItems.map((item) => (
               <div key={item.label} className="kpi-card">
                 <div className="kpi-label">{item.label}</div>

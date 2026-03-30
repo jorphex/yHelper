@@ -92,22 +92,14 @@ function ChainsPageContent() {
         </div>
       </section>
 
-      {/* KPI Grid with new metrics */}
+      {/* KPI Grid - compact headline metrics */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
-            {Array(6).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+            {Array(3).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
-            <div className="kpi-card">
-              <div className="kpi-label">Chains</div>
-              <div className="kpi-value">{summary?.chains ?? "n/a"}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Active Vaults</div>
-              <div className="kpi-value">{summary?.active_vaults ?? "n/a"}</div>
-            </div>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
             <div className="kpi-card">
               <div className="kpi-label">With Metrics</div>
               <div className="kpi-value">{summary?.with_metrics ?? "n/a"}</div>
@@ -119,11 +111,6 @@ function ChainsPageContent() {
             <div className="kpi-card">
               <div className="kpi-label">Median Chain APY</div>
               <div className="kpi-value">{formatPct(summary?.median_chain_apy_30d)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Top Chain Share</div>
-              <div className="kpi-value">{formatPct(summary?.top_chain_tvl_share)}</div>
-              <div className="kpi-hint">{chainLabel(summary?.top_chain_id ?? 0)}</div>
             </div>
           </div>
         )}
