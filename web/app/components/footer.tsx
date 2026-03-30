@@ -4,10 +4,6 @@ export function Footer() {
   return (
     <footer className="app-footer">
       <div className="footer-inner">
-        <div className="footer-brand">
-          <span className="footer-logo">yHelper</span>
-          <span className="footer-tagline">Analytics for Yearn vaults</span>
-        </div>
         <nav className="footer-links">
           <a 
             href="https://yearn.fi" 
@@ -34,9 +30,6 @@ export function Footer() {
             GitHub
           </a>
         </nav>
-        <div className="footer-meta">
-          <span className="footer-copy">© {new Date().getFullYear()} yHelper</span>
-        </div>
       </div>
     </footer>
   );
