@@ -7,10 +7,8 @@ import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "..
 import { useChangesData } from "../hooks/use-changes-data";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { VaultLink } from "../components/vault-link";
+import { ScatterPlot } from "../components/visuals";
 import type { UniverseKind } from "../lib/universe";
-import { ScatterPlot, TrendStrips } from "../components/visuals";
-
-
 
 function formatDelta(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "n/a";
@@ -51,7 +49,7 @@ function ChangesPageContent() {
   const movers = data?.movers?.largest_abs_delta ?? [];
   const summary = data?.summary;
 
-  const scatterPoints = useMemo(() => movers.slice(0, 50).map((row) => ({
+  const scatterPoints = useMemo(() => movers.slice(0, 50).map((row: any) => ({
     id: row.vault_address,
     x: row.delta_apy ?? 0,
     y: row.safe_apy_window ?? 0,
@@ -61,15 +59,8 @@ function ChangesPageContent() {
     tooltip: `${row.symbol || row.vault_address}\nAPY: ${formatPct(row.safe_apy_window)}\nDelta: ${formatDelta(row.delta_apy)}`,
   })), [movers]);
 
-  const trendItems = useMemo(() => [
-    { id: "avg", label: "Avg Delta", points: [] },
-    { id: "risers", label: "Risers", points: [] },
-    { id: "fallers", label: "Fallers", points: [] },
-  ], []);
-
   return (
     <div>
-      {/* Header */}
       <section className="page-header" style={{ borderBottom: "none" }}>
         <h1 className="page-title">
           Changes.
@@ -107,7 +98,6 @@ function ChangesPageContent() {
                 style={{ width: "100%", marginTop: "6px" }}
               >
                 <option value={1}>1 day</option>
-                <option value={3}>3 days</option>
                 <option value={7}>7 days</option>
                 <option value={14}>14 days</option>
                 <option value={30}>30 days</option>
@@ -201,7 +191,7 @@ function ChangesPageContent() {
             <tbody>
               {isLoading ? (
                 <TableSkeleton rows={5} columns={8} />
-              ) : movers.slice(0, 20).map((row) => (
+              ) : movers.slice(0, 20).map((row: any) => (
                 <tr key={row.vault_address}>
                   <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
                   <td style={{ textAlign: "center" }}>{chainLabel(row.chain_id)}</td>
@@ -235,8 +225,6 @@ function ChangesPageContent() {
             xFormatter={(v) => formatDelta(v)}
             yFormatter={(v) => formatPct(v)}
           />
-
-
         </div>
       </section>
     </div>
