@@ -105,21 +105,21 @@ function RegimesPageContent() {
             <div className="kpi-card">
               <div className="kpi-label">Rising</div>
               <div className="kpi-value" style={{ color: "var(--positive)" }}>
-                {regimes.find((r: any) => r.regime === "rising")?.vaults ?? 0}
+                {regimes.find((r: any) => r.regime === "rising")?.vaults ?? "n/a"}
               </div>
               <div className="kpi-hint">Vaults improving</div>
             </div>
             <div className="kpi-card">
               <div className="kpi-label">Stable</div>
               <div className="kpi-value">
-                {regimes.find((r: any) => r.regime === "stable")?.vaults ?? 0}
+                {regimes.find((r: any) => r.regime === "stable")?.vaults ?? "n/a"}
               </div>
               <div className="kpi-hint">Holding steady</div>
             </div>
             <div className="kpi-card">
               <div className="kpi-label">Falling</div>
               <div className="kpi-value" style={{ color: "var(--negative)" }}>
-                {regimes.find((r: any) => r.regime === "falling")?.vaults ?? 0}
+                {regimes.find((r: any) => r.regime === "falling")?.vaults ?? "n/a"}
               </div>
               <div className="kpi-hint">Vaults declining</div>
             </div>
