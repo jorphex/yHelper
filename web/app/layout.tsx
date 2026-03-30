@@ -1,11 +1,8 @@
-import "./globals.css";
-import "./globals-fixes.css";
+import "./globals-editorial.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode } from "react";
-import Link from "next/link";
+import { Sidebar } from "./components/sidebar";
 import { ChunkRecovery } from "./components/chunk-recovery";
-import { FreshnessBadge } from "./components/freshness-badge";
-import { NavLinks } from "./components/nav-links";
 import { Providers } from "./providers";
 import { SOCIAL_IMAGE_VERSION } from "./lib/social-image-version";
 
@@ -57,10 +54,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#080c16",
+  themeColor: "#0a0a0a",
 };
 
-// Ambient background component
+// Ambient background component (preserved film grain + haze)
 function AmbientBackground() {
   return (
     <>
@@ -83,22 +80,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <a className="skip-link" href="#main-content">
           Skip to main content
         </a>
-        <header className="site-header">
-          <nav className="site-nav" aria-label="Primary">
-            <Link href="/" className="site-brand" aria-label="yHelper overview">
-              yHelper
-            </Link>
-            <NavLinks />
-            <div className="site-controls">
-              <FreshnessBadge />
-            </div>
-          </nav>
-        </header>
-        <Providers>
-          <main id="main-content" tabIndex={-1}>
-            {children}
+        
+        <div className="app-shell">
+          <Sidebar />
+          
+          <main id="main-content" className="main-content" tabIndex={-1}>
+            <Providers>
+              <div className="content-area">
+                {children}
+              </div>
+            </Providers>
           </main>
-        </Providers>
+        </div>
       </body>
     </html>
   );
