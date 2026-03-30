@@ -610,7 +610,195 @@ select:focus {
 }
 
 /* --------------------------------------------------------------------------
-   19. Skeleton Loading States
+   19. Visualizations
+   -------------------------------------------------------------------------- */
+.viz-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+}
+
+.viz-panel h3 {
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+.viz-plot-bg {
+  fill: var(--bg-elevated);
+}
+
+.viz-axis {
+  stroke: var(--border-soft);
+  stroke-width: 1;
+}
+
+.viz-axis-grid {
+  stroke: var(--border-subtle);
+  stroke-dasharray: 4, 4;
+}
+
+.viz-point-positive {
+  fill: var(--positive);
+}
+
+.viz-point-negative {
+  fill: var(--negative);
+}
+
+.viz-point-neutral {
+  fill: var(--text-tertiary);
+}
+
+.viz-tick {
+  font-size: 12px;
+  fill: var(--text-tertiary);
+}
+
+.viz-axis-label {
+  font-size: 11px;
+  fill: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.panel-empty {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+/* Bar List */
+.bar-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.bar-panel h3 {
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+.bar-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+}
+
+.bar-list li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bar-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bar-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.bar-value {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-family: var(--font-data);
+}
+
+.bar-track {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-soft) 100%);
+  border-radius: var(--radius-full);
+  transition: width 0.8s var(--ease-out);
+}
+
+.bar-note {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* Heat Grid */
+.heat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.heat-cell {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.heat-cell:hover {
+  border-color: var(--border-soft);
+  background: var(--bg-surface);
+}
+
+.heat-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+.heat-value {
+  font-family: var(--font-data);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.heat-note {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.heat-cell {
+  background: rgba(6, 87, 233, var(--heat-alpha, 0.16));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.viz-legend {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* --------------------------------------------------------------------------
+   20. Skeleton Loading States
    -------------------------------------------------------------------------- */
 .skeleton {
   background: linear-gradient(
