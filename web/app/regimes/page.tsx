@@ -24,7 +24,7 @@ function RegimesPageContent() {
       if (value === null || value === undefined) params.delete(key);
       else params.set(key, String(value));
     });
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   const { data: regimesData, isLoading: isLoadingRegimes } = useRegimesData({
