@@ -585,16 +585,10 @@ function DiscoverPageContent() {
   const apyBucketTrendItems = useMemo(
     () => [
       {
-        id: "neg",
-        label: "Negative APY share",
-        points: trendSlice.map((row) => row.bucket_neg_ratio),
-        note: "Share of eligible vaults with APY below 0%",
-      },
-      {
-        id: "low",
-        label: "Low APY share (0-5%)",
-        points: trendSlice.map((row) => row.bucket_low_ratio),
-        note: "Share of vaults in the 0% to <5% APY bucket",
+        id: "high",
+        label: "High APY share (15%+)",
+        points: trendSlice.map((row) => row.bucket_high_ratio),
+        note: "Share of vaults at 15% APY or above",
       },
       {
         id: "mid",
@@ -603,10 +597,10 @@ function DiscoverPageContent() {
         note: "Share of vaults in the 5% to <15% APY bucket",
       },
       {
-        id: "high",
-        label: "High APY share (15%+)",
-        points: trendSlice.map((row) => row.bucket_high_ratio),
-        note: "Share of vaults at 15% APY or above",
+        id: "low",
+        label: "Low APY share (0-5%)",
+        points: trendSlice.map((row) => row.bucket_low_ratio),
+        note: "Share of vaults in the 0% to <5% APY bucket",
       },
     ],
     [trendSlice],
@@ -692,14 +686,14 @@ function DiscoverPageContent() {
   ];
   if (error && !data) {
     return (
-      <main className="container route-page">
+      <>
         <DataLoadError onRetry={() => refetch()} />
-      </main>
+      </>
     );
   }
 
   return (
-    <main className="container route-page">
+    <>
       <section className="hero hero-discover">
         <p className="hero-kicker">Opportunity scan</p>
         <h1>Discover</h1>
@@ -877,18 +871,18 @@ function DiscoverPageContent() {
           <TableSkeleton rows={8} columns={10} />
         ) : (
           <div className="table-wrap">
-            <table className="discover-table" style={{tableLayout: 'fixed', width: '100%', fontSize: '12px'}}>
+            <table className="discover-table">
             <thead>
               <tr>
-                <th style={{width: '23%', textAlign: 'left', padding: '10px 8px'}}>Vault</th>
-                <th style={{width: '8%', textAlign: 'center', padding: '10px 8px'}}>Chain</th>
-                <th style={{width: '10%', textAlign: 'left', padding: '10px 8px'}}>Token</th>
-                <th style={{width: '10%', textAlign: 'center', padding: '10px 8px'}}>Category</th>
-                <th style={{width: '12%', textAlign: 'right', padding: '10px 8px'}}>TVL</th>
-                <th style={{width: '10%', textAlign: 'right', padding: '10px 8px'}}>APY 30d</th>
-                <th style={{width: '11%', textAlign: 'right', padding: '10px 8px'}}>Momentum</th>
-                <th className="tablet-hide" style={{width: '10%', textAlign: 'center', padding: '10px 8px'}}>Consistency</th>
-                <th className="tablet-hide" style={{width: '9%', textAlign: 'center', padding: '10px 8px'}}>Risk</th>
+                <th className="col-vault">Vault</th>
+                <th className="col-chain">Chain</th>
+                <th className="col-token">Token</th>
+                <th className="col-category">Category</th>
+                <th className="col-tvl">TVL</th>
+                <th className="col-apy">APY 30d</th>
+                <th className="col-momentum">Momentum</th>
+                <th className="tablet-hide col-consistency">Consistency</th>
+                <th className="tablet-hide col-risk">Risk</th>
                 <th style={{width: '10%', textAlign: 'center', padding: '10px 8px'}}>Regime</th>
               </tr>
             </thead>
@@ -1012,7 +1006,7 @@ function DiscoverPageContent() {
           </div>
           
           {/* Row 2: Token APY Dispersion full width */}
-          <div style={{marginBottom: '24px'}}>
+          <div style={{marginTop: '48px', marginBottom: '24px'}}>
             <HeatGrid
               title="Token APY Dispersion"
               items={tokenSpreadHeat}
@@ -1077,14 +1071,16 @@ function DiscoverPageContent() {
           </div>
         </div>
       </section>
-    </main>
+    </>
   );
 }
 
 export default function DiscoverPage() {
   return (
     <Suspense fallback={<main className="container route-page"><section className="card">Loading…</section></main>}>
-      <DiscoverPageContent />
+      <main className="container route-page">
+        <DiscoverPageContent />
+      </main>
     </Suspense>
   );
 }

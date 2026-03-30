@@ -134,7 +134,7 @@
    3. DISCOVER PAGE
    ========================================================================== */
 
-/* Vault Universe Table - match styfi 13px font */
+/* Vault Universe Table - fixed layout like styfi */
 .discover-table {
   table-layout: fixed !important;
   width: 100% !important;
@@ -149,16 +149,22 @@
   white-space: nowrap !important;
 }
 
-.discover-table .col-vault { width: 21% !important; }
-.discover-table .col-chain { width: 10% !important; text-align: center !important; }
-.discover-table .col-token { width: 9% !important; }
-.discover-table .col-category { width: 11% !important; text-align: center !important; }
-.discover-table .col-tvl { width: 11% !important; text-align: right !important; }
-.discover-table .col-apy { width: 10% !important; text-align: right !important; }
-.discover-table .col-momentum { width: 11% !important; text-align: right !important; }
-.discover-table .col-consistency { width: 11% !important; text-align: center !important; }
-.discover-table .col-risk { width: 10% !important; text-align: center !important; }
-.discover-table .col-regime { width: 10% !important; text-align: center !important; }
+.discover-table th {
+  font-size: inherit !important;
+  letter-spacing: var(--tracking-wider) !important;
+}
+
+/* Column sizing - min-widths instead of fixed percentages */
+.discover-table .col-vault { min-width: 160px !important; }
+.discover-table .col-chain { min-width: 60px !important; text-align: center !important; }
+.discover-table .col-token { min-width: 70px !important; text-align: left !important; }
+.discover-table .col-category { min-width: 95px !important; text-align: center !important; }
+.discover-table .col-tvl { min-width: 100px !important; text-align: right !important; }
+.discover-table .col-apy { min-width: 85px !important; text-align: right !important; }
+.discover-table .col-momentum { min-width: 95px !important; text-align: right !important; }
+.discover-table .col-consistency { min-width: 115px !important; text-align: center !important; }
+.discover-table .col-risk { min-width: 80px !important; text-align: center !important; padding-left: 8px !important; padding-right: 8px !important; }
+.discover-table .col-regime { min-width: 75px !important; text-align: center !important; }
 
 /* Scatter chart - remove side margins */
 .discover-main-scatter {
@@ -172,7 +178,7 @@
   display: block !important;
 }
 
-/* Scatter plot - force full width, remove all margins */
+/* Scatter plot - standard card padding */
 .discover-scatter-section {
   padding: 0 !important;
   margin: 0 !important;
@@ -180,14 +186,18 @@
 
 .discover-scatter-section .viz-panel,
 .discover-main-scatter.viz-panel {
-  padding: 0 !important;
+  padding: var(--space-6) !important;
   margin: 0 !important;
 }
 
 .discover-scatter-section h3,
 .discover-main-scatter h3 {
-  padding: 16px 16px 12px !important;
-  margin-bottom: 0 !important;
+  padding: 0 0 var(--space-5) 0 !important;
+  margin: 0 !important;
+  font-size: var(--text-xs) !important;
+  text-transform: uppercase !important;
+  letter-spacing: var(--tracking-wider) !important;
+  color: var(--ink-dim) !important;
 }
 
 .discover-scatter-section .scatter-wrap,
@@ -201,7 +211,7 @@
 .discover-main-scatter svg {
   width: 100% !important;
   max-width: 100% !important;
-  height: 420px !important;
+  height: 360px !important;
   display: block !important;
 }
 
@@ -232,20 +242,6 @@
   padding: 0 16px !important;
 }
 
-
-
-/* Table column widths adjusted */
-.discover-table .col-vault { width: 23% !important; }
-.discover-table .col-chain { width: 8% !important; text-align: center !important; }
-.discover-table .col-token { width: 10% !important; }
-.discover-table .col-category { width: 10% !important; text-align: center !important; }
-.discover-table .col-tvl { width: 12% !important; text-align: right !important; }
-.discover-table .col-apy { width: 10% !important; text-align: right !important; }
-.discover-table .col-momentum { width: 11% !important; text-align: right !important; }
-.discover-table .col-consistency { width: 10% !important; text-align: center !important; }
-.discover-table .col-risk { width: 9% !important; text-align: center !important; }
-.discover-table .col-regime { width: 10% !important; text-align: center !important; }
-
 /* Token APY Dispersion, Yield-Momentum Quadrants, Chain Momentum - 4 columns */
 .discover-visual-layout .heat-grid {
   display: grid !important;
@@ -265,26 +261,6 @@
   .discover-visual-layout .heat-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
-}
-
-.discover-main-scatter {
-  width: 100% !important;
-  max-width: 100% !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-.discover-main-scatter .scatter-wrap {
-  width: 100% !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-.discover-main-scatter svg {
-  width: 100% !important;
-  max-width: 100% !important;
-  height: 360px !important;
-  display: block !important;
 }
 
 /* ==========================================================================
