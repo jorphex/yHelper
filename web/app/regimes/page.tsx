@@ -669,11 +669,19 @@ function RegimesPageContent() {
       {/* KPI Grid */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-            {Array(4).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+            {Array(6).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+            <div className="kpi-card">
+              <div className="kpi-label">Regimes Tracked</div>
+              <div className="kpi-value">{summaryRows.length}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Total Vaults</div>
+              <div className="kpi-value">{summaryRows.reduce((acc, row) => acc + row.vaults, 0)}</div>
+            </div>
             <div className="kpi-card">
               <div className="kpi-label">Current Regime</div>
               <div className="kpi-value" style={{ textTransform: "capitalize" }}>

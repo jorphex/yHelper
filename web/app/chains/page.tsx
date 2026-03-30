@@ -95,11 +95,19 @@ function ChainsPageContent() {
       {/* KPI Grid with new metrics */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-            {Array(4).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+            {Array(6).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+            <div className="kpi-card">
+              <div className="kpi-label">Chains</div>
+              <div className="kpi-value">{summary?.chains ?? "n/a"}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Active Vaults</div>
+              <div className="kpi-value">{summary?.active_vaults ?? "n/a"}</div>
+            </div>
             <div className="kpi-card">
               <div className="kpi-label">With Metrics</div>
               <div className="kpi-value">{summary?.with_metrics ?? "n/a"}</div>

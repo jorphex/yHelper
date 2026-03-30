@@ -67,8 +67,8 @@ type StaleByCategory = {
 };
 
 type MoverSortKey = "vault" | "chain" | "tvl" | "current" | "previous" | "delta" | "age";
-type StaleSortKey = "chain" | "vaults" | "stale" | "ratio" | "tvl";
-type StaleCatSortKey = "category" | "vaults" | "stale" | "ratio" | "tvl";
+type StaleSortKey = "chain" | "vaults" | "stale" | "ratio" | "tvl" | "stale_tvl";
+type StaleCatSortKey = "category" | "vaults" | "stale" | "ratio" | "tvl" | "stale_tvl";
 
 function MoverTable({
   title,
@@ -403,6 +403,16 @@ function ChangesPageContent() {
     [categoryTrendLatest, isCompactViewport],
   );
 
+  // Grouped momentum snapshot for latest day
+  const groupedMomentumSnapshot = useMemo(() => {
+    if (query.trendGroup === "none") return { chain: [], category: [] };
+    const latest = query.trendGroup === "chain" ? chainTrendLatest : categoryTrendLatest;
+    return {
+      chain: query.trendGroup === "chain" ? latest : [],
+      category: query.trendGroup === "category" ? latest : [],
+    };
+  }, [query.trendGroup, chainTrendLatest, categoryTrendLatest]);
+
   // Stale data calculations
   const staleByChain = data?.freshness?.stale_by_chain ?? [];
   const staleByCategory = data?.freshness?.stale_by_category ?? [];
@@ -413,6 +423,7 @@ function ChangesPageContent() {
     stale: (row) => row.stale_vaults,
     ratio: (row) => row.stale_ratio,
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
+    stale_tvl: (row) => row.stale_tvl_usd ?? Number.NEGATIVE_INFINITY,
   });
 
   const staleCategoryRows = sortRows(staleByCategory, staleCatSort, {
@@ -421,6 +432,7 @@ function ChangesPageContent() {
     stale: (row) => row.stale_vaults,
     ratio: (row) => row.stale_ratio,
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
+    stale_tvl: (row) => row.stale_tvl_usd ?? Number.NEGATIVE_INFINITY,
   });
 
   // Stale ratio heatmaps
@@ -660,12 +672,12 @@ function ChangesPageContent() {
                 <div className="kpi-value">{formatHours(data?.freshness?.latest_pps_age_seconds)}</div>
               </div>
               <div className="kpi-card">
-                <div className="kpi-label">Window Stale Ratio</div>
-                <div className="kpi-value">{formatPct(data?.freshness?.window_stale_ratio)}</div>
+                <div className="kpi-label">Newest Metrics Age</div>
+                <div className="kpi-value">{formatHours(data?.freshness?.metrics_newest_age_seconds)}</div>
               </div>
               <div className="kpi-card">
-                <div className="kpi-label">PPS Stale Ratio</div>
-                <div className="kpi-value">{formatPct(data?.freshness?.pps_stale_ratio)}</div>
+                <div className="kpi-label">Window Stale Ratio</div>
+                <div className="kpi-value">{formatPct(data?.freshness?.window_stale_ratio)}</div>
               </div>
             </div>
           </>
@@ -716,6 +728,30 @@ function ChangesPageContent() {
         </div>
       </section>
 
+      {/* Grouped Momentum Snapshot (Latest Day) */}
+      <section className="section" style={{ marginBottom: "48px" }}>
+        <div className="card-header">
+          <h2 className="card-title">Grouped Momentum Snapshot (Latest Day)</h2>
+          <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginTop: "8px" }}>
+            TVL-weighted momentum by chain/category (7d APY minus 30d APY). Positive values indicate short-term strengthening.
+          </p>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+          <HeatGrid
+            title="By Chain"
+            items={chainMomentumHeat}
+            valueFormatter={(value) => formatPct(value, 1)}
+            legend="Cells are sorted by latest TVL. Notes show TVL and weighted APY 30d for context."
+          />
+          <HeatGrid
+            title="By Category"
+            items={categoryMomentumHeat}
+            valueFormatter={(value) => formatPct(value, 1)}
+            legend="Use this to compare category momentum drift independent of single-vault outliers."
+          />
+        </div>
+      </section>
+
       {/* Freshness by Chain Table */}
       <section className="section" style={{ marginBottom: "48px" }}>
         <div className="card-header">
@@ -750,11 +786,16 @@ function ChangesPageContent() {
                     TVL {sortIndicator(staleSort, "tvl")}
                   </button>
                 </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "stale_tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Stale TVL {sortIndicator(staleSort, "stale_tvl")}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <TableSkeleton rows={5} columns={5} />
+                <TableSkeleton rows={5} columns={6} />
               ) : staleChainRows.map((row) => (
                 <tr key={`stale-chain-${row.chain_id}`}>
                   <td>{chainLabel(row.chain_id)}</td>
@@ -762,6 +803,7 @@ function ChangesPageContent() {
                   <td style={{ textAlign: "right" }} className="data-value">{row.stale_vaults}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.stale_ratio)}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.stale_tvl_usd)}</td>
                 </tr>
               ))}
             </tbody>
@@ -803,11 +845,16 @@ function ChangesPageContent() {
                     TVL {sortIndicator(staleCatSort, "tvl")}
                   </button>
                 </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "stale_tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Stale TVL {sortIndicator(staleCatSort, "stale_tvl")}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <TableSkeleton rows={5} columns={5} />
+                <TableSkeleton rows={5} columns={6} />
               ) : staleCategoryRows.map((row) => (
                 <tr key={`stale-cat-${row.category}`}>
                   <td>{row.category}</td>
@@ -815,6 +862,7 @@ function ChangesPageContent() {
                   <td style={{ textAlign: "right" }} className="data-value">{row.stale_vaults}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.stale_ratio)}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.stale_tvl_usd)}</td>
                 </tr>
               ))}
             </tbody>

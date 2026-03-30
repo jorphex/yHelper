@@ -342,11 +342,11 @@ function CompositionPageContent() {
       {/* Summary KPIs */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
-            {Array(5).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+            {Array(6).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
             <div className="kpi-card">
               <div className="kpi-label">Vaults</div>
               <div className="kpi-value">{data?.summary.vaults ?? "n/a"}</div>
@@ -366,6 +366,10 @@ function CompositionPageContent() {
             <div className="kpi-card">
               <div className="kpi-label">Category HHI</div>
               <div className="kpi-value">{data?.concentration.category_hhi?.toFixed(3) ?? "n/a"}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Token HHI</div>
+              <div className="kpi-value">{data?.concentration.token_hhi?.toFixed(3) ?? "n/a"}</div>
             </div>
           </div>
         )}
@@ -518,7 +522,13 @@ function CompositionPageContent() {
                 <TableSkeleton rows={5} columns={5} />
               ) : categoryRows.map((row) => (
                 <tr key={row.category}>
-                  <td>{row.category || "Unknown"}</td>
+                  <td>
+                    {row.category ? (
+                      <Link href={`/discover?category=${encodeURIComponent(row.category)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                        {row.category}
+                      </Link>
+                    ) : "Unknown"}
+                  </td>
                   <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.share_tvl)}</td>
@@ -645,8 +655,20 @@ function CompositionPageContent() {
               ) : crowdedRows.slice(0, query.crowdingLimit).map((row) => (
                 <tr key={row.vault_address}>
                   <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td>{chainLabel(row.chain_id)}</td>
-                  {!isCompactViewport && <td>{row.token_symbol || "n/a"}</td>}
+                  <td>
+                    <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                      {chainLabel(row.chain_id)}
+                    </Link>
+                  </td>
+                  {!isCompactViewport && (
+                    <td>
+                      {row.token_symbol ? (
+                        <Link href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                          {row.token_symbol}
+                        </Link>
+                      ) : "n/a"}
+                    </td>
+                  )}
                   {!isCompactViewport && <td>{row.category || "n/a"}</td>}
                   <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_30d)}</td>
@@ -711,8 +733,20 @@ function CompositionPageContent() {
               ) : uncrowdedRows.slice(0, query.crowdingLimit).map((row) => (
                 <tr key={row.vault_address}>
                   <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                  <td>{chainLabel(row.chain_id)}</td>
-                  {!isCompactViewport && <td>{row.token_symbol || "n/a"}</td>}
+                  <td>
+                    <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                      {chainLabel(row.chain_id)}
+                    </Link>
+                  </td>
+                  {!isCompactViewport && (
+                    <td>
+                      {row.token_symbol ? (
+                        <Link href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                          {row.token_symbol}
+                        </Link>
+                      ) : "n/a"}
+                    </td>
+                  )}
                   {!isCompactViewport && <td>{row.category || "n/a"}</td>}
                   <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
                   <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_30d)}</td>
