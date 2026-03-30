@@ -104,12 +104,12 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-        <div style={{ position: 'relative', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'relative', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Image
             src="/home-assets-yearn-blender/hero-yearn-blender-coins.png"
             alt="Yearn Finance"
-            width={400}
-            height={280}
+            width={500}
+            height={320}
             priority
             style={{ objectFit: 'contain' }}
           />

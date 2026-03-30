@@ -37,12 +37,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="sidebar-footer">
-        <div className="freshness-badge">
-          <span className="freshness-dot" />
-          <span className="freshness-label">Live data</span>
-        </div>
-      </div>
+
     </aside>
   );
 }

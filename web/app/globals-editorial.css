@@ -280,18 +280,6 @@ h4 { font-size: var(--text-xl); }
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: var(--tracking-tight);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.sidebar-logo::after {
-  content: "";
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
-  border-radius: 50%;
-  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .sidebar-nav {
@@ -384,9 +372,9 @@ h4 { font-size: var(--text-xl); }
    8. Page Header
    -------------------------------------------------------------------------- */
 .page-header {
-  margin-top: var(--space-8);
-  margin-bottom: var(--space-12);
-  padding-bottom: var(--space-8);
+  margin-top: var(--space-16);
+  margin-bottom: var(--space-16);
+  padding-bottom: var(--space-12);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -489,7 +477,6 @@ tbody tr {
 
 tbody tr:hover {
   background: rgba(6, 87, 233, 0.04);
-  transform: translateX(2px);
 }
 
 tbody tr:last-child td {
@@ -546,8 +533,6 @@ td.numeric, th.numeric {
 .kpi-card:hover {
   border-color: var(--border-soft);
   background: rgba(255, 255, 255, 0.02);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .kpi-card:hover::before {
@@ -574,11 +559,6 @@ td.numeric, th.numeric {
   color: var(--text-primary);
   letter-spacing: -0.02em;
   margin-bottom: var(--space-2);
-  transition: transform var(--duration-base) var(--ease-out);
-}
-
-.kpi-card:hover .kpi-value {
-  transform: scale(1.02);
 }
 
 .kpi-hint {
@@ -673,8 +653,6 @@ td.numeric, th.numeric {
 .hover-card:hover {
   border-color: var(--border-soft);
   background: rgba(255, 255, 255, 0.02);
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 
 .hover-card:hover::after {
@@ -682,31 +660,43 @@ td.numeric, th.numeric {
 }
 
 /* --------------------------------------------------------------------------
-   18. Custom Select/Dropdown
+   18. Custom Inputs
    -------------------------------------------------------------------------- */
-select {
+select, input[type="number"], input[type="text"] {
   appearance: none;
   background: var(--bg-elevated);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
-  padding: 10px 36px 10px 14px;
+  padding: 10px 14px;
   font-size: var(--text-sm);
   color: var(--text-primary);
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
+  font-family: var(--font-sans);
   transition: all var(--duration-fast) var(--ease-out);
+  width: 100%;
 }
 
-select:hover {
+select {
+  padding-right: 36px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+select:hover, input:hover {
   border-color: var(--border-medium);
 }
 
-select:focus {
+select:focus, input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(6, 87, 233, 0.1);
+  box-shadow: 0 0 0 2px rgba(6, 87, 233, 0.15);
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* --------------------------------------------------------------------------
