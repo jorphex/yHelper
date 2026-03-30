@@ -872,7 +872,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .heat-cell {
-  background: var(--bg-elevated);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: var(--space-4);
@@ -880,7 +880,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .heat-cell.has-value {
-  background: rgba(6, 87, 233, calc(0.08 + var(--heat-alpha, 0) * 0.12));
+  background: rgba(59, 130, 246, calc(0.06 + var(--heat-alpha, 0) * 0.18));
 }
 
 .viz-legend {

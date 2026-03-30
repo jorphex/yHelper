@@ -204,7 +204,7 @@ export function HeatGrid({
                   key={item.id}
                   style={
                     {
-                      "--heat-alpha": `${Math.pow(intensity, 0.5) * 0.5}`,
+                      "--heat-alpha": `${Math.pow(intensity, 0.7) * 0.35}`,
                       "--heat-delay": `${Math.min(index, 10) * 0.012}s`,
                     } as CSSProperties
                   }
