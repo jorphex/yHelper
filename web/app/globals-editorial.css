@@ -535,8 +535,8 @@ td.numeric, th.numeric {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.kpi-card:hover::before {
-  opacity: 1;
+.kpi-card::before {
+  display: none;
 }
 
 .kpi-label {
@@ -872,11 +872,15 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .heat-cell {
-  background: rgba(6, 87, 233, var(--heat-alpha, 0.16));
+  background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   transition: all var(--duration-fast) var(--ease-out);
+}
+
+.heat-cell.has-value {
+  background: rgba(6, 87, 233, calc(0.08 + var(--heat-alpha, 0) * 0.12));
 }
 
 .viz-legend {

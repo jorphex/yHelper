@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { ReactNode, Suspense } from "react";
 import { Sidebar } from "./components/sidebar";
 import { ChunkRecovery } from "./components/chunk-recovery";
+import { PageTransition } from "./components/page-transition";
 import { Providers } from "./providers";
 import { SOCIAL_IMAGE_VERSION } from "./lib/social-image-version";
 
@@ -84,11 +85,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div className="app-shell">
           <Sidebar />
           
-          <main id="main-content" className="main-content animate-fade-in-up" tabIndex={-1}>
+          <main id="main-content" className="main-content" tabIndex={-1}>
             <Providers>
               <div className="content-area">
                 <Suspense fallback={null}>
-                  {children}
+                  <PageTransition>
+                    {children}
+                  </PageTransition>
                 </Suspense>
               </div>
             </Providers>

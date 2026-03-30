@@ -200,11 +200,11 @@ export function HeatGrid({
               const emphasized = Math.pow(intensity, 0.62);
               return (
                 <article
-                  className="heat-cell"
+                  className={`heat-cell ${item.value ? 'has-value' : ''}`}
                   key={item.id}
                   style={
                     {
-                      "--heat-alpha": `${0.16 + emphasized * 0.78}`,
+                      "--heat-alpha": `${Math.pow(intensity, 0.5) * 0.5}`,
                       "--heat-delay": `${Math.min(index, 10) * 0.012}s`,
                     } as CSSProperties
                   }
