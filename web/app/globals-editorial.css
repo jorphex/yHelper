@@ -291,6 +291,9 @@ h4 { font-size: var(--text-xl); }
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: var(--tracking-tight);
+  text-decoration: none;
+  text-align: center;
+  display: block;
 }
 
 .sidebar-nav {
