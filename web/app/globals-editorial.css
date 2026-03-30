@@ -367,8 +367,9 @@ h4 { font-size: var(--text-xl); }
    8. Page Header
    -------------------------------------------------------------------------- */
 .page-header {
-  margin-bottom: var(--space-10);
-  padding-bottom: var(--space-6);
+  margin-top: var(--space-8);
+  margin-bottom: var(--space-12);
+  padding-bottom: var(--space-8);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -578,6 +579,73 @@ td.numeric, th.numeric {
 .hover-card:hover {
   border-color: var(--border-soft);
   background: var(--bg-surface);
+}
+
+/* --------------------------------------------------------------------------
+   18. Custom Select/Dropdown
+   -------------------------------------------------------------------------- */
+select {
+  appearance: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 10px 36px 10px 14px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+select:hover {
+  border-color: var(--border-medium);
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(6, 87, 233, 0.1);
+}
+
+/* --------------------------------------------------------------------------
+   19. Skeleton Loading States
+   -------------------------------------------------------------------------- */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    var(--bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-text {
+  height: 1em;
+  margin-bottom: 0.5em;
+}
+
+.skeleton-text:last-child {
+  width: 80%;
+}
+
+.skeleton-card {
+  height: 120px;
+  border-radius: var(--radius-lg);
+}
+
+.skeleton-table-row {
+  height: 48px;
+  margin-bottom: 2px;
 }
 
 /* --------------------------------------------------------------------------

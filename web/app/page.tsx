@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
@@ -83,23 +84,35 @@ export default function HomePage() {
 
   return (
     <div className={`transition-opacity duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
-      {/* Hero Section */}
-      <section className="page-header" style={{ borderBottom: 'none' }}>
-        <h1 className="page-title">
-          Clear signals.<br />
-          <em className="page-title-accent">Faster decisions.</em>
-        </h1>
-        <p className="page-description">
-          Purpose-built analytics for Yearn vault discovery, yield shifts, and strategic decisions. 
-          Find opportunities without wading through repeated guesswork.
-        </p>
-        <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
-          <Link href="/discover" className="button button-primary">
-            Start in Discover
-          </Link>
-          <Link href="/changes" className="button button-secondary">
-            Check Changes
-          </Link>
+      {/* Hero Section with Yearn Logo */}
+      <section className="page-header" style={{ borderBottom: 'none', display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '48px', alignItems: 'center' }}>
+        <div>
+          <h1 className="page-title" style={{ marginBottom: '24px' }}>
+            Clear signals.<br />
+            <em className="page-title-accent">Faster decisions.</em>
+          </h1>
+          <p className="page-description" style={{ maxWidth: '480px', marginBottom: '32px' }}>
+            Purpose-built analytics for Yearn vault discovery, yield shifts, and strategic decisions. 
+            Find opportunities without wading through repeated guesswork.
+          </p>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Link href="/discover" className="button button-primary">
+              Start in Discover
+            </Link>
+            <Link href="/changes" className="button button-secondary">
+              Check Changes
+            </Link>
+          </div>
+        </div>
+        <div style={{ position: 'relative', height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Image
+            src="/home-assets-yearn-blender/hero-yearn-blender-coins.png"
+            alt="Yearn Finance"
+            width={400}
+            height={280}
+            priority
+            style={{ objectFit: 'contain' }}
+          />
         </div>
       </section>
 
