@@ -1,92 +1,426 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
+import { apiUrl } from "../lib/api";
+import { chainLabel, compactChainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
+import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
+import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
+import { BarList, HeatGrid, ScatterPlot, ShareMeter, TrendStrips } from "../components/visuals";
+import { VaultLink } from "../components/vault-link";
+import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 import { useChangesData } from "../hooks/use-changes-data";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
-import { VaultLink } from "../components/vault-link";
-import { ScatterPlot, BarList } from "../components/visuals";
-import { UniverseKind, universeDefaults, UNIVERSE_VALUES } from "../lib/universe";
+
+type WindowKey = "24h" | "7d" | "30d";
+type TrendGroupKey = "none" | "chain" | "category";
 
 type ChangeRow = {
   vault_address: string;
   chain_id: number;
   symbol: string | null;
   token_symbol: string | null;
+  category: string | null;
   tvl_usd: number | null;
   safe_apy_window: number | null;
   safe_apy_prev_window: number | null;
   delta_apy: number | null;
+  age_seconds: number | null;
 };
 
-type WindowKey = "24h" | "7d" | "30d";
+type DailyTrendRow = {
+  day: string;
+  weighted_apy_7d?: number | null;
+  weighted_apy_30d?: number | null;
+  weighted_momentum_7d_30d?: number | null;
+  riser_ratio?: number | null;
+  faller_ratio?: number | null;
+  bucket_high_ratio?: number | null;
+};
+
+type GroupedTrendRow = {
+  day: string;
+  group_key: string;
+  total_tvl_usd?: number | null;
+  weighted_apy_30d?: number | null;
+  weighted_momentum_7d_30d?: number | null;
+};
+
+type MoverSortKey = "vault" | "chain" | "tvl" | "current" | "previous" | "delta" | "age";
+
+function MoverTable({
+  title,
+  rows,
+  universe,
+  minTvl,
+  minPoints,
+  compact,
+}: {
+  title: string;
+  rows: ChangeRow[];
+  universe: UniverseKind;
+  minTvl: number;
+  minPoints: number;
+  compact: boolean;
+}) {
+  const [sort, setSort] = useState<SortState<MoverSortKey>>({
+    key: title === "Stalest Series" ? "age" : "delta",
+    direction: title === "Stalest Series" ? "desc" : "desc",
+  });
+
+  const sortedRows = sortRows(rows, sort, {
+    vault: (row) => row.symbol ?? row.vault_address,
+    chain: (row) => chainLabel(row.chain_id),
+    tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
+    current: (row) => row.safe_apy_window ?? Number.NEGATIVE_INFINITY,
+    previous: (row) => row.safe_apy_prev_window ?? Number.NEGATIVE_INFINITY,
+    delta: (row) => row.delta_apy ?? Number.NEGATIVE_INFINITY,
+    age: (row) => row.age_seconds ?? Number.NEGATIVE_INFINITY,
+  });
+
+  return (
+    <section className="card" style={{ marginBottom: "24px" }}>
+      <h2 className="card-title">{title}</h2>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "vault"))}>
+                  Vault {sortIndicator(sort, "vault")}
+                </button>
+              </th>
+              <th>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "chain"))}>
+                  Chain {sortIndicator(sort, "chain")}
+                </button>
+              </th>
+              <th style={{ textAlign: "right" }}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "tvl"))}>
+                  TVL {sortIndicator(sort, "tvl")}
+                </button>
+              </th>
+              <th style={{ textAlign: "right" }}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "current"))}>
+                  Current {sortIndicator(sort, "current")}
+                </button>
+              </th>
+              <th style={{ textAlign: "right" }}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "previous"))}>
+                  Previous {sortIndicator(sort, "previous")}
+                </button>
+              </th>
+              <th style={{ textAlign: "right" }}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "delta"))}>
+                  Delta {sortIndicator(sort, "delta")}
+                </button>
+              </th>
+              <th style={{ textAlign: "right" }}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "age"))}>
+                  Age {sortIndicator(sort, "age")}
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRows.map((row) => (
+              <tr key={`${title}-${row.vault_address}`}>
+                <td>
+                  <VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} />
+                </td>
+                <td>
+                  <Link href={`/discover?chain=${row.chain_id}&universe=${universe}&min_tvl=${minTvl}&min_points=${minPoints}`}>
+                    {compactChainLabel(row.chain_id, compact)}
+                  </Link>
+                </td>
+                <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
+                <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_window)}</td>
+                <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_prev_window)}</td>
+                <td style={{ textAlign: "right", color: (row.delta_apy ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }} className="data-value">
+                  {formatPct(row.delta_apy)}
+                </td>
+                <td style={{ textAlign: "right" }} className="data-value">{formatHours(row.age_seconds)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
 
 function ChangesPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [trends, setTrends] = useState<DailyTrendRow[]>([]);
+  const [chainTrendLatest, setChainTrendLatest] = useState<GroupedTrendRow[]>([]);
+  const [categoryTrendLatest, setCategoryTrendLatest] = useState<GroupedTrendRow[]>([]);
+  const [chainTrendSeries, setChainTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
+  const [categoryTrendSeries, setCategoryTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
+  const [trendError, setTrendError] = useState<string | null>(null);
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
 
   const query = useMemo(() => {
-    const universe = (searchParams.get("universe") || "core") as UniverseKind;
+    const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
     const defaults = universeDefaults(universe);
     return {
       universe,
-      window: (searchParams.get("window") || "7d") as WindowKey,
-      minTvl: Number(searchParams.get("min_tvl") || defaults.minTvl),
-      minPoints: Number(searchParams.get("min_points") || defaults.minPoints),
+      window: queryChoice<WindowKey>(searchParams, "window", ["24h", "7d", "30d"] as const, "7d"),
+      trendGroup: queryChoice<TrendGroupKey>(searchParams, "trend_group", ["none", "chain", "category"] as const, "none"),
+      limit: queryInt(searchParams, "limit", 20, { min: 5, max: 80 }),
+      minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
+      minPoints: queryInt(searchParams, "min_points", defaults.minPoints, { min: 0, max: 365 }),
     };
   }, [searchParams]);
 
-  const updateQuery = (updates: Record<string, string | number | null>) => {
-    const params = new URLSearchParams(searchParams);
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value === null || value === undefined) params.delete(key);
-      else params.set(key, String(value));
-    });
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  };
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const onChange = () => setIsCompactViewport(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
 
-  const { data, isLoading } = useChangesData({
+  const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
+    replaceQuery(router, pathname, searchParams, updates);
+
+  const { data, isLoading, error, refetch } = useChangesData({
     universe: query.universe,
     minTvl: query.minTvl,
     window: query.window,
     staleThreshold: "auto",
   });
 
-  const summary = data?.summary;
-  const risers = data?.movers?.risers ?? [];
-  const fallers = data?.movers?.fallers ?? [];
-  const largest = data?.movers?.largest_abs_delta ?? [];
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const baseParams = new URLSearchParams({
+          universe: query.universe,
+          min_tvl_usd: String(query.minTvl),
+          min_points: String(query.minPoints),
+        });
+        const globalParams = new URLSearchParams(baseParams);
+        globalParams.set("days", "90");
+        const chainParams = new URLSearchParams(baseParams);
+        chainParams.set("days", "90");
+        chainParams.set("group_by", "chain");
+        chainParams.set("group_limit", "10");
+        const categoryParams = new URLSearchParams(baseParams);
+        categoryParams.set("days", "90");
+        categoryParams.set("group_by", "category");
+        categoryParams.set("group_limit", "10");
+        
+        const requests = [
+          fetch(apiUrl("/trends/daily", globalParams), { cache: "no-store" }),
+          fetch(apiUrl("/trends/daily", chainParams), { cache: "no-store" }),
+          fetch(apiUrl("/trends/daily", categoryParams), { cache: "no-store" }),
+        ];
 
-  const scatterPoints = useMemo(() => {
-    return largest.slice(0, 50).map((row: ChangeRow) => ({
-      id: `${row.chain_id}:${row.vault_address}`,
-      x: row.delta_apy ?? 0,
-      y: row.safe_apy_window ?? 0,
-      size: row.tvl_usd ?? 0,
-      href: yearnVaultUrl(row.chain_id, row.vault_address),
-      tone: (row.delta_apy ?? 0) >= 0 ? "positive" as const : "negative" as const,
-    }));
-  }, [largest]);
+        const responses = await Promise.all(requests);
+        if (!active) return;
+        
+        const [globalRes, chainRes, categoryRes] = responses;
+        if (!globalRes.ok || !chainRes.ok || !categoryRes.ok) {
+          setTrendError("Trends API error");
+          return;
+        }
+        
+        const [globalPayload, chainPayload, categoryPayload] = await Promise.all([
+          globalRes.json(),
+          chainRes.json(),
+          categoryRes.json(),
+        ]);
+        
+        if (!active) return;
+        setTrends(globalPayload.rows || []);
+        setChainTrendLatest(chainPayload.grouped?.latest?.filter((r: GroupedTrendRow) => r.group_key && r.group_key !== "unknown") || []);
+        setCategoryTrendLatest(categoryPayload.grouped?.latest?.filter((r: GroupedTrendRow) => r.group_key && r.group_key !== "unknown") || []);
+        setChainTrendSeries(chainPayload.grouped?.series || {});
+        setCategoryTrendSeries(categoryPayload.grouped?.series || {});
+        setTrendError(null);
+      } catch (err) {
+        if (active) setTrendError(`Trends load failed: ${String(err)}`);
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, [query.universe, query.minTvl, query.minPoints]);
 
-  const deltaBands = useMemo(() => {
+  const moverScatterRows = useMemo(() => {
+    const index = new Map<string, ChangeRow>();
+    const allRows = [
+      ...(data?.movers?.risers ?? []),
+      ...(data?.movers?.fallers ?? []),
+      ...(data?.movers?.largest_abs_delta ?? []),
+    ];
+    for (const row of allRows) {
+      const key = `${row.chain_id}:${row.vault_address}`;
+      const existing = index.get(key);
+      if (!existing || (row.tvl_usd ?? 0) > (existing.tvl_usd ?? 0)) {
+        index.set(key, row);
+      }
+    }
+    return [...index.values()]
+      .sort((a, b) => (b.tvl_usd ?? 0) - (a.tvl_usd ?? 0))
+      .slice(0, isCompactViewport ? 56 : 80);
+  }, [data?.movers, isCompactViewport]);
+
+  const deltaBandItems = useMemo(() => {
     const bands = [
-      { id: "gt5", label: "+5%+", min: 0.05, max: Infinity },
+      { id: "gt5", label: "≥ +5%", min: 0.05, max: Infinity },
       { id: "gt1", label: "+1% to +5%", min: 0.01, max: 0.05 },
       { id: "mid", label: "-1% to +1%", min: -0.01, max: 0.01 },
       { id: "lt1", label: "-5% to -1%", min: -0.05, max: -0.01 },
-      { id: "lt5", label: "-5%+", min: -Infinity, max: -0.05 },
-    ];
+      { id: "lt5", label: "≤ -5%", min: -Infinity, max: -0.05 },
+    ].map((band) => ({ ...band, count: 0, tvl: 0 }));
+    
+    for (const row of moverScatterRows) {
+      if (row.delta_apy === null || row.delta_apy === undefined) continue;
+      const band = bands.find((b) => row.delta_apy! >= b.min && row.delta_apy! < b.max);
+      if (!band) continue;
+      band.count += 1;
+      band.tvl += row.tvl_usd ?? 0;
+    }
     return bands.map((band) => ({
       id: band.id,
       label: band.label,
-      value: largest.filter((r: ChangeRow) => {
-        const d = r.delta_apy ?? 0;
-        return d >= band.min && d < band.max;
-      }).length,
+      value: band.count,
+      note: `${formatUsd(band.tvl)} TVL`,
     }));
-  }, [largest]);
+  }, [moverScatterRows]);
+
+  const trendSlice = useMemo(() => trends.slice(Math.max(0, trends.length - 60)), [trends]);
+  
+  const moverDriftTrendItems = useMemo(
+    () => [
+      {
+        id: "riser-ratio",
+        label: "Riser share",
+        points: trendSlice.map((row) => row.riser_ratio),
+        note: "Vaults with improving short-term APY",
+      },
+      {
+        id: "faller-ratio",
+        label: "Faller share",
+        points: trendSlice.map((row) => row.faller_ratio),
+        note: "Vaults with weakening short-term APY",
+      },
+      {
+        id: "momentum",
+        label: "Weighted momentum",
+        points: trendSlice.map((row) => row.weighted_momentum_7d_30d),
+        note: "TVL-weighted momentum baseline",
+      },
+    ],
+    [trendSlice],
+  );
+
+  const weightedApyTrendItems = useMemo(
+    () => [
+      {
+        id: "apy7",
+        label: "APY 7d",
+        points: trendSlice.map((row) => row.weighted_apy_7d),
+        note: "Latest-week annualized yield",
+      },
+      {
+        id: "apy30",
+        label: "APY 30d",
+        points: trendSlice.map((row) => row.weighted_apy_30d),
+        note: "Primary comparison baseline",
+      },
+    ],
+    [trendSlice],
+  );
+
+  const groupedApyTrendItems = useMemo(() => {
+    if (query.trendGroup === "none") return [];
+    const latest = query.trendGroup === "chain" ? chainTrendLatest : categoryTrendLatest;
+    const series = query.trendGroup === "chain" ? chainTrendSeries : categoryTrendSeries;
+    return latest
+      .sort((a, b) => (b.total_tvl_usd ?? 0) - (a.total_tvl_usd ?? 0))
+      .slice(0, 6)
+      .map((row) => ({
+        id: `group-${query.trendGroup}-${row.group_key}`,
+        label: query.trendGroup === "chain" ? chainLabel(Number(row.group_key)) : row.group_key,
+        points: (series[row.group_key] ?? []).map((p) => p.weighted_apy_30d),
+        note: `APY ${formatPct(row.weighted_apy_30d)} • TVL ${formatUsd(row.total_tvl_usd)}`,
+      }));
+  }, [query.trendGroup, chainTrendLatest, categoryTrendLatest, chainTrendSeries, categoryTrendSeries]);
+
+  const chainMomentumHeat = useMemo(
+    () =>
+      chainTrendLatest
+        .sort((a, b) => (b.total_tvl_usd ?? 0) - (a.total_tvl_usd ?? 0))
+        .slice(0, isCompactViewport ? 8 : 12)
+        .map((row) => ({
+          id: `chain-${row.group_key}`,
+          label: chainLabel(Number(row.group_key)),
+          value: row.weighted_momentum_7d_30d,
+          note: `${formatUsd(row.total_tvl_usd)} • APY ${formatPct(row.weighted_apy_30d)}`,
+        })),
+    [chainTrendLatest, isCompactViewport],
+  );
+
+  const categoryMomentumHeat = useMemo(
+    () =>
+      categoryTrendLatest
+        .sort((a, b) => (b.total_tvl_usd ?? 0) - (a.total_tvl_usd ?? 0))
+        .slice(0, isCompactViewport ? 8 : 12)
+        .map((row) => ({
+          id: `cat-${row.group_key}`,
+          label: row.group_key,
+          value: row.weighted_momentum_7d_30d,
+          note: `${formatUsd(row.total_tvl_usd)} • APY ${formatPct(row.weighted_apy_30d)}`,
+        })),
+    [categoryTrendLatest, isCompactViewport],
+  );
+
+  if (error && !data) {
+    return (
+      <div className="card" style={{ padding: "48px" }}>
+        <h2>Changes data is temporarily unavailable</h2>
+        <p>The change feed failed to load. Please try again later.</p>
+        <button onClick={() => refetch()} className="button button-primary" style={{ marginTop: "16px" }}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const summary = data?.summary;
+  const eligibleVaults = summary?.vaults_eligible ?? 0;
+  const comparedVaults = data?.freshness?.window_tracked_vaults ?? summary?.vaults_with_change ?? 0;
+  const staleVaults = data?.freshness?.window_stale_vaults ?? summary?.stale_vaults ?? 0;
+  const freshComparedVaults = Math.max(0, comparedVaults - staleVaults);
+  const missingWindowVaults = Math.max(0, eligibleVaults - comparedVaults);
+
+  const vaultCoverageSegments = [
+    {
+      id: "fresh-window",
+      label: "Fresh window",
+      value: freshComparedVaults,
+      note: eligibleVaults > 0 ? `${formatPct(freshComparedVaults / eligibleVaults, 0)} of eligible` : "Waiting...",
+      tone: "positive" as const,
+    },
+    {
+      id: "stale-window",
+      label: "Stale window",
+      value: staleVaults,
+      note: eligibleVaults > 0 ? `${formatPct(staleVaults / eligibleVaults, 0)} beyond cutoff` : "...",
+      tone: "warning" as const,
+    },
+    {
+      id: "missing-window",
+      label: "Missing window",
+      value: missingWindowVaults,
+      note: eligibleVaults > 0 ? `${formatPct(missingWindowVaults / eligibleVaults, 0)} no delta` : "...",
+      tone: "muted" as const,
+    },
+  ];
 
   return (
     <div>
@@ -98,7 +432,7 @@ function ChangesPageContent() {
           <em className="page-title-accent">Recent shifts.</em>
         </h1>
         <p className="page-description">
-          APY movers over a configurable window. Spot which vaults are rising, falling, and how concentrated the changes are.
+          Track APY window-to-window shifts with freshness diagnostics and trend analysis.
         </p>
       </section>
 
@@ -122,11 +456,11 @@ function ChangesPageContent() {
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
               <select
                 value={query.universe}
-                onChange={(e) => updateQuery({ universe: e.target.value })}
+                onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null, min_points: null })}
                 style={{ width: "100%", marginTop: "6px" }}
               >
                 {UNIVERSE_VALUES.map((v) => (
-                  <option key={v} value={v}>{v}</option>
+                  <option key={v} value={v}>{universeLabel(v)}</option>
                 ))}
               </select>
             </label>
@@ -140,16 +474,22 @@ function ChangesPageContent() {
               />
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Avg Delta</span>
-              <div style={{ marginTop: "12px", fontSize: "14px", color: "var(--text-secondary)" }}>
-                {isLoading ? "Loading..." : formatPct(summary?.avg_delta)}
-              </div>
+              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Trend View</span>
+              <select
+                value={query.trendGroup}
+                onChange={(e) => updateQuery({ trend_group: e.target.value as TrendGroupKey })}
+                style={{ width: "100%", marginTop: "6px" }}
+              >
+                <option value="none">Global</option>
+                <option value="chain">By Chain</option>
+                <option value="category">By Category</option>
+              </select>
             </label>
           </div>
         </div>
       </section>
 
-      {/* Summary */}
+      {/* Summary KPIs */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
           <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
@@ -160,7 +500,7 @@ function ChangesPageContent() {
         ) : (
           <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
             <div className="kpi-card">
-              <div className="kpi-label">Eligible</div>
+              <div className="kpi-label">Eligible Vaults</div>
               <div className="kpi-value">{summary?.vaults_eligible ?? "n/a"}</div>
             </div>
             <div className="kpi-card">
@@ -168,115 +508,136 @@ function ChangesPageContent() {
               <div className="kpi-value">{summary?.vaults_with_change ?? "n/a"}</div>
             </div>
             <div className="kpi-card">
-              <div className="kpi-label">Risers</div>
-              <div className="kpi-value" style={{ color: "var(--positive)" }}>{risers.length}</div>
+              <div className="kpi-label">Avg Delta</div>
+              <div className="kpi-value" style={{ color: (summary?.avg_delta ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }}>
+                {formatPct(summary?.avg_delta)}
+              </div>
             </div>
             <div className="kpi-card">
-              <div className="kpi-label">Fallers</div>
-              <div className="kpi-value" style={{ color: "var(--negative)" }}>{fallers.length}</div>
+              <div className="kpi-label">Fresh PPS Age</div>
+              <div className="kpi-value">{formatHours(data?.freshness?.latest_pps_age_seconds)}</div>
             </div>
           </div>
         )}
       </section>
 
-      {/* Movers Tables */}
+      {/* Coverage */}
+      <section className="section" style={{ marginBottom: "48px" }}>
+        <div className="card-header">
+          <h2 className="card-title">Window Coverage</h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+          <ShareMeter
+            title="By Vaults"
+            segments={vaultCoverageSegments}
+            total={eligibleVaults}
+            valueFormatter={(value) => (value === null || value === undefined ? "n/a" : Number(value).toLocaleString())}
+            legend="Eligible vaults split by comparison freshness"
+          />
+          <HeatGrid
+            title="Momentum by Chain"
+            items={chainMomentumHeat}
+            valueFormatter={(value) => formatPct(value, 1)}
+            legend="TVL-weighted momentum (7d minus 30d APY)"
+          />
+        </div>
+      </section>
+
+      {/* Movers */}
       <section className="section">
         <div className="card-header">
-          <h2 className="card-title">Top Risers</h2>
+          <h2 className="card-title">Movers</h2>
         </div>
-        <div className="table-wrap" style={{ marginBottom: "48px" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Vault</th>
-                <th>Chain</th>
-                <th style={{ textAlign: "right" }}>TVL</th>
-                <th style={{ textAlign: "right" }}>Previous</th>
-                <th style={{ textAlign: "right" }}>Current</th>
-                <th style={{ textAlign: "right" }}>Delta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <TableSkeleton rows={5} columns={6} />
-              ) : (
-                risers.slice(0, 10).map((row: ChangeRow) => (
-                  <tr key={row.vault_address}>
-                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                    <td>{chainLabel(row.chain_id)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_prev_window)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_window)}</td>
-                    <td style={{ textAlign: "right", color: "var(--positive)" }} className="data-value">+{formatPct(row.delta_apy)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="card-header">
-          <h2 className="card-title">Top Fallers</h2>
-        </div>
-        <div className="table-wrap" style={{ marginBottom: "48px" }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Vault</th>
-                <th>Chain</th>
-                <th style={{ textAlign: "right" }}>TVL</th>
-                <th style={{ textAlign: "right" }}>Previous</th>
-                <th style={{ textAlign: "right" }}>Current</th>
-                <th style={{ textAlign: "right" }}>Delta</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <TableSkeleton rows={5} columns={6} />
-              ) : (
-                fallers.slice(0, 10).map((row: ChangeRow) => (
-                  <tr key={row.vault_address}>
-                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                    <td>{chainLabel(row.chain_id)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_prev_window)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_window)}</td>
-                    <td style={{ textAlign: "right", color: "var(--negative)" }} className="data-value">{formatPct(row.delta_apy)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        
+        {isLoading ? (
+          <>
+            <TableSkeleton rows={6} columns={7} />
+            <TableSkeleton rows={6} columns={7} />
+          </>
+        ) : (
+          <>
+            <MoverTable
+              title="Top Risers"
+              rows={data?.movers?.risers ?? []}
+              universe={query.universe}
+              minTvl={query.minTvl}
+              minPoints={query.minPoints}
+              compact={isCompactViewport}
+            />
+            <MoverTable
+              title="Top Fallers"
+              rows={data?.movers?.fallers ?? []}
+              universe={query.universe}
+              minTvl={query.minTvl}
+              minPoints={query.minPoints}
+              compact={isCompactViewport}
+            />
+            <MoverTable
+              title="Largest Absolute Changes"
+              rows={data?.movers?.largest_abs_delta ?? []}
+              universe={query.universe}
+              minTvl={query.minTvl}
+              minPoints={query.minPoints}
+              compact={isCompactViewport}
+            />
+          </>
+        )}
       </section>
 
       {/* Visualizations */}
       <section className="section">
         <div className="card-header">
-          <h2 className="card-title">Delta Analysis</h2>
+          <h2 className="card-title">Trend Analysis</h2>
         </div>
+        
+        {trendError ? <div className="card" style={{ padding: "24px", marginBottom: "24px" }}>{trendError}</div> : null}
+        
         <div style={{ display: "grid", gap: "24px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+            <TrendStrips
+              title="Riser/Faller Drift (60 Days)"
+              items={moverDriftTrendItems}
+              valueFormatter={(value) => formatPct(value, 1)}
+              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 1)}`}
+              emptyText="Trend data unavailable"
+            />
+            <TrendStrips
+              title={query.trendGroup === "none" ? "APY Trend" : `APY by ${query.trendGroup === "chain" ? "Chain" : "Category"}`}
+              items={query.trendGroup === "none" ? weightedApyTrendItems : groupedApyTrendItems}
+              valueFormatter={(value) => formatPct(value, 2)}
+              deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
+              emptyText="Trend data unavailable"
+            />
+          </div>
+          
           <ScatterPlot
             title="Delta vs Current APY"
             xLabel="Delta"
             yLabel="Current APY"
-            points={scatterPoints}
-            xFormatter={(v) => formatPct(v, 1)}
-            yFormatter={(v) => formatPct(v, 1)}
+            points={moverScatterRows.map((row) => ({
+              id: `${row.chain_id}:${row.vault_address}`,
+              x: row.delta_apy,
+              y: row.safe_apy_window,
+              size: row.tvl_usd,
+              href: yearnVaultUrl(row.chain_id, row.vault_address),
+              tone: (row.delta_apy ?? 0) >= 0 ? "positive" : "negative",
+            }))}
+            xFormatter={(value) => formatPct(value, 1)}
+            yFormatter={(value) => formatPct(value, 1)}
           />
+          
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
             <BarList
               title="Delta Distribution"
-              items={deltaBands}
-              valueFormatter={(v) => String(v ?? 0)}
+              items={deltaBandItems}
+              valueFormatter={(value) => String(value ?? 0)}
             />
-            <div className="card" style={{ padding: "24px" }}>
-              <h3 style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Summary</h3>
-              <p style={{ fontSize: "14px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                Delta shows the change in APY from the previous period to the current period. 
-                Positive values indicate rising yields, negative values indicate falling yields.
-              </p>
-            </div>
+            <HeatGrid
+              title="Momentum by Category"
+              items={categoryMomentumHeat}
+              valueFormatter={(value) => formatPct(value, 1)}
+              legend="Compare category momentum drift"
+            />
           </div>
         </div>
       </section>
