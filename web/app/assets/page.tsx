@@ -156,7 +156,8 @@ function AssetsPageContent() {
           <em className="page-title-accent">Venue comparison.</em>
         </h1>
         <p className="page-description">
-          Compare vault venues for the same token to spot meaningful APY dispersion and momentum gaps.
+          Compare vault venues for the same token to spot meaningful APY dispersion and momentum gaps. 
+          Weighted APY reflects where most capital sits.
         </p>
       </section>
 
@@ -241,6 +242,11 @@ function AssetsPageContent() {
               <div className="kpi-label">Best APY</div>
               <div className="kpi-value">{formatPct(detail?.summary.best_safe_apy_30d)}</div>
             </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Spread</div>
+              <div className="kpi-value">{formatPct(detail?.summary.spread_safe_apy_30d)}</div>
+              <div className="kpi-hint">Best minus worst</div>
+            </div>
           </div>
         ) : null}
 
@@ -250,6 +256,7 @@ function AssetsPageContent() {
               <tr>
                 <th>Vault</th>
                 <th>Chain</th>
+                <th style={{ textAlign: "center" }}>Category</th>
                 <th style={{ textAlign: "right" }}>TVL</th>
                 <th style={{ textAlign: "right" }}>APY</th>
                 <th style={{ textAlign: "right" }}>Momentum</th>
@@ -264,6 +271,7 @@ function AssetsPageContent() {
                   <tr key={row.vault_address}>
                     <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
                     <td>{compactChainLabel(row.chain_id, isCompactViewport)}</td>
+                    <td style={{ textAlign: "center" }}>{compactCategoryLabel(row.category)}</td>
                     <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
                     <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_30d)}</td>
                     <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.momentum_7d_30d)}</td>
@@ -286,7 +294,7 @@ function AssetsPageContent() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px", marginBottom: "32px" }}>
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
             <div className="kpi-card">
               <div className="kpi-label">Tokens</div>
               <div className="kpi-value">{assetData?.summary?.tokens ?? filteredTokenRows.length}</div>
@@ -296,8 +304,12 @@ function AssetsPageContent() {
               <div className="kpi-value">{assetData?.summary?.multi_chain_tokens ?? "n/a"}</div>
             </div>
             <div className="kpi-card">
-              <div className="kpi-label">High Spread</div>
-              <div className="kpi-value">{assetData?.summary?.high_spread_tokens ?? "n/a"}</div>
+              <div className="kpi-label">Median Spread</div>
+              <div className="kpi-value">{formatPct(assetData?.summary?.median_spread_safe_apy_30d)}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Total TVL</div>
+              <div className="kpi-value">{formatUsd(assetData?.summary?.total_tvl_usd)}</div>
             </div>
           </div>
 
@@ -332,7 +344,10 @@ function AssetsPageContent() {
                   <tr
                     key={row.token_symbol}
                     onClick={() => updateQuery({ token: row.token_symbol })}
-                    style={{ cursor: "pointer" }}
+                    style={{ 
+                      cursor: "pointer", 
+                      backgroundColor: row.token_symbol === selectedSymbol ? "rgba(6, 87, 233, 0.08)" : undefined 
+                    }}
                   >
                     <td style={{ fontWeight: 500 }}>{row.token_symbol}</td>
                     <td style={{ textAlign: "center" }}>{row.venues}</td>

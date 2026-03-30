@@ -15,6 +15,7 @@ import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 
 type WindowKey = "24h" | "7d" | "30d";
 type TrendGroupKey = "none" | "chain" | "category";
+type TvlViewKey = "filtered" | "reference";
 
 type ChangeRow = {
   vault_address: string;
@@ -47,7 +48,27 @@ type GroupedTrendRow = {
   weighted_momentum_7d_30d?: number | null;
 };
 
+type StaleByChain = {
+  chain_id: number;
+  vaults: number;
+  stale_vaults: number;
+  stale_ratio: number;
+  tvl_usd: number | null;
+  stale_tvl_usd: number | null;
+};
+
+type StaleByCategory = {
+  category: string;
+  vaults: number;
+  stale_vaults: number;
+  stale_ratio: number;
+  tvl_usd: number | null;
+  stale_tvl_usd: number | null;
+};
+
 type MoverSortKey = "vault" | "chain" | "tvl" | "current" | "previous" | "delta" | "age";
+type StaleSortKey = "chain" | "vaults" | "stale" | "ratio" | "tvl";
+type StaleCatSortKey = "category" | "vaults" | "stale" | "ratio" | "tvl";
 
 function MoverTable({
   title,
@@ -87,37 +108,37 @@ function MoverTable({
           <thead>
             <tr>
               <th>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "vault"))}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "vault"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Vault {sortIndicator(sort, "vault")}
                 </button>
               </th>
               <th>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "chain"))}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Chain {sortIndicator(sort, "chain")}
                 </button>
               </th>
               <th style={{ textAlign: "right" }}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "tvl"))}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   TVL {sortIndicator(sort, "tvl")}
                 </button>
               </th>
               <th style={{ textAlign: "right" }}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "current"))}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "current"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Current {sortIndicator(sort, "current")}
                 </button>
               </th>
               <th style={{ textAlign: "right" }}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "previous"))}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "previous"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Previous {sortIndicator(sort, "previous")}
                 </button>
               </th>
               <th style={{ textAlign: "right" }}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "delta"))}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "delta"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Delta {sortIndicator(sort, "delta")}
                 </button>
               </th>
               <th style={{ textAlign: "right" }}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "age"))}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "age"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Age {sortIndicator(sort, "age")}
                 </button>
               </th>
@@ -161,6 +182,8 @@ function ChangesPageContent() {
   const [categoryTrendSeries, setCategoryTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
   const [trendError, setTrendError] = useState<string | null>(null);
   const [isCompactViewport, setIsCompactViewport] = useState(false);
+  const [staleSort, setStaleSort] = useState<SortState<StaleSortKey>>({ key: "ratio", direction: "desc" });
+  const [staleCatSort, setStaleCatSort] = useState<SortState<StaleCatSortKey>>({ key: "ratio", direction: "desc" });
 
   const query = useMemo(() => {
     const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
@@ -169,6 +192,7 @@ function ChangesPageContent() {
       universe,
       window: queryChoice<WindowKey>(searchParams, "window", ["24h", "7d", "30d"] as const, "7d"),
       trendGroup: queryChoice<TrendGroupKey>(searchParams, "trend_group", ["none", "chain", "category"] as const, "none"),
+      tvlView: queryChoice<TvlViewKey>(searchParams, "tvl_view", ["filtered", "reference"] as const, "filtered"),
       limit: queryInt(searchParams, "limit", 20, { min: 5, max: 80 }),
       minTvl: queryFloat(searchParams, "min_tvl", defaults.minTvl, { min: 0 }),
       minPoints: queryInt(searchParams, "min_points", defaults.minPoints, { min: 0, max: 365 }),
@@ -379,6 +403,51 @@ function ChangesPageContent() {
     [categoryTrendLatest, isCompactViewport],
   );
 
+  // Stale data calculations
+  const staleByChain = data?.freshness?.stale_by_chain ?? [];
+  const staleByCategory = data?.freshness?.stale_by_category ?? [];
+
+  const staleChainRows = sortRows(staleByChain, staleSort, {
+    chain: (row) => chainLabel(row.chain_id),
+    vaults: (row) => row.vaults,
+    stale: (row) => row.stale_vaults,
+    ratio: (row) => row.stale_ratio,
+    tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
+  });
+
+  const staleCategoryRows = sortRows(staleByCategory, staleCatSort, {
+    category: (row) => row.category,
+    vaults: (row) => row.vaults,
+    stale: (row) => row.stale_vaults,
+    ratio: (row) => row.stale_ratio,
+    tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
+  });
+
+  // Stale ratio heatmaps
+  const staleChainHeatItems = useMemo(() => {
+    return staleByChain
+      .sort((a, b) => b.stale_ratio - a.stale_ratio)
+      .slice(0, 10)
+      .map((row) => ({
+        id: `stale-chain-${row.chain_id}`,
+        label: chainLabel(row.chain_id),
+        value: row.stale_ratio,
+        note: `${row.stale_vaults}/${row.vaults} vaults • ${formatUsd(row.tvl_usd)} TVL`,
+      }));
+  }, [staleByChain]);
+
+  const staleCategoryHeatItems = useMemo(() => {
+    return staleByCategory
+      .sort((a, b) => b.stale_ratio - a.stale_ratio)
+      .slice(0, 10)
+      .map((row) => ({
+        id: `stale-cat-${row.category}`,
+        label: row.category,
+        value: row.stale_ratio,
+        note: `${row.stale_vaults}/${row.vaults} vaults • ${formatUsd(row.tvl_usd)} TVL`,
+      }));
+  }, [staleByCategory]);
+
   if (error && !data) {
     return (
       <div className="card" style={{ padding: "48px" }}>
@@ -397,6 +466,15 @@ function ChangesPageContent() {
   const staleVaults = data?.freshness?.window_stale_vaults ?? summary?.stale_vaults ?? 0;
   const freshComparedVaults = Math.max(0, comparedVaults - staleVaults);
   const missingWindowVaults = Math.max(0, eligibleVaults - comparedVaults);
+
+  // Yearn-aligned reference data
+  const yearnAligned = data?.reference_tvl?.yearn_aligned_proxy;
+  const filteredTvl = summary?.total_tvl_usd;
+  const trackedTvl = summary?.tracked_tvl_usd;
+  const yearnTvl = yearnAligned?.tvl_usd;
+  const yearnVaults = yearnAligned?.vaults;
+  const gap = yearnAligned?.comparison_to_filtered_universe?.gap_usd;
+  const ratio = yearnAligned?.comparison_to_filtered_universe?.ratio;
 
   const vaultCoverageSegments = [
     {
@@ -422,6 +500,23 @@ function ChangesPageContent() {
     },
   ];
 
+  const tvlCoverageSegments = [
+    {
+      id: "fresh-tvl",
+      label: "Fresh TVL",
+      value: trackedTvl ?? 0,
+      note: filteredTvl && trackedTvl ? `${formatPct(trackedTvl / filteredTvl, 0)} of filtered` : "...",
+      tone: "positive" as const,
+    },
+    {
+      id: "stale-tvl",
+      label: "Stale TVL",
+      value: (filteredTvl ?? 0) - (trackedTvl ?? 0),
+      note: filteredTvl ? `${formatPct(((filteredTvl ?? 0) - (trackedTvl ?? 0)) / filteredTvl, 0)} beyond cutoff` : "...",
+      tone: "warning" as const,
+    },
+  ];
+
   return (
     <div>
       {/* Header */}
@@ -439,7 +534,7 @@ function ChangesPageContent() {
       {/* Filters */}
       <section className="section" style={{ marginBottom: "32px" }}>
         <div className="card">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px" }}>
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Window</span>
               <select
@@ -485,12 +580,26 @@ function ChangesPageContent() {
                 <option value="category">By Category</option>
               </select>
             </label>
+            <label>
+              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>TVL View</span>
+              <select
+                value={query.tvlView}
+                onChange={(e) => updateQuery({ tvl_view: e.target.value as TvlViewKey })}
+                style={{ width: "100%", marginTop: "6px" }}
+              >
+                <option value="filtered">Filtered Universe</option>
+                <option value="reference">Yearn Aligned</option>
+              </select>
+            </label>
           </div>
         </div>
       </section>
 
-      {/* Summary KPIs */}
+      {/* Window Summary KPI Block */}
       <section className="section" style={{ marginBottom: "48px" }}>
+        <div className="card-header">
+          <h2 className="card-title">Window Summary</h2>
+        </div>
         {isLoading ? (
           <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
             {Array(4).fill(null).map((_, i) => (
@@ -498,30 +607,72 @@ function ChangesPageContent() {
             ))}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-            <div className="kpi-card">
-              <div className="kpi-label">Eligible Vaults</div>
-              <div className="kpi-value">{summary?.vaults_eligible ?? "n/a"}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">With Change</div>
-              <div className="kpi-value">{summary?.vaults_with_change ?? "n/a"}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Avg Delta</div>
-              <div className="kpi-value" style={{ color: (summary?.avg_delta ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }}>
-                {formatPct(summary?.avg_delta)}
+          <>
+            {query.tvlView === "filtered" ? (
+              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+                <div className="kpi-card">
+                  <div className="kpi-label">Filtered Universe TVL</div>
+                  <div className="kpi-value">{formatUsd(filteredTvl)}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">Tracked TVL</div>
+                  <div className="kpi-value">{formatUsd(trackedTvl)}</div>
+                  <div className="kpi-hint">With delta available</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">Eligible Vaults</div>
+                  <div className="kpi-value">{summary?.vaults_eligible ?? "n/a"}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">With Change</div>
+                  <div className="kpi-value">{summary?.vaults_with_change ?? "n/a"}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+                <div className="kpi-card">
+                  <div className="kpi-label">Yearn-Aligned TVL</div>
+                  <div className="kpi-value">{formatUsd(yearnTvl)}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">Yearn-Aligned Vaults</div>
+                  <div className="kpi-value">{yearnVaults ?? "n/a"}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">Filtered vs Yearn Gap</div>
+                  <div className="kpi-value">{formatUsd(gap)}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">Filtered/Yearn Ratio</div>
+                  <div className="kpi-value">{ratio ? ratio.toFixed(2) : "n/a"}</div>
+                </div>
+              </div>
+            )}
+            <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginTop: "16px" }}>
+              <div className="kpi-card">
+                <div className="kpi-label">Avg Delta</div>
+                <div className="kpi-value" style={{ color: (summary?.avg_delta ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }}>
+                  {formatPct(summary?.avg_delta)}
+                </div>
+              </div>
+              <div className="kpi-card">
+                <div className="kpi-label">Fresh PPS Age</div>
+                <div className="kpi-value">{formatHours(data?.freshness?.latest_pps_age_seconds)}</div>
+              </div>
+              <div className="kpi-card">
+                <div className="kpi-label">Window Stale Ratio</div>
+                <div className="kpi-value">{formatPct(data?.freshness?.window_stale_ratio)}</div>
+              </div>
+              <div className="kpi-card">
+                <div className="kpi-label">PPS Stale Ratio</div>
+                <div className="kpi-value">{formatPct(data?.freshness?.pps_stale_ratio)}</div>
               </div>
             </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Fresh PPS Age</div>
-              <div className="kpi-value">{formatHours(data?.freshness?.latest_pps_age_seconds)}</div>
-            </div>
-          </div>
+          </>
         )}
       </section>
 
-      {/* Coverage */}
+      {/* Coverage by Vaults and TVL */}
       <section className="section" style={{ marginBottom: "48px" }}>
         <div className="card-header">
           <h2 className="card-title">Window Coverage</h2>
@@ -534,12 +685,140 @@ function ChangesPageContent() {
             valueFormatter={(value) => (value === null || value === undefined ? "n/a" : Number(value).toLocaleString())}
             legend="Eligible vaults split by comparison freshness"
           />
-          <HeatGrid
-            title="Momentum by Chain"
-            items={chainMomentumHeat}
-            valueFormatter={(value) => formatPct(value, 1)}
-            legend="TVL-weighted momentum (7d minus 30d APY)"
+          <ShareMeter
+            title="By TVL"
+            segments={tvlCoverageSegments}
+            total={filteredTvl ?? 0}
+            valueFormatter={(value) => formatUsd(value)}
+            legend="Filtered TVL split by freshness"
           />
+        </div>
+      </section>
+
+      {/* Stale-ratio heatmaps */}
+      <section className="section" style={{ marginBottom: "48px" }}>
+        <div className="card-header">
+          <h2 className="card-title">Stale Ratio Heatmaps</h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+          <HeatGrid
+            title="By Chain"
+            items={staleChainHeatItems}
+            valueFormatter={(value) => formatPct(value, 1)}
+            legend="Stale vault ratio by chain"
+          />
+          <HeatGrid
+            title="By Category"
+            items={staleCategoryHeatItems}
+            valueFormatter={(value) => formatPct(value, 1)}
+            legend="Stale vault ratio by category"
+          />
+        </div>
+      </section>
+
+      {/* Freshness by Chain Table */}
+      <section className="section" style={{ marginBottom: "48px" }}>
+        <div className="card-header">
+          <h2 className="card-title">Freshness by Chain</h2>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Chain {sortIndicator(staleSort, "chain")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Vaults {sortIndicator(staleSort, "vaults")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "stale"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Stale {sortIndicator(staleSort, "stale")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "ratio"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Stale % {sortIndicator(staleSort, "ratio")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    TVL {sortIndicator(staleSort, "tvl")}
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <TableSkeleton rows={5} columns={5} />
+              ) : staleChainRows.map((row) => (
+                <tr key={`stale-chain-${row.chain_id}`}>
+                  <td>{chainLabel(row.chain_id)}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{row.stale_vaults}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.stale_ratio)}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Freshness by Category Table */}
+      <section className="section" style={{ marginBottom: "48px" }}>
+        <div className="card-header">
+          <h2 className="card-title">Freshness by Category</h2>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "category"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Category {sortIndicator(staleCatSort, "category")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Vaults {sortIndicator(staleCatSort, "vaults")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "stale"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Stale {sortIndicator(staleCatSort, "stale")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "ratio"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    Stale % {sortIndicator(staleCatSort, "ratio")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "right" }}>
+                  <button className="th-button" onClick={() => setStaleCatSort(toggleSort(staleCatSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                    TVL {sortIndicator(staleCatSort, "tvl")}
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <TableSkeleton rows={5} columns={5} />
+              ) : staleCategoryRows.map((row) => (
+                <tr key={`stale-cat-${row.category}`}>
+                  <td>{row.category}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{row.stale_vaults}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.stale_ratio)}</td>
+                  <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -575,6 +854,14 @@ function ChangesPageContent() {
             <MoverTable
               title="Largest Absolute Changes"
               rows={data?.movers?.largest_abs_delta ?? []}
+              universe={query.universe}
+              minTvl={query.minTvl}
+              minPoints={query.minPoints}
+              compact={isCompactViewport}
+            />
+            <MoverTable
+              title="Stalest Series"
+              rows={data?.stale ?? []}
               universe={query.universe}
               minTvl={query.minTvl}
               minPoints={query.minPoints}

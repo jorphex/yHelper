@@ -99,9 +99,10 @@ function formatUtcDate(value: string | null | undefined): string {
   return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" }).format(date);
 }
 
-export default function StYfiPage() {
+function StYfiPageContent() {
   const [data, setData] = useState<StYfiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -109,13 +110,18 @@ export default function StYfiPage() {
       try {
         const params = new URLSearchParams({ days: "122", epoch_limit: "12" });
         const res = await fetch(apiUrl("/styfi", params), { cache: "no-store" });
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        if (!res.ok) {
+          if (active) setError(`API error: ${res.status}`);
+          return;
+        }
         const payload = await res.json() as StYfiResponse;
         if (active) {
           setData(payload);
-          setIsLoading(false);
+          setError(null);
         }
-      } catch {
+      } catch (err) {
+        if (active) setError(`Load failed: ${String(err)}`);
+      } finally {
         if (active) setIsLoading(false);
       }
     };
@@ -133,8 +139,16 @@ export default function StYfiPage() {
   const hasNetFlow24h = summary?.net_flow_24h !== null && summary?.net_flow_24h !== undefined && Number.isFinite(summary.net_flow_24h);
   const hasNetFlow7d = summary?.net_flow_7d !== null && summary?.net_flow_7d !== undefined && Number.isFinite(summary.net_flow_7d);
 
+  // Calculate if we should show Reward Token fallback
+  const showRewardTokenFallback = !hasNetFlow7d;
+
   const summaryItems = useMemo(() => {
     const items = [
+      {
+        label: "Current Epoch",
+        value: currentEpoch ?? "n/a",
+        hint: "Active reward epoch",
+      },
       {
         label: "stYFI Staked",
         value: formatTokenCompact(summary?.styfi_staked ?? null, "YFI"),
@@ -158,9 +172,15 @@ export default function StYfiPage() {
       {
         label: "Current Reward APR",
         value: formatPct(data?.current_reward_state?.styfi_current_apr ?? null, 2),
-        hint: `Current run-rate from ${rewardSymbol} rewards`,
+        hint: data?.current_reward_state?.styfix_current_apr 
+          ? `stYFI ${formatPct(data.current_reward_state.styfi_current_apr, 2)} • stYFIx ${formatPct(data.current_reward_state.styfix_current_apr, 2)}`
+          : `Current run-rate from ${rewardSymbol} rewards`,
       },
-      {
+      showRewardTokenFallback ? {
+        label: "Reward Token",
+        value: rewardSymbol,
+        hint: "Current reward denomination",
+      } : {
         label: "Snapshot Freshness",
         value: formatHours(data?.freshness?.latest_snapshot_age_seconds ?? null, 1),
         hint: formatUtcDateTime(data?.freshness?.latest_snapshot_at ?? null),
@@ -185,7 +205,7 @@ export default function StYfiPage() {
       },
     ];
     return items;
-  }, [summary, data?.current_reward_state, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue]);
+  }, [summary, data?.current_reward_state, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue, currentEpoch, showRewardTokenFallback]);
 
   const stakeSplitSegments = useMemo(() => [
     { id: "styfi", label: "stYFI", value: summary?.styfi_staked ?? null, note: percentShare(summary?.styfi_staked ?? null, summary?.combined_staked ?? null), tone: "primary" as const },
@@ -217,35 +237,62 @@ export default function StYfiPage() {
     },
   ], [data?.current_reward_state]);
 
+  // Error state fallback - after all hooks
+  if (error && !data) {
+    return (
+      <div className="card" style={{ padding: "48px", textAlign: "center" }}>
+        <h2 style={{ marginBottom: "16px" }}>Data temporarily unavailable</h2>
+        <p style={{ color: "var(--text-secondary)", marginBottom: "24px" }}>
+          The stYFI data feed failed to load. Please try again later.
+        </p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="button button-primary"
+          style={{ padding: "12px 24px" }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Header */}
-      <section className="page-header" style={{ borderBottom: "none" }}>
-        <h1 className="page-title">
-          stYFI.
-          <br />
-          <em className="page-title-accent">Staking surface.</em>
-        </h1>
-        <p className="page-description">
-          Track Yearn staking balance, reward epochs, and protocol-level yield. 
-          Current reward token: <strong>{rewardSymbol}</strong>. 
-          History retained for {data?.data_policy?.retention_days ?? "—"} days.
-        </p>
+      <section className="page-header" style={{ borderBottom: "none", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 className="page-title">
+            stYFI.
+            <br />
+            <em className="page-title-accent">Staking surface.</em>
+          </h1>
+          <p className="page-description">
+            Track Yearn staking balance, reward epochs, and protocol-level yield. 
+            Current reward token: <strong>{rewardSymbol}</strong>. 
+            History retained for {data?.data_policy?.retention_days ?? "—"} days.
+          </p>
+        </div>
+        <a 
+          href="https://yearn.finance/stake-yfi" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="button button-primary"
+          style={{ whiteSpace: "nowrap" }}
+        >
+          Open stYFI App
+        </a>
       </section>
 
-      {/* Summary KPIs - 8 cards */}
+      {/* Summary KPIs - 9 cards */}
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-            {Array(8).fill(null).map((_, i) => (
-              <div key={i} className="kpi-card" style={{ height: "100px" }}>
-                <div className="skeleton" style={{ height: "12px", width: "60%", marginBottom: "12px" }} />
-                <div className="skeleton" style={{ height: "24px", width: "80%" }} />
-              </div>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+            {Array(9).fill(null).map((_, i) => (
+              <KpiGridSkeleton key={i} count={1} />
             ))}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
             {summaryItems.map((item) => (
               <div key={item.label} className="kpi-card">
                 <div className="kpi-label">{item.label}</div>
@@ -297,7 +344,7 @@ export default function StYfiPage() {
         <div className="card-header">
           <h2 className="card-title">Epoch Detail</h2>
           <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-            Epochs start at 00:00:00 UTC. Component columns are protocol allocations.
+            Epochs start at 00:00:00 UTC. Component columns are protocol allocations (not user claim totals).
           </p>
         </div>
         
@@ -350,5 +397,20 @@ export default function StYfiPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function StYfiPage() {
+  return (
+    <Suspense fallback={
+      <div className="card" style={{ padding: "48px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div className="skeleton" style={{ height: "40px", width: "200px" }} />
+          <div className="skeleton" style={{ height: "20px", width: "60%" }} />
+        </div>
+      </div>
+    }>
+      <StYfiPageContent />
+    </Suspense>
   );
 }
