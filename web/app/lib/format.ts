@@ -74,6 +74,18 @@ export function formatUsd(value: number | null | undefined, digits = 0, isLoadin
   }).format(value);
 }
 
+export function formatUsdCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "n/a";
+  }
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 export function formatHours(seconds: number | null | undefined, digits = 1, isLoading = false): string {
   if (isLoading) {
     return "—";

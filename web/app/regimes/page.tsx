@@ -3,9 +3,9 @@
 import { Suspense, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatPct, formatUsd } from "../lib/format";
-import { useRegimesData } from "../hooks/use-regimes-data";
+import { useRegimesData, useTransitionsData } from "../hooks/use-regimes-data";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
-import { HeatGrid } from "../components/visuals";
+import { HeatGrid, RegimeSankey } from "../components/visuals";
 import type { UniverseKind } from "../lib/universe";
 
 function RegimesPageContent() {
@@ -27,14 +27,23 @@ function RegimesPageContent() {
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const { data, isLoading } = useRegimesData({
+  const { data: regimesData, isLoading: isLoadingRegimes } = useRegimesData({
     universe: query.universe,
     minTvl: query.minTvl,
     minPoints: 45,
   });
 
-  const regimes = data?.summary ?? [];
-  const movers = data?.movers ?? [];
+  const { data: transitionsData, isLoading: isLoadingTransitions } = useTransitionsData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: 45,
+  });
+
+  const isLoading = isLoadingRegimes || isLoadingTransitions;
+
+  const regimes = regimesData?.summary ?? [];
+  const movers = regimesData?.movers ?? [];
+  const transitions = transitionsData?.matrix ?? [];
   const currentRegime = regimes[0]?.regime ?? "n/a";
 
   return (
@@ -120,6 +129,20 @@ function RegimesPageContent() {
 
       <section className="section">
         <div className="card-header">
+          <h2 className="card-title">Regime Flow</h2>
+        </div>
+        
+        <RegimeSankey
+          title="Transitions by TVL"
+          rows={transitions.map((t: any) => ({
+            previous_regime: t.previous_regime,
+            current_regime: t.current_regime,
+            tvl_usd: t.tvl_usd,
+            vaults: t.vaults,
+          }))}
+        />
+        
+        <div className="card-header" style={{ marginTop: "48px" }}>
           <h2 className="card-title">Regime Distribution</h2>
         </div>
         

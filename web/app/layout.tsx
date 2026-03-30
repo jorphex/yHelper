@@ -2,6 +2,7 @@ import "./globals-editorial.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode, Suspense } from "react";
 import { Sidebar } from "./components/sidebar";
+import { Footer } from "./components/footer";
 import { ChunkRecovery } from "./components/chunk-recovery";
 import { PageTransition } from "./components/page-transition";
 import { Providers } from "./providers";
@@ -94,6 +95,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   </PageTransition>
                 </Suspense>
               </div>
+              <Footer />
             </Providers>
           </main>
         </div>

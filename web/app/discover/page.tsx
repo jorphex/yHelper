@@ -11,7 +11,7 @@ import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { NoVaultsEmptyState } from "../components/empty-state";
 import { DataLoadError } from "../components/error-state";
 import { VaultLink } from "../components/vault-link";
-import { BarList, HeatGrid, ScatterPlot, TrendStrips } from "../components/visuals";
+import { BarList, HeatGrid, ScatterPlot, TrendStrips, Ridgeline } from "../components/visuals";
 
 type DiscoverRow = {
   vault_address: string;
@@ -108,6 +108,25 @@ function DiscoverPageContent() {
     href: `https://yearn.fi/v3/${row.chain_id}/${row.vault_address}`,
     tooltip: `${row.symbol || row.vault_address}\nAPY: ${formatPct(row.safe_apy_30d)}\nMomentum: ${formatPct(row.momentum_7d_30d)}`,
   })), [rows]);
+
+  // Ridgeline data - group by chain
+  const chainRidgelineSeries = useMemo(() => {
+    const byChain = new Map<number, number[]>();
+    for (const row of rows) {
+      if (!row.safe_apy_30d) continue;
+      if (!byChain.has(row.chain_id)) byChain.set(row.chain_id, []);
+      byChain.get(row.chain_id)!.push(row.safe_apy_30d);
+    }
+    return Array.from(byChain.entries())
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 6)
+      .map(([chainId, values]) => ({
+        id: String(chainId),
+        label: chainLabel(chainId),
+        values,
+        note: `${values.length} vaults`,
+      }));
+  }, [rows]);
 
 
 
@@ -356,6 +375,11 @@ function DiscoverPageContent() {
             yFormatter={(v) => formatPct(v, 1)}
           />
           
+          <Ridgeline
+            title="APY Distribution by Chain"
+            series={chainRidgelineSeries}
+          />
+          
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
             <BarList
               title="APY Buckets"
@@ -369,7 +393,7 @@ function DiscoverPageContent() {
             
             <HeatGrid
               title="Risk Mix"
-              items={(data?.risk_mix ?? []).map((r) => ({
+              items={(data?.risk_mix ?? []).map((r: { risk_level: string; vaults: number; tvl_usd: number | null }) => ({
                 id: r.risk_level,
                 label: riskLabel(r.risk_level),
                 value: r.vaults,
@@ -378,8 +402,6 @@ function DiscoverPageContent() {
               valueFormatter={(v) => String(v ?? "n/a")}
             />
           </div>
-          
-
         </div>
       </section>
     </div>

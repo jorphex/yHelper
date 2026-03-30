@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { formatPct, formatUsd, formatUsdCompact } from "../lib/format";
 
 type Kpi = {
   label: string;
@@ -48,6 +49,20 @@ type TrendStripDatum = {
   note?: string;
 };
 
+type RidgelineSeries = {
+  id: string;
+  label: string;
+  values: number[];
+  note: string;
+};
+
+type SankeyRow = {
+  previous_regime: string;
+  current_regime: string;
+  tvl_usd: number | null | undefined;
+  vaults: number;
+};
+
 function finiteValues(values: Array<number | null | undefined>): number[] {
   return values.filter((value): value is number => value !== null && value !== undefined && Number.isFinite(value));
 }
@@ -69,6 +84,47 @@ function pickTrendStroke(id: string, index: number): string {
   let hash = 0;
   for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return TREND_STROKE_COLORS[(hash + index) % TREND_STROKE_COLORS.length];
+}
+
+// Regime helpers for Sankey
+const REGIME_ORDER: Record<string, number> = {
+  rising: 0,
+  improving: 0,
+  stable: 1,
+  plateau: 1,
+  falling: 2,
+  declining: 2,
+  choppy: 3,
+  uncertain: 3,
+  unknown: 4,
+};
+
+function regimeOrder(regime: string): number {
+  return REGIME_ORDER[regime?.toLowerCase()] ?? 99;
+}
+
+function regimeColor(regime: string): [number, number, number] {
+  const tone = regime?.toLowerCase() || "unknown";
+  if (tone === "rising" || tone === "improving") return [34, 197, 94]; // green
+  if (tone === "stable" || tone === "plateau") return [250, 204, 21]; // yellow
+  if (tone === "falling" || tone === "declining") return [239, 68, 68]; // red
+  if (tone === "choppy" || tone === "uncertain") return [168, 85, 247]; // purple
+  return [148, 163, 184]; // gray
+}
+
+function compactRegimeLabel(regime: string): string {
+  const map: Record<string, string> = {
+    rising: "Rising",
+    improving: "Rising",
+    stable: "Stable",
+    plateau: "Stable",
+    falling: "Falling",
+    declining: "Falling",
+    choppy: "Choppy",
+    uncertain: "Choppy",
+    unknown: "Unknown",
+  };
+  return map[regime?.toLowerCase()] || regime || "Unknown";
 }
 
 export function useInViewOnce<T extends HTMLElement>() {
@@ -197,10 +253,9 @@ export function HeatGrid({
             {valid.map((item, index) => {
               const value = Number(item.value);
               const intensity = normalize(value, min, max);
-              const emphasized = Math.pow(intensity, 0.62);
               return (
                 <article
-                  className={`heat-cell ${item.value ? 'has-value' : ''}`}
+                  className={`heat-cell ${item.value ? "has-value" : ""}`}
                   key={item.id}
                   style={
                     {
@@ -600,6 +655,201 @@ export function ScatterPlot({
           </text>
         </svg>
       </div>
+    </section>
+  );
+}
+
+// Ridgeline component for APY distribution
+export function Ridgeline({
+  title,
+  series,
+  emptyText = "Need more APY samples for distribution curves.",
+}: {
+  title: string;
+  series: RidgelineSeries[];
+  emptyText?: string;
+}) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
+  const ridgelinePalette = [
+    { stroke: "var(--viz-line-2)", fill: "rgba(var(--accent-rgb), 0.24)" },
+    { stroke: "var(--viz-line-5)", fill: "rgba(var(--accent-teal-rgb), 0.22)" },
+    { stroke: "var(--viz-line-4)", fill: "rgba(var(--accent-purple-rgb), 0.22)" },
+    { stroke: "var(--viz-line-3)", fill: "rgba(var(--accent-2-rgb), 0.2)" },
+  ];
+  const valid = series.filter((row) => row.values.length >= 4).slice(0, 6);
+  if (valid.length === 0) {
+    return (
+      <section className="viz-panel ridgeline-panel">
+        <h3>{title}</h3>
+        <p className="muted">{emptyText}</p>
+      </section>
+    );
+  }
+  const width = 920;
+  const rowH = valid.length >= 5 ? 28 : 32;
+  const maxLabelChars = valid.reduce((acc, row) => Math.max(acc, row.label.length), 0);
+  const maxNoteChars = valid.reduce((acc, row) => Math.max(acc, row.note.length), 0);
+  const chartLeft = Math.round(width * Math.max(0.102, Math.min(0.172, 0.036 + maxLabelChars * 0.0072)));
+  const chartRight = Math.round(width * Math.max(0.104, Math.min(0.188, 0.048 + maxNoteChars * 0.0068)));
+  const chartWidth = Math.max(220, width - chartLeft - chartRight);
+  const peakHeight = Math.max(8, Math.min(11, rowH * 0.38));
+  const height = 8 + valid.length * rowH + 16;
+  const bins = Math.max(14, Math.min(20, Math.round(chartWidth / 48)));
+  const allValues = valid.flatMap((row) => row.values);
+  const min = Math.min(...allValues);
+  const max = Math.max(...allValues);
+  const span = Math.max(0.0001, max - min);
+
+  return (
+    <section ref={ref} className={`viz-panel ridgeline-panel ${isInView ? "is-in-view" : ""}`.trim()}>
+      <h3>{title}</h3>
+      <div className="scatter-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+          {valid.map((row, idx) => {
+            const tone = ridgelinePalette[idx % ridgelinePalette.length];
+            const yBase = 8 + idx * rowH + peakHeight + 3;
+            const counts = new Array<number>(bins).fill(0);
+            for (const value of row.values) {
+              const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
+              counts[bucket] += 1;
+            }
+            const maxCount = Math.max(1, ...counts);
+            const pathTop = counts
+              .map((count, bIdx) => {
+                const x = chartLeft + (bIdx / (bins - 1)) * chartWidth;
+                const y = yBase - (count / maxCount) * peakHeight;
+                return `${bIdx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+              })
+              .join(" ");
+            const pathBottom = counts
+              .map((_, bIdx) => {
+                const rev = bins - 1 - bIdx;
+                const x = chartLeft + (rev / (bins - 1)) * chartWidth;
+                return `L${x.toFixed(2)},${yBase.toFixed(2)}`;
+              })
+              .join(" ");
+            return (
+              <g key={row.id}>
+                <title>{`${row.label}\n${row.note}\nAPY range ${formatPct(min, 1)} to ${formatPct(max, 1)}`}</title>
+                <path d={`${pathTop} ${pathBottom} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth={0.9} className="ridgeline-curve" />
+                <text x={8} y={yBase - 0.5} className="ridgeline-label" dominantBaseline="central">{row.label}</text>
+                <text x={width - 8} y={yBase - 0.5} className="ridgeline-note" textAnchor="end" dominantBaseline="central">{row.note}</text>
+              </g>
+            );
+          })}
+          <line x1={chartLeft} x2={width - chartRight} y1={height - 12} y2={height - 12} className="viz-axis" />
+          <text x={chartLeft} y={height - 2} className="ridgeline-axis">{formatPct(min, 1)}</text>
+          <text x={width - chartRight} y={height - 2} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
+        </svg>
+      </div>
+      <p className="muted viz-legend">Ridgelines show APY shape by chain. Taller peaks mean more vaults at that APY zone.</p>
+    </section>
+  );
+}
+
+// Sankey diagram for regime transitions
+export function RegimeSankey({
+  title,
+  rows,
+  emptyText = "No transition flows available.",
+}: {
+  title: string;
+  rows: SankeyRow[];
+  emptyText?: string;
+}) {
+  const { ref, isInView } = useInViewOnce<HTMLElement>();
+  const validRows = rows
+    .filter((row) => row.tvl_usd !== null && row.tvl_usd !== undefined && Number.isFinite(row.tvl_usd) && Number(row.tvl_usd) > 0)
+    .sort((left, right) => Number(right.tvl_usd) - Number(left.tvl_usd))
+    .slice(0, 20);
+  const regimes = Array.from(
+    new Set(validRows.flatMap((row) => [row.previous_regime, row.current_regime]).filter(Boolean)),
+  ).sort((a, b) => regimeOrder(a) - regimeOrder(b));
+  if (validRows.length === 0 || regimes.length === 0) {
+    return (
+      <section className="viz-panel sankey-panel">
+        {title ? <h3>{title}</h3> : null}
+        <p className="muted">{emptyText}</p>
+      </section>
+    );
+  }
+  const width = 720;
+  const height = 268;
+  const xLeft = 112;
+  const xRight = width - 112;
+  const laneTop = 60;
+  const laneBottom = height - 38;
+  const laneHeight = laneBottom - laneTop;
+  const laneStep = regimes.length > 1 ? laneHeight / (regimes.length - 1) : laneHeight / 2;
+  const yPos = new Map(regimes.map((key, index) => [key, laneTop + index * laneStep]));
+  const maxFlow = Math.max(...validRows.map((row) => Number(row.tvl_usd)));
+  const incomingByRegime = new Map<string, number>();
+  const outgoingByRegime = new Map<string, number>();
+  for (const row of validRows) {
+    outgoingByRegime.set(row.previous_regime, (outgoingByRegime.get(row.previous_regime) ?? 0) + Number(row.tvl_usd));
+    incomingByRegime.set(row.current_regime, (incomingByRegime.get(row.current_regime) ?? 0) + Number(row.tvl_usd));
+  }
+
+  return (
+    <section ref={ref} className={`viz-panel sankey-panel ${isInView ? "is-in-view" : ""}`.trim()}>
+      {title ? <h3>{title}</h3> : null}
+      <div className="scatter-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+          {validRows.map((row) => {
+            const y1 = yPos.get(row.previous_regime) ?? laneTop;
+            const y2 = yPos.get(row.current_regime) ?? laneTop;
+            const value = Number(row.tvl_usd);
+            const strokeWidth = 1.4 + (value / maxFlow) * 7.2;
+            const intensity = Math.max(0, Math.min(1, value / maxFlow));
+            const [prevR, prevG, prevB] = regimeColor(row.previous_regime);
+            const [currR, currG, currB] = regimeColor(row.current_regime);
+            const strokeR = Math.round((prevR + currR) / 2);
+            const strokeG = Math.round((prevG + currG) / 2);
+            const strokeB = Math.round((prevB + currB) / 2);
+            const stroke = `rgba(${strokeR}, ${strokeG}, ${strokeB}, ${0.26 + intensity * 0.5})`;
+            const c1x = xLeft + (xRight - xLeft) * 0.34;
+            const c2x = xLeft + (xRight - xLeft) * 0.66;
+            const path = `M${xLeft},${y1} C${c1x},${y1} ${c2x},${y2} ${xRight},${y2}`;
+            return (
+              <g key={`${row.previous_regime}-${row.current_regime}-${row.vaults}`} className="sankey-flow">
+                <path
+                  d={path}
+                  fill="none"
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                  pathLength={1}
+                >
+                  <title>
+                    {`${compactRegimeLabel(row.previous_regime)} → ${compactRegimeLabel(row.current_regime)}\nTVL ${formatUsd(row.tvl_usd)}\nVaults ${row.vaults}`}
+                  </title>
+                </path>
+              </g>
+            );
+          })}
+          {regimes.map((regime) => {
+            const y = yPos.get(regime) ?? laneTop;
+            const outValue = outgoingByRegime.get(regime) ?? 0;
+            const inValue = incomingByRegime.get(regime) ?? 0;
+            const [r, g, b] = regimeColor(regime);
+            const fill = `rgba(${r}, ${g}, ${b}, 0.24)`;
+            const stroke = `rgba(${Math.min(255, r + 36)}, ${Math.min(255, g + 36)}, ${Math.min(255, b + 36)}, 0.78)`;
+            return (
+              <g key={`left-${regime}`}>
+                <rect x={8} y={y - 15} width={104} height={30} rx={6} fill={fill} stroke={stroke} />
+                <text x={14} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
+                <text x={106} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(outValue)}</text>
+                <rect x={width - 112} y={y - 15} width={104} height={30} rx={6} fill={fill} stroke={stroke} />
+                <text x={width - 106} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
+                <text x={width - 14} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(inValue)}</text>
+              </g>
+            );
+          })}
+          <text x={8} y={18} className="sankey-axis-label">Previous Regime</text>
+          <text x={width - 8} y={18} className="sankey-axis-label" textAnchor="end">Current Regime</text>
+        </svg>
+      </div>
+      <p className="muted viz-legend">Stroke width scales by transitioned TVL; labels show total outgoing vs incoming TVL per regime.</p>
     </section>
   );
 }
