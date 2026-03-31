@@ -142,7 +142,7 @@ function MoverTable({
                   <VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} />
                 </td>
                 <td>
-                  <Link href={`/discover?chain=${row.chain_id}&universe=${universe}&min_tvl=${minTvl}&min_points=${minPoints}`}>
+                  <Link href={`/explore?chain=${row.chain_id}&universe=${universe}&min_tvl=${minTvl}&min_points=${minPoints}`}>
                     {compactChainLabel(row.chain_id, compact)}
                   </Link>
                 </td>

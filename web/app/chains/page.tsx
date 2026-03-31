@@ -220,7 +220,7 @@ function ChainsPageContent() {
               ) : sortedChains.map((row) => (
                 <tr key={row.chain_id}>
                   <td>
-                    <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                    <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>

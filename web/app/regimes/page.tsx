@@ -786,7 +786,7 @@ function RegimesPageContent() {
               ) : summaryRows.map((row) => (
                 <tr key={row.regime}>
                   <td style={{ textTransform: "capitalize" }}>
-                    <Link href={`/changes?window=7d&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
+                    <Link href={`/momentum?window=7d&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
                       {compactRegimeLabel(row.regime)}
                     </Link>
                   </td>
@@ -913,14 +913,14 @@ function RegimesPageContent() {
                 <tr key={row.vault_address}>
                   <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
                   <td title={chainLabel(row.chain_id)}>
-                    <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
+                    <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
                       {compactChainLabel(row.chain_id, isCompactViewport)}
                     </Link>
                   </td>
                   {!isCompactViewport && (
                     <td>
                       {row.token_symbol ? (
-                        <Link href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
+                        <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}&min_points=${query.minPoints}`}>
                           {row.token_symbol}
                         </Link>
                       ) : (

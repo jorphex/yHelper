@@ -445,7 +445,7 @@ function CompositionPageContent() {
               ) : chainRows.map((row) => (
                 <tr key={row.chain_id}>
                   <td>
-                    <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                    <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
@@ -503,7 +503,7 @@ function CompositionPageContent() {
                 <tr key={row.category}>
                   <td>
                     {row.category ? (
-                      <Link href={`/discover?category=${encodeURIComponent(row.category)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                      <Link href={`/explore?category=${encodeURIComponent(row.category)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                         {row.category}
                       </Link>
                     ) : "Unknown"}
@@ -562,7 +562,7 @@ function CompositionPageContent() {
                 <tr key={row.token_symbol}>
                   <td>
                     {row.token_symbol ? (
-                      <Link href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                      <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                         {row.token_symbol}
                       </Link>
                     ) : "Unknown"}
@@ -635,14 +635,14 @@ function CompositionPageContent() {
                 <tr key={row.vault_address}>
                   <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
                   <td>
-                    <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                    <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
                   {!isCompactViewport && (
                     <td>
                       {row.token_symbol ? (
-                        <Link href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                        <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                           {row.token_symbol}
                         </Link>
                       ) : "n/a"}
@@ -713,14 +713,14 @@ function CompositionPageContent() {
                 <tr key={row.vault_address}>
                   <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
                   <td>
-                    <Link href={`/discover?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                    <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                       {chainLabel(row.chain_id)}
                     </Link>
                   </td>
                   {!isCompactViewport && (
                     <td>
                       {row.token_symbol ? (
-                        <Link href={`/assets?token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
+                        <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                           {row.token_symbol}
                         </Link>
                       ) : "n/a"}

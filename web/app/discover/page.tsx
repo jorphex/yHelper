@@ -331,13 +331,13 @@ function DiscoverPageContent() {
                         />
                       </td>
                       <td style={{ textAlign: "center" }}>
-                        <Link href={`/discover?chain=${row.chain_id}`} style={{ color: "var(--text-secondary)" }}>
+                        <Link href={`/explore?chain=${row.chain_id}`} style={{ color: "var(--text-secondary)" }}>
                           {chainLabel(row.chain_id)}
                         </Link>
                       </td>
                       <td>
                         {row.token_symbol ? (
-                          <Link href={`/assets?token=${encodeURIComponent(row.token_symbol)}`} style={{ color: "var(--accent)" }}>
+                          <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}`} style={{ color: "var(--accent)" }}>
                             {row.token_symbol}
                           </Link>
                         ) : "n/a"}
