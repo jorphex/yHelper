@@ -226,6 +226,21 @@ function ExplorePageContent() {
 
   const selectedSymbol = query.token || "";
 
+  // Auto-select first token when venues tab opens without a selected token,
+  // or when the current token becomes invalid after a token_scope change
+  useEffect(() => {
+    if (query.tab !== "venues" || tokenRows.length === 0) return;
+
+    const currentToken = query.token;
+    const tokenExists = tokenRows.some((row) => row.token_symbol === currentToken);
+
+    // Select first token if: no token selected, or current token not in list
+    if (!currentToken || !tokenExists) {
+      updateQuery({ token: tokenRows[0].token_symbol });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.tab, query.token, tokenRows]);
+
   if (errorDiscover && !discoverData) {
     return <DataLoadError onRetry={() => refetchDiscover()} />;
   }
@@ -275,7 +290,7 @@ function ExplorePageContent() {
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: query.tab === "vaults" ? "repeat(4, 1fr)" : "repeat(5, 1fr)", gap: "16px" }}>
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
               <select
@@ -325,18 +340,36 @@ function ExplorePageContent() {
                 </select>
               </label>
             ) : (
-              <label>
-                <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Token List</span>
-                <select
-                  value={query.tokenScope}
-                  onChange={(e) => updateQuery({ token_scope: e.target.value })}
-                  style={{ width: "100%", marginTop: "6px" }}
-                >
-                  <option value="featured">Featured</option>
-                  <option value="canonical">Canonical</option>
-                  <option value="all">All</option>
-                </select>
-              </label>
+              <>
+                <label>
+                  <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Token</span>
+                  <select
+                    value={query.token || ""}
+                    onChange={(e) => updateQuery({ token: e.target.value || null })}
+                    style={{ width: "100%", marginTop: "6px" }}
+                  >
+                    {isLoadingAssets ? (
+                      <option value="">Loading...</option>
+                    ) : (
+                      tokenRows.map((row) => (
+                        <option key={row.token_symbol} value={row.token_symbol}>{row.token_symbol}</option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                <label>
+                  <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>List</span>
+                  <select
+                    value={query.tokenScope}
+                    onChange={(e) => updateQuery({ token_scope: e.target.value })}
+                    style={{ width: "100%", marginTop: "6px" }}
+                  >
+                    <option value="featured">Featured</option>
+                    <option value="canonical">Canonical</option>
+                    <option value="all">All</option>
+                  </select>
+                </label>
+              </>
             )}
           </div>
 

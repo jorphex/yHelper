@@ -14,7 +14,7 @@ import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 
 type TabKey = "overview" | "chains" | "crowding";
-type ChainSortKey = "chain" | "vaults" | "tvl" | "share" | "apy";
+type ChainSortKey = "chain" | "vaults" | "with_metrics" | "tvl" | "apy" | "momentum" | "consistency";
 type CategorySortKey = "category" | "vaults" | "tvl" | "share" | "apy";
 type TokenSortKey = "token" | "vaults" | "tvl" | "share" | "apy";
 type CrowdingSortKey = "vault" | "chain" | "token" | "category" | "tvl" | "apy" | "crowding";
@@ -212,12 +212,24 @@ function StructurePageContent() {
     minTvl: query.minTvl,
   });
 
+  // Chain rows for Overview tab (from composition data)
+  // @ts-expect-error - Overview chain rows don't have momentum/consistency/with_metrics fields
   const chainRows = sortRows(compData?.chains ?? [], chainSort, {
     chain: (row) => chainLabel(row.chain_id),
     vaults: (row) => row.vaults,
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    share: (row) => row.share_tvl ?? Number.NEGATIVE_INFINITY,
     apy: (row) => row.weighted_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
+  });
+
+  // Chain rows for Chains tab (from chains data API with extra columns)
+  const chainsTabRows = sortRows(chainsData?.rows ?? [], chainSort, {
+    chain: (row) => chainLabel(row.chain_id),
+    vaults: (row) => row.active_vaults,
+    with_metrics: (row) => row.with_metrics,
+    tvl: (row) => row.total_tvl_usd ?? Number.NEGATIVE_INFINITY,
+    apy: (row) => row.weighted_apy_30d ?? Number.NEGATIVE_INFINITY,
+    momentum: (row) => row.avg_momentum_7d_30d ?? Number.NEGATIVE_INFINITY,
+    consistency: (row) => row.avg_consistency ?? Number.NEGATIVE_INFINITY,
   });
 
   const categoryRows = sortRows(compData?.categories ?? [], categorySort, {
@@ -550,21 +562,21 @@ function StructurePageContent() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px", marginBottom: "48px" }}>
               <HeatGrid
                 title="By Chain"
-                items={chainsData?.rows?.slice(0, 6).map((row) => ({
+                items={chainsTabRows.slice(0, 6).map((row) => ({
                   id: String(row.chain_id),
                   label: chainLabel(row.chain_id),
                   value: row.active_vaults,
                   note: formatUsd(row.total_tvl_usd),
-                })) ?? []}
+                }))}
                 valueFormatter={(v) => String(v ?? "n/a")}
               />
               <BarList
                 title="TVL Distribution"
-                items={chainsData?.rows?.map((row) => ({
+                items={chainsTabRows.map((row) => ({
                   id: String(row.chain_id),
                   label: chainLabel(row.chain_id),
                   value: row.total_tvl_usd,
-                })) ?? []}
+                }))}
                 valueFormatter={(v) => formatUsd(v)}
               />
             </div>
@@ -584,13 +596,13 @@ function StructurePageContent() {
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "tvl"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        TVL {sortIndicator(chainSort, "tvl")}
+                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "with_metrics"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                        With Metrics {sortIndicator(chainSort, "with_metrics")}
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "share"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Share {sortIndicator(chainSort, "share")}
+                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "tvl"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                        TVL {sortIndicator(chainSort, "tvl")}
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
@@ -598,23 +610,35 @@ function StructurePageContent() {
                         APY {sortIndicator(chainSort, "apy")}
                       </button>
                     </th>
+                    <th style={{ textAlign: "right" }}>
+                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "momentum"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                        Avg Momentum {sortIndicator(chainSort, "momentum")}
+                      </button>
+                    </th>
+                    <th style={{ textAlign: "right" }}>
+                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "consistency"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                        Avg Consistency {sortIndicator(chainSort, "consistency")}
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    <TableSkeleton rows={5} columns={5} />
+                    <TableSkeleton rows={5} columns={7} />
                   ) : (
-                    chainRows.map((row) => (
+                    chainsTabRows.map((row) => (
                       <tr key={row.chain_id}>
                         <td>
                           <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
                             {chainLabel(row.chain_id)}
                           </Link>
                         </td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.share_tvl)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_safe_apy_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{row.active_vaults}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{row.with_metrics}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.total_tvl_usd)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_apy_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.avg_momentum_7d_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{row.avg_consistency?.toFixed(2) ?? "n/a"}</td>
                       </tr>
                     ))
                   )}
