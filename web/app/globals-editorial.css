@@ -221,17 +221,15 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: var(--tracking-tight);
 }
 
-/* Editorial Display Titles */
+/* Editorial Display Titles - Now using Aeonik */
 .display-serif {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-weight: 400;
-  font-style: italic;
   letter-spacing: -0.02em;
 }
 
 .display-serif em {
   color: var(--accent);
-  font-style: italic;
 }
 
 h1 { font-size: var(--text-5xl); }
@@ -393,17 +391,18 @@ h4 { font-size: var(--text-xl); }
 }
 
 .page-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: var(--text-6xl);
-  font-weight: 400;
-  font-style: italic;
+  font-weight: 500;
   color: var(--text-primary);
   line-height: 1.1;
   margin-bottom: var(--space-4);
+  letter-spacing: -0.03em;
 }
 
 .page-title-accent {
   color: var(--accent);
+  font-style: normal;
 }
 
 .page-description {

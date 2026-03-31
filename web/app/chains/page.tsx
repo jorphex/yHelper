@@ -54,12 +54,12 @@ function ChainsPageContent() {
     <div>
       <section className="page-header" style={{ borderBottom: "none" }}>
         <h1 className="page-title">
-          Chains.
+          Chains
           <br />
-          <em className="page-title-accent">Network view.</em>
+          <em className="page-title-accent">Network view</em>
         </h1>
         <p className="page-description">
-          Compare chain scale, weighted yield, and coverage quality from the same filtered universe.
+          Compare chain scale, weighted yield, and coverage quality.
         </p>
       </section>
 

@@ -545,13 +545,14 @@ function RegimesPageContent() {
       {/* Header */}
       <section className="page-header" style={{ borderBottom: "none" }}>
         <h1 className="page-title">
-          Regimes.
+          Regimes
           <br />
-          <em className="page-title-accent">States. Behavior.</em>
+          <em className="page-title-accent">States and transitions</em>
         </h1>
         <p className="page-description">
-          Follow rising, stable, falling, and choppy states. Understand recent yield behavior 
-          and how cohorts are transitioning.
+          Follow rising, stable, falling, and choppy states.
+          <br />
+          Track how vaults transition between yield behaviors.
         </p>
       </section>
 

@@ -80,7 +80,17 @@ const TREND_STROKE_COLORS = [
   "var(--viz-line-5)",
 ];
 
+// Custom trend colors for stYFI page lines
+const TREND_STROKE_CUSTOM: Record<string, string> = {
+  styfi: "#0657E9", // Yearn blue
+  styfix: "#0657E9", // Yearn blue
+  combined: "#0657E9", // Yearn blue (same as stYFI/stYFIx)
+};
+
 function pickTrendStroke(id: string, index: number): string {
+  // Check for custom color first
+  if (TREND_STROKE_CUSTOM[id]) return TREND_STROKE_CUSTOM[id];
+  // Fall back to palette
   let hash = 0;
   for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return TREND_STROKE_COLORS[(hash + index) % TREND_STROKE_COLORS.length];

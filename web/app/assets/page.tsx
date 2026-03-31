@@ -151,12 +151,13 @@ function AssetsPageContent() {
       {/* Header */}
       <section className="page-header" style={{ borderBottom: "none" }}>
         <h1 className="page-title">
-          Assets.
+          Assets
           <br />
-          <em className="page-title-accent">Venue comparison.</em>
+          <em className="page-title-accent">Venue comparison</em>
         </h1>
         <p className="page-description">
-          Compare vault venues for the same token to spot meaningful APY dispersion and momentum gaps. 
+          Compare vault venues for the same token.
+          <br />
           Weighted APY reflects where most capital sits.
         </p>
       </section>

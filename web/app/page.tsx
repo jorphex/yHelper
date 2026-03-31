@@ -87,14 +87,13 @@ export default function HomePage() {
       <section className="page-header" style={{ borderBottom: 'none', display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '48px', alignItems: 'center' }}>
         <div>
           <h1 className="page-title">
-            Clear signals.<br />
-            <em className="page-title-accent">Faster decisions.</em>
+            Clear signals<br />
+            <em className="page-title-accent">Faster decisions</em>
           </h1>
           <p className="page-description">
-            Purpose-built analytics for Yearn vault discovery, yield shifts, and strategic decisions. 
-            Find opportunities without wading through repeated guesswork.
+            Analytics for Yearn vault discovery, yield shifts, and strategic decisions.
           </p>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
             <Link href="/discover" className="button button-primary">
               Start in Discover
             </Link>

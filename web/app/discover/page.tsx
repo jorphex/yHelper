@@ -138,13 +138,14 @@ function DiscoverPageContent() {
       {/* Header */}
       <section className="page-header" style={{ borderBottom: "none" }}>
         <h1 className="page-title">
-          Discover.
+          Discover
           <br />
-          <em className="page-title-accent">Scan. Filter. Decide.</em>
+          <em className="page-title-accent">Scan and filter</em>
         </h1>
         <p className="page-description">
-          Yield opportunities with filters for size, data quality, and trend direction. 
-          APY is estimated from Price Per Share history—a backward-looking signal.
+          Find vaults with filters for size, data quality, and trend direction.
+          <br />
+          APY is estimated from Price Per Share history, a backward-looking signal.
         </p>
       </section>
 

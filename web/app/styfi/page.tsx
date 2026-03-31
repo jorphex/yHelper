@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
 import { formatHours, formatPct, formatUtcDateTime } from "../lib/format";
-import { BarList, ShareMeter, TrendStrips } from "../components/visuals";
+import { BarList, TrendStrips } from "../components/visuals";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 
 type StYfiSnapshotPoint = {
@@ -185,11 +185,6 @@ function StYfiPageContent() {
     return items;
   }, [summary, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue, showRewardTokenFallback]);
 
-  const stakeSplitSegments = useMemo(() => [
-    { id: "styfi", label: "stYFI", value: summary?.styfi_staked ?? null, note: percentShare(summary?.styfi_staked ?? null, summary?.combined_staked ?? null), tone: "primary" as const },
-    { id: "styfix", label: "stYFIx", value: summary?.styfix_staked ?? null, note: percentShare(summary?.styfix_staked ?? null, summary?.combined_staked ?? null), tone: "positive" as const },
-  ], [summary]);
-
   const stakeTrendItems = useMemo(() => [
     { id: "combined", label: "Combined staked", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest combined balance vs previous snapshot" },
     { id: "styfi", label: "stYFI", points: snapshotSeries.map((r) => r.styfi_staked), note: "Latest stYFI balance vs previous snapshot" },
@@ -237,25 +232,21 @@ function StYfiPageContent() {
   return (
     <div>
       {/* Header */}
-      <section className="page-header" style={{ borderBottom: "none", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <h1 className="page-title">
-            stYFI.
-            <br />
-            <em className="page-title-accent">Staking surface.</em>
-          </h1>
-          <p className="page-description">
-            Track Yearn staking balance, reward epochs, and protocol-level yield. 
-            Current reward token: <strong>{rewardSymbol}</strong>. 
-            History retained for {data?.data_policy?.retention_days ?? "—"} days.
-          </p>
-        </div>
-        <a 
-          href="https://yearn.finance/stake-yfi" 
-          target="_blank" 
+      <section className="page-header" style={{ borderBottom: "none" }}>
+        <h1 className="page-title">
+          stYFI
+          <br />
+          <em className="page-title-accent">Governance staking</em>
+        </h1>
+        <p className="page-description">
+          Track Yearn staking balance, reward epochs, and protocol-level yield.
+        </p>
+        <a
+          href="https://yearn.finance/stake-yfi"
+          target="_blank"
           rel="noopener noreferrer"
           className="button button-primary"
-          style={{ whiteSpace: "nowrap" }}
+          style={{ marginTop: "24px" }}
         >
           Open stYFI App
         </a>
@@ -282,23 +273,14 @@ function StYfiPageContent() {
         )}
       </section>
 
-      {/* Visualizations Grid */}
-      <section className="section">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "48px" }}>
-          <ShareMeter
-            title="Stake Split Now"
-            segments={stakeSplitSegments}
-            total={summary?.combined_staked ?? null}
-            valueFormatter={(value) => formatTokenCompact(value, "YFI")}
-            legend="Combined stake mix across stYFI and stYFIx."
-          />
-          <BarList
-            title={`Current Reward Split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
-            items={rewardBars}
-            valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
-            emptyText="Current reward split syncing."
-          />
-        </div>
+      {/* Reward Split */}
+      <section className="section" style={{ marginBottom: "48px" }}>
+        <BarList
+          title={`Current Reward Split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
+          items={rewardBars}
+          valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
+          emptyText="Current reward split syncing."
+        />
       </section>
 
       {/* Stake Trend */}

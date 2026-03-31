@@ -515,12 +515,12 @@ function ChangesPageContent() {
       {/* Header */}
       <section className="page-header" style={{ borderBottom: "none" }}>
         <h1 className="page-title">
-          Changes.
+          Changes
           <br />
-          <em className="page-title-accent">Recent shifts.</em>
+          <em className="page-title-accent">Recent shifts</em>
         </h1>
         <p className="page-description">
-          Track APY window-to-window shifts with freshness diagnostics and trend analysis.
+          Track APY changes with freshness metrics and trend direction.
         </p>
       </section>
 

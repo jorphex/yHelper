@@ -280,12 +280,12 @@ function CompositionPageContent() {
       {/* Header */}
       <section className="page-header" style={{ borderBottom: "none" }}>
         <h1 className="page-title">
-          Composition.
+          Composition
           <br />
-          <em className="page-title-accent">Concentration lens.</em>
+          <em className="page-title-accent">Concentration lens</em>
         </h1>
         <p className="page-description">
-          Map where TVL concentrates and which vaults are crowded or under-densed.
+          Map where TVL concentrates and which vaults are crowded.
         </p>
       </section>
 

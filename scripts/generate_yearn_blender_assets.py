@@ -7,29 +7,75 @@ import sys
 from pathlib import Path
 
 import bpy
+from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUT_DIR = ROOT / "web/public/home-assets-yearn-blender"
-DEFAULT_LOGO_CANDIDATES = [
-    ROOT / "web/public/yearn-symbol-white-rgb.png",
-    Path("/tmp/yearn-press-kit/public/downloads/YEARN_SYMBOL_WHITE_RGB.png"),
-]
-SCENE_OUTPUTS: dict[str, tuple[str, tuple[int, int]]] = {
-    "hero": ("hero-yearn-blender-coins.png", (1400, 820)),
-    "purpose": ("purpose-yearn-blender-coins.png", (1000, 420)),
-    "divider": ("divider-yearn-blender-coins.png", (1600, 220)),
+DEFAULT_THEME_LOGO_PNG_CANDIDATES: dict[str, list[Path]] = {
+    "yearn": [
+        ROOT / "web/public/yearn-symbol-white-rgb.png",
+        Path("/tmp/yearn-press-kit/public/downloads/YEARN_SYMBOL_WHITE_RGB.png"),
+    ],
+    "styfi": [
+        ROOT / "web/public/stYFI-mark-tight.png",
+        ROOT / "web/public/stYFI-logo-flat-removebg-preview.png",
+    ],
+}
+DEFAULT_THEME_LOGO_SVG_CANDIDATES: dict[str, list[Path]] = {
+    "yearn": [],
+    "styfi": [
+        ROOT / "web/public/stYFI-mark.svg",
+        ROOT / "web/public/stYFI-logo.svg",
+        Path("/tmp/stYFI-logo.svg"),
+    ],
+}
+THEME_DEFAULTS: dict[str, dict[str, Path | str]] = {
+    "yearn": {
+        "output_dir": ROOT / "web/public/home-assets-yearn-blender",
+        "basename": "yearn-blender-coins",
+    },
+    "styfi": {
+        "output_dir": ROOT / "web/public/styfi-assets-blender",
+        "basename": "styfi-blender-coin",
+    },
+}
+SCENE_SIZES: dict[str, tuple[int, int]] = {
+    "hero": (1400, 820),
+    "purpose": (1000, 420),
+    "divider": (1600, 220),
 }
 
 CoinColor = tuple[float, float, float, float]
-TokenPose = tuple[tuple[float, float, float], tuple[float, float, float], float, CoinColor]
+PaletteIndex = int
+TokenPose = tuple[tuple[float, float, float], tuple[float, float, float], float, PaletteIndex]
 
-C0: CoinColor = (0.006, 0.12, 0.62, 1.0)
-C1: CoinColor = (0.005, 0.095, 0.5, 1.0)
-C2: CoinColor = (0.003, 0.07, 0.38, 1.0)
-C3: CoinColor = (0.01, 0.14, 0.7, 1.0)
-C4: CoinColor = (0.008, 0.11, 0.56, 1.0)
-C5: CoinColor = (0.0025, 0.06, 0.33, 1.0)
-C6: CoinColor = (0.011, 0.16, 0.76, 1.0)
+C0: PaletteIndex = 0
+C1: PaletteIndex = 1
+C2: PaletteIndex = 2
+C3: PaletteIndex = 3
+C4: PaletteIndex = 4
+C5: PaletteIndex = 5
+C6: PaletteIndex = 6
+
+PALETTES: dict[str, list[CoinColor]] = {
+    "yearn": [
+        (0.006, 0.12, 0.62, 1.0),
+        (0.005, 0.095, 0.5, 1.0),
+        (0.003, 0.07, 0.38, 1.0),
+        (0.01, 0.14, 0.7, 1.0),
+        (0.008, 0.11, 0.56, 1.0),
+        (0.0025, 0.06, 0.33, 1.0),
+        (0.011, 0.16, 0.76, 1.0),
+    ],
+    "styfi": [
+        (0.984, 0.498, 0.2, 1.0),
+        (0.949, 0.42, 0.13, 1.0),
+        (0.851, 0.337, 0.09, 1.0),
+        (1.0, 0.62, 0.38, 1.0),
+        (0.792, 0.286, 0.082, 1.0),
+        (0.464, 0.149, 0.035, 1.0),
+        (0.996, 0.84, 0.76, 1.0),
+    ],
+}
 
 HERO_LAYOUTS: dict[str, list[TokenPose]] = {
     "default": [
@@ -109,23 +155,53 @@ PURPOSE_LAYOUTS: dict[str, list[TokenPose]] = {
 
 LAYOUT_NAMES = sorted(set(HERO_LAYOUTS) & set(PURPOSE_LAYOUTS))
 
+STYFI_HERO_LAYOUTS: dict[str, list[TokenPose]] = {
+    "tilt-left": [
+        ((0.28, -0.02, 0.38), (24, -22, 12), 1.08, C0),
+    ],
+    "tilt-front": [
+        ((0.34, 0.0, 0.34), (22, -6, 4), 1.06, C0),
+    ],
+    "tilt-right": [
+        ((0.4, -0.02, 0.38), (24, 22, -12), 1.08, C0),
+    ],
+}
+
+STYFI_PURPOSE_LAYOUTS: dict[str, list[TokenPose]] = {
+    "tilt-left": [
+        ((-0.14, 0.0, 0.22), (13, -26, 16), 0.82, C0),
+    ],
+    "tilt-front": [
+        ((-0.08, 0.02, 0.2), (11, -8, 8), 0.8, C0),
+    ],
+    "tilt-right": [
+        ((0.02, 0.02, 0.18), (13, 24, -16), 0.78, C0),
+    ],
+}
+
 
 def parse_args() -> argparse.Namespace:
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     parser = argparse.ArgumentParser(
-        description="Render Yearn home page Blender assets (hero/purpose/divider).",
+        description="Render branded token Blender assets (hero/purpose/divider).",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=DEFAULT_OUT_DIR,
-        help=f"Output directory for rendered PNGs (default: {DEFAULT_OUT_DIR}).",
+        default=None,
+        help="Output directory for rendered PNGs. Defaults depend on --theme.",
     )
     parser.add_argument(
         "--logo-png",
         type=Path,
         default=None,
-        help="Path to Yearn logo PNG with alpha. Overrides YEARN_LOGO_PNG env var and defaults.",
+        help="Path to logo PNG with alpha. Overrides LOGO_PNG env var and defaults.",
+    )
+    parser.add_argument(
+        "--logo-svg",
+        type=Path,
+        default=None,
+        help="Path to logo SVG. When provided, the script imports vector artwork instead of a PNG decal.",
     )
     parser.add_argument(
         "--scenes",
@@ -137,25 +213,61 @@ def parse_args() -> argparse.Namespace:
         "--layout",
         type=str,
         default="default",
-        help=f"Coin layout for hero/purpose scenes from: {', '.join(LAYOUT_NAMES)}.",
+        help=f"Single coin layout for hero/purpose scenes from: {', '.join(LAYOUT_NAMES)}.",
+    )
+    parser.add_argument(
+        "--layouts",
+        type=str,
+        default=None,
+        help="Optional comma-separated layout list. When set, renders one output per layout.",
+    )
+    parser.add_argument(
+        "--theme",
+        type=str,
+        default="yearn",
+        help="Color/output theme: yearn, styfi.",
+    )
+    parser.add_argument(
+        "--basename",
+        type=str,
+        default=None,
+        help="Base filename stem used for outputs. Defaults depend on --theme.",
     )
     return parser.parse_args(argv)
 
 
-def resolve_logo_png(explicit_logo: Path | None) -> Path:
+def resolve_logo_png(explicit_logo: Path | None, theme: str) -> Path:
     candidates: list[Path] = []
     if explicit_logo is not None:
         candidates.append(explicit_logo)
-    env_logo = os.getenv("YEARN_LOGO_PNG")
+    env_logo = os.getenv("LOGO_PNG") or os.getenv("YEARN_LOGO_PNG")
     if env_logo:
         candidates.append(Path(env_logo))
-    candidates.extend(DEFAULT_LOGO_CANDIDATES)
+    candidates.extend(DEFAULT_THEME_LOGO_PNG_CANDIDATES.get(theme, []))
     for candidate in candidates:
         if candidate.exists():
             return candidate
     checked = ", ".join(str(path) for path in candidates) or "(none)"
     raise RuntimeError(
-        "Missing Yearn logo PNG. Provide --logo-png or YEARN_LOGO_PNG. "
+        "Missing logo PNG. Provide --logo-png or LOGO_PNG. "
+        f"Checked: {checked}"
+    )
+
+
+def resolve_logo_svg(explicit_logo: Path | None, theme: str) -> Path:
+    candidates: list[Path] = []
+    if explicit_logo is not None:
+        candidates.append(explicit_logo)
+    env_logo = os.getenv("LOGO_SVG")
+    if env_logo:
+        candidates.append(Path(env_logo))
+    candidates.extend(DEFAULT_THEME_LOGO_SVG_CANDIDATES.get(theme, []))
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    checked = ", ".join(str(path) for path in candidates) or "(none)"
+    raise RuntimeError(
+        "Missing logo SVG. Provide --logo-svg or LOGO_SVG. "
         f"Checked: {checked}"
     )
 
@@ -163,8 +275,8 @@ def resolve_logo_png(explicit_logo: Path | None) -> Path:
 def normalize_scene_selection(raw: str) -> list[str]:
     selected = [item.strip().lower() for item in raw.split(",") if item.strip()]
     if not selected:
-        return list(SCENE_OUTPUTS.keys())
-    invalid = [item for item in selected if item not in SCENE_OUTPUTS]
+        return list(SCENE_SIZES.keys())
+    invalid = [item for item in selected if item not in SCENE_SIZES]
     if invalid:
         raise ValueError(f"Unknown scene(s): {', '.join(invalid)}")
     ordered_unique: list[str] = []
@@ -181,12 +293,75 @@ def normalize_layout(raw: str) -> str:
     return choice
 
 
+def available_layout_names(theme: str) -> list[str]:
+    if theme == "styfi":
+        return sorted(set(STYFI_HERO_LAYOUTS) & set(STYFI_PURPOSE_LAYOUTS))
+    return LAYOUT_NAMES
+
+
+def normalize_layouts(raw: str | None, fallback: str, theme: str) -> list[str]:
+    available = available_layout_names(theme)
+    if raw is None:
+        choice = fallback.strip().lower()
+        if choice not in available:
+            choice = available[0]
+        return [choice]
+    choices = [item.strip().lower() for item in raw.split(",") if item.strip()]
+    if not choices:
+        return normalize_layouts(None, fallback, theme)
+    invalid = [item for item in choices if item not in available]
+    if invalid:
+        raise ValueError(f"Unknown layout(s): {', '.join(invalid)}. Choose from: {', '.join(available)}")
+    ordered_unique: list[str] = []
+    for item in choices:
+        if item not in ordered_unique:
+            ordered_unique.append(item)
+    return ordered_unique
+
+
+def hero_layouts(theme: str) -> dict[str, list[TokenPose]]:
+    return STYFI_HERO_LAYOUTS if theme == "styfi" else HERO_LAYOUTS
+
+
+def purpose_layouts(theme: str) -> dict[str, list[TokenPose]]:
+    return STYFI_PURPOSE_LAYOUTS if theme == "styfi" else PURPOSE_LAYOUTS
+
+
+def normalize_theme(raw: str) -> str:
+    choice = raw.strip().lower()
+    if choice not in PALETTES:
+        raise ValueError(f"Unknown theme '{raw}'. Choose from: {', '.join(PALETTES)}")
+    return choice
+
+
+def srgb_channel_to_linear(value: float) -> float:
+    if value <= 0.04045:
+        return value / 12.92
+    return ((value + 0.055) / 1.055) ** 2.4
+
+
+def srgb_color_to_linear(color: CoinColor) -> CoinColor:
+    return (
+        srgb_channel_to_linear(color[0]),
+        srgb_channel_to_linear(color[1]),
+        srgb_channel_to_linear(color[2]),
+        color[3],
+    )
+
+
+def palette_color(theme: str, index: PaletteIndex) -> CoinColor:
+    color = PALETTES[theme][index]
+    if theme == "styfi":
+        return srgb_color_to_linear(color)
+    return color
+
+
 def clear_scene() -> None:
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
 
 
-def setup_render(width: int, height: int) -> None:
+def setup_render(width: int, height: int, theme: str = "yearn") -> None:
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_EEVEE"
     scene.render.image_settings.file_format = "PNG"
@@ -197,19 +372,20 @@ def setup_render(width: int, height: int) -> None:
     scene.render.resolution_y = height
     scene.render.resolution_percentage = 100
     scene.eevee.use_gtao = True
-    scene.eevee.taa_render_samples = 128
+    scene.eevee.taa_render_samples = 192 if theme == "styfi" else 128
     if hasattr(scene.eevee, "use_soft_shadows"):
         scene.eevee.use_soft_shadows = True
     if hasattr(scene.eevee, "use_ssr"):
         scene.eevee.use_ssr = True
     if hasattr(scene.eevee, "use_bloom"):
-        scene.eevee.use_bloom = True
+        scene.eevee.use_bloom = theme != "styfi"
     if hasattr(scene.eevee, "bloom_intensity"):
-        scene.eevee.bloom_intensity = 0.06
+        scene.eevee.bloom_intensity = 0.0 if theme == "styfi" else 0.06
     if hasattr(scene.eevee, "bloom_radius"):
-        scene.eevee.bloom_radius = 6.0
+        scene.eevee.bloom_radius = 4.2 if theme == "styfi" else 6.0
     if hasattr(scene.eevee, "bloom_threshold"):
-        scene.eevee.bloom_threshold = 0.62
+        scene.eevee.bloom_threshold = 1.0 if theme == "styfi" else 0.62
+    scene.render.filter_size = 0.65 if theme == "styfi" else 1.0
     scene.view_settings.view_transform = "Standard"
     scene.view_settings.look = "None"
     scene.view_settings.exposure = -0.42
@@ -266,7 +442,12 @@ def rim_tint(color: tuple[float, float, float, float]) -> tuple[float, float, fl
     )
 
 
-def apply_coin_surface(mat: bpy.types.Material, color: tuple[float, float, float, float]) -> None:
+def apply_coin_surface(
+    mat: bpy.types.Material,
+    color: tuple[float, float, float, float],
+    *,
+    theme: str = "yearn",
+) -> None:
     mat.use_nodes = True
     nt = mat.node_tree
     nodes = nt.nodes
@@ -308,7 +489,7 @@ def apply_coin_surface(mat: bpy.types.Material, color: tuple[float, float, float
         mix.name = "CoinColorMix"
     mix.location = (-90, 120)
     mix.blend_type = "MULTIPLY"
-    mix.inputs["Fac"].default_value = 0.23
+    mix.inputs["Fac"].default_value = 0.14 if theme == "styfi" else 0.23
     mix.inputs["Color1"].default_value = color
 
     bump = nodes.get("CoinBump")
@@ -326,29 +507,36 @@ def apply_coin_surface(mat: bpy.types.Material, color: tuple[float, float, float
     ensure_socket_link(links, noise.outputs["Fac"], bump.inputs["Height"])
     ensure_socket_link(links, bump.outputs["Normal"], bsdf.inputs["Normal"])
 
-    bsdf.inputs["Metallic"].default_value = 0.16
-    bsdf.inputs["Roughness"].default_value = 0.31
-    set_specular(bsdf, 0.5)
-    set_coat(bsdf, value=0.34, roughness=0.22)
+    bsdf.inputs["Metallic"].default_value = 0.12 if theme == "styfi" else 0.16
+    bsdf.inputs["Roughness"].default_value = 0.4 if theme == "styfi" else 0.31
+    set_specular(bsdf, 0.36 if theme == "styfi" else 0.5)
+    set_coat(bsdf, value=0.14 if theme == "styfi" else 0.34, roughness=0.34 if theme == "styfi" else 0.22)
     if "Emission Strength" in bsdf.inputs:
-        bsdf.inputs["Emission Strength"].default_value = 0.1
+        bsdf.inputs["Emission Strength"].default_value = 0.0 if theme == "styfi" else 0.1
     if "Emission Color" in bsdf.inputs:
+        emission_scale = 1.0 if theme == "styfi" else 1.7
         bsdf.inputs["Emission Color"].default_value = (
-            min(1.0, color[0] * 1.7),
-            min(1.0, color[1] * 1.7),
-            min(1.0, color[2] * 1.82),
+            min(1.0, color[0] * emission_scale),
+            min(1.0, color[1] * emission_scale),
+            min(1.0, color[2] * (1.14 if theme == "styfi" else 1.82)),
             1.0,
         )
     elif "Emission" in bsdf.inputs:
+        emission_scale = 1.0 if theme == "styfi" else 1.7
         bsdf.inputs["Emission"].default_value = (
-            min(1.0, color[0] * 1.7),
-            min(1.0, color[1] * 1.7),
-            min(1.0, color[2] * 1.82),
+            min(1.0, color[0] * emission_scale),
+            min(1.0, color[1] * emission_scale),
+            min(1.0, color[2] * (1.14 if theme == "styfi" else 1.82)),
             1.0,
         )
 
 
-def apply_rim_surface(mat: bpy.types.Material, color: tuple[float, float, float, float]) -> None:
+def apply_rim_surface(
+    mat: bpy.types.Material,
+    color: tuple[float, float, float, float],
+    *,
+    theme: str = "yearn",
+) -> None:
     mat.use_nodes = True
     nt = mat.node_tree
     nodes = nt.nodes
@@ -418,7 +606,7 @@ def apply_rim_surface(mat: bpy.types.Material, color: tuple[float, float, float,
         mix.name = "RimColorMix"
     mix.location = (170, 120)
     mix.blend_type = "MULTIPLY"
-    mix.inputs["Fac"].default_value = 0.32
+    mix.inputs["Fac"].default_value = 0.2 if theme == "styfi" else 0.32
     mix.inputs["Color1"].default_value = rim_tint(color)
 
     bump = nodes.get("RimBump")
@@ -440,14 +628,14 @@ def apply_rim_surface(mat: bpy.types.Material, color: tuple[float, float, float,
     ensure_socket_link(links, blend.outputs["Color"], bump.inputs["Height"])
     ensure_socket_link(links, bump.outputs["Normal"], bsdf.inputs["Normal"])
 
-    bsdf.inputs["Metallic"].default_value = 0.26
-    bsdf.inputs["Roughness"].default_value = 0.22
-    set_specular(bsdf, 0.54)
-    set_coat(bsdf, value=0.2, roughness=0.24)
+    bsdf.inputs["Metallic"].default_value = 0.18 if theme == "styfi" else 0.26
+    bsdf.inputs["Roughness"].default_value = 0.34 if theme == "styfi" else 0.22
+    set_specular(bsdf, 0.4 if theme == "styfi" else 0.54)
+    set_coat(bsdf, value=0.12 if theme == "styfi" else 0.2, roughness=0.32 if theme == "styfi" else 0.24)
     if "Anisotropic" in bsdf.inputs:
         bsdf.inputs["Anisotropic"].default_value = 0.35
     if "Emission Strength" in bsdf.inputs:
-        bsdf.inputs["Emission Strength"].default_value = 0.09
+        bsdf.inputs["Emission Strength"].default_value = 0.0 if theme == "styfi" else 0.09
     tint = rim_tint(color)
     rim_emission = (
         min(1.0, tint[0] * 1.32),
@@ -464,37 +652,46 @@ def apply_rim_surface(mat: bpy.types.Material, color: tuple[float, float, float,
 def make_coin_mat(
     name: str,
     color: tuple[float, float, float, float],
+    *,
+    theme: str = "yearn",
 ) -> bpy.types.Material:
     mat = bpy.data.materials.new(name=name)
-    apply_coin_surface(mat, color)
+    apply_coin_surface(mat, color, theme=theme)
     return mat
 
 
 def make_rim_mat(
     name: str,
     color: tuple[float, float, float, float],
+    *,
+    theme: str = "yearn",
 ) -> bpy.types.Material:
     mat = bpy.data.materials.new(name=name)
-    apply_rim_surface(mat, color)
+    apply_rim_surface(mat, color, theme=theme)
     return mat
 
 
-def set_mat_color(mat: bpy.types.Material, color: tuple[float, float, float, float]) -> None:
-    apply_coin_surface(mat, color)
+def set_mat_color(mat: bpy.types.Material, color: tuple[float, float, float, float], *, theme: str = "yearn") -> None:
+    apply_coin_surface(mat, color, theme=theme)
 
 
-def set_rim_color(mat: bpy.types.Material, color: tuple[float, float, float, float]) -> None:
-    apply_rim_surface(mat, color)
+def set_rim_color(mat: bpy.types.Material, color: tuple[float, float, float, float], *, theme: str = "yearn") -> None:
+    apply_rim_surface(mat, color, theme=theme)
 
 
-def get_logo_decal_mat(logo_png: Path, name: str = "YearnLogoDecal") -> bpy.types.Material:
-    existing = bpy.data.materials.get(name)
+def get_logo_decal_mat(
+    logo_png: Path,
+    theme: str,
+    name: str = "LogoDecal",
+) -> bpy.types.Material:
+    themed_name = f"{name}_{theme}"
+    existing = bpy.data.materials.get(themed_name)
     if existing:
         return existing
     if not logo_png.exists():
         raise RuntimeError(f"Missing logo PNG at {logo_png}")
 
-    mat = bpy.data.materials.new(name=name)
+    mat = bpy.data.materials.new(name=themed_name)
     mat.use_nodes = True
     mat.blend_method = "BLEND"
     mat.shadow_method = "NONE"
@@ -512,7 +709,8 @@ def get_logo_decal_mat(logo_png: Path, name: str = "YearnLogoDecal") -> bpy.type
     transparent.location = (-130, -160)
     emission = nodes.new(type="ShaderNodeEmission")
     emission.location = (-130, 80)
-    emission.inputs["Strength"].default_value = 0.68
+    emission.inputs["Strength"].default_value = 0.92 if theme == "styfi" else 0.68
+    emission.inputs["Color"].default_value = (1.0, 1.0, 1.0, 1.0)
     mix = nodes.new(type="ShaderNodeMixShader")
     mix.location = (120, 0)
     tex = nodes.new(type="ShaderNodeTexImage")
@@ -522,7 +720,6 @@ def get_logo_decal_mat(logo_png: Path, name: str = "YearnLogoDecal") -> bpy.type
     tex.interpolation = "Cubic"
     tex.extension = "CLIP"
 
-    ensure_socket_link(links, tex.outputs["Color"], emission.inputs["Color"])
     ensure_socket_link(links, tex.outputs["Alpha"], mix.inputs["Fac"])
     ensure_socket_link(links, transparent.outputs["BSDF"], mix.inputs[1])
     ensure_socket_link(links, emission.outputs["Emission"], mix.inputs[2])
@@ -530,25 +727,108 @@ def get_logo_decal_mat(logo_png: Path, name: str = "YearnLogoDecal") -> bpy.type
     return mat
 
 
-def build_logo_plane_template(logo_png: Path) -> bpy.types.Object:
+def build_logo_plane_template(logo_png: Path, theme: str) -> list[bpy.types.Object]:
     bpy.ops.mesh.primitive_plane_add(size=1.0, location=(0.0, 0.0, 0.0))
     logo = bpy.context.active_object
-    logo.name = "YearnLogoPlaneTemplate"
+    logo.name = "LogoPlaneTemplate"
 
-    # Yearn symbol aspect ratio (roughly 308 x 361)
-    logo.scale = (0.853, 1.0, 1.0)
+    image = bpy.data.images.load(str(logo_png), check_existing=True)
+    width = max(image.size[0], 1)
+    height = max(image.size[1], 1)
+    aspect = width / height
+    height_scale = 1.16 if theme == "styfi" else 1.0
+    logo.scale = (aspect * height_scale, 1.0 * height_scale, 1.0)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
-    logo_mat = get_logo_decal_mat(logo_png=logo_png)
+    logo_mat = get_logo_decal_mat(logo_png=logo_png, theme=theme)
     logo.data.materials.clear()
     logo.data.materials.append(logo_mat)
 
     logo.hide_render = True
     logo.hide_set(True)
-    return logo
+    return [logo]
 
 
-def build_token_prefab(logo_template: bpy.types.Object) -> bpy.types.Object:
+def object_bounds(obj: bpy.types.Object) -> tuple[Vector, Vector]:
+    points = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    minimum = Vector((min(point.x for point in points), min(point.y for point in points), min(point.z for point in points)))
+    maximum = Vector((max(point.x for point in points), max(point.y for point in points), max(point.z for point in points)))
+    return minimum, maximum
+
+
+def curve_material_base_color(mat: bpy.types.Material) -> CoinColor:
+    color = tuple(mat.diffuse_color[:4])
+    if len(color) == 4:
+        return color
+    if len(color) == 3:
+        return (color[0], color[1], color[2], 1.0)
+    return (1.0, 1.0, 1.0, 1.0)
+
+
+def apply_curve_fill_surface(mat: bpy.types.Material, color: CoinColor) -> None:
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nodes = nt.nodes
+    links = nt.links
+    for node in list(nodes):
+        nodes.remove(node)
+
+    output = nodes.new(type="ShaderNodeOutputMaterial")
+    output.location = (320, 0)
+    bsdf = nodes.new(type="ShaderNodeBsdfPrincipled")
+    bsdf.location = (60, 0)
+    bsdf.inputs["Base Color"].default_value = color
+    bsdf.inputs["Metallic"].default_value = 0.08
+    bsdf.inputs["Roughness"].default_value = 0.22
+    set_specular(bsdf, 0.58)
+    set_coat(bsdf, value=0.22, roughness=0.16)
+    if "Emission Strength" in bsdf.inputs:
+        bsdf.inputs["Emission Strength"].default_value = 0.08
+    if "Emission Color" in bsdf.inputs:
+        bsdf.inputs["Emission Color"].default_value = color
+    elif "Emission" in bsdf.inputs:
+        bsdf.inputs["Emission"].default_value = color
+    ensure_socket_link(links, bsdf.outputs["BSDF"], output.inputs["Surface"])
+
+
+def build_logo_curve_templates(logo_svg: Path) -> list[bpy.types.Object]:
+    existing_names = {obj.name for obj in bpy.data.objects}
+    bpy.ops.import_curve.svg(filepath=str(logo_svg))
+    imported = [obj for obj in bpy.context.scene.objects if obj.name not in existing_names]
+    if not imported:
+        raise RuntimeError(f"Failed to import logo SVG at {logo_svg}")
+
+    mins: list[Vector] = []
+    maxs: list[Vector] = []
+    for obj in imported:
+        if obj.type == "CURVE":
+            obj.data.fill_mode = "BOTH"
+            obj.data.extrude = 0.0014
+            obj.data.resolution_u = 24
+            obj.data.render_resolution_u = 24
+        min_corner, max_corner = object_bounds(obj)
+        mins.append(min_corner)
+        maxs.append(max_corner)
+        for mat in obj.data.materials:
+            apply_curve_fill_surface(mat, curve_material_base_color(mat))
+
+    minimum = Vector((min(v.x for v in mins), min(v.y for v in mins), min(v.z for v in mins)))
+    maximum = Vector((max(v.x for v in maxs), max(v.y for v in maxs), max(v.z for v in maxs)))
+    center = (minimum + maximum) * 0.5
+    size = maximum - minimum
+    max_dim = max(size.x, size.y, 0.001)
+    scale_factor = 1.62 / max_dim
+
+    for obj in imported:
+        obj.location = (obj.location - center) * scale_factor
+        obj.scale = tuple(component * scale_factor for component in obj.scale)
+        obj.hide_render = True
+        obj.hide_set(True)
+
+    return imported
+
+
+def build_token_prefab(logo_templates: list[bpy.types.Object], theme: str) -> bpy.types.Object:
     bpy.ops.mesh.primitive_cylinder_add(vertices=220, radius=1.0, depth=0.29, location=(0.0, 0.0, 0.0))
     token = bpy.context.active_object
     token.name = "TokenPrefab"
@@ -562,23 +842,29 @@ def build_token_prefab(logo_template: bpy.types.Object) -> bpy.types.Object:
     token.data.use_auto_smooth = True
     token.data.auto_smooth_angle = math.radians(40)
 
-    base_mat = make_coin_mat("TokenBaseMat", (0.006, 0.12, 0.62, 1.0))
-    rim_mat = make_rim_mat("TokenRimMat", (0.006, 0.12, 0.62, 1.0))
+    base_mat = make_coin_mat("TokenBaseMat", palette_color(theme, C0), theme=theme)
+    rim_mat = make_rim_mat("TokenRimMat", palette_color(theme, C0), theme=theme)
     token.data.materials.append(base_mat)
     token.data.materials.append(rim_mat)
     for poly in token.data.polygons:
         poly.material_index = 1 if abs(poly.normal.z) < 0.3 else 0
 
-    logo = logo_template.copy()
-    logo.data = logo_template.data.copy()
-    bpy.context.collection.objects.link(logo)
-    logo.name = "TokenPrefabLogo"
-    logo.parent = token
-    logo.location = (0.0, 0.0, 0.156)
-    logo.rotation_euler = (0.0, 0.0, 0.0)
-    logo.scale = (0.92, 0.92, 0.92)
-    logo.hide_render = True
-    logo.hide_set(True)
+    for idx, logo_template in enumerate(logo_templates):
+        logo = logo_template.copy()
+        if getattr(logo_template, "data", None) is not None:
+            logo.data = logo_template.data.copy()
+        bpy.context.collection.objects.link(logo)
+        logo.name = f"TokenPrefabLogo{idx}"
+        logo.parent = token
+        logo.location = (
+            logo_template.location.x,
+            logo_template.location.y,
+            0.156 + logo_template.location.z,
+        )
+        logo.rotation_euler = (0.0, 0.0, 0.0)
+        logo.scale = tuple(component for component in logo_template.scale)
+        logo.hide_render = True
+        logo.hide_set(True)
 
     token.hide_render = True
     token.hide_set(True)
@@ -593,6 +879,7 @@ def instance_token(
     rotation_deg: tuple[float, float, float],
     scale: float,
     color: tuple[float, float, float, float],
+    theme: str,
 ) -> bpy.types.Object:
     token = prefab.copy()
     token.data = prefab.data.copy()
@@ -607,10 +894,10 @@ def instance_token(
         face_mat = token.data.materials[0].copy()
         rim_mat = token.data.materials[1].copy()
     else:
-        face_mat = make_coin_mat(f"{name}Mat", color)
-        rim_mat = make_rim_mat(f"{name}RimMat", color)
-    set_mat_color(face_mat, color)
-    set_rim_color(rim_mat, color)
+        face_mat = make_coin_mat(f"{name}Mat", color, theme=theme)
+        rim_mat = make_rim_mat(f"{name}RimMat", color, theme=theme)
+    set_mat_color(face_mat, color, theme=theme)
+    set_rim_color(rim_mat, color, theme=theme)
     token.data.materials.clear()
     token.data.materials.append(face_mat)
     token.data.materials.append(rim_mat)
@@ -635,37 +922,37 @@ def instance_token(
     return token
 
 
-def add_lights() -> None:
+def add_lights(theme: str) -> None:
     set_world_lighting()
 
     bpy.ops.object.light_add(type="AREA", location=(1.4, -3.0, 4.2))
     key = bpy.context.active_object
-    key.data.energy = 320
+    key.data.energy = 320 if theme == "styfi" else 320
     key.data.size = 3.4
-    key.data.color = (0.95, 0.98, 1.0)
+    key.data.color = (0.95, 0.98, 1.0) if theme == "styfi" else (0.95, 0.98, 1.0)
 
     bpy.ops.object.light_add(type="AREA", location=(-3.4, 2.5, 2.7))
     fill = bpy.context.active_object
-    fill.data.energy = 98
+    fill.data.energy = 98 if theme == "styfi" else 98
     fill.data.size = 2.8
-    fill.data.color = (0.7, 0.82, 1.0)
+    fill.data.color = (0.7, 0.82, 1.0) if theme == "styfi" else (0.7, 0.82, 1.0)
 
     bpy.ops.object.light_add(type="POINT", location=(0.1, -1.6, 2.6))
     rim = bpy.context.active_object
-    rim.data.energy = 84
-    rim.data.color = (0.88, 0.94, 1.0)
+    rim.data.energy = 84 if theme == "styfi" else 84
+    rim.data.color = (0.88, 0.94, 1.0) if theme == "styfi" else (0.88, 0.94, 1.0)
 
     bpy.ops.object.light_add(type="AREA", location=(0.0, 0.2, 4.8))
     top = bpy.context.active_object
-    top.data.energy = 46
+    top.data.energy = 46 if theme == "styfi" else 46
     top.data.size = 2.2
-    top.data.color = (0.78, 0.88, 1.0)
+    top.data.color = (0.78, 0.88, 1.0) if theme == "styfi" else (0.78, 0.88, 1.0)
 
     bpy.ops.object.light_add(type="AREA", location=(3.3, 2.1, 1.85))
     side = bpy.context.active_object
-    side.data.energy = 72
+    side.data.energy = 72 if theme == "styfi" else 72
     side.data.size = 2.1
-    side.data.color = (0.7, 0.81, 1.0)
+    side.data.color = (0.7, 0.81, 1.0) if theme == "styfi" else (0.7, 0.81, 1.0)
 
 
 def set_camera(
@@ -680,38 +967,42 @@ def set_camera(
     return cam
 
 
-def render(path: Path, width: int, height: int) -> None:
-    setup_render(width, height)
+def render(path: Path, width: int, height: int, theme: str = "yearn") -> None:
+    setup_render(width, height, theme=theme)
     bpy.context.scene.render.filepath = str(path)
     bpy.ops.render.render(write_still=True)
 
 
-def apply_token_layout(prefab: bpy.types.Object, prefix: str, poses: list[TokenPose]) -> None:
-    for idx, (location, rotation_deg, scale, color) in enumerate(poses):
+def apply_token_layout(prefab: bpy.types.Object, prefix: str, poses: list[TokenPose], theme: str) -> None:
+    for idx, (location, rotation_deg, scale, color_idx) in enumerate(poses):
         instance_token(
             prefab=prefab,
             name=f"{prefix}{idx + 1}",
             location=location,
             rotation_deg=rotation_deg,
             scale=scale,
-            color=color,
+            color=palette_color(theme, color_idx),
+            theme=theme,
         )
 
 
-def hero_scene(prefab: bpy.types.Object, layout: str) -> None:
-    add_lights()
-    set_camera((0.0, -7.2, 2.1), (77, 0, 0), 72)
-    apply_token_layout(prefab, "Hero", HERO_LAYOUTS[layout])
+def hero_scene(prefab: bpy.types.Object, layout: str, theme: str) -> None:
+    add_lights(theme)
+    if theme == "styfi":
+        set_camera((0.0, -7.2, 2.1), (77, 0, 0), 72)
+    else:
+        set_camera((0.0, -7.2, 2.1), (77, 0, 0), 72)
+    apply_token_layout(prefab, "Hero", hero_layouts(theme)[layout], theme)
 
 
-def purpose_scene(prefab: bpy.types.Object, layout: str) -> None:
-    add_lights()
+def purpose_scene(prefab: bpy.types.Object, layout: str, theme: str) -> None:
+    add_lights(theme)
     set_camera((0.0, -6.1, 1.82), (76, 0, 0), 70)
-    apply_token_layout(prefab, "Purpose", PURPOSE_LAYOUTS[layout])
+    apply_token_layout(prefab, "Purpose", purpose_layouts(theme)[layout], theme)
 
 
-def divider_scene(prefab: bpy.types.Object) -> None:
-    add_lights()
+def divider_scene(prefab: bpy.types.Object, theme: str) -> None:
+    add_lights(theme)
     cam = set_camera((0.0, -6.8, 2.2), (72, 0, 0), 70)
     cam.data.type = "ORTHO"
     cam.data.ortho_scale = 7.8
@@ -722,7 +1013,8 @@ def divider_scene(prefab: bpy.types.Object) -> None:
         location=(-2.4, 0.0, -0.08),
         rotation_deg=(22, -14, -14),
         scale=0.37,
-        color=(0.005, 0.095, 0.5, 1.0),
+        color=palette_color(theme, C1),
+        theme=theme,
     )
     instance_token(
         prefab=prefab,
@@ -730,7 +1022,8 @@ def divider_scene(prefab: bpy.types.Object) -> None:
         location=(0.0, 0.02, -0.08),
         rotation_deg=(16, 10, 0),
         scale=0.38,
-        color=(0.0055, 0.102, 0.53, 1.0),
+        color=palette_color(theme, C0),
+        theme=theme,
     )
     instance_token(
         prefab=prefab,
@@ -738,45 +1031,89 @@ def divider_scene(prefab: bpy.types.Object) -> None:
         location=(2.4, 0.0, -0.08),
         rotation_deg=(22, 14, 14),
         scale=0.37,
-        color=(0.005, 0.095, 0.5, 1.0),
+        color=palette_color(theme, C1),
+        theme=theme,
     )
 
 
-def render_scene(kind: str, out_dir: Path, logo_png: Path, layout: str) -> None:
-    out_name, size = SCENE_OUTPUTS[kind]
+def output_name(kind: str, basename: str, layout: str, layout_count: int) -> str:
+    suffix = f"-{layout}" if kind != "divider" and layout_count > 1 else ""
+    return f"{kind}-{basename}{suffix}.png"
+
+
+def render_scene(
+    kind: str,
+    out_dir: Path,
+    logo_png: Path | None,
+    logo_svg: Path | None,
+    layout: str,
+    theme: str,
+    basename: str,
+    layout_count: int,
+) -> None:
+    size = SCENE_SIZES[kind]
     clear_scene()
-    logo_template = build_logo_plane_template(logo_png)
-    prefab = build_token_prefab(logo_template)
+    if logo_svg is not None:
+        logo_templates = build_logo_curve_templates(logo_svg)
+    elif logo_png is not None:
+        logo_templates = build_logo_plane_template(logo_png, theme=theme)
+    else:
+        raise RuntimeError("Either logo_png or logo_svg must be provided.")
+    prefab = build_token_prefab(logo_templates, theme=theme)
 
     if kind == "hero":
-        hero_scene(prefab, layout=layout)
+        hero_scene(prefab, layout=layout, theme=theme)
     elif kind == "purpose":
-        purpose_scene(prefab, layout=layout)
+        purpose_scene(prefab, layout=layout, theme=theme)
     elif kind == "divider":
-        divider_scene(prefab)
+        divider_scene(prefab, theme=theme)
     else:
         raise ValueError(kind)
 
-    output_path = out_dir / out_name
+    output_path = out_dir / output_name(kind, basename=basename, layout=layout, layout_count=layout_count)
     print(f"Rendering {kind}: {output_path} ({size[0]}x{size[1]})")
-    render(output_path, size[0], size[1])
+    render(output_path, size[0], size[1], theme=theme)
 
 
 def main() -> None:
     args = parse_args()
-    logo_png = resolve_logo_png(args.logo_png)
-    output_dir: Path = args.output_dir
+    theme = normalize_theme(args.theme)
+    layout_choices = normalize_layouts(args.layouts, args.layout, theme)
+    basename = args.basename or str(THEME_DEFAULTS[theme]["basename"])
+    output_dir: Path = args.output_dir or Path(THEME_DEFAULTS[theme]["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     scenes = normalize_scene_selection(args.scenes)
-    layout = normalize_layout(args.layout)
+    logo_png: Path | None = None
+    logo_svg: Path | None = None
+    if args.logo_svg is not None:
+        logo_svg = resolve_logo_svg(args.logo_svg, theme)
+    else:
+        try:
+            logo_png = resolve_logo_png(args.logo_png, theme)
+        except RuntimeError:
+            logo_svg = resolve_logo_svg(args.logo_svg, theme)
 
     print(f"Output dir: {output_dir}")
-    print(f"Logo PNG:   {logo_png}")
+    print(f"Theme:      {theme}")
+    if logo_svg is not None:
+        print(f"Logo SVG:   {logo_svg}")
+    if logo_png is not None:
+        print(f"Logo PNG:   {logo_png}")
     print(f"Scenes:     {', '.join(scenes)}")
-    print(f"Layout:     {layout}")
+    print(f"Layouts:    {', '.join(layout_choices)}")
 
-    for scene_name in scenes:
-        render_scene(scene_name, out_dir=output_dir, logo_png=logo_png, layout=layout)
+    for layout in layout_choices:
+        for scene_name in scenes:
+            render_scene(
+                scene_name,
+                out_dir=output_dir,
+                logo_png=logo_png,
+                logo_svg=logo_svg,
+                layout=layout,
+                theme=theme,
+                basename=basename,
+                layout_count=len(layout_choices),
+            )
 
     print("Render complete.")
 
