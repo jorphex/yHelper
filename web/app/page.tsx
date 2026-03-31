@@ -94,11 +94,11 @@ export default function HomePage() {
             Analytics for Yearn vault discovery, yield shifts, and strategic decisions.
           </p>
           <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-            <Link href="/discover" className="button button-primary">
-              Start in Discover
+            <Link href="/explore" className="button button-primary">
+              Start in Explore
             </Link>
-            <Link href="/changes" className="button button-secondary">
-              Check Changes
+            <Link href="/momentum" className="button button-secondary">
+              Check Momentum
             </Link>
           </div>
         </div>
@@ -209,12 +209,9 @@ export default function HomePage() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {[
-            { href: "/discover", title: "Discover", desc: "Rank vaults by quality, size, and trend direction.", tag: "Best first stop" },
-            { href: "/changes", title: "Changes", desc: "See recent APY movers and freshness context.", tag: "Timing matters" },
-            { href: "/assets", title: "Assets", desc: "Compare venues for the same token.", tag: "One-asset focus" },
-            { href: "/composition", title: "Composition", desc: "Check concentration before sizing risk.", tag: "Risk sizing" },
-            { href: "/regimes", title: "Regimes", desc: "Follow rising, stable, falling states.", tag: "Yield behavior" },
-            { href: "/chains", title: "Chains", desc: "Compare chain scale and coverage.", tag: "Network view" },
+            { href: "/explore", title: "Explore", desc: "Find vaults and compare token venues.", tag: "Best first stop" },
+            { href: "/structure", title: "Structure", desc: "Check concentration and chain coverage.", tag: "Risk sizing" },
+            { href: "/momentum", title: "Momentum", desc: "Track APY changes and regime shifts.", tag: "Timing matters" },
             { href: "/styfi", title: "stYFI", desc: "Track stake balances and reward epochs.", tag: "Governance" },
           ].map((item) => (
             <Link 
