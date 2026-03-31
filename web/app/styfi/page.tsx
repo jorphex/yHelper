@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
 import { formatHours, formatPct, formatUtcDateTime } from "../lib/format";
@@ -232,24 +233,36 @@ function StYfiPageContent() {
   return (
     <div>
       {/* Header */}
-      <section className="page-header" style={{ borderBottom: "none" }}>
-        <h1 className="page-title">
-          stYFI
-          <br />
-          <em className="page-title-accent">Governance staking</em>
-        </h1>
-        <p className="page-description">
-          Track Yearn staking balance, reward epochs, and protocol-level yield.
-        </p>
-        <a
-          href="https://yearn.finance/stake-yfi"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="button button-primary"
-          style={{ marginTop: "24px" }}
-        >
-          Open stYFI App
-        </a>
+      <section className="page-header" style={{ borderBottom: "none", display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "48px", alignItems: "center" }}>
+        <div>
+          <h1 className="page-title">
+            stYFI
+            <br />
+            <em className="page-title-accent">Governance staking</em>
+          </h1>
+          <p className="page-description">
+            Track Yearn staking balance, reward epochs, and protocol-level yield.
+          </p>
+          <a
+            href="https://yearn.finance/stake-yfi"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="button button-primary"
+            style={{ marginTop: "24px" }}
+          >
+            Open stYFI App
+          </a>
+        </div>
+        <div style={{ position: "relative", height: "280px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Image
+            src="/styfi-assets-blender/hero-styfi-blender-coin-tilt-left.png"
+            alt="stYFI"
+            width={420}
+            height={280}
+            priority
+            style={{ objectFit: "contain" }}
+          />
+        </div>
       </section>
 
       {/* Summary KPIs - 5 cards */}

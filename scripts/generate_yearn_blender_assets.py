@@ -38,6 +38,10 @@ THEME_DEFAULTS: dict[str, dict[str, Path | str]] = {
         "basename": "styfi-blender-coin",
     },
 }
+LOGO_HEIGHT_SCALES: dict[str, float] = {
+    "yearn": 1.1,
+    "styfi": 1.16,
+}
 SCENE_SIZES: dict[str, tuple[int, int]] = {
     "hero": (1400, 820),
     "purpose": (1000, 420),
@@ -489,7 +493,7 @@ def apply_coin_surface(
         mix.name = "CoinColorMix"
     mix.location = (-90, 120)
     mix.blend_type = "MULTIPLY"
-    mix.inputs["Fac"].default_value = 0.14 if theme == "styfi" else 0.23
+    mix.inputs["Fac"].default_value = 0.22 if theme == "styfi" else 0.23
     mix.inputs["Color1"].default_value = color
 
     bump = nodes.get("CoinBump")
@@ -507,26 +511,26 @@ def apply_coin_surface(
     ensure_socket_link(links, noise.outputs["Fac"], bump.inputs["Height"])
     ensure_socket_link(links, bump.outputs["Normal"], bsdf.inputs["Normal"])
 
-    bsdf.inputs["Metallic"].default_value = 0.12 if theme == "styfi" else 0.16
-    bsdf.inputs["Roughness"].default_value = 0.4 if theme == "styfi" else 0.31
-    set_specular(bsdf, 0.36 if theme == "styfi" else 0.5)
-    set_coat(bsdf, value=0.14 if theme == "styfi" else 0.34, roughness=0.34 if theme == "styfi" else 0.22)
+    bsdf.inputs["Metallic"].default_value = 0.15 if theme == "styfi" else 0.16
+    bsdf.inputs["Roughness"].default_value = 0.33 if theme == "styfi" else 0.31
+    set_specular(bsdf, 0.48 if theme == "styfi" else 0.5)
+    set_coat(bsdf, value=0.3 if theme == "styfi" else 0.34, roughness=0.24 if theme == "styfi" else 0.22)
     if "Emission Strength" in bsdf.inputs:
-        bsdf.inputs["Emission Strength"].default_value = 0.0 if theme == "styfi" else 0.1
+        bsdf.inputs["Emission Strength"].default_value = 0.06 if theme == "styfi" else 0.1
     if "Emission Color" in bsdf.inputs:
-        emission_scale = 1.0 if theme == "styfi" else 1.7
+        emission_scale = 1.35 if theme == "styfi" else 1.7
         bsdf.inputs["Emission Color"].default_value = (
             min(1.0, color[0] * emission_scale),
             min(1.0, color[1] * emission_scale),
-            min(1.0, color[2] * (1.14 if theme == "styfi" else 1.82)),
+            min(1.0, color[2] * (1.52 if theme == "styfi" else 1.82)),
             1.0,
         )
     elif "Emission" in bsdf.inputs:
-        emission_scale = 1.0 if theme == "styfi" else 1.7
+        emission_scale = 1.35 if theme == "styfi" else 1.7
         bsdf.inputs["Emission"].default_value = (
             min(1.0, color[0] * emission_scale),
             min(1.0, color[1] * emission_scale),
-            min(1.0, color[2] * (1.14 if theme == "styfi" else 1.82)),
+            min(1.0, color[2] * (1.52 if theme == "styfi" else 1.82)),
             1.0,
         )
 
@@ -606,7 +610,7 @@ def apply_rim_surface(
         mix.name = "RimColorMix"
     mix.location = (170, 120)
     mix.blend_type = "MULTIPLY"
-    mix.inputs["Fac"].default_value = 0.2 if theme == "styfi" else 0.32
+    mix.inputs["Fac"].default_value = 0.3 if theme == "styfi" else 0.32
     mix.inputs["Color1"].default_value = rim_tint(color)
 
     bump = nodes.get("RimBump")
@@ -628,14 +632,14 @@ def apply_rim_surface(
     ensure_socket_link(links, blend.outputs["Color"], bump.inputs["Height"])
     ensure_socket_link(links, bump.outputs["Normal"], bsdf.inputs["Normal"])
 
-    bsdf.inputs["Metallic"].default_value = 0.18 if theme == "styfi" else 0.26
-    bsdf.inputs["Roughness"].default_value = 0.34 if theme == "styfi" else 0.22
-    set_specular(bsdf, 0.4 if theme == "styfi" else 0.54)
-    set_coat(bsdf, value=0.12 if theme == "styfi" else 0.2, roughness=0.32 if theme == "styfi" else 0.24)
+    bsdf.inputs["Metallic"].default_value = 0.24 if theme == "styfi" else 0.26
+    bsdf.inputs["Roughness"].default_value = 0.24 if theme == "styfi" else 0.22
+    set_specular(bsdf, 0.5 if theme == "styfi" else 0.54)
+    set_coat(bsdf, value=0.18 if theme == "styfi" else 0.2, roughness=0.24 if theme == "styfi" else 0.24)
     if "Anisotropic" in bsdf.inputs:
         bsdf.inputs["Anisotropic"].default_value = 0.35
     if "Emission Strength" in bsdf.inputs:
-        bsdf.inputs["Emission Strength"].default_value = 0.0 if theme == "styfi" else 0.09
+        bsdf.inputs["Emission Strength"].default_value = 0.07 if theme == "styfi" else 0.09
     tint = rim_tint(color)
     rim_emission = (
         min(1.0, tint[0] * 1.32),
@@ -736,7 +740,7 @@ def build_logo_plane_template(logo_png: Path, theme: str) -> list[bpy.types.Obje
     width = max(image.size[0], 1)
     height = max(image.size[1], 1)
     aspect = width / height
-    height_scale = 1.16 if theme == "styfi" else 1.0
+    height_scale = LOGO_HEIGHT_SCALES.get(theme, 1.0)
     logo.scale = (aspect * height_scale, 1.0 * height_scale, 1.0)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
