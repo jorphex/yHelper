@@ -12,6 +12,67 @@ const nextConfig = {
         destination: "/twitter-image",
         permanent: false,
       },
+      // Legacy route redirects
+      {
+        source: "/discover",
+        destination: "/explore",
+        permanent: true,
+      },
+      {
+        source: "/discover/:path*",
+        destination: "/explore/:path*",
+        permanent: true,
+      },
+      {
+        source: "/assets",
+        destination: "/explore?tab=venues",
+        permanent: true,
+      },
+      {
+        source: "/assets/:path*",
+        destination: "/explore/:path*",
+        permanent: true,
+      },
+      {
+        source: "/composition",
+        destination: "/structure",
+        permanent: true,
+      },
+      {
+        source: "/composition/:path*",
+        destination: "/structure/:path*",
+        permanent: true,
+      },
+      {
+        source: "/chains",
+        destination: "/structure?tab=chains",
+        permanent: true,
+      },
+      {
+        source: "/chains/:path*",
+        destination: "/structure/:path*",
+        permanent: true,
+      },
+      {
+        source: "/changes",
+        destination: "/momentum",
+        permanent: true,
+      },
+      {
+        source: "/changes/:path*",
+        destination: "/momentum/:path*",
+        permanent: true,
+      },
+      {
+        source: "/regimes",
+        destination: "/momentum?tab=regimes",
+        permanent: true,
+      },
+      {
+        source: "/regimes/:path*",
+        destination: "/momentum/:path*",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {

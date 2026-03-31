@@ -5,13 +5,10 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/", label: "Overview" },
+  { href: "/explore", label: "Explore" },
+  { href: "/structure", label: "Structure" },
+  { href: "/momentum", label: "Momentum" },
   { href: "/styfi", label: "stYFI" },
-  { href: "/discover", label: "Discover" },
-  { href: "/assets", label: "Assets" },
-  { href: "/composition", label: "Composition" },
-  { href: "/changes", label: "Changes" },
-  { href: "/regimes", label: "Regimes" },
-  { href: "/chains", label: "Chains" },
 ];
 
 const externalLinks = [
