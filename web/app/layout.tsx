@@ -6,12 +6,11 @@ import { Footer } from "./components/footer";
 import { ChunkRecovery } from "./components/chunk-recovery";
 import { PageTransition } from "./components/page-transition";
 import { Providers } from "./providers";
-import { SOCIAL_IMAGE_VERSION } from "./lib/social-image-version";
 
 const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
 const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
-const SOCIAL_PREVIEW_SRC = `/social/yhelper-preview-${SOCIAL_IMAGE_VERSION}.png`;
-const SOCIAL_PREVIEW_URL = `${siteUrl}${SOCIAL_PREVIEW_SRC}`;
+const OPEN_GRAPH_IMAGE_URL = `${siteUrl}/opengraph-image`;
+const TWITTER_IMAGE_URL = `${siteUrl}/twitter-image`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -33,7 +32,7 @@ export const metadata: Metadata = {
     description: "Elegant analytics for Yearn vault discovery, yield shifts, and strategic decisions.",
     images: [
       {
-        url: SOCIAL_PREVIEW_URL,
+        url: OPEN_GRAPH_IMAGE_URL,
         width: 1200,
         height: 630,
         alt: `yHelper dashboard preview`,
@@ -44,11 +43,11 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "yHelper - Yearn Vault Analytics",
     description: "Elegant analytics for Yearn vault discovery, yield shifts, and strategic decisions.",
-    images: [SOCIAL_PREVIEW_URL],
+    images: [TWITTER_IMAGE_URL],
   },
   other: {
-    "og:image:secure_url": SOCIAL_PREVIEW_URL,
-    "twitter:image:src": SOCIAL_PREVIEW_URL,
+    "og:image:secure_url": OPEN_GRAPH_IMAGE_URL,
+    "twitter:image:src": TWITTER_IMAGE_URL,
   },
 };
 
