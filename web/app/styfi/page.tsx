@@ -187,7 +187,7 @@ function StYfiPageContent() {
   }, [summary, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue, showRewardTokenFallback]);
 
   const stakeTrendItems = useMemo(() => [
-    { id: "combined", label: "Combined staked", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest combined balance vs previous snapshot" },
+    { id: "combined", label: "Total", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest combined balance vs previous snapshot" },
     { id: "styfi", label: "stYFI", points: snapshotSeries.map((r) => r.styfi_staked), note: "Latest stYFI balance vs previous snapshot" },
     { id: "styfix", label: "stYFIx", points: snapshotSeries.map((r) => r.styfix_staked), note: "Latest stYFIx balance vs previous snapshot" },
   ], [snapshotSeries]);
