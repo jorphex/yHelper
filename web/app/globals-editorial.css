@@ -340,6 +340,38 @@ h4 { font-size: var(--text-xl); }
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
+/* Sidebar Divider */
+.sidebar-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: var(--space-4) 0;
+  opacity: 0.5;
+}
+
+/* External Links Section */
+.sidebar-external {
+  flex: 0;
+}
+
+.sidebar-link-external {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.external-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.sidebar-link-external:hover .external-arrow {
+  color: var(--accent);
+  transform: translate(1px, -1px);
+}
+
 .sidebar-footer {
   padding-top: var(--space-4);
   margin-top: auto;
