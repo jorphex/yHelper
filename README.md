@@ -4,24 +4,27 @@ yHelper is a public Yearn analytics dashboard.
 
 It is built to answer a few simple questions fast:
 - where yield is moving
-- which vaults or assets are crowded
-- how chains and categories compare
-- whether the data is fresh enough to trust
+- how vault concentration and crowding are changing
+- how chains, tokens, and categories compare
 
-## Pages
-- `Overview` for the high-level snapshot
-- `Discover` for vault scanning and ranking
-- `Assets` for token and venue comparison
-- `Composition` for concentration and crowding
-- `Changes` for recent movers and stale data checks
-- `Regimes` for behavior classes and transitions
-- `Chains` for chain-level rollups
+## Navigation
+- `Overview` is the landing page with the current protocol snapshot, PPS freshness, latest shift, highest-yield vault, and direct links into the main workflows.
+- `Explore` is the scanning surface.
+  - `Vaults` ranks the current vault universe with filters for universe, TVL, points, chain, category, and sort mode, plus APY/momentum visuals.
+  - `Venues` compares token venues across vaults, with token selection, token list scope (`featured`, `canonical`, `all`), and venue spread views.
+- `Structure` is the concentration surface.
+  - `Overview` shows concentration KPIs, the TVL treemap, and category/token breakdown tables.
+  - `Chains` compares chain-level rollups including active vaults, metrics coverage, TVL, APY, momentum, and consistency.
+  - `Crowding` ranks the most and least crowded vaults and plots crowding against APY/TVL.
+- `Momentum` is the change-detection surface.
+  - `Changes` tracks APY deltas by window (`24h`, `7d`, `30d`), freshness/coverage, movers, stale series, and grouped momentum trends.
+  - `Regimes` tracks rising/stable/falling/choppy cohorts, current regime movers, and transition analysis over configurable windows.
+- `stYFI` is the governance staking page with combined stake balances, supply share, snapshot freshness, reward split, and epoch history.
 
 ## Data
 The app combines:
 - Yearn yDaemon metadata and snapshots
 - Kong PPS history and derived yield metrics
-- optional DefiLlama context for protocol-level TVL comparisons
 
 ## Stack
 - `web` is the Next.js frontend
