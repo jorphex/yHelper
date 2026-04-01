@@ -16,7 +16,9 @@ const publicPath = (...segments: string[]) => path.join(process.cwd(), "public",
 
 const regularFontPromise = readFile(publicPath("fonts", "yearn", "Aeonik-Regular.ttf"));
 const boldFontPromise = readFile(publicPath("fonts", "yearn", "Aeonik-Bold.ttf"));
-const yearnLogoPromise = readFile(publicPath("yearn-logo.svg"), "utf-8").then((svg) => svg.replaceAll("#0657F9", "#F5F1EA"));
+const previewBaseImagePromise = readFile(publicPath("social", "yhelper-preview-base.png")).then(
+  (file) => `data:image/png;base64,${file.toString("base64")}`,
+);
 
 type SocialPreviewResponse = {
   summary?: {
@@ -32,6 +34,15 @@ type SocialPreviewResponse = {
   };
 };
 
+type OverviewResponse = {
+  protocol_context?: {
+    current_yearn?: {
+      tvl_usd?: number | null;
+      vaults?: number | null;
+    } | null;
+  } | null;
+};
+
 type StyfiResponse = {
   summary?: {
     reward_epoch?: number | null;
@@ -39,11 +50,12 @@ type StyfiResponse = {
   };
   current_reward_state?: {
     styfi_current_apr?: number | null;
+    epoch?: number | null;
   };
 };
 
-async function fetchJson<T>(path: string): Promise<T | null> {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+async function fetchJson<T>(pathName: string): Promise<T | null> {
+  const normalizedPath = pathName.startsWith("/") ? pathName : `/${pathName}`;
   const candidates = [internalApiUrl(normalizedPath), `http://127.0.0.1:8000/api${normalizedPath}`];
 
   for (const url of candidates) {
@@ -109,29 +121,44 @@ function chainLabel(chainId: number | null | undefined): string {
 }
 
 export async function renderSocialImage() {
-  const [social, styfi, regularFontData, boldFontData, yearnLogoSvg] = await Promise.all([
+  const [social, overview, styfi, regularFontData, boldFontData, previewBaseImageSrc] = await Promise.all([
     fetchJson<SocialPreviewResponse>("/meta/social-preview"),
+    fetchJson<OverviewResponse>("/overview"),
     fetchJson<StyfiResponse>("/styfi"),
     regularFontPromise,
     boldFontPromise,
-    yearnLogoPromise,
+    previewBaseImagePromise,
   ]);
 
   const summary = social?.summary || {};
+  const protocol = overview?.protocol_context?.current_yearn || {};
   const highest = social?.highest_apy_vault || {};
   const styfiSummary = styfi?.summary || {};
   const rewardState = styfi?.current_reward_state || {};
 
-  const trackedTvl = usdCompact(summary.tracked_tvl_active_usd);
-  const activeVaults = Number.isFinite(summary.active_vaults) ? String(summary.active_vaults) : "n/a";
-  const highestName = compactText(highest.name || highest.symbol, 16);
-  const highestApy = pct(highest.current_net_apy ?? highest.safe_apy_30d, 1);
-  const highestChain = chainLabel(highest.chain_id);
-  const styfiApr = pct(rewardState.styfi_current_apr, 1);
-  const styfiEpoch = Number.isFinite(styfiSummary.reward_epoch) ? String(styfiSummary.reward_epoch) : "n/a";
-  const combinedStaked =
-    Number.isFinite(styfiSummary.combined_staked) ? `${(styfiSummary.combined_staked as number).toFixed(1)}` : "n/a";
-  const yearnLogoSrc = `data:image/svg+xml;base64,${Buffer.from(yearnLogoSvg).toString("base64")}`;
+  const activeVaultCount = summary.active_vaults ?? protocol.vaults;
+  const styfiEpochValue = rewardState.epoch ?? styfiSummary.reward_epoch;
+
+  const cards = [
+    {
+      value: usdCompact(summary.tracked_tvl_active_usd ?? protocol.tvl_usd),
+      noteStrong: Number.isFinite(activeVaultCount) ? String(activeVaultCount) : "n/a",
+      noteTail: "active vaults",
+      valueStyle: { fontSize: 62, lineHeight: 0.9, letterSpacing: "-0.05em" },
+    },
+    {
+      value: compactText(highest.name || highest.symbol, 14),
+      noteStrong: pct(highest.current_net_apy ?? highest.safe_apy_30d, 1),
+      noteTail: `APY · ${chainLabel(highest.chain_id)}`,
+      valueStyle: { fontSize: 56, lineHeight: 0.92, letterSpacing: "-0.05em", maxWidth: 300 },
+    },
+    {
+      value: pct(rewardState.styfi_current_apr, 1),
+      noteStrong: `Epoch ${Number.isFinite(styfiEpochValue) ? String(styfiEpochValue) : "n/a"}`,
+      noteTail: `${Number.isFinite(styfiSummary.combined_staked) ? (styfiSummary.combined_staked as number).toFixed(1) : "n/a"} staked`,
+      valueStyle: { fontSize: 62, lineHeight: 0.9, letterSpacing: "-0.05em" },
+    },
+  ];
 
   return new ImageResponse(
     (
@@ -147,23 +174,14 @@ export async function renderSocialImage() {
           overflow: "hidden",
         }}
       >
-        <div
+        <img
+          alt=""
+          src={previewBaseImageSrc}
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage:
-              "radial-gradient(circle at 84% 4%, rgba(6, 87, 233, 0.24), transparent 32%), radial-gradient(circle at 12% 90%, rgba(94, 231, 223, 0.11), transparent 26%), radial-gradient(circle at 86% 56%, rgba(196, 168, 255, 0.10), transparent 24%)",
-          }}
-        />
-
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            opacity: 0.045,
-            backgroundImage:
-              "linear-gradient(0deg, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-            backgroundSize: "4px 4px, 4px 4px",
+            width: "100%",
+            height: "100%",
           }}
         />
 
@@ -172,7 +190,6 @@ export async function renderSocialImage() {
             position: "relative",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "space-between",
             width: "100%",
             height: "100%",
             padding: "48px 56px",
@@ -181,34 +198,9 @@ export async function renderSocialImage() {
           <div
             style={{
               display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
+              flex: 1,
             }}
-          >
-            <div
-              style={{
-                display: "flex",
-                fontSize: 84,
-                lineHeight: 0.92,
-                letterSpacing: "-0.06em",
-                fontWeight: 700,
-                color: "#f5f1ea",
-              }}
-            >
-              yHelper
-            </div>
-
-            <img
-              alt=""
-              src={yearnLogoSrc}
-              style={{
-                width: 300,
-                height: "auto",
-                objectFit: "contain",
-                opacity: 0.97,
-              }}
-            />
-          </div>
+          />
 
           <div
             style={{
@@ -217,62 +209,22 @@ export async function renderSocialImage() {
               alignItems: "stretch",
             }}
           >
-            {[
-              {
-                label: "Tracked Scope TVL",
-                value: trackedTvl,
-                noteStrong: activeVaults,
-                noteTail: "active vaults",
-                valueStyle: { fontSize: 66, lineHeight: 0.9, letterSpacing: "-0.055em" },
-              },
-              {
-                label: "Highest Yielding Vault",
-                value: highestName,
-                noteStrong: highestApy,
-                noteTail: `APY · ${highestChain}`,
-                valueStyle: { fontSize: 58, lineHeight: 0.92, letterSpacing: "-0.05em", maxWidth: 300 },
-              },
-              {
-                label: "stYFI APR",
-                value: styfiApr,
-                noteStrong: `Epoch ${styfiEpoch}`,
-                noteTail: `${combinedStaked} staked`,
-                valueStyle: { fontSize: 66, lineHeight: 0.9, letterSpacing: "-0.055em" },
-              },
-            ].map((card) => (
+            {cards.map((card, index) => (
               <div
-                key={card.label}
+                key={`${index}-${card.noteStrong}`}
                 style={{
                   flex: 1,
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
-                  minHeight: 224,
-                  padding: "22px 22px 20px",
-                  borderRadius: 24,
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+                  justifyContent: "flex-end",
+                  minHeight: 314,
+                  padding: "24px 24px 22px",
                 }}
               >
                 <div
                   style={{
                     display: "flex",
-                    fontSize: 26,
-                    lineHeight: 1,
-                    letterSpacing: "-0.02em",
-                    fontWeight: 700,
-                    color: "#d8cec0",
-                  }}
-                >
-                  {card.label}
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
                     flexDirection: "column",
-                    gap: 14,
                   }}
                 >
                   <div
@@ -292,13 +244,20 @@ export async function renderSocialImage() {
                       alignItems: "baseline",
                       flexWrap: "wrap",
                       gap: 8,
-                      fontSize: 28,
-                      lineHeight: 1.2,
-                      letterSpacing: "0.01em",
+                      marginTop: 16,
+                      fontSize: 25,
+                      lineHeight: 1.28,
                       color: "#d8cec0",
                     }}
                   >
-                    <span style={{ color: "#faf8f3", fontWeight: 700 }}>{card.noteStrong}</span>
+                    <span
+                      style={{
+                        color: "#faf8f3",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {card.noteStrong}
+                    </span>
                     <span>{card.noteTail}</span>
                   </div>
                 </div>
