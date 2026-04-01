@@ -84,8 +84,8 @@ export default function HomePage() {
     ? Math.max(0, Number(ppsTrackedVaults) - Number(ppsStaleVaults))
     : null;
   const ppsFreshnessHint = Number.isFinite(ppsFreshVaults) && Number.isFinite(ppsTrackedVaults)
-    ? `${ppsFreshVaults} / ${ppsTrackedVaults} tracked vaults within 24h`
-    : "Tracked vaults within 24h";
+    ? `${ppsFreshVaults} / ${ppsTrackedVaults} V3 allocator vaults over $100k TVL within 24h`
+    : "V3 allocator vaults over $100k TVL within 24h";
 
   const currentYearnVaultCount = Number.isFinite(overview?.protocol_context?.current_yearn?.vaults ?? null)
     ? `${overview?.protocol_context?.current_yearn?.vaults}`
