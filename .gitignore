@@ -19,6 +19,7 @@ screenshots/
 *.backup
 web/screenshot.js
 web/scripts/ui_audit_playwright.mjs
+scripts/generate_og_image.py
 web/public/home-assets-yearn-blender-tests/
 web/public/social/yhelper-preview-*.png
 !web/public/social/yhelper-preview-base.png
