@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import psycopg
 from psycopg.rows import dict_row
 
@@ -58,6 +59,7 @@ STYFI_TOKEN_SCALE = float(10**18)
 STYFI_SITE_REWARD_SCALE = float(10**18)
 STYFI_REWARD_TOKEN_DEFAULT = {"address": None, "symbol": "yvUSDC-1", "decimals": 6}
 _SOCIAL_PREVIEW_LIVE_CACHE: dict[str, float | dict[str, object] | None] = {"fetched_at": 0.0, "highest_apy_vault": None}
+OVERVIEW_NOTE_VIEW_KEY = "overview"
 
 
 def _validate_data_policy_config() -> None:
@@ -110,6 +112,33 @@ def _seconds_since(ts: datetime | None, now: datetime) -> int | None:
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=UTC)
     return max(0, int((now - ts).total_seconds()))
+
+
+def _fetch_overview_note(
+    cur: psycopg.Cursor,
+) -> dict[str, object] | None:
+    cur.execute(
+        """
+        SELECT
+            view_key,
+            page_key,
+            tab_key,
+            view_label,
+            scope,
+            source_hash,
+            source_as_of,
+            note_json,
+            model,
+            prompt_version,
+            generated_at
+        FROM llm_view_notes
+        WHERE view_key = %(view_key)s
+        LIMIT 1
+        """,
+        {"view_key": OVERVIEW_NOTE_VIEW_KEY},
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
 
 
 def _resolve_universe_gate(
@@ -1406,6 +1435,26 @@ async def meta_social_preview() -> dict[str, object]:
         },
         "highest_apy_vault": highest_row,
     }
+
+
+def _overview_note_response() -> JSONResponse:
+    try:
+        with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+            with conn.cursor() as cur:
+                row = _fetch_overview_note(cur)
+    except Exception as exc:
+        return JSONResponse(status_code=503, content={"summary": None, "error": str(exc)})
+
+    if not row:
+        return JSONResponse(status_code=404, content={"summary": None})
+
+    note_json = row.get("note_json") if isinstance(row.get("note_json"), dict) else {}
+    return JSONResponse(status_code=200, content={"summary": note_json.get("summary")})
+
+
+@app.get("/api/overview-note")
+async def overview_note() -> JSONResponse:
+    return _overview_note_response()
 
 
 @app.get("/api/overview")
