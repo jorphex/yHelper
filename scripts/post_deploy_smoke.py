@@ -43,7 +43,7 @@ def check_with_retries(url: str, timeout: float, retries: int, retry_delay: floa
 
 
 def run_checks(base_url: str, timeout: float, retries: int, retry_delay: float, allow_status: set[int]) -> int:
-    routes = ["/", "/styfi", "/discover", "/assets", "/composition", "/changes", "/regimes", "/chains"]
+    routes = ["/", "/explore", "/momentum", "/structure", "/styfi"]
     apis = [
         "/api/overview",
         "/api/meta/freshness?threshold=24h",
