@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { apiUrl } from "../lib/api";
 
 const navItems = [
   { href: "/", label: "Overview" },
@@ -15,8 +17,33 @@ const externalLinks = [
   { href: "https://powerglove.yearn.fi", label: "Powerglove" },
 ];
 
+type OverviewNoteResponse = {
+  summary?: string | null;
+};
+
 export function Sidebar() {
   const pathname = usePathname();
+  const [summary, setSummary] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchOverviewNote() {
+      try {
+        const res = await fetch(apiUrl("/overview-note"), { cache: "no-store" });
+        if (!res.ok) {
+          return;
+        }
+        const data: OverviewNoteResponse = await res.json();
+        if (!cancelled) {
+          setSummary(data.summary || null);
+        }
+      } catch {
+        // Silently fail - box will be hidden
+      }
+    }
+    fetchOverviewNote();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <aside className="sidebar">
@@ -37,6 +64,13 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
+
+      {summary && (
+        <div className="sidebar-note">
+          <div className="sidebar-note-title">Summary</div>
+          <div className="sidebar-note-content">{summary}</div>
+        </div>
+      )}
 
       <div className="sidebar-divider" />
 
