@@ -9,9 +9,19 @@ NOTES.md
 PLAN.md
 PROMPT.md
 DESIGN.md
+DESIGN_CRITIQUE.md
+FIXES_SUMMARY.md
 plan.md
 reports/
 infra/cloudflared/config.yml.example
+Screenshot *.png
+screenshots/
+*.backup
+web/screenshot.js
+web/scripts/ui_audit_playwright.mjs
+web/public/home-assets-yearn-blender-tests/
+web/public/social/yhelper-preview-*.png
+!web/public/social/yhelper-preview-base.png
 
 # Python
 __pycache__/
