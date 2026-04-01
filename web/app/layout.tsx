@@ -14,8 +14,8 @@ const TWITTER_IMAGE_URL = `${siteUrl}/twitter-image`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "yHelper - Yearn Vault Analytics",
-  description: "Elegant analytics for Yearn vault discovery, yield shifts, and strategic decisions.",
+  title: "yHelper",
+  description: "Yearn vault discovery, yield shifts, and strategic decisions.",
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
@@ -28,8 +28,8 @@ export const metadata: Metadata = {
     type: "website",
     url: siteUrl,
     siteName: "yHelper",
-    title: "yHelper - Yearn Vault Analytics",
-    description: "Elegant analytics for Yearn vault discovery, yield shifts, and strategic decisions.",
+    title: "yHelper",
+    description: "Yearn vault discovery, yield shifts, and strategic decisions.",
     images: [
       {
         url: OPEN_GRAPH_IMAGE_URL,
@@ -41,8 +41,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "yHelper - Yearn Vault Analytics",
-    description: "Elegant analytics for Yearn vault discovery, yield shifts, and strategic decisions.",
+    title: "yHelper",
+    description: "Yearn vault discovery, yield shifts, and strategic decisions.",
     images: [TWITTER_IMAGE_URL],
   },
   other: {
