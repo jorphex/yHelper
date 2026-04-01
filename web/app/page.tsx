@@ -76,6 +76,16 @@ export default function HomePage() {
     : null;
   const highestYieldName = compactTitle(highestYieldVault?.name ?? highestYieldVault?.symbol ?? null);
   const highestYieldApy = formatPct(highestYieldVault?.current_net_apy ?? highestYieldVault?.safe_apy_30d ?? null, 1);
+  const ppsStaleRatio = overview?.freshness?.pps_stale_ratio ?? null;
+  const ppsStaleVaults = overview?.freshness?.pps_vaults_stale ?? null;
+  const ppsTrackedVaults = overview?.freshness?.pps_vaults_total ?? null;
+  const ppsFreshRatio = Number.isFinite(ppsStaleRatio) ? Math.max(0, 1 - Number(ppsStaleRatio)) : null;
+  const ppsFreshVaults = Number.isFinite(ppsTrackedVaults) && Number.isFinite(ppsStaleVaults)
+    ? Math.max(0, Number(ppsTrackedVaults) - Number(ppsStaleVaults))
+    : null;
+  const ppsFreshnessHint = Number.isFinite(ppsFreshVaults) && Number.isFinite(ppsTrackedVaults)
+    ? `${ppsFreshVaults} / ${ppsTrackedVaults} tracked vaults within 24h`
+    : "Tracked vaults within 24h";
 
   const currentYearnVaultCount = Number.isFinite(overview?.protocol_context?.current_yearn?.vaults ?? null)
     ? `${overview?.protocol_context?.current_yearn?.vaults}`
@@ -139,9 +149,9 @@ export default function HomePage() {
             </div>
 
             <div className="kpi-card">
-              <div className="kpi-label">Coverage Quality</div>
-              <div className="kpi-value">{formatHours(overview?.freshness?.latest_pps_age_seconds ?? null, 1, false)}</div>
-              <div className="kpi-hint">Latest PPS age in tracked scope</div>
+              <div className="kpi-label">PPS Freshness</div>
+              <div className="kpi-value">{formatPct(ppsFreshRatio, 1)}</div>
+              <div className="kpi-hint">{ppsFreshnessHint}</div>
             </div>
 
             <div className="kpi-card">

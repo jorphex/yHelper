@@ -9,6 +9,8 @@ type OverviewResponse = {
   freshness?: {
     latest_pps_age_seconds?: number | null;
     pps_stale_ratio?: number | null;
+    pps_vaults_stale?: number | null;
+    pps_vaults_total?: number | null;
   } | null;
   protocol_context?: {
     current_yearn?: {
