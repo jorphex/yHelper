@@ -559,8 +559,15 @@ def _extract_kong_est_apy(vault: dict) -> float | None:
     performance_obj = performance if isinstance(performance, dict) else {}
     oracle = performance_obj.get("oracle")
     oracle_obj = oracle if isinstance(oracle, dict) else {}
-    value = _first_present(oracle_obj, ("apy", "netAPY", "netApy", "apr", "netAPR"))
+    value = _first_present(oracle_obj, ("apy", "netAPY", "netApy"))
     return _to_float(value)
+
+
+def _extract_kong_tvl_usd(vault: dict) -> float | None:
+    tvl = vault.get("tvl")
+    if isinstance(tvl, dict):
+        return _to_float(_first_present(tvl, ("close", "tvl", "tvlUsd", "usd")))
+    return _to_float(tvl)
 
 
 def _fetch_live_kong_chain_leaders(limit: int = 3) -> list[dict[str, object]]:
@@ -587,15 +594,22 @@ def _fetch_live_kong_chain_leaders(limit: int = 3) -> list[dict[str, object]]:
         est_apy = _extract_kong_est_apy(vault)
         if est_apy is None or est_apy <= 0:
             continue
+        tvl_usd = _extract_kong_tvl_usd(vault)
         current = leaders.get(chain_id)
-        if current and float(current.get("est_apy") or 0.0) >= est_apy:
-            continue
+        if current:
+            current_apy = float(current.get("est_apy") or 0.0)
+            current_tvl = _to_float(current.get("tvl_usd"))
+            candidate_tvl = float("-inf") if tvl_usd is None else tvl_usd
+            current_tvl_value = float("-inf") if current_tvl is None else current_tvl
+            if current_apy > est_apy or (current_apy == est_apy and current_tvl_value >= candidate_tvl):
+                continue
         leaders[chain_id] = {
             "chain": _chain_label(chain_id),
             "chain_id": chain_id,
             "symbol": vault.get("symbol"),
             "apy_pct": _format_pct(est_apy),
             "est_apy": est_apy,
+            "tvl_usd": tvl_usd,
         }
     return sorted(leaders.values(), key=lambda row: float(row.get("est_apy") or 0.0), reverse=True)[:limit]
 

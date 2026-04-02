@@ -567,6 +567,13 @@ def _extract_kong_est_apy(vault: dict[str, object]) -> float | None:
     return None
 
 
+def _extract_kong_tvl_usd(vault: dict[str, object]) -> float | None:
+    tvl = vault.get("tvl")
+    if isinstance(tvl, dict):
+        return _to_float_or_none(tvl.get("close") if "close" in tvl else tvl.get("tvl"))
+    return _to_float_or_none(tvl)
+
+
 def _live_social_preview_highest_vault() -> dict[str, object]:
     now_mono = time.monotonic()
     cached_at = float(_SOCIAL_PREVIEW_LIVE_CACHE.get("fetched_at") or 0.0)
@@ -594,11 +601,10 @@ def _live_social_preview_highest_vault() -> dict[str, object]:
                 continue
             if bool(vault.get("isHidden")) or bool(vault.get("isRetired")):
                 continue
-            tvl = vault.get("tvl") if isinstance(vault.get("tvl"), dict) else {}
             current_net_apy = _extract_kong_est_apy(vault)
             if current_net_apy is None:
                 continue
-            tvl_usd = _to_float_or_none(tvl.get("close") if "close" in tvl else tvl.get("tvl"))
+            tvl_usd = _extract_kong_tvl_usd(vault)
             candidate_tvl = float("-inf") if tvl_usd is None else tvl_usd
             if current_net_apy < best_score or (current_net_apy == best_score and candidate_tvl <= best_tvl):
                 continue
