@@ -11,7 +11,7 @@ type BreakdownRow = {
   vaults: number;
   tvl_usd: number | null;
   share_tvl?: number | null;
-  weighted_safe_apy_30d?: number | null;
+  weighted_realized_apy_30d?: number | null;
 };
 
 type CrowdingRow = {
@@ -21,7 +21,7 @@ type CrowdingRow = {
   token_symbol: string | null;
   category: string | null;
   tvl_usd: number | null;
-  safe_apy_30d: number | null;
+  realized_apy_30d: number | null;
   momentum_7d_30d: number | null;
   consistency_score: number | null;
   crowding_index: number | null;
@@ -31,7 +31,7 @@ type CompositionResponse = {
   summary: {
     vaults: number;
     total_tvl_usd: number | null;
-    avg_safe_apy_30d: number | null;
+    avg_realized_apy_30d: number | null;
   };
   concentration: {
     chain_hhi: number | null;

@@ -669,15 +669,17 @@ export function ScatterPlot({
   );
 }
 
-// Ridgeline component for APY distribution
+// Ridgeline component for value distributions such as realized APY by chain.
 export function Ridgeline({
   title,
   series,
-  emptyText = "Need more APY samples for distribution curves.",
+  emptyText = "Need more samples for distribution curves.",
+  valueLabel = "APY",
 }: {
   title: string;
   series: RidgelineSeries[];
   emptyText?: string;
+  valueLabel?: string;
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
   const ridgelinePalette = [
@@ -740,7 +742,7 @@ export function Ridgeline({
               .join(" ");
             return (
               <g key={row.id}>
-                <title>{`${row.label}\n${row.note}\nAPY range ${formatPct(min, 1)} to ${formatPct(max, 1)}`}</title>
+                <title>{`${row.label}\n${row.note}\n${valueLabel} range ${formatPct(min, 1)} to ${formatPct(max, 1)}`}</title>
                 <path d={`${pathTop} ${pathBottom} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth={0.9} className="ridgeline-curve" />
                 <text x={8} y={yBase - 0.5} className="ridgeline-label" dominantBaseline="central">{row.label}</text>
                 <text x={width - 8} y={yBase - 0.5} className="ridgeline-note" textAnchor="end" dominantBaseline="central">{row.note}</text>
@@ -752,7 +754,7 @@ export function Ridgeline({
           <text x={width - chartRight} y={height - 2} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
         </svg>
       </div>
-      <p className="muted viz-legend">Ridgelines show APY shape by chain. Taller peaks mean more vaults at that APY zone.</p>
+      <p className="muted viz-legend">Ridgelines show {valueLabel.toLowerCase()} shape by chain. Taller peaks mean more vaults at that {valueLabel.toLowerCase()} zone.</p>
     </section>
   );
 }

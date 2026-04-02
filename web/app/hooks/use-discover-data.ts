@@ -12,7 +12,7 @@ type DiscoverRow = {
   category: string | null;
   tvl_usd: number | null;
   est_apy: number | null;
-  safe_apy_30d: number | null;
+  realized_apy_30d: number | null;
   momentum_7d_30d: number | null;
   consistency_score: number | null;
   risk_level: string | null;
@@ -34,9 +34,9 @@ type DiscoverResponse = {
     avg_est_apy?: number | null;
     median_est_apy?: number | null;
     tvl_weighted_est_apy?: number | null;
-    avg_safe_apy_30d?: number | null;
-    median_safe_apy_30d?: number | null;
-    tvl_weighted_safe_apy_30d?: number | null;
+    avg_realized_apy_30d?: number | null;
+    median_realized_apy_30d?: number | null;
+    tvl_weighted_realized_apy_30d?: number | null;
     avg_momentum_7d_30d?: number | null;
     median_momentum_7d_30d?: number | null;
     avg_consistency_score?: number | null;
@@ -51,13 +51,13 @@ type DiscoverResponse = {
   };
   coverage?: {
     visible_vaults?: number;
-    with_metrics?: number;
+    with_realized_apy?: number;
     missing_metrics?: number;
     low_points?: number;
     missing_or_low_points?: number;
     coverage_ratio?: number | null;
     visible_tvl_usd?: number | null;
-    with_metrics_tvl_usd?: number | null;
+    with_realized_apy_tvl_usd?: number | null;
   };
   risk_mix?: Array<{ risk_level: string; vaults: number; tvl_usd: number | null }>;
   rows: DiscoverRow[];

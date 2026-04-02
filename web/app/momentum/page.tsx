@@ -27,8 +27,8 @@ type ChangeRow = {
   token_symbol: string | null;
   category: string | null;
   tvl_usd: number | null;
-  safe_apy_window: number | null;
-  safe_apy_prev_window: number | null;
+  realized_apy_window: number | null;
+  realized_apy_prev_window: number | null;
   delta_apy: number | null;
   age_seconds: number | null;
 };
@@ -82,7 +82,7 @@ type RegimeMover = {
   symbol: string | null;
   token_symbol: string | null;
   tvl_usd: number | null;
-  safe_apy_30d: number | null;
+  realized_apy_30d: number | null;
   momentum_7d_30d: number | null;
   regime: string;
 };
@@ -200,8 +200,8 @@ function MoverTable({
     vault: (row) => row.symbol ?? row.vault_address,
     chain: (row) => chainLabel(row.chain_id),
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    current: (row) => row.safe_apy_window ?? Number.NEGATIVE_INFINITY,
-    previous: (row) => row.safe_apy_prev_window ?? Number.NEGATIVE_INFINITY,
+    current: (row) => row.realized_apy_window ?? Number.NEGATIVE_INFINITY,
+    previous: (row) => row.realized_apy_prev_window ?? Number.NEGATIVE_INFINITY,
     delta: (row) => row.delta_apy ?? Number.NEGATIVE_INFINITY,
     age: (row) => row.age_seconds ?? Number.NEGATIVE_INFINITY,
   });
@@ -262,8 +262,8 @@ function MoverTable({
                   </Link>
                 </td>
                 <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_window)}</td>
-                <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_prev_window)}</td>
+                <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_window)}</td>
+                <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_prev_window)}</td>
                 <td style={{ textAlign: "right", color: (row.delta_apy ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }} className="data-value">
                   {formatPct(row.delta_apy)}
                 </td>
@@ -837,7 +837,7 @@ function MomentumPageContent() {
     chain: (row) => chainLabel(row.chain_id),
     token: (row) => row.token_symbol ?? "",
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.safe_apy_30d ?? Number.NEGATIVE_INFINITY,
+    apy: (row) => row.realized_apy_30d ?? Number.NEGATIVE_INFINITY,
     momentum: (row) => row.momentum_7d_30d ?? Number.NEGATIVE_INFINITY,
     regime: (row) => row.regime,
   });
@@ -1403,7 +1403,7 @@ function MomentumPageContent() {
                 points={moverScatterRows.map((row) => ({
                   id: `${row.chain_id}:${row.vault_address}`,
                   x: row.delta_apy,
-                  y: row.safe_apy_window,
+                  y: row.realized_apy_window,
                   size: row.tvl_usd,
                   href: yearnVaultUrl(row.chain_id, row.vault_address),
                   tone: (row.delta_apy ?? 0) >= 0 ? "positive" : "negative",
@@ -1709,7 +1709,7 @@ function MomentumPageContent() {
                         </td>
                       )}
                       <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_30d)}</td>
+                      <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_30d)}</td>
                       <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.momentum_7d_30d)}</td>
                       {!isCompactViewport && <td style={{ textAlign: "right" }} className="data-value" title={compactRegimeLabel(row.regime)}>{compactRegimeLabel(row.regime)}</td>}
                     </tr>

@@ -16,7 +16,7 @@ type RegimeMover = {
   symbol: string | null;
   token_symbol: string | null;
   tvl_usd: number | null;
-  safe_apy_30d: number | null;
+  realized_apy_30d: number | null;
   momentum_7d_30d: number | null;
   regime: string;
 };

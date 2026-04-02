@@ -129,7 +129,7 @@ export function NoChangesEmptyState() {
   return (
     <EmptyState
       title="No changes detected"
-      description="There are no significant APY changes in the selected time window. Try extending the range or adjusting the stale threshold."
+      description="There are no significant realized APY changes in the selected time window. Try extending the range or adjusting the stale threshold."
       icon="chart"
     />
   );

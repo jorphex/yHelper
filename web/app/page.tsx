@@ -13,7 +13,7 @@ type ChangeMoverRow = {
   symbol?: string | null;
   token_symbol?: string | null;
   delta_apy?: number | null;
-  safe_apy_30d?: number | null;
+  realized_apy_30d?: number | null;
 };
 
 function pctDelta(value: number | null | undefined, digits = 2): string {
@@ -68,14 +68,14 @@ export default function HomePage() {
     ? yearnVaultUrl(Number(topMover.chain_id), topMover.vault_address)
     : null;
   const liveShiftValue = Number.isFinite(topMover?.delta_apy ?? null) ? pctDelta(topMover?.delta_apy, 2) : "n/a";
-  const liveShiftApy = topMover ? formatPct(topMover?.safe_apy_30d ?? null, 2) : "n/a";
+  const liveShiftApy = topMover ? formatPct(topMover?.realized_apy_30d ?? null, 2) : "n/a";
 
-  const highestYieldVault = socialPreview?.highest_apy_vault ?? null;
+  const highestYieldVault = socialPreview?.highest_est_apy_vault ?? null;
   const highestYieldHref = highestYieldVault?.vault_address && highestYieldVault?.chain_id != null
     ? yearnVaultUrl(Number(highestYieldVault.chain_id), highestYieldVault.vault_address)
     : null;
   const highestYieldName = compactTitle(highestYieldVault?.name ?? highestYieldVault?.symbol ?? null);
-  const highestYieldApy = formatPct(highestYieldVault?.current_net_apy ?? highestYieldVault?.safe_apy_30d ?? null, 1);
+  const highestYieldApy = formatPct(highestYieldVault?.est_apy ?? null, 1);
   const ppsStaleRatio = overview?.freshness?.pps_stale_ratio ?? null;
   const ppsStaleVaults = overview?.freshness?.pps_vaults_stale ?? null;
   const ppsTrackedVaults = overview?.freshness?.pps_vaults_total ?? null;
@@ -155,7 +155,7 @@ export default function HomePage() {
             </div>
 
             <div className="kpi-card">
-              <div className="kpi-label">Highest Yield</div>
+              <div className="kpi-label">Highest Est. APY</div>
               <div className="kpi-value" style={{ fontSize: '20px' }}>
                 {highestYieldHref ? (
                   <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="external-link" style={{ color: 'var(--accent)' }}>

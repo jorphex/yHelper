@@ -7,9 +7,9 @@ import { UniverseKind } from "../lib/universe";
 type ChainRow = {
   chain_id: number;
   active_vaults: number;
-  with_metrics: number;
+  with_realized_apy: number;
   total_tvl_usd: number | null;
-  weighted_apy_30d: number | null;
+  weighted_realized_apy_30d: number | null;
   avg_momentum_7d_30d: number | null;
   avg_consistency: number | null;
 };
@@ -19,10 +19,10 @@ type ChainsResponse = {
     chains?: number;
     total_tvl_usd?: number;
     active_vaults?: number;
-    with_metrics?: number;
+    with_realized_apy?: number;
     metrics_coverage_ratio?: number | null;
-    tvl_weighted_apy_30d?: number | null;
-    median_chain_apy_30d?: number | null;
+    tvl_weighted_realized_apy_30d?: number | null;
+    median_chain_realized_apy_30d?: number | null;
     tvl_hhi?: number | null;
     top_chain_id?: number | null;
     top_chain_tvl_share?: number | null;

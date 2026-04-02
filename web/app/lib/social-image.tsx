@@ -25,12 +25,11 @@ type SocialPreviewResponse = {
     active_vaults?: number | null;
     tracked_tvl_active_usd?: number | null;
   };
-  highest_apy_vault?: {
+  highest_est_apy_vault?: {
     name?: string | null;
     symbol?: string | null;
     chain_id?: number | null;
-    current_net_apy?: number | null;
-    safe_apy_30d?: number | null;
+    est_apy?: number | null;
   };
 };
 
@@ -132,7 +131,7 @@ export async function renderSocialImage() {
 
   const summary = social?.summary || {};
   const protocol = overview?.protocol_context?.current_yearn || {};
-  const highest = social?.highest_apy_vault || {};
+  const highest = social?.highest_est_apy_vault || {};
   const styfiSummary = styfi?.summary || {};
   const rewardState = styfi?.current_reward_state || {};
 
@@ -148,8 +147,8 @@ export async function renderSocialImage() {
     },
     {
       value: compactText(highest.name || highest.symbol, 14),
-      noteStrong: pct(highest.current_net_apy ?? highest.safe_apy_30d, 1),
-      noteTail: `APY · ${chainLabel(highest.chain_id)}`,
+      noteStrong: pct(highest.est_apy, 1),
+      noteTail: `Est. APY · ${chainLabel(highest.chain_id)}`,
       valueStyle: { fontSize: 56, lineHeight: 0.92, letterSpacing: "-0.05em", maxWidth: 300 },
     },
     {

@@ -30,8 +30,8 @@ type ChangeMoverRow = {
   symbol?: string | null;
   token_symbol?: string | null;
   delta_apy?: number | null;
-  safe_apy_30d?: number | null;
-  safe_apy_window?: number | null;
+  realized_apy_30d?: number | null;
+  realized_apy_window?: number | null;
 };
 
 type ChangesResponse = {
@@ -59,14 +59,21 @@ type StYfiHomeResponse = {
 };
 
 type SocialPreviewResponse = {
-  highest_apy_vault?: {
+  highest_est_apy_vault?: {
     vault_address?: string | null;
     name?: string | null;
     symbol?: string | null;
     chain_id?: number | null;
     tvl_usd?: number | null;
-    current_net_apy?: number | null;
-    safe_apy_30d?: number | null;
+    est_apy?: number | null;
+  } | null;
+  highest_realized_apy_fallback_vault?: {
+    vault_address?: string | null;
+    name?: string | null;
+    symbol?: string | null;
+    chain_id?: number | null;
+    tvl_usd?: number | null;
+    realized_apy_30d?: number | null;
   } | null;
 };
 

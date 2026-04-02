@@ -14,8 +14,8 @@ type Summary = {
   total_tvl_usd: number | null;
   tracked_tvl_usd: number | null;
   stale_tracked_tvl_usd?: number | null;
-  avg_safe_apy_window: number | null;
-  avg_safe_apy_prev_window: number | null;
+  avg_realized_apy_window: number | null;
+  avg_realized_apy_prev_window: number | null;
   avg_delta: number | null;
 };
 
@@ -26,8 +26,8 @@ type ChangeRow = {
   token_symbol: string | null;
   category: string | null;
   tvl_usd: number | null;
-  safe_apy_window: number | null;
-  safe_apy_prev_window: number | null;
+  realized_apy_window: number | null;
+  realized_apy_prev_window: number | null;
   delta_apy: number | null;
   age_seconds: number | null;
 };

@@ -12,9 +12,9 @@ type AssetRow = {
   total_tvl_usd: number | null;
   best_est_apy: number | null;
   weighted_est_apy: number | null;
-  best_safe_apy_30d: number | null;
-  weighted_safe_apy_30d: number | null;
-  spread_safe_apy_30d: number | null;
+  best_realized_apy_30d: number | null;
+  weighted_realized_apy_30d: number | null;
+  realized_spread_30d: number | null;
 };
 
 type AssetsResponse = {
@@ -35,11 +35,11 @@ type AssetsResponse = {
     avg_venues_per_token?: number | null;
     multi_chain_tokens?: number;
     high_spread_tokens?: number;
-    median_spread_safe_apy_30d?: number | null;
+    median_realized_spread_30d?: number | null;
     median_best_est_apy?: number | null;
-    median_best_safe_apy_30d?: number | null;
+    median_best_realized_apy_30d?: number | null;
     tvl_weighted_est_apy?: number | null;
-    tvl_weighted_safe_apy_30d?: number | null;
+    tvl_weighted_realized_apy_30d?: number | null;
     top_token_symbol?: string | null;
     top_token_tvl_share?: number | null;
   };
@@ -54,7 +54,7 @@ type VenueRow = {
   version: string | null;
   tvl_usd: number | null;
   est_apy: number | null;
-  safe_apy_30d: number | null;
+  realized_apy_30d: number | null;
   momentum_7d_30d: number | null;
   consistency_score: number | null;
   regime: string;
@@ -68,13 +68,13 @@ type AssetVenuesResponse = {
     total_tvl_usd: number;
     best_est_apy: number | null;
     weighted_est_apy: number | null;
-    best_safe_apy_30d: number | null;
-    worst_safe_apy_30d: number | null;
-    spread_safe_apy_30d: number | null;
-    weighted_safe_apy_30d: number | null;
+    best_realized_apy_30d: number | null;
+    worst_realized_apy_30d: number | null;
+    realized_spread_30d: number | null;
+    weighted_realized_apy_30d: number | null;
     best_venue_symbol: string | null;
     median_est_apy?: number | null;
-    median_safe_apy_30d?: number | null;
+    median_realized_apy_30d?: number | null;
     median_momentum_7d_30d?: number | null;
     tvl_weighted_momentum_7d_30d?: number | null;
     regime_counts?: Array<{ regime: string; vaults: number }>;

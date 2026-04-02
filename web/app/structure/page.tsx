@@ -14,7 +14,7 @@ import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 
 type TabKey = "overview" | "chains" | "crowding";
-type ChainSortKey = "chain" | "vaults" | "with_metrics" | "tvl" | "apy" | "momentum" | "consistency";
+type ChainSortKey = "chain" | "vaults" | "with_realized_apy" | "tvl" | "apy" | "momentum" | "consistency";
 type CategorySortKey = "category" | "vaults" | "tvl" | "share" | "apy";
 type TokenSortKey = "token" | "vaults" | "tvl" | "share" | "apy";
 type CrowdingSortKey = "vault" | "chain" | "token" | "category" | "tvl" | "apy" | "crowding";
@@ -26,7 +26,7 @@ type BreakdownRow = {
   vaults: number;
   tvl_usd: number | null;
   share_tvl?: number | null;
-  weighted_safe_apy_30d?: number | null;
+  weighted_realized_apy_30d?: number | null;
 };
 
 type CrowdingRow = {
@@ -36,7 +36,7 @@ type CrowdingRow = {
   token_symbol: string | null;
   category: string | null;
   tvl_usd: number | null;
-  safe_apy_30d: number | null;
+  realized_apy_30d: number | null;
   crowding_index: number | null;
 };
 
@@ -224,9 +224,9 @@ function StructurePageContent() {
   const chainsTabRows = sortRows(chainsData?.rows ?? [], chainSort, {
     chain: (row) => chainLabel(row.chain_id),
     vaults: (row) => row.active_vaults,
-    with_metrics: (row) => row.with_metrics,
+    with_realized_apy: (row) => row.with_realized_apy,
     tvl: (row) => row.total_tvl_usd ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.weighted_apy_30d ?? Number.NEGATIVE_INFINITY,
+    apy: (row) => row.weighted_realized_apy_30d ?? Number.NEGATIVE_INFINITY,
     momentum: (row) => row.avg_momentum_7d_30d ?? Number.NEGATIVE_INFINITY,
     consistency: (row) => row.avg_consistency ?? Number.NEGATIVE_INFINITY,
   });
@@ -236,7 +236,7 @@ function StructurePageContent() {
     vaults: (row) => row.vaults,
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
     share: (row) => row.share_tvl ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.weighted_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
+    apy: (row) => row.weighted_realized_apy_30d ?? Number.NEGATIVE_INFINITY,
   });
 
   const tokenRows = sortRows(compData?.tokens ?? [], tokenSort, {
@@ -244,7 +244,7 @@ function StructurePageContent() {
     vaults: (row) => row.vaults,
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
     share: (row) => row.share_tvl ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.weighted_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
+    apy: (row) => row.weighted_realized_apy_30d ?? Number.NEGATIVE_INFINITY,
   });
 
   const crowdedRows = sortRows(compData?.crowding.most_crowded ?? [], crowdingSort, {
@@ -253,7 +253,7 @@ function StructurePageContent() {
     token: (row) => row.token_symbol ?? "",
     category: (row) => row.category ?? "",
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.safe_apy_30d ?? Number.NEGATIVE_INFINITY,
+    apy: (row) => row.realized_apy_30d ?? Number.NEGATIVE_INFINITY,
     crowding: (row) => row.crowding_index ?? Number.NEGATIVE_INFINITY,
   });
 
@@ -263,7 +263,7 @@ function StructurePageContent() {
     token: (row) => row.token_symbol ?? "",
     category: (row) => row.category ?? "",
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.safe_apy_30d ?? Number.NEGATIVE_INFINITY,
+    apy: (row) => row.realized_apy_30d ?? Number.NEGATIVE_INFINITY,
     crowding: (row) => row.crowding_index ?? Number.NEGATIVE_INFINITY,
   });
 
@@ -375,7 +375,7 @@ function StructurePageContent() {
                 </div>
                 <div className="kpi-card">
                   <div className="kpi-label">Average Realized APY 30d</div>
-                  <div className="kpi-value">{formatPct(compData?.summary.avg_safe_apy_30d)}</div>
+                  <div className="kpi-value">{formatPct(compData?.summary.avg_realized_apy_30d)}</div>
                 </div>
                 <div className="kpi-card">
                   <div className="kpi-label">Chain HHI</div>
@@ -455,7 +455,7 @@ function StructurePageContent() {
                         <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.share_tvl)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_safe_apy_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
                       </tr>
                     ))
                   )}
@@ -516,7 +516,7 @@ function StructurePageContent() {
                         <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.share_tvl)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_safe_apy_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
                       </tr>
                     ))
                   )}
@@ -539,7 +539,7 @@ function StructurePageContent() {
               <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
                 <div className="kpi-card">
                   <div className="kpi-label">With Realized APY</div>
-                  <div className="kpi-value">{chainsData?.summary?.with_metrics ?? "n/a"}</div>
+                  <div className="kpi-value">{chainsData?.summary?.with_realized_apy ?? "n/a"}</div>
                 </div>
                 <div className="kpi-card">
                   <div className="kpi-label">Coverage Ratio</div>
@@ -547,7 +547,7 @@ function StructurePageContent() {
                 </div>
                 <div className="kpi-card">
                   <div className="kpi-label">Median Chain Realized APY 30d</div>
-                  <div className="kpi-value">{formatPct(chainsData?.summary?.median_chain_apy_30d)}</div>
+                  <div className="kpi-value">{formatPct(chainsData?.summary?.median_chain_realized_apy_30d)}</div>
                 </div>
               </div>
             )}
@@ -595,8 +595,8 @@ function StructurePageContent() {
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "with_metrics"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        With Realized APY {sortIndicator(chainSort, "with_metrics")}
+                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "with_realized_apy"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                        With Realized APY {sortIndicator(chainSort, "with_realized_apy")}
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
@@ -633,9 +633,9 @@ function StructurePageContent() {
                           </Link>
                         </td>
                         <td style={{ textAlign: "right" }} className="data-value">{row.active_vaults}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.with_metrics}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{row.with_realized_apy}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.total_tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_apy_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.avg_momentum_7d_30d)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{row.avg_consistency?.toFixed(2) ?? "n/a"}</td>
                       </tr>
@@ -661,7 +661,7 @@ function StructurePageContent() {
               yLabel="TVL (USD)"
               points={crowdingScatterRows.map((row) => ({
                 id: `${row.chain_id}:${row.vault_address}`,
-                x: row.safe_apy_30d,
+                x: row.realized_apy_30d,
                 y: row.tvl_usd,
                 size: row.crowding_index,
                 href: yearnVaultUrl(row.chain_id, row.vault_address),
@@ -744,7 +744,7 @@ function StructurePageContent() {
                         )}
                         {!isCompactViewport && <td>{row.category || "n/a"}</td>}
                         <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_30d)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{row.crowding_index?.toFixed(2) ?? "n/a"}</td>
                       </tr>
                     ))
@@ -827,7 +827,7 @@ function StructurePageContent() {
                         )}
                         {!isCompactViewport && <td>{row.category || "n/a"}</td>}
                         <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_30d)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{row.crowding_index?.toFixed(2) ?? "n/a"}</td>
                       </tr>
                     ))
