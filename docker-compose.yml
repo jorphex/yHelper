@@ -37,6 +37,8 @@ services:
       INGESTION_RUN_RETENTION_DAYS: ${INGESTION_RUN_RETENTION_DAYS:-14}
       DB_CLEANUP_MIN_INTERVAL_SEC: ${DB_CLEANUP_MIN_INTERVAL_SEC:-86400}
       KONG_PPS_LOOKBACK_DAYS: ${KONG_PPS_LOOKBACK_DAYS:-119}
+      KONG_GQL_URL: ${KONG_GQL_URL:-https://kong.yearn.fi/api/gql}
+      KONG_REST_VAULTS_URL: ${KONG_REST_VAULTS_URL:-https://kong.yearn.fi/api/rest/list/vaults?origin=yearn}
       STYFI_SYNC_ENABLED: ${STYFI_SYNC_ENABLED:-0}
       STYFI_CHAIN_ID: ${STYFI_CHAIN_ID:-1}
       STYFI_RETENTION_DAYS: ${STYFI_RETENTION_DAYS:-122}
@@ -63,8 +65,8 @@ services:
     environment:
       DATABASE_URL: ${WORKER_DATABASE_URL:-postgresql://yhelper:change_me@127.0.0.1:5432/yhelper}
       WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-3600}
-      YDAEMON_URL: ${YDAEMON_URL:-https://ydaemon.yearn.fi/vaults/detected?limit=2000}
-      KONG_GQL_URL: ${KONG_GQL_URL:-https://kong.yearn.farm/api/gql}
+      KONG_GQL_URL: ${KONG_GQL_URL:-https://kong.yearn.fi/api/gql}
+      KONG_REST_VAULTS_URL: ${KONG_REST_VAULTS_URL:-https://kong.yearn.fi/api/rest/list/vaults?origin=yearn}
       KONG_MAX_VAULTS: ${KONG_MAX_VAULTS:-120}
       KONG_MIN_TVL_USD: ${KONG_MIN_TVL_USD:-100000}
       KONG_PPS_LOOKBACK_DAYS: ${KONG_PPS_LOOKBACK_DAYS:-119}

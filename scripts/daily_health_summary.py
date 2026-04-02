@@ -60,7 +60,7 @@ def main() -> int:
     firing_alerts = [name for name, alert in alerts.items() if isinstance(alert, dict) and alert.get("is_firing")]
 
     jobs = freshness.get("ingestion_jobs") or {}
-    ydaemon_age = _to_int((jobs.get("ydaemon_snapshot") or {}).get("last_success_age_seconds"))
+    snapshot_age = _to_int((jobs.get("kong_vault_snapshot") or {}).get("last_success_age_seconds"))
     kong_age = _to_int((jobs.get("kong_pps_metrics") or {}).get("last_success_age_seconds"))
 
     stale_ratio = freshness.get("pps_stale_ratio")
@@ -69,9 +69,9 @@ def main() -> int:
     checks: list[tuple[str, bool, str]] = [
         ("firing_alerts", len(firing_alerts) == 0, f"count={len(firing_alerts)} names={firing_alerts}"),
         (
-            "ydaemon_last_success_age",
-            ydaemon_age is not None and ydaemon_age <= allowed_success_age,
-            f"value={ydaemon_age} allowed={allowed_success_age}",
+            "kong_snapshot_last_success_age",
+            snapshot_age is not None and snapshot_age <= allowed_success_age,
+            f"value={snapshot_age} allowed={allowed_success_age}",
         ),
         (
             "kong_last_success_age",

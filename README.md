@@ -23,7 +23,7 @@ It is built to answer a few simple questions fast:
 
 ## Data
 The app combines:
-- Yearn yDaemon metadata and snapshots
+- Kong REST/GraphQL metadata, snapshots, and PPS history
 - Kong PPS history and derived yield metrics
 
 ## Stack
