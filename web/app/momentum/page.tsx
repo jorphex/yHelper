@@ -230,12 +230,12 @@ function MoverTable({
               </th>
               <th style={{ textAlign: "right" }}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "current"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                  Current {sortIndicator(sort, "current")}
+                  Current Realized APY {sortIndicator(sort, "current")}
                 </button>
               </th>
               <th style={{ textAlign: "right" }}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "previous"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                  Previous {sortIndicator(sort, "previous")}
+                  Previous Realized APY {sortIndicator(sort, "previous")}
                 </button>
               </th>
               <th style={{ textAlign: "right" }}>
@@ -447,6 +447,7 @@ function MomentumPageContent() {
   const { data: changesData, isLoading: changesLoading, error: changesError, refetch: refetchChanges } = useChangesData({
     universe: query.universe,
     minTvl: query.minTvl,
+    minPoints: query.minPoints,
     window: query.window,
     staleThreshold: "auto",
   });
@@ -583,6 +584,9 @@ function MomentumPageContent() {
   const yearnAligned = changesData?.reference_tvl?.yearn_aligned_proxy;
   const filteredTvl = summary?.total_tvl_usd;
   const trackedTvl = summary?.tracked_tvl_usd;
+  const staleTrackedTvl = summary?.stale_tracked_tvl_usd ?? 0;
+  const freshTrackedTvl = Math.max(0, (trackedTvl ?? 0) - staleTrackedTvl);
+  const missingWindowTvl = Math.max(0, (filteredTvl ?? 0) - (trackedTvl ?? 0));
   const yearnTvl = yearnAligned?.tvl_usd;
   const yearnVaults = yearnAligned?.vaults;
   const gap = yearnAligned?.comparison_to_filtered_universe?.gap_usd;
@@ -616,16 +620,23 @@ function MomentumPageContent() {
     {
       id: "fresh-tvl",
       label: "Fresh TVL",
-      value: trackedTvl ?? 0,
-      note: filteredTvl && trackedTvl ? `${formatPct(trackedTvl / filteredTvl, 0)} of filtered` : "...",
+      value: freshTrackedTvl,
+      note: filteredTvl ? `${formatPct(freshTrackedTvl / filteredTvl, 0)} of filtered` : "...",
       tone: "positive" as const,
     },
     {
       id: "stale-tvl",
       label: "Stale TVL",
-      value: (filteredTvl ?? 0) - (trackedTvl ?? 0),
-      note: filteredTvl ? `${formatPct(((filteredTvl ?? 0) - (trackedTvl ?? 0)) / filteredTvl, 0)} beyond cutoff` : "...",
+      value: staleTrackedTvl,
+      note: filteredTvl ? `${formatPct(staleTrackedTvl / filteredTvl, 0)} beyond cutoff` : "...",
       tone: "warning" as const,
+    },
+    {
+      id: "missing-tvl",
+      label: "Missing TVL",
+      value: missingWindowTvl,
+      note: filteredTvl ? `${formatPct(missingWindowTvl / filteredTvl, 0)} no delta` : "...",
+      tone: "muted" as const,
     },
   ];
 
@@ -680,13 +691,13 @@ function MomentumPageContent() {
         id: "riser-ratio",
         label: "Riser share",
         points: trendSlice.map((row) => row.riser_ratio),
-        note: "Vaults with improving short-term APY",
+        note: "Vaults with improving short-term realized APY",
       },
       {
         id: "faller-ratio",
         label: "Faller share",
         points: trendSlice.map((row) => row.faller_ratio),
-        note: "Vaults with weakening short-term APY",
+        note: "Vaults with weakening short-term realized APY",
       },
       {
         id: "momentum",
@@ -702,13 +713,13 @@ function MomentumPageContent() {
     () => [
       {
         id: "apy7",
-        label: "APY 7d",
+        label: "Realized APY 7d",
         points: trendSlice.map((row) => row.weighted_apy_7d),
-        note: "Latest-week annualized yield",
+        note: "Latest-week realized annualized yield",
       },
       {
         id: "apy30",
-        label: "APY 30d",
+        label: "Realized APY 30d",
         points: trendSlice.map((row) => row.weighted_apy_30d),
         note: "Primary comparison baseline",
       },
@@ -727,7 +738,7 @@ function MomentumPageContent() {
         id: `group-${query.trendGroup}-${row.group_key}`,
         label: query.trendGroup === "chain" ? chainLabel(Number(row.group_key)) : row.group_key,
         points: (series[row.group_key] ?? []).map((p) => p.weighted_apy_30d),
-        note: `APY ${formatPct(row.weighted_apy_30d)} • TVL ${formatUsd(row.total_tvl_usd)}`,
+        note: `Realized APY 30d ${formatPct(row.weighted_apy_30d)} • TVL ${formatUsd(row.total_tvl_usd)}`,
       }));
   }, [query.trendGroup, chainTrendLatest, categoryTrendLatest, chainTrendSeries, categoryTrendSeries]);
 
@@ -740,7 +751,7 @@ function MomentumPageContent() {
           id: `chain-${row.group_key}`,
           label: chainLabel(Number(row.group_key)),
           value: row.weighted_momentum_7d_30d,
-          note: `${formatUsd(row.total_tvl_usd)} • APY ${formatPct(row.weighted_apy_30d)}`,
+          note: `${formatUsd(row.total_tvl_usd)} • Realized APY 30d ${formatPct(row.weighted_apy_30d)}`,
         })),
     [chainTrendLatest, isCompactViewport],
   );
@@ -754,14 +765,17 @@ function MomentumPageContent() {
           id: `cat-${row.group_key}`,
           label: row.group_key,
           value: row.weighted_momentum_7d_30d,
-          note: `${formatUsd(row.total_tvl_usd)} • APY ${formatPct(row.weighted_apy_30d)}`,
+          note: `${formatUsd(row.total_tvl_usd)} • Realized APY 30d ${formatPct(row.weighted_apy_30d)}`,
         })),
     [categoryTrendLatest, isCompactViewport],
   );
 
   // Stale data calculations
-  const staleByChain: StaleByChain[] = changesData?.freshness?.stale_by_chain ?? [];
-  const staleByCategory: StaleByCategory[] = changesData?.freshness?.stale_by_category ?? [];
+  const staleByChain = useMemo<StaleByChain[]>(() => changesData?.freshness?.stale_by_chain ?? [], [changesData?.freshness?.stale_by_chain]);
+  const staleByCategory = useMemo<StaleByCategory[]>(
+    () => changesData?.freshness?.stale_by_category ?? [],
+    [changesData?.freshness?.stale_by_category],
+  );
 
   const staleChainRows = sortRows(staleByChain, staleSort, {
     chain: (row) => chainLabel(row.chain_id),
@@ -834,7 +848,17 @@ function MomentumPageContent() {
     return REGIME_ORDER.map((regime) => byRegime.get(regime) ?? { regime, vaults: 0, tvl_usd: 0 });
   }, [regimeData?.summary]);
 
-  const currentRegime = regimes.find((row) => row.vaults > 0)?.regime ?? "n/a";
+  const dominantRegime = useMemo(
+    () =>
+      [...(regimeData?.summary ?? [])]
+        .filter((row) => row.vaults > 0)
+        .sort(
+          (left, right) =>
+            (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY)
+            || right.vaults - left.vaults,
+        )[0]?.regime ?? "n/a",
+    [regimeData?.summary],
+  );
   const totalRegimeTvl = useMemo(
     () => regimes.reduce((sum, row) => sum + (row.tvl_usd ?? 0), 0),
     [regimes],
@@ -1012,7 +1036,7 @@ function MomentumPageContent() {
           <em className="page-title-accent">Recent shifts</em>
         </h1>
         <p className="page-description">
-          Track APY changes and regime transitions to time allocation decisions.
+          Track realized APY changes and regime transitions to time allocation decisions.
         </p>
 
         {/* Tab Navigation */}
@@ -1146,7 +1170,7 @@ function MomentumPageContent() {
                     </div>
                     <div className="kpi-card">
                       <div className="kpi-label">Filtered/Yearn Ratio</div>
-                      <div className="kpi-value">{ratio ? ratio.toFixed(2) : "n/a"}</div>
+                      <div className="kpi-value">{ratio !== null && ratio !== undefined ? ratio.toFixed(2) : "n/a"}</div>
                     </div>
                   </div>
                 )}
@@ -1223,7 +1247,7 @@ function MomentumPageContent() {
             <div className="card-header">
               <h2 className="card-title">Grouped Momentum Snapshot (Latest Day)</h2>
               <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginTop: "8px" }}>
-                TVL-weighted momentum by chain/category (7d APY minus 30d APY). Positive values indicate short-term strengthening.
+                TVL-weighted momentum by chain/category (realized 7d APY minus realized 30d APY). Positive values indicate short-term strengthening.
               </p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
@@ -1231,7 +1255,7 @@ function MomentumPageContent() {
                 title="By Chain"
                 items={chainMomentumHeat}
                 valueFormatter={(value) => formatPct(value, 1)}
-                legend="Cells are sorted by latest TVL. Notes show TVL and weighted APY 30d for context."
+                legend="Cells are sorted by latest TVL. Notes show TVL and weighted realized APY 30d for context."
               />
               <HeatGrid
                 title="By Category"
@@ -1365,7 +1389,7 @@ function MomentumPageContent() {
                   emptyText="Trend data unavailable"
                 />
                 <TrendStrips
-                  title={query.trendGroup === "none" ? "APY Trend" : `APY by ${query.trendGroup === "chain" ? "Chain" : "Category"}`}
+                  title={query.trendGroup === "none" ? "Realized APY Trend" : `Realized APY by ${query.trendGroup === "chain" ? "Chain" : "Category"}`}
                   items={query.trendGroup === "none" ? weightedApyTrendItems : groupedApyTrendItems}
                   valueFormatter={(value) => formatPct(value, 2)}
                   deltaFormatter={(value) => `${value >= 0 ? "+" : ""}${formatPct(value, 2)}`}
@@ -1373,9 +1397,9 @@ function MomentumPageContent() {
                 />
               </div>
               <ScatterPlot
-                title="Delta vs Current APY"
+                title="Delta vs Current Realized APY"
                 xLabel="Delta"
-                yLabel="Current APY"
+                yLabel="Current Realized APY"
                 points={moverScatterRows.map((row) => ({
                   id: `${row.chain_id}:${row.vault_address}`,
                   x: row.delta_apy,
@@ -1536,8 +1560,9 @@ function MomentumPageContent() {
                   <div className="kpi-value">{summaryRows.reduce((acc, row) => acc + row.vaults, 0)}</div>
                 </div>
                 <div className="kpi-card">
-                  <div className="kpi-label">Current Regime</div>
-                  <div className="kpi-value" style={{ textTransform: "capitalize" }}>{currentRegime}</div>
+                  <div className="kpi-label">Dominant Regime</div>
+                  <div className="kpi-value" style={{ textTransform: "capitalize" }}>{dominantRegime}</div>
+                  <div className="kpi-hint">Largest TVL share</div>
                 </div>
                 <div className="kpi-card">
                   <div className="kpi-label">Rising</div>
@@ -1646,7 +1671,7 @@ function MomentumPageContent() {
                     </th>
                     <th style={{ textAlign: "right" }}>
                       <button className="th-button" onClick={() => { const next = toggleSort(regimeMoverSort, "apy"); setRegimeMoverSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        APY 30d <span>{sortIndicator(regimeMoverSort, "apy")}</span>
+                        Realized APY 30d <span>{sortIndicator(regimeMoverSort, "apy")}</span>
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
@@ -1697,7 +1722,7 @@ function MomentumPageContent() {
             <div className="card-header">
               <h2 className="card-title">Transition Analysis</h2>
               <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginTop: "8px" }}>
-                Compare current short-term regime (7d vs 30d APY) with prior baseline (30d vs 90d APY).
+                Compare current short-term regime (realized 7d vs realized 30d APY) with prior baseline (realized 30d vs realized 90d APY).
               </p>
             </div>
 

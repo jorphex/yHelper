@@ -13,6 +13,7 @@ type Summary = {
   stale_vaults: number;
   total_tvl_usd: number | null;
   tracked_tvl_usd: number | null;
+  stale_tracked_tvl_usd?: number | null;
   avg_safe_apy_window: number | null;
   avg_safe_apy_prev_window: number | null;
   avg_delta: number | null;
@@ -89,6 +90,7 @@ type ChangesResponse = {
 interface UseChangesDataParams {
   universe: UniverseKind;
   minTvl: number;
+  minPoints: number;
   window: WindowKey;
   staleThreshold: StaleThresholdKey;
 }
@@ -99,7 +101,7 @@ async function fetchChangesData(params: UseChangesDataParams): Promise<ChangesRe
     stale_threshold: params.staleThreshold,
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
-    min_points: "45",
+    min_points: String(params.minPoints),
     limit: "60",
   });
 

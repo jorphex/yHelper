@@ -80,7 +80,8 @@ function formatSignedToken(value: number | null | undefined, symbol: string, dig
 }
 
 function percentShare(value: number | null | undefined, total: number | null | undefined): string {
-  if (!value || !total || !Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return "Share syncing";
+  if (value === null || value === undefined || total === null || total === undefined) return "Share syncing";
+  if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return "Share syncing";
   return `${formatPct(value / total, 0)} of total`;
 }
 
@@ -132,16 +133,13 @@ function StYfiPageContent() {
 
   const rewardSymbol = data?.reward_token?.symbol?.trim() || "yvUSDC-1";
   const summary = data?.summary ?? null;
-  const epochSeries = data?.series?.epochs ?? [];
-  const snapshotSeries = data?.series?.snapshots ?? [];
+  const epochSeries = useMemo<StYfiEpochPoint[]>(() => data?.series?.epochs ?? [], [data?.series?.epochs]);
+  const snapshotSeries = useMemo<StYfiSnapshotPoint[]>(() => data?.series?.snapshots ?? [], [data?.series?.snapshots]);
   const currentEpoch = summary?.reward_epoch ?? null;
   const historySpan = formatRollingSpan(summary?.first_snapshot_at ?? null, summary?.latest_snapshot_at ?? null);
   const snapshotCountValue = summary?.snapshots_count ?? "n/a";
   const hasNetFlow24h = summary?.net_flow_24h !== null && summary?.net_flow_24h !== undefined && Number.isFinite(summary.net_flow_24h);
   const hasNetFlow7d = summary?.net_flow_7d !== null && summary?.net_flow_7d !== undefined && Number.isFinite(summary.net_flow_7d);
-
-  // Calculate if we should show Reward Token fallback
-  const showRewardTokenFallback = !hasNetFlow7d;
 
   const summaryItems = useMemo(() => {
     const items = [
@@ -155,11 +153,7 @@ function StYfiPageContent() {
         value: formatPct(summary?.staked_share_supply ?? null, 2),
         hint: `${formatToken(summary?.yfi_total_supply ?? null, "YFI", 0)} total supply`,
       },
-      showRewardTokenFallback ? {
-        label: "Reward Token",
-        value: rewardSymbol,
-        hint: "Current reward denomination",
-      } : {
+      {
         label: "Snapshot Freshness",
         value: formatHours(data?.freshness?.latest_snapshot_age_seconds ?? null, 1),
         hint: formatUtcDateTime(data?.freshness?.latest_snapshot_at ?? null),
@@ -178,13 +172,13 @@ function StYfiPageContent() {
         value: formatSignedToken(summary?.net_flow_7d ?? null, "YFI"),
         hint: "Compared with snapshot seven days back",
       } : {
-        label: "History Span",
-        value: historySpan,
-        hint: "Rolling snapshot history available",
+        label: "Reward Token",
+        value: rewardSymbol,
+        hint: `History span ${historySpan}`,
       },
     ];
     return items;
-  }, [summary, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue, showRewardTokenFallback]);
+  }, [summary, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue]);
 
   const stakeTrendItems = useMemo(() => [
     { id: "combined", label: "Total", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest combined balance vs previous snapshot" },

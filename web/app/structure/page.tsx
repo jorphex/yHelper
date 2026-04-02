@@ -212,14 +212,13 @@ function StructurePageContent() {
     minTvl: query.minTvl,
   });
 
-  // Chain rows for Overview tab (from composition data)
-  // @ts-expect-error - Overview chain rows don't have momentum/consistency/with_metrics fields
-  const chainRows = sortRows(compData?.chains ?? [], chainSort, {
-    chain: (row) => chainLabel(row.chain_id),
-    vaults: (row) => row.vaults,
-    tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.weighted_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
-  });
+  const chainRows = useMemo(
+    () =>
+      [...(compData?.chains ?? [])].sort(
+        (left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY),
+      ),
+    [compData?.chains],
+  );
 
   // Chain rows for Chains tab (from chains data API with extra columns)
   const chainsTabRows = sortRows(chainsData?.rows ?? [], chainSort, {
@@ -294,7 +293,7 @@ function StructurePageContent() {
           <em className="page-title-accent">Concentration lens</em>
         </h1>
         <p className="page-description">
-          Map where TVL concentrates and which vaults are crowded.
+          Map where TVL concentrates and how realized APY 30d is distributed.
         </p>
 
         {/* Tab Navigation */}
@@ -375,7 +374,7 @@ function StructurePageContent() {
                   <div className="kpi-value">{compData?.summary.vaults ?? "n/a"}</div>
                 </div>
                 <div className="kpi-card">
-                  <div className="kpi-label">Average APY 30d</div>
+                  <div className="kpi-label">Average Realized APY 30d</div>
                   <div className="kpi-value">{formatPct(compData?.summary.avg_safe_apy_30d)}</div>
                 </div>
                 <div className="kpi-card">
@@ -435,7 +434,7 @@ function StructurePageContent() {
                     </th>
                     <th style={{ textAlign: "right" }}>
                       <button className="th-button" onClick={() => { const next = toggleSort(categorySort, "apy"); setCategorySort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        APY {sortIndicator(categorySort, "apy")}
+                        Realized APY 30d {sortIndicator(categorySort, "apy")}
                       </button>
                     </th>
                   </tr>
@@ -496,7 +495,7 @@ function StructurePageContent() {
                     </th>
                     <th style={{ textAlign: "right" }}>
                       <button className="th-button" onClick={() => { const next = toggleSort(tokenSort, "apy"); setTokenSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        APY {sortIndicator(tokenSort, "apy")}
+                        Realized APY 30d {sortIndicator(tokenSort, "apy")}
                       </button>
                     </th>
                   </tr>
@@ -539,7 +538,7 @@ function StructurePageContent() {
             ) : (
               <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
                 <div className="kpi-card">
-                  <div className="kpi-label">With Metrics</div>
+                  <div className="kpi-label">With Realized APY</div>
                   <div className="kpi-value">{chainsData?.summary?.with_metrics ?? "n/a"}</div>
                 </div>
                 <div className="kpi-card">
@@ -547,7 +546,7 @@ function StructurePageContent() {
                   <div className="kpi-value">{formatPct(chainsData?.summary?.metrics_coverage_ratio)}</div>
                 </div>
                 <div className="kpi-card">
-                  <div className="kpi-label">Median Chain APY</div>
+                  <div className="kpi-label">Median Chain Realized APY 30d</div>
                   <div className="kpi-value">{formatPct(chainsData?.summary?.median_chain_apy_30d)}</div>
                 </div>
               </div>
@@ -597,7 +596,7 @@ function StructurePageContent() {
                     </th>
                     <th style={{ textAlign: "right" }}>
                       <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "with_metrics"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        With Metrics {sortIndicator(chainSort, "with_metrics")}
+                        With Realized APY {sortIndicator(chainSort, "with_metrics")}
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
@@ -607,7 +606,7 @@ function StructurePageContent() {
                     </th>
                     <th style={{ textAlign: "right" }}>
                       <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "apy"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        APY {sortIndicator(chainSort, "apy")}
+                        Realized APY 30d {sortIndicator(chainSort, "apy")}
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
@@ -654,11 +653,11 @@ function StructurePageContent() {
         <>
           <section className="section" style={{ marginBottom: "48px" }}>
             <div className="card-header">
-              <h2 className="card-title">APY vs TVL Map</h2>
+              <h2 className="card-title">Realized APY vs TVL Map</h2>
             </div>
             <ScatterPlot
               title=""
-              xLabel="APY 30d"
+              xLabel="Realized APY 30d"
               yLabel="TVL (USD)"
               points={crowdingScatterRows.map((row) => ({
                 id: `${row.chain_id}:${row.vault_address}`,
@@ -712,7 +711,7 @@ function StructurePageContent() {
                     </th>
                     <th style={{ textAlign: "right" }}>
                       <button className="th-button" onClick={() => { const next = toggleSort(crowdingSort, "apy"); setCrowdingSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        APY {sortIndicator(crowdingSort, "apy")}
+                        Realized APY 30d {sortIndicator(crowdingSort, "apy")}
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
@@ -795,7 +794,7 @@ function StructurePageContent() {
                     </th>
                     <th style={{ textAlign: "right" }}>
                       <button className="th-button" onClick={() => { const next = toggleSort(uncrowdedSort, "apy"); setUncrowdedSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        APY {sortIndicator(uncrowdedSort, "apy")}
+                        Realized APY 30d {sortIndicator(uncrowdedSort, "apy")}
                       </button>
                     </th>
                     <th style={{ textAlign: "right" }}>
