@@ -62,7 +62,7 @@ STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
 STYFI_TOKEN_SCALE = float(10**18)
 STYFI_SITE_REWARD_SCALE = float(10**18)
 STYFI_REWARD_TOKEN_DEFAULT = {"address": None, "symbol": "yvUSDC-1", "decimals": 6}
-_SOCIAL_PREVIEW_LIVE_CACHE: dict[str, float | dict[str, object] | None] = {"fetched_at": 0.0, "highest_apy_vault": None}
+_SOCIAL_PREVIEW_LIVE_CACHE: dict[str, float | dict[str, object] | None] = {"fetched_at": 0.0, "highest_est_apy_vault": None}
 OVERVIEW_NOTE_VIEW_KEY = "overview"
 
 
@@ -518,8 +518,10 @@ def _freshness_snapshot(
                     notify_channels,
                     last_notify_result
                 FROM alert_state
+                WHERE job_name = ANY(%s)
                 ORDER BY alert_key
-                """
+                """,
+                (list(job_names),),
             )
             alerts: dict[str, object] = {}
             for row in cur.fetchall():
@@ -577,7 +579,7 @@ def _extract_kong_tvl_usd(vault: dict[str, object]) -> float | None:
 def _live_social_preview_highest_vault() -> dict[str, object]:
     now_mono = time.monotonic()
     cached_at = float(_SOCIAL_PREVIEW_LIVE_CACHE.get("fetched_at") or 0.0)
-    cached_value = _SOCIAL_PREVIEW_LIVE_CACHE.get("highest_apy_vault")
+    cached_value = _SOCIAL_PREVIEW_LIVE_CACHE.get("highest_est_apy_vault")
     if cached_value is not None and now_mono - cached_at < SOCIAL_PREVIEW_LIVE_TTL_SEC:
         return dict(cached_value)
 
@@ -601,14 +603,14 @@ def _live_social_preview_highest_vault() -> dict[str, object]:
                 continue
             if bool(vault.get("isHidden")) or bool(vault.get("isRetired")):
                 continue
-            current_net_apy = _extract_kong_est_apy(vault)
-            if current_net_apy is None:
+            est_apy = _extract_kong_est_apy(vault)
+            if est_apy is None:
                 continue
             tvl_usd = _extract_kong_tvl_usd(vault)
             candidate_tvl = float("-inf") if tvl_usd is None else tvl_usd
-            if current_net_apy < best_score or (current_net_apy == best_score and candidate_tvl <= best_tvl):
+            if est_apy < best_score or (est_apy == best_score and candidate_tvl <= best_tvl):
                 continue
-            best_score = current_net_apy
+            best_score = est_apy
             best_tvl = candidate_tvl
             best = {
                 "vault_address": vault.get("address"),
@@ -616,8 +618,10 @@ def _live_social_preview_highest_vault() -> dict[str, object]:
                 "symbol": vault.get("symbol"),
                 "chain_id": chain_id,
                 "tvl_usd": tvl_usd,
-                "current_net_apy": current_net_apy,
-                "current_est_apy": current_net_apy,
+                "est_apy": est_apy,
+                "current_est_apy": est_apy,
+                "current_net_apy": est_apy,
+                "yield_kind": "estimated_apy",
                 "source": "kong_rest_live",
             }
     except Exception:
@@ -626,7 +630,7 @@ def _live_social_preview_highest_vault() -> dict[str, object]:
         return {}
 
     _SOCIAL_PREVIEW_LIVE_CACHE["fetched_at"] = now_mono
-    _SOCIAL_PREVIEW_LIVE_CACHE["highest_apy_vault"] = dict(best) if best else None
+    _SOCIAL_PREVIEW_LIVE_CACHE["highest_est_apy_vault"] = dict(best) if best else None
     return best
 
 
@@ -801,6 +805,62 @@ def _delta_or_none(left: object, right: object) -> float | None:
     if left_value is None or right_value is None:
         return None
     return left_value - right_value
+
+
+def _apply_aliases(row: dict[str, object], alias_map: dict[str, str]) -> dict[str, object]:
+    for alias_key, source_key in alias_map.items():
+        if alias_key not in row and source_key in row:
+            row[alias_key] = row.get(source_key)
+    return row
+
+
+def _apply_aliases_many(rows: list[dict[str, object]], alias_map: dict[str, str]) -> list[dict[str, object]]:
+    for row in rows:
+        _apply_aliases(row, alias_map)
+    return rows
+
+
+def _alias_realized_apy_fields(row: dict[str, object]) -> dict[str, object]:
+    return _apply_aliases(
+        row,
+        {
+            "realized_apy_30d": "safe_apy_30d",
+            "avg_realized_apy_30d": "avg_safe_apy_30d",
+            "median_realized_apy_30d": "median_safe_apy_30d",
+            "weighted_realized_apy_30d": "weighted_safe_apy_30d",
+            "tvl_weighted_realized_apy_30d": "tvl_weighted_safe_apy_30d",
+            "best_realized_apy_30d": "best_safe_apy_30d",
+            "worst_realized_apy_30d": "worst_safe_apy_30d",
+            "median_best_realized_apy_30d": "median_best_safe_apy_30d",
+            "realized_spread_30d": "spread_safe_apy_30d",
+            "median_realized_spread_30d": "median_spread_safe_apy_30d",
+            "realized_apy_window": "safe_apy_window",
+            "realized_apy_prev_window": "safe_apy_prev_window",
+            "avg_realized_apy_window": "avg_safe_apy_window",
+            "avg_realized_apy_prev_window": "avg_safe_apy_prev_window",
+        },
+    )
+
+
+def _alias_realized_apy_many(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    return _apply_aliases_many(
+        rows,
+        {
+            "realized_apy_30d": "safe_apy_30d",
+            "realized_apy_window": "safe_apy_window",
+            "realized_apy_prev_window": "safe_apy_prev_window",
+        },
+    )
+
+
+def _alias_realized_coverage_fields(row: dict[str, object]) -> dict[str, object]:
+    return _apply_aliases(
+        row,
+        {
+            "with_realized_apy": "with_metrics",
+            "with_realized_apy_tvl_usd": "with_metrics_tvl_usd",
+        },
+    )
 
 
 def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
@@ -1430,11 +1490,12 @@ async def meta_movers(
 @app.get("/api/meta/social-preview")
 async def meta_social_preview() -> dict[str, object]:
     tracked_scope: dict[str, object] = {}
-    highest_row = _live_social_preview_highest_vault()
+    highest_est_row = _live_social_preview_highest_vault()
+    highest_realized_fallback_row: dict[str, object] = {}
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             tracked_scope = _tracked_scope_snapshot(cur)
-            if not highest_row:
+            if not highest_est_row:
                 cur.execute(
                     f"""
                     SELECT
@@ -1455,14 +1516,21 @@ async def meta_social_preview() -> dict[str, object]:
                     """,
                     {"apy_min": APY_MIN, "apy_max": APY_MAX},
                 )
-                highest_row = cur.fetchone() or {}
+                highest_realized_fallback_row = cur.fetchone() or {}
+                _alias_realized_apy_fields(highest_realized_fallback_row)
+                if highest_realized_fallback_row:
+                    highest_realized_fallback_row["source"] = "postgres_realized_fallback"
+                    highest_realized_fallback_row["yield_kind"] = "realized_apy_30d"
+    _alias_realized_coverage_fields(tracked_scope)
     return {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "filters": {
             "total_vaults_scope": "all rows in vault_dim",
             "active_vaults_scope": "active + non-retired + non-hidden vaults in vault_dim",
             "tracked_tvl_scope": "active + non-retired + non-hidden, debt-adjusted for single-strategy overlap",
-            "highest_apy_scope": "live Kong REST user-visible multi-strategy v3 scope",
+            "highest_est_apy_scope": "live Kong REST user-visible multi-strategy v3 scope",
+            "fallback_highest_realized_apy_scope": "Postgres user-visible scored-vault fallback, realized APY 30d",
+            "highest_apy_scope": "legacy alias for highest_est_apy_scope",
             "exclude_retired": True,
             "exclude_hidden": True,
         },
@@ -1471,8 +1539,11 @@ async def meta_social_preview() -> dict[str, object]:
             "active_vaults": tracked_scope.get("active_vaults"),
             "tracked_tvl_active_usd": tracked_scope.get("tracked_tvl_active_usd"),
             "active_with_metrics": tracked_scope.get("active_with_metrics"),
+            "active_with_realized_apy": tracked_scope.get("active_with_metrics"),
         },
-        "highest_apy_vault": highest_row,
+        "highest_est_apy_vault": highest_est_row or None,
+        "highest_realized_apy_fallback_vault": highest_realized_fallback_row or None,
+        "highest_apy_vault": highest_est_row or None,
     }
 
 
@@ -1905,6 +1976,9 @@ def _fetch_change_movers(
     fallers = cur.fetchall()
     cur.execute(movers_sql.format(order_expr="ABS((n.safe_apy_window - n.safe_apy_prev_window)) DESC"), movers_params)
     largest = cur.fetchall()
+    _alias_realized_apy_many(risers)
+    _alias_realized_apy_many(fallers)
+    _alias_realized_apy_many(largest)
     return {"risers": risers, "fallers": fallers, "largest_abs_delta": largest}
 
 
@@ -1912,7 +1986,7 @@ def _compact_mover_rows(rows: list[dict]) -> list[dict]:
     out: list[dict] = []
     for row in rows:
         out.append(
-            {
+            _alias_realized_apy_fields({
                 "vault_address": row.get("vault_address"),
                 "chain_id": row.get("chain_id"),
                 "symbol": row.get("symbol"),
@@ -1924,7 +1998,7 @@ def _compact_mover_rows(rows: list[dict]) -> list[dict]:
                 "safe_apy_prev_window": row.get("safe_apy_prev_window"),
                 "delta_apy": row.get("delta_apy"),
                 "age_seconds": row.get("age_seconds"),
-            }
+            })
         )
     return out
 
@@ -1961,7 +2035,7 @@ async def discover(
     order_map = {
         "quality": _quality_score_sql(),
         "tvl": "COALESCE(d.tvl_usd, 0.0)",
-        "est_apy": "COALESCE(d.apr_net, -999999.0)",
+        "est_apy": "COALESCE(d.est_apy, -999999.0)",
         "apy_7d": "COALESCE(m.apy_7d, -999999.0)",
         "apy_30d": "COALESCE(m.apy_30d, -999999.0)",
         "momentum": f"COALESCE(({safe_momentum_sql}), -999999.0)",
@@ -2060,8 +2134,8 @@ async def discover(
                     COUNT(DISTINCT LOWER(COALESCE(d.token_symbol, ''))) FILTER (WHERE COALESCE(d.token_symbol, '') <> '') AS tokens,
                     COUNT(DISTINCT LOWER(COALESCE(d.category, ''))) FILTER (WHERE COALESCE(d.category, '') <> '') AS categories,
                     SUM(COALESCE(d.tvl_usd, 0.0)) AS total_tvl_usd,
-                    AVG(d.apr_net) AS avg_est_apy,
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY d.apr_net) AS median_est_apy,
+                    AVG(d.est_apy) AS avg_est_apy,
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY d.est_apy) AS median_est_apy,
                     AVG({safe_apy_sql}) AS avg_safe_apy_30d,
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {safe_apy_sql}) AS median_safe_apy_30d,
                     AVG({safe_momentum_sql}) AS avg_momentum_7d_30d,
@@ -2072,9 +2146,9 @@ async def discover(
                     COUNT(*) FILTER (WHERE {migration_sql} = TRUE) AS migration_ready_vaults,
                     AVG({strategies_count_sql})::DOUBLE PRECISION AS avg_strategies_per_vault,
                     CASE
-                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE d.apr_net IS NOT NULL) > 0
-                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * d.apr_net) FILTER (WHERE d.apr_net IS NOT NULL)
-                             / SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE d.apr_net IS NOT NULL)
+                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE d.est_apy IS NOT NULL) > 0
+                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * d.est_apy) FILTER (WHERE d.est_apy IS NOT NULL)
+                             / SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE d.est_apy IS NOT NULL)
                         ELSE NULL
                     END AS tvl_weighted_est_apy,
                     CASE
@@ -2147,7 +2221,7 @@ async def discover(
                     d.version,
                     d.token_symbol,
                     d.tvl_usd,
-                    d.apr_net AS est_apy,
+                    d.est_apy AS est_apy,
                     m.points_count,
                     m.last_point_time,
                     {risk_level_sql} AS risk_level,
@@ -2180,6 +2254,9 @@ async def discover(
     missing_metrics = int(coverage.get("missing_metrics") or 0)
     coverage["missing_or_low_points"] = max(0, visible_vaults - with_metrics)
     coverage["coverage_ratio"] = (with_metrics / visible_vaults) if visible_vaults > 0 else None
+    _alias_realized_apy_fields(summary)
+    _alias_realized_coverage_fields(coverage)
+    _alias_realized_apy_many(rows)
 
     return {
         "filters": {
@@ -2202,12 +2279,14 @@ async def discover(
         "coverage": {
             "visible_vaults": visible_vaults,
             "with_metrics": with_metrics,
+            "with_realized_apy": with_metrics,
             "missing_metrics": missing_metrics,
             "low_points": low_points,
             "missing_or_low_points": coverage["missing_or_low_points"],
             "coverage_ratio": coverage["coverage_ratio"],
             "visible_tvl_usd": _to_float_or_none(coverage.get("visible_tvl_usd")),
             "with_metrics_tvl_usd": _to_float_or_none(coverage.get("with_metrics_tvl_usd")),
+            "with_realized_apy_tvl_usd": _to_float_or_none(coverage.get("with_metrics_tvl_usd")),
         },
         "risk_mix": risk_mix,
         "regime_mix": regime_mix,
@@ -2291,6 +2370,7 @@ async def regimes(
             )
             movers = cur.fetchall()
 
+    _alias_realized_apy_many(movers)
     return {
         "filters": {
             "universe": universe,
@@ -2885,6 +2965,21 @@ async def chains_rollups(
         "top_chain_id": top_chain.get("chain_id") if top_chain else None,
         "top_chain_tvl_share": top_chain.get("tvl_share") if top_chain else None,
     }
+    _apply_aliases_many(
+        rows,
+        {
+            "with_realized_apy": "with_metrics",
+            "weighted_realized_apy_30d": "weighted_apy_30d",
+        },
+    )
+    _apply_aliases(
+        summary,
+        {
+            "with_realized_apy": "with_metrics",
+            "tvl_weighted_realized_apy_30d": "tvl_weighted_apy_30d",
+            "median_chain_realized_apy_30d": "median_chain_apy_30d",
+        },
+    )
 
     return {
         "filters": {
@@ -3232,7 +3327,7 @@ async def assets(
     min_points: int | None = Query(default=None, ge=0),
     max_vaults: int | None = Query(default=None, ge=0),
     limit: int = Query(default=150, ge=1, le=500),
-    sort_by: Literal["tvl", "spread", "best_apy", "venues"] = "tvl",
+    sort_by: Literal["tvl", "spread", "best_apy", "best_est_apy", "venues"] = "tvl",
     direction: Literal["asc", "desc"] = "desc",
 ) -> dict[str, object]:
     universe_gate = _resolve_universe_gate(
@@ -3245,10 +3340,12 @@ async def assets(
         "tvl": "total_tvl_usd",
         "spread": "spread_safe_apy_30d",
         "best_apy": "best_est_apy",
+        "best_est_apy": "best_est_apy",
         "venues": "venues",
     }
     order_expr = order_map[sort_by]
     order_dir = "ASC" if direction == "asc" else "DESC"
+    canonical_sort_by = "best_est_apy" if sort_by == "best_apy" else sort_by
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
     token_type_sql = """
@@ -3270,7 +3367,7 @@ async def assets(
                 {token_type_sql} AS token_type,
                 d.chain_id,
                 COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
-                d.apr_net AS est_apy,
+                d.est_apy AS est_apy,
                 {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d
             FROM vault_dim d
             JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
@@ -3437,6 +3534,16 @@ async def assets(
     for row in rows:
         tvl = float(row.get("total_tvl_usd") or 0.0)
         row["tvl_share"] = (tvl / total_tvl) if total_tvl > 0 else None
+    _apply_aliases_many(
+        rows,
+        {
+            "best_realized_apy_30d": "best_safe_apy_30d",
+            "worst_realized_apy_30d": "worst_safe_apy_30d",
+            "weighted_realized_apy_30d": "weighted_safe_apy_30d",
+            "realized_spread_30d": "spread_safe_apy_30d",
+        },
+    )
+    _alias_realized_apy_fields(summary)
 
     return {
         "filters": {
@@ -3446,7 +3553,7 @@ async def assets(
             "min_points": min_points,
             "max_vaults": max_vaults,
             "limit": limit,
-            "sort_by": sort_by,
+            "sort_by": canonical_sort_by,
             "direction": direction,
             "featured_min_tvl_usd": ASSETS_FEATURED_MIN_TVL_USD,
             "featured_min_venues": ASSETS_FEATURED_MIN_VENUES,
@@ -3502,7 +3609,7 @@ async def asset_venues(
                     d.kind,
                     d.version,
                     d.tvl_usd,
-                    d.apr_net AS est_apy,
+                    d.est_apy AS est_apy,
                     m.points_count,
                     m.last_point_time,
                     m.apy_7d,
@@ -3522,7 +3629,7 @@ async def asset_venues(
                     AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                     AND COALESCE(m.points_count, 0) >= %(min_points)s
                     {rank_clause}
-                ORDER BY d.apr_net DESC NULLS LAST, safe_apy_30d DESC NULLS LAST, d.tvl_usd DESC
+                ORDER BY d.est_apy DESC NULLS LAST, safe_apy_30d DESC NULLS LAST, d.tvl_usd DESC
                 LIMIT %(limit)s
                 """,
                 params,
@@ -3591,6 +3698,8 @@ async def asset_venues(
         weighted_momentum_num / weighted_momentum_den if weighted_momentum_den > 0 else None
     )
     summary["regime_counts"] = [{"regime": regime, "vaults": count} for regime, count in sorted(regime_counts.items())]
+    _alias_realized_apy_many(rows)
+    _alias_realized_apy_fields(summary)
 
     return {
         "token_symbol": token_symbol.upper(),
@@ -3787,6 +3896,13 @@ async def composition(
             row["share_tvl"] = float(row.get("tvl_usd") or 0.0) / total_tvl
         return rows
 
+    _alias_realized_apy_fields(summary)
+    _apply_aliases_many(chains, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
+    _apply_aliases_many(categories, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
+    _apply_aliases_many(tokens, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
+    _alias_realized_apy_many(crowded)
+    _alias_realized_apy_many(uncrowded)
+
     return {
         "filters": {
             "universe": universe,
@@ -3973,6 +4089,11 @@ async def changes(
         freshness["window_stale_vaults"] = stale_vaults
         freshness["window_tracked_vaults"] = tracked
         freshness["window_stale_ratio"] = (stale_vaults / tracked) if tracked > 0 else None
+    _alias_realized_apy_fields(summary)
+    _alias_realized_apy_many(movers.get("risers", []))
+    _alias_realized_apy_many(movers.get("fallers", []))
+    _alias_realized_apy_many(movers.get("largest_abs_delta", []))
+    _alias_realized_apy_many(stale)
 
     return {
         "filters": {

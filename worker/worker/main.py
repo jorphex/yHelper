@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS vault_dim (
     token_symbol TEXT,
     token_name TEXT,
     tvl_usd DOUBLE PRECISION,
-    apr_net DOUBLE PRECISION,
+    est_apy DOUBLE PRECISION,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -358,7 +358,7 @@ INSERT INTO vault_dim (
     token_symbol,
     token_name,
     tvl_usd,
-    apr_net,
+    est_apy,
     active,
     last_seen_at,
     raw
@@ -374,7 +374,7 @@ INSERT INTO vault_dim (
     %(token_symbol)s,
     %(token_name)s,
     %(tvl_usd)s,
-    %(apr_net)s,
+    %(est_apy)s,
     TRUE,
     NOW(),
     %(raw)s
@@ -389,7 +389,7 @@ ON CONFLICT (chain_id, vault_address) DO UPDATE SET
     token_symbol = EXCLUDED.token_symbol,
     token_name = EXCLUDED.token_name,
     tvl_usd = EXCLUDED.tvl_usd,
-    apr_net = EXCLUDED.apr_net,
+    est_apy = EXCLUDED.est_apy,
     active = TRUE,
     last_seen_at = NOW(),
     raw = EXCLUDED.raw
@@ -486,12 +486,12 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
     raw_tvl = _first_present(tvl_obj, ("close", "tvl", "tvlUsd", "usd", "totalValueLockedUSD"))
     raw_apr = _first_present(oracle_obj, ("apy", "netAPY", "netApy"))
     tvl_usd = _to_float(raw_tvl)
-    apr_net = _to_float(raw_apr)
+    est_apy = _to_float(raw_apr)
     numeric_parse_failures: list[str] = []
     if tvl_usd is None and _has_raw_numeric_value(raw_tvl):
         numeric_parse_failures.append("tvl_usd")
-    if apr_net is None and _has_raw_numeric_value(raw_apr):
-        numeric_parse_failures.append("apr_net")
+    if est_apy is None and _has_raw_numeric_value(raw_apr):
+        numeric_parse_failures.append("est_apy")
     row = {
         "vault_address": vault_address,
         "chain_id": chain_id,
@@ -504,7 +504,7 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
         "token_symbol": _first_present(asset_obj, ("symbol", "tokenSymbol")),
         "token_name": _first_present(asset_obj, ("name", "tokenName")),
         "tvl_usd": tvl_usd,
-        "apr_net": apr_net,
+        "est_apy": est_apy,
         "raw": Json(vault),
     }
     return row, numeric_parse_failures
@@ -712,7 +712,7 @@ def _build_overview_note_source() -> tuple[dict[str, object], datetime]:
                 (stablecoin_eligible_tvl / eligible_tvl_total) if eligible_tvl_total > 0 else None,
                 0,
             ),
-            "avg_safe_apy_pct": _format_pct((changes.get("summary") or {}).get("avg_safe_apy_window")),
+            "avg_realized_apy_pct": _format_pct((changes.get("summary") or {}).get("avg_realized_apy_window")),
             "stable_tvl_share": (stable_tvl / regime_tvl_total) if regime_tvl_total > 0 else None,
             "stable_tvl_share_pct": _format_pct((stable_tvl / regime_tvl_total) if regime_tvl_total > 0 else None, 0),
         },
@@ -764,7 +764,7 @@ def _structured_overview_summary(source_payload: dict[str, object]) -> dict[str,
         second_sentence = "stYFI snapshot data is currently incomplete."
 
     macro = source_payload.get("macro") or {}
-    avg_safe_apy = str(macro.get("avg_safe_apy_pct") or "").strip()
+    avg_safe_apy = str(macro.get("avg_realized_apy_pct") or "").strip()
     stablecoin_share = str(macro.get("stablecoin_share_pct") or "").strip()
     if avg_safe_apy and stablecoin_share:
         third_sentence = (
@@ -1308,6 +1308,22 @@ def _ensure_schema(conn: psycopg.Connection) -> None:
 
                 IF EXISTS (
                     SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'vault_dim'
+                      AND column_name = 'apr_net'
+                ) AND NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'vault_dim'
+                      AND column_name = 'est_apy'
+                ) THEN
+                    ALTER TABLE vault_dim RENAME COLUMN apr_net TO est_apy;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
                     FROM pg_constraint
                     WHERE conname = 'pps_timeseries_pkey'
                       AND conrelid = 'pps_timeseries'::regclass
@@ -1755,9 +1771,29 @@ def _evaluate_job_stale_alert(conn: psycopg.Connection, *, job_name: str) -> Non
         )
 
 
+def _prune_obsolete_alert_state(conn: psycopg.Connection, *, active_job_names: tuple[str, ...]) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM alert_state
+            WHERE alert_key LIKE 'ingestion_stale:%'
+              AND NOT (job_name = ANY(%s))
+            """,
+            (list(active_job_names),),
+        )
+        deleted = cur.rowcount or 0
+    if deleted:
+        conn.commit()
+    return int(deleted)
+
+
 def _evaluate_alerts(conn: psycopg.Connection) -> None:
+    active_job_names = (JOB_KONG_SNAPSHOT, JOB_KONG_PPS)
     _evaluate_job_stale_alert(conn, job_name=JOB_KONG_SNAPSHOT)
     _evaluate_job_stale_alert(conn, job_name=JOB_KONG_PPS)
+    deleted = _prune_obsolete_alert_state(conn, active_job_names=active_job_names)
+    if deleted:
+        logging.info("Pruned %s obsolete alert_state rows", deleted)
 
 
 def _fetch_kong_snapshot() -> list[dict]:
@@ -1773,7 +1809,7 @@ def _fetch_kong_snapshot() -> list[dict]:
 
 def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
     rows_by_identity: dict[tuple[int, str], dict] = {}
-    numeric_failures = {"tvl_usd": 0, "apr_net": 0}
+    numeric_failures = {"tvl_usd": 0, "est_apy": 0}
     skipped_missing_identity = 0
     duplicate_identities = 0
     for vault in vaults:
@@ -1818,9 +1854,9 @@ def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
         )
     if any(numeric_failures.values()):
         logging.warning(
-            "Snapshot numeric parse fallbacks: tvl_usd=%s apr_net=%s",
+            "Snapshot numeric parse fallbacks: tvl_usd=%s est_apy=%s",
             numeric_failures["tvl_usd"],
-            numeric_failures["apr_net"],
+            numeric_failures["est_apy"],
         )
     return len(rows)
 
