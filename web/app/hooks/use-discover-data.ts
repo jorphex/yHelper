@@ -11,6 +11,7 @@ type DiscoverRow = {
   token_symbol: string | null;
   category: string | null;
   tvl_usd: number | null;
+  est_apy: number | null;
   safe_apy_30d: number | null;
   momentum_7d_30d: number | null;
   consistency_score: number | null;
@@ -30,13 +31,15 @@ type DiscoverResponse = {
     tokens?: number;
     categories?: number;
     total_tvl_usd?: number | null;
+    avg_est_apy?: number | null;
+    median_est_apy?: number | null;
+    tvl_weighted_est_apy?: number | null;
     avg_safe_apy_30d?: number | null;
     median_safe_apy_30d?: number | null;
     tvl_weighted_safe_apy_30d?: number | null;
     avg_momentum_7d_30d?: number | null;
     median_momentum_7d_30d?: number | null;
     avg_consistency_score?: number | null;
-    avg_feature_score?: number | null;
     retired_vaults?: number;
     highlighted_vaults?: number;
     migration_ready_vaults?: number;
@@ -67,6 +70,9 @@ interface UseDiscoverDataParams {
   limit: number;
   sort: string;
   dir: string;
+  chain?: string | null;
+  category?: string | null;
+  token?: string | null;
 }
 
 async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<DiscoverResponse> {
@@ -78,6 +84,9 @@ async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<Discove
     sort_by: params.sort,
     direction: params.dir,
   });
+  if (params.chain) searchParams.set("chain_id", params.chain);
+  if (params.category) searchParams.set("category", params.category);
+  if (params.token) searchParams.set("token_symbol", params.token);
 
   const res = await fetch(apiUrl("/discover", searchParams), { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);

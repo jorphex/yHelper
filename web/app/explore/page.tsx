@@ -11,10 +11,8 @@ import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { NoVaultsEmptyState } from "../components/empty-state";
 import { DataLoadError } from "../components/error-state";
 import { VaultLink } from "../components/vault-link";
-import { BarList, HeatGrid, ScatterPlot, TrendStrips, Ridgeline } from "../components/visuals";
+import { BarList, HeatGrid, ScatterPlot, Ridgeline } from "../components/visuals";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
-import { queryChoice, queryFloat, queryInt, queryString, replaceQuery } from "../lib/url";
-import { UniverseKind as UniverseKindType, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 
 type TabKey = "vaults" | "venues";
 
@@ -25,6 +23,7 @@ type DiscoverRow = {
   token_symbol: string | null;
   category: string | null;
   tvl_usd: number | null;
+  est_apy: number | null;
   safe_apy_30d: number | null;
   momentum_7d_30d: number | null;
   consistency_score: number | null;
@@ -42,6 +41,8 @@ type AssetRow = {
   venues: number;
   chains: number;
   total_tvl_usd: number | null;
+  best_est_apy: number | null;
+  weighted_est_apy: number | null;
   best_safe_apy_30d: number | null;
   weighted_safe_apy_30d: number | null;
   spread_safe_apy_30d: number | null;
@@ -53,6 +54,7 @@ type VenueRow = {
   symbol: string | null;
   category: string | null;
   tvl_usd: number | null;
+  est_apy: number | null;
   safe_apy_30d: number | null;
   momentum_7d_30d: number | null;
   consistency_score: number | null;
@@ -63,11 +65,6 @@ type TokenSortKey = "token" | "venues" | "chains" | "tvl" | "best" | "weighted" 
 type VenueSortKey = "vault" | "chain" | "category" | "tvl" | "apy" | "momentum" | "consistency" | "regime";
 type AssetApiSort = "tvl" | "spread" | "best_apy" | "venues";
 type TokenScope = "featured" | "canonical" | "all";
-
-function formatCompact(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "n/a";
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
-}
 
 function riskLabel(level: string | null): string {
   if (!level) return "n/a";
@@ -91,7 +88,7 @@ function ExplorePageContent() {
     minTvl: Number(searchParams.get("min_tvl") || 1000000),
     minPoints: Number(searchParams.get("min_points") || 45),
     limit: Number(searchParams.get("limit") || 30),
-    sort: searchParams.get("api_sort") || "quality",
+    sort: searchParams.get("api_sort") || "tvl",
     dir: searchParams.get("api_dir") || "desc",
     chain: searchParams.get("chain") || null,
     category: searchParams.get("category") || null,
@@ -122,6 +119,9 @@ function ExplorePageContent() {
     limit: query.limit,
     sort: query.sort,
     dir: query.dir,
+    chain: query.chain,
+    category: query.category,
+    token: query.tab === "vaults" ? query.token : null,
   });
 
   // Assets data for venues tab
@@ -153,34 +153,39 @@ function ExplorePageContent() {
     return () => media.removeEventListener("change", onChange);
   }, []);
 
-  const discoverRows: DiscoverRow[] = discoverData?.rows ?? [];
+  const discoverRows = useMemo<DiscoverRow[]>(() => discoverData?.rows ?? [], [discoverData?.rows]);
   const discoverSummary = discoverData?.summary;
 
   // KPI items for vaults tab
   const vaultKpiItems = useMemo(() => [
     { label: "Chains", value: String(discoverSummary?.chains ?? "n/a") },
-    { label: "Tokens", value: String(discoverSummary?.tokens ?? "n/a") },
-    { label: "Median APY", value: formatPct(discoverSummary?.median_safe_apy_30d) },
-    { label: "Coverage", value: formatPct(discoverData?.coverage?.coverage_ratio, 0), hint: "Visible vaults with metrics" },
-    { label: "Avg Momentum", value: formatPct(discoverSummary?.avg_momentum_7d_30d), hint: "7d minus 30d APY" },
+    { label: "Median Est. APY", value: formatPct(discoverSummary?.median_est_apy) },
+    { label: "Median Realized APY 30d", value: formatPct(discoverSummary?.median_safe_apy_30d) },
+    { label: "Coverage", value: formatPct(discoverData?.coverage?.coverage_ratio, 0), hint: "Visible vaults with realized APY history" },
+    { label: "Avg Realized Momentum", value: formatPct(discoverSummary?.avg_momentum_7d_30d), hint: "7d minus 30d realized APY" },
   ], [discoverSummary, discoverData]);
 
   // Scatter data
-  const scatterPoints = useMemo(() => discoverRows.slice(0, 50).map((row) => ({
-    id: row.vault_address,
-    x: row.momentum_7d_30d ?? 0,
-    y: row.safe_apy_30d ?? 0,
-    size: row.tvl_usd ?? 0,
-    tone: (row.momentum_7d_30d ?? 0) >= 0 ? "positive" as const : "negative" as const,
-    href: `https://yearn.fi/v3/${row.chain_id}/${row.vault_address}`,
-    tooltip: `${row.symbol || row.vault_address}\nAPY: ${formatPct(row.safe_apy_30d)}\nMomentum: ${formatPct(row.momentum_7d_30d)}`,
-  })), [discoverRows]);
+  const scatterPoints = useMemo(() =>
+    [...discoverRows]
+      .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
+      .slice(0, 50)
+      .map((row) => ({
+        id: row.vault_address,
+        x: row.momentum_7d_30d ?? 0,
+        y: row.safe_apy_30d ?? 0,
+        size: row.tvl_usd ?? 0,
+        tone: (row.momentum_7d_30d ?? 0) >= 0 ? "positive" as const : "negative" as const,
+        href: `https://yearn.fi/v3/${row.chain_id}/${row.vault_address}`,
+        tooltip: `${row.symbol || row.vault_address}\nRealized APY 30d: ${formatPct(row.safe_apy_30d)}\nRealized Momentum: ${formatPct(row.momentum_7d_30d)}`,
+      })),
+  [discoverRows]);
 
   // Ridgeline data
   const chainRidgelineSeries = useMemo(() => {
     const byChain = new Map<number, number[]>();
     for (const row of discoverRows) {
-      if (!row.safe_apy_30d) continue;
+      if (row.safe_apy_30d === null || row.safe_apy_30d === undefined) continue;
       if (!byChain.has(row.chain_id)) byChain.set(row.chain_id, []);
       byChain.get(row.chain_id)!.push(row.safe_apy_30d);
     }
@@ -201,8 +206,8 @@ function ExplorePageContent() {
     venues: (row) => row.venues,
     chains: (row) => row.chains,
     tvl: (row) => row.total_tvl_usd ?? Number.NEGATIVE_INFINITY,
-    best: (row) => row.best_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
-    weighted: (row) => row.weighted_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
+    best: (row) => row.best_est_apy ?? Number.NEGATIVE_INFINITY,
+    weighted: (row) => row.weighted_est_apy ?? Number.NEGATIVE_INFINITY,
     spread: (row) => row.spread_safe_apy_30d ?? Number.NEGATIVE_INFINITY,
   });
 
@@ -211,7 +216,7 @@ function ExplorePageContent() {
     chain: (row) => chainLabel(row.chain_id),
     category: (row) => row.category ?? "",
     tvl: (row) => row.tvl_usd ?? Number.NEGATIVE_INFINITY,
-    apy: (row) => row.safe_apy_30d ?? Number.NEGATIVE_INFINITY,
+    apy: (row) => row.est_apy ?? Number.NEGATIVE_INFINITY,
     momentum: (row) => row.momentum_7d_30d ?? Number.NEGATIVE_INFINITY,
     consistency: (row) => row.consistency_score ?? Number.NEGATIVE_INFINITY,
     regime: (row) => row.regime,
@@ -255,9 +260,9 @@ function ExplorePageContent() {
           <em className="page-title-accent">Scan and filter</em>
         </h1>
         <p className="page-description">
-          Find vaults with filters for size, data quality, and trend direction.
+          Browse current estimated APY, then compare realized 30d APY and momentum from PPS history.
           <br />
-          APY is estimated from Price Per Share history, a backward-looking signal.
+          Estimated APY is current-looking; realized APY 30d is backward-looking.
         </p>
 
         {/* Tab Navigation */}
@@ -332,9 +337,10 @@ function ExplorePageContent() {
                   onChange={(e) => updateQuery({ api_sort: e.target.value })}
                   style={{ width: "100%", marginTop: "6px" }}
                 >
-                  <option value="quality">Quality</option>
                   <option value="tvl">TVL</option>
-                  <option value="apy_30d">APY 30d</option>
+                  <option value="quality">Quality</option>
+                  <option value="est_apy">Est. APY</option>
+                  <option value="apy_30d">Realized APY 30d</option>
                   <option value="momentum">Momentum</option>
                   <option value="consistency">Consistency</option>
                 </select>
@@ -479,15 +485,16 @@ function ExplorePageContent() {
                       <th>Token</th>
                       <th style={{ textAlign: "center" }}>Category</th>
                       <th style={{ textAlign: "right" }}>TVL</th>
-                      <th style={{ textAlign: "right" }}>APY</th>
-                      <th style={{ textAlign: "right" }}>Momentum</th>
+                      <th style={{ textAlign: "right" }}>Est. APY</th>
+                      <th style={{ textAlign: "right" }}>Realized 30d</th>
+                      <th style={{ textAlign: "right" }}>Realized Momentum</th>
                       <th style={{ textAlign: "center" }}>Risk</th>
                       <th style={{ textAlign: "center" }}>Regime</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoadingDiscover ? (
-                      <TableSkeleton rows={5} columns={9} />
+                      <TableSkeleton rows={5} columns={10} />
                     ) : (
                       discoverRows.map((row) => (
                         <tr key={row.vault_address}>
@@ -515,6 +522,7 @@ function ExplorePageContent() {
                           </td>
                           <td style={{ textAlign: "center" }}>{row.category || "n/a"}</td>
                           <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
+                          <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.est_apy)}</td>
                           <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_30d)}</td>
                           <td style={{ textAlign: "right", color: (row.momentum_7d_30d ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }} className="data-value">
                             {formatPct(row.momentum_7d_30d)}
@@ -538,22 +546,22 @@ function ExplorePageContent() {
 
             <div style={{ display: "grid", gap: "24px" }}>
               <ScatterPlot
-                title="APY vs Momentum (Top 50 by TVL)"
-                xLabel="Momentum (7d - 30d APY)"
-                yLabel="APY 30d"
+                title="Realized APY vs Momentum (Top 50 by TVL)"
+                xLabel="Realized Momentum (7d - 30d realized APY)"
+                yLabel="Realized APY 30d"
                 points={scatterPoints}
                 xFormatter={(v) => formatPct(v, 1)}
                 yFormatter={(v) => formatPct(v, 1)}
               />
 
               <Ridgeline
-                title="APY Distribution by Chain"
+                title="Realized APY Distribution by Chain"
                 series={chainRidgelineSeries}
               />
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
                 <BarList
-                  title="APY Buckets"
+                  title="Realized APY 30d Buckets"
                   items={[
                     { id: "high", label: "15%+", value: discoverSummary?.apy_high_vaults },
                     { id: "mid", label: "5-15%", value: discoverSummary?.apy_mid_vaults },
@@ -588,11 +596,11 @@ function ExplorePageContent() {
             </div>
 
             {isLoadingVenues ? (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "24px" }}>
-                {Array(3).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
+              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "24px" }}>
+                {Array(4).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
               </div>
             ) : selectedSymbol ? (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "24px" }}>
+              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "24px" }}>
                 <div className="kpi-card">
                   <div className="kpi-label">Venues</div>
                   <div className="kpi-value">{venueData?.summary.venues ?? "n/a"}</div>
@@ -602,7 +610,11 @@ function ExplorePageContent() {
                   <div className="kpi-value">{venueData?.summary.chains ?? "n/a"}</div>
                 </div>
                 <div className="kpi-card">
-                  <div className="kpi-label">Spread</div>
+                  <div className="kpi-label">Best Est. APY</div>
+                  <div className="kpi-value">{formatPct(venueData?.summary.best_est_apy)}</div>
+                </div>
+                <div className="kpi-card">
+                  <div className="kpi-label">Realized Spread 30d</div>
                   <div className="kpi-value">{formatPct(venueData?.summary.spread_safe_apy_30d)}</div>
                   <div className="kpi-hint">Best minus worst</div>
                 </div>
@@ -617,14 +629,15 @@ function ExplorePageContent() {
                     <th>Chain</th>
                     <th style={{ textAlign: "center" }}>Category</th>
                     <th style={{ textAlign: "right" }}>TVL</th>
-                    <th style={{ textAlign: "right" }}>APY</th>
-                    <th style={{ textAlign: "right" }}>Momentum</th>
+                    <th style={{ textAlign: "right" }}>Est. APY</th>
+                    <th style={{ textAlign: "right" }}>Realized 30d</th>
+                    <th style={{ textAlign: "right" }}>Realized Momentum</th>
                     <th style={{ textAlign: "center" }}>Regime</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoadingVenues ? (
-                    <TableSkeleton rows={5} columns={6} />
+                    <TableSkeleton rows={5} columns={8} />
                   ) : (
                     venueRows.map((row) => (
                       <tr key={row.vault_address}>
@@ -632,6 +645,7 @@ function ExplorePageContent() {
                         <td>{chainLabel(row.chain_id)}</td>
                         <td style={{ textAlign: "center" }}>{row.category || "n/a"}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.est_apy)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.safe_apy_30d)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.momentum_7d_30d)}</td>
                         <td style={{ textAlign: "center" }}>{regimeLabel(row.regime)}</td>
@@ -659,8 +673,8 @@ function ExplorePageContent() {
                   <div className="kpi-value">{assetData?.summary?.multi_chain_tokens ?? "n/a"}</div>
                 </div>
                 <div className="kpi-card">
-                  <div className="kpi-label">Median Spread</div>
-                  <div className="kpi-value">{formatPct(assetData?.summary?.median_spread_safe_apy_30d)}</div>
+                  <div className="kpi-label">Median Best Est. APY</div>
+                  <div className="kpi-value">{formatPct(assetData?.summary?.median_best_est_apy)}</div>
                 </div>
               </div>
 
@@ -683,8 +697,8 @@ function ExplorePageContent() {
                     <th style={{ textAlign: "center" }}>Venues</th>
                     <th style={{ textAlign: "center" }}>Chains</th>
                     <th style={{ textAlign: "right" }}>TVL</th>
-                    <th style={{ textAlign: "right" }}>Best APY</th>
-                    <th style={{ textAlign: "right" }}>Spread</th>
+                    <th style={{ textAlign: "right" }}>Best Est. APY</th>
+                    <th style={{ textAlign: "right" }}>Realized Spread 30d</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -704,7 +718,7 @@ function ExplorePageContent() {
                         <td style={{ textAlign: "center" }}>{row.venues}</td>
                         <td style={{ textAlign: "center" }}>{row.chains}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.total_tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.best_safe_apy_30d)}</td>
+                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.best_est_apy)}</td>
                         <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.spread_safe_apy_30d)}</td>
                       </tr>
                     ))

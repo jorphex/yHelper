@@ -135,7 +135,7 @@ export default function HomePage() {
         ) : (
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="kpi-card">
-              <div className="kpi-label">Latest Shift</div>
+              <div className="kpi-label">Largest Shift</div>
               <div className="kpi-value" style={{ color: (topMover?.delta_apy ?? 0) >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
                 {liveShiftValue}
               </div>
@@ -144,7 +144,7 @@ export default function HomePage() {
                   <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="external-link" style={{ color: 'var(--accent)' }}>
                     {topMoverName}
                   </a>
-                ) : topMoverName} · 30d APY now {liveShiftApy}
+                ) : topMoverName} · Realized APY 30d now {liveShiftApy}
               </div>
             </div>
 
@@ -163,7 +163,7 @@ export default function HomePage() {
                   </a>
                 ) : highestYieldName}
               </div>
-              <div className="kpi-hint">{highestYieldApy} · {chainLabel(highestYieldVault?.chain_id ?? null)}</div>
+              <div className="kpi-hint">Est. APY {highestYieldApy} · {chainLabel(highestYieldVault?.chain_id ?? null)}</div>
             </div>
           </div>
         )}
@@ -221,7 +221,7 @@ export default function HomePage() {
           {[
             { href: "/explore", title: "Explore", desc: "Find vaults and compare token venues.", tag: "Best first stop" },
             { href: "/structure", title: "Structure", desc: "Check concentration and chain coverage.", tag: "Risk sizing" },
-            { href: "/momentum", title: "Momentum", desc: "Track APY changes and regime shifts.", tag: "Timing matters" },
+            { href: "/momentum", title: "Momentum", desc: "Track realized APY changes and regime shifts.", tag: "Timing matters" },
             { href: "/styfi", title: "stYFI", desc: "Track stake balances and reward epochs.", tag: "Governance" },
           ].map((item) => (
             <Link 
