@@ -49,7 +49,11 @@ PPS_RETENTION_DAYS = int(os.getenv("PPS_RETENTION_DAYS", "180"))
 INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30"))
 DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
 KONG_PPS_LOOKBACK_DAYS = int(os.getenv("KONG_PPS_LOOKBACK_DAYS", "119"))
-YDAEMON_URL = os.getenv("YDAEMON_URL", "https://ydaemon.yearn.fi/vaults/detected?limit=2000")
+KONG_GQL_URL = os.getenv("KONG_GQL_URL", "https://kong.yearn.fi/api/gql")
+KONG_REST_VAULTS_URL = os.getenv(
+    "KONG_REST_VAULTS_URL",
+    "https://kong.yearn.fi/api/rest/list/vaults?origin=yearn",
+)
 SOCIAL_PREVIEW_LIVE_TTL_SEC = int(os.getenv("SOCIAL_PREVIEW_LIVE_TTL_SEC", "300"))
 STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_DAYS)))
 STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
@@ -188,10 +192,77 @@ def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None) -> str:
         SELECT r.chain_id, r.vault_address
         FROM vault_dim r
         WHERE {scope_sql}
-        ORDER BY r.feature_score DESC NULLS LAST, r.tvl_usd DESC NULLS LAST, r.chain_id, r.vault_address
+        ORDER BY r.tvl_usd DESC NULLS LAST, r.chain_id, r.vault_address
         LIMIT %(max_vaults)s
     )
     """.format(alias=alias, scope_sql=_user_visible_filter_sql("r", include_retired=False))
+
+
+def _raw_hidden_sql(alias: str) -> str:
+    return (
+        f"COALESCE(({alias}.raw->'meta'->>'isHidden')::boolean, "
+        f"({alias}.raw->>'isHidden')::boolean, "
+        f"({alias}.raw->'info'->>'isHidden')::boolean, FALSE)"
+    )
+
+
+def _raw_retired_sql(alias: str) -> str:
+    return (
+        f"COALESCE(({alias}.raw->'meta'->>'isRetired')::boolean, "
+        f"({alias}.raw->>'isRetired')::boolean, "
+        f"({alias}.raw->'info'->>'isRetired')::boolean, FALSE)"
+    )
+
+
+def _raw_highlighted_sql(alias: str) -> str:
+    return (
+        f"COALESCE(({alias}.raw->'meta'->>'isHighlighted')::boolean, "
+        f"({alias}.raw->>'isHighlighted')::boolean, "
+        f"({alias}.raw->'info'->>'isHighlighted')::boolean, FALSE)"
+    )
+
+
+def _raw_migration_available_sql(alias: str) -> str:
+    return (
+        f"COALESCE(({alias}.raw->'meta'->'migration'->>'available')::boolean, "
+        f"({alias}.raw->'migration'->>'available')::boolean, FALSE)"
+    )
+
+
+def _raw_risk_level_sql(alias: str) -> str:
+    return (
+        f"COALESCE(NULLIF({alias}.raw->'risk'->>'riskLevel', ''), "
+        f"NULLIF({alias}.raw->>'riskLevel', ''), "
+        f"NULLIF({alias}.raw->'info'->>'riskLevel', ''), 'unknown')"
+    )
+
+
+def _raw_strategies_count_sql(alias: str) -> str:
+    return f"""
+    COALESCE(
+        NULLIF({alias}.raw->>'strategiesCount', '')::INT,
+        CASE WHEN jsonb_typeof({alias}.raw->'strategies') = 'array' THEN jsonb_array_length({alias}.raw->'strategies') END,
+        CASE WHEN jsonb_typeof({alias}.raw->'debts') = 'array' THEN jsonb_array_length({alias}.raw->'debts') END,
+        0
+    )
+    """
+
+
+def _raw_current_debt_usd_sum_sql(alias: str) -> str:
+    return f"""
+    SELECT
+        {alias}.chain_id,
+        LOWER({alias}.vault_address) AS vault_address,
+        SUM(
+            COALESCE(
+                NULLIF(d->>'currentDebtUsd', '')::numeric,
+                NULLIF(d->>'totalDebtUsd', '')::numeric,
+                0
+            )
+        ) AS debt_usd
+    FROM vault_dim {alias}
+    CROSS JOIN LATERAL jsonb_array_elements(COALESCE({alias}.raw->'debts', '[]'::jsonb)) d
+    """
 
 
 def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> str:
@@ -201,10 +272,10 @@ def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> st
         f"COALESCE({alias}.kind, '') = '{USER_VISIBLE_KIND}'",
         f"COALESCE({alias}.version, '') LIKE '{USER_VISIBLE_VERSION_PREFIX}%%'",
         f"COALESCE({alias}.chain_id, -1) NOT IN ({excluded_ids_sql})",
-        f"COALESCE(({alias}.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE",
+        f"{_raw_hidden_sql(alias)} = FALSE",
     ]
     if not include_retired:
-        clauses.append(f"COALESCE(({alias}.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE")
+        clauses.append(f"{_raw_retired_sql(alias)} = FALSE")
     return " AND ".join(clauses)
 
 
@@ -231,7 +302,7 @@ def _freshness_snapshot(
         "ingestion_jobs": {},
         "alerts": {},
     }
-    job_names = ("ydaemon_snapshot", "kong_pps_metrics")
+    job_names = ("kong_vault_snapshot", "kong_pps_metrics")
 
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
@@ -476,23 +547,24 @@ def _freshness_snapshot(
     return result
 
 
-def _fetch_ydaemon_vaults() -> list[dict]:
-    request = Request(YDAEMON_URL, headers={"User-Agent": "yHelper/0.1"})
+def _fetch_kong_vaults() -> list[dict]:
+    request = Request(KONG_REST_VAULTS_URL, headers={"User-Agent": "yHelper/0.1"})
     with urlopen(request, timeout=8.0) as response:
         payload = loads(response.read().decode("utf-8"))
-    if isinstance(payload, list):
-        return payload
-    if isinstance(payload, dict):
-        for key in ("data", "vaults", "items", "results"):
-            candidate = payload.get(key)
-            if isinstance(candidate, list):
-                return candidate
-            if isinstance(candidate, dict):
-                for nested_key in ("vaults", "items", "results"):
-                    nested = candidate.get(nested_key)
-                    if isinstance(nested, list):
-                        return nested
-    return []
+    return payload if isinstance(payload, list) else []
+
+
+def _extract_kong_est_apy(vault: dict[str, object]) -> float | None:
+    performance = vault.get("performance")
+    performance_obj = performance if isinstance(performance, dict) else {}
+    oracle = performance_obj.get("oracle")
+    oracle_obj = oracle if isinstance(oracle, dict) else {}
+    for key in ("apy", "netAPY", "netApy"):
+        value = oracle_obj.get(key)
+        parsed = _to_float_or_none(value)
+        if parsed is not None:
+            return parsed
+    return None
 
 
 def _live_social_preview_highest_vault() -> dict[str, object]:
@@ -506,12 +578,12 @@ def _live_social_preview_highest_vault() -> dict[str, object]:
     best_score = float("-inf")
     best_tvl = float("-inf")
     try:
-        for vault in _fetch_ydaemon_vaults():
+        for vault in _fetch_kong_vaults():
             if not isinstance(vault, dict):
                 continue
             if str(vault.get("kind") or "") != USER_VISIBLE_KIND:
                 continue
-            if not str(vault.get("version") or "").startswith(USER_VISIBLE_VERSION_PREFIX):
+            if not str(vault.get("apiVersion") or vault.get("version") or "").startswith(USER_VISIBLE_VERSION_PREFIX):
                 continue
             raw_chain_id = vault.get("chainID") or vault.get("chainId") or vault.get("chain_id")
             try:
@@ -520,15 +592,13 @@ def _live_social_preview_highest_vault() -> dict[str, object]:
                 chain_id = None
             if chain_id is None or chain_id in EXCLUDED_CHAIN_IDS:
                 continue
-            info = vault.get("info") if isinstance(vault.get("info"), dict) else {}
-            if bool(info.get("isHidden")) or bool(info.get("isRetired")):
+            if bool(vault.get("isHidden")) or bool(vault.get("isRetired")):
                 continue
-            apr = vault.get("apr") if isinstance(vault.get("apr"), dict) else {}
             tvl = vault.get("tvl") if isinstance(vault.get("tvl"), dict) else {}
-            current_net_apy = _to_float_or_none(apr.get("netAPR"))
+            current_net_apy = _extract_kong_est_apy(vault)
             if current_net_apy is None:
                 continue
-            tvl_usd = _to_float_or_none(tvl.get("tvl"))
+            tvl_usd = _to_float_or_none(tvl.get("close") if "close" in tvl else tvl.get("tvl"))
             candidate_tvl = float("-inf") if tvl_usd is None else tvl_usd
             if current_net_apy < best_score or (current_net_apy == best_score and candidate_tvl <= best_tvl):
                 continue
@@ -541,8 +611,8 @@ def _live_social_preview_highest_vault() -> dict[str, object]:
                 "chain_id": chain_id,
                 "tvl_usd": tvl_usd,
                 "current_net_apy": current_net_apy,
-                "apy_type": apr.get("type"),
-                "source": "ydaemon_live",
+                "current_est_apy": current_net_apy,
+                "source": "kong_rest_live",
             }
     except Exception:
         if isinstance(cached_value, dict):
@@ -729,7 +799,7 @@ def _delta_or_none(left: object, right: object) -> float | None:
 
 def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     cur.execute(
-        """
+        f"""
         WITH all_vaults AS (
             SELECT
                 d.chain_id,
@@ -737,8 +807,8 @@ def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
                 d.active,
                 COALESCE(d.kind, '') AS kind,
                 COALESCE(d.tvl_usd, 0.0)::numeric AS tvl_usd,
-                COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) AS is_retired,
-                COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) AS is_hidden
+                {_raw_retired_sql('d')} AS is_retired,
+                {_raw_hidden_sql('d')} AS is_hidden
             FROM vault_dim d
         ),
         active_visible AS (
@@ -749,25 +819,11 @@ def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
               AND is_hidden = FALSE
         ),
         strategy_debt_usd AS (
-            SELECT
-                m.chain_id,
-                LOWER(s->>'address') AS vault_address,
-                SUM(
-                    (
-                        COALESCE(NULLIF(s->'details'->>'totalDebt', '')::numeric, 0)
-                        / POWER(10::numeric, COALESCE(NULLIF(v.raw->>'decimals', '')::numeric, 18))
-                    )
-                    * COALESCE(NULLIF(v.raw->'tvl'->>'price', '')::numeric, 0)
-                ) AS debt_usd
-            FROM vault_dim m
-            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(m.raw->'strategies', '[]'::jsonb)) s
-            JOIN vault_dim v
-              ON v.chain_id = m.chain_id
-             AND LOWER(v.vault_address) = LOWER(s->>'address')
+            {_raw_current_debt_usd_sum_sql('m')}
             WHERE m.active = TRUE
               AND COALESCE(m.kind, '') = 'Multi Strategy'
-              AND COALESCE((m.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
-              AND COALESCE((m.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
+              AND {_raw_retired_sql('m')} = FALSE
+              AND {_raw_hidden_sql('m')} = FALSE
             GROUP BY 1, 2
         ),
         single_independent AS (
@@ -804,12 +860,11 @@ def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
             )::double precision AS tracked_tvl_active_usd,
             (
                 SELECT COUNT(DISTINCT (a.chain_id, a.vault_address))
-                FROM all_vaults a
+                FROM active_visible a
                 JOIN vault_metrics_latest m
                   ON m.chain_id = a.chain_id
                  AND m.vault_address = a.vault_address
-                WHERE a.active = TRUE
-                  AND m.apy_30d IS NOT NULL
+                WHERE m.apy_30d IS NOT NULL
             ) AS active_with_metrics
         """
     )
@@ -831,9 +886,9 @@ def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
 def _yearn_scope_filter_sql(alias: str, *, include_hidden: bool, include_retired: bool, include_fantom: bool) -> str:
     clauses = [f"{alias}.active = TRUE"]
     if not include_hidden:
-        clauses.append(f"COALESCE(({alias}.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE")
+        clauses.append(f"{_raw_hidden_sql(alias)} = FALSE")
     if not include_retired:
-        clauses.append(f"COALESCE(({alias}.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE")
+        clauses.append(f"{_raw_retired_sql(alias)} = FALSE")
     if not include_fantom:
         clauses.append(f"COALESCE({alias}.chain_id, -1) <> 250")
     return " AND ".join(clauses)
@@ -858,12 +913,6 @@ def _deduped_yearn_scope_snapshot(
         include_retired=include_retired,
         include_fantom=include_fantom,
     )
-    child_scope_sql = _yearn_scope_filter_sql(
-        "v",
-        include_hidden=include_hidden,
-        include_retired=include_retired,
-        include_fantom=include_fantom,
-    )
     cur.execute(
         f"""
         WITH in_scope AS (
@@ -876,25 +925,9 @@ def _deduped_yearn_scope_snapshot(
             WHERE {scope_sql}
         ),
         strategy_debt_usd AS (
-            SELECT
-                m.chain_id,
-                LOWER(s->>'address') AS vault_address,
-                SUM(
-                    (
-                        COALESCE(NULLIF(s->'details'->>'totalDebt', '')::numeric, 0)
-                        / POWER(10::numeric, COALESCE(NULLIF(v.raw->>'decimals', '')::numeric, 18))
-                    )
-                    * COALESCE(NULLIF(v.raw->'tvl'->>'price', '')::numeric, 0)
-                ) AS debt_usd
-            FROM vault_dim m
-            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(m.raw->'strategies', '[]'::jsonb)) s
-            JOIN vault_dim v
-              ON v.chain_id = m.chain_id
-             AND LOWER(v.vault_address) = LOWER(s->>'address')
+            {_raw_current_debt_usd_sum_sql('m')}
             WHERE {parent_scope_sql}
-              AND {child_scope_sql}
               AND COALESCE(m.kind, '') = 'Multi Strategy'
-              AND COALESCE(v.kind, '') = 'Single Strategy'
             GROUP BY 1, 2
         )
         SELECT
@@ -1423,7 +1456,7 @@ async def meta_social_preview() -> dict[str, object]:
             "total_vaults_scope": "all rows in vault_dim",
             "active_vaults_scope": "active + non-retired + non-hidden vaults in vault_dim",
             "tracked_tvl_scope": "active + non-retired + non-hidden, debt-adjusted for single-strategy overlap",
-            "highest_apy_scope": "live yDaemon user-visible multi-strategy v3 scope",
+            "highest_apy_scope": "live Kong REST user-visible multi-strategy v3 scope",
             "exclude_retired": True,
             "exclude_hidden": True,
         },
@@ -1469,7 +1502,7 @@ async def overview() -> dict[str, object]:
     tracked_scope: dict[str, object] | None = None
     lifecycle: dict[str, object] | None = None
     last_runs: dict[str, dict[str, object] | None] = {
-        "ydaemon_snapshot": None,
+        "kong_vault_snapshot": None,
         "kong_pps_metrics": None,
         "styfi_snapshot": None,
     }
@@ -1491,18 +1524,18 @@ async def overview() -> dict[str, object]:
                 cur.execute("SELECT COUNT(*) FROM vault_metrics_latest")
                 metrics_count = cur.fetchone()["count"]
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         COUNT(*) FILTER (WHERE active) AS active_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE((raw->'info'->>'isRetired')::boolean, FALSE)) AS retired_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE((raw->'info'->>'isHighlighted')::boolean, FALSE)) AS highlighted_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE((raw->'migration'->>'available')::boolean, FALSE)) AS migration_ready_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE(raw->'info'->>'riskLevel', '') = '-1') AS risk_unrated_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE(raw->'info'->>'riskLevel', '') = '0') AS risk_0_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE(raw->'info'->>'riskLevel', '') = '1') AS risk_1_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE(raw->'info'->>'riskLevel', '') = '2') AS risk_2_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE(raw->'info'->>'riskLevel', '') = '3') AS risk_3_vaults,
-                        COUNT(*) FILTER (WHERE active AND COALESCE(raw->'info'->>'riskLevel', '') = '4') AS risk_4_vaults
+                        COUNT(*) FILTER (WHERE active AND {_raw_retired_sql('vault_dim')}) AS retired_vaults,
+                        COUNT(*) FILTER (WHERE active AND {_raw_highlighted_sql('vault_dim')}) AS highlighted_vaults,
+                        COUNT(*) FILTER (WHERE active AND {_raw_migration_available_sql('vault_dim')}) AS migration_ready_vaults,
+                        COUNT(*) FILTER (WHERE active AND {_raw_risk_level_sql('vault_dim')} = '-1') AS risk_unrated_vaults,
+                        COUNT(*) FILTER (WHERE active AND {_raw_risk_level_sql('vault_dim')} = '0') AS risk_0_vaults,
+                        COUNT(*) FILTER (WHERE active AND {_raw_risk_level_sql('vault_dim')} = '1') AS risk_1_vaults,
+                        COUNT(*) FILTER (WHERE active AND {_raw_risk_level_sql('vault_dim')} = '2') AS risk_2_vaults,
+                        COUNT(*) FILTER (WHERE active AND {_raw_risk_level_sql('vault_dim')} = '3') AS risk_3_vaults,
+                        COUNT(*) FILTER (WHERE active AND {_raw_risk_level_sql('vault_dim')} = '4') AS risk_4_vaults
                     FROM vault_dim
                     """
                 )
@@ -1563,8 +1596,8 @@ async def overview() -> dict[str, object]:
         "status": "Phase 6 Hardening (Freshness Calibration In Progress)",
         "server_time_utc": datetime.now(UTC).isoformat(),
         "sources": {
-            "ydaemon": os.getenv("YDAEMON_URL", "https://ydaemon.yearn.fi/vaults/detected?limit=2000"),
-            "kong_gql": os.getenv("KONG_GQL_URL", "https://kong.yearn.farm/api/gql"),
+            "kong_rest": KONG_REST_VAULTS_URL,
+            "kong_gql": KONG_GQL_URL,
         },
         "data_policy": {
             "worker_interval_sec": WORKER_INTERVAL_SEC,
@@ -1904,7 +1937,7 @@ async def discover(
     include_retired: bool = Query(default=False),
     migration_only: bool = Query(default=False),
     highlighted_only: bool = Query(default=False),
-    sort_by: Literal["quality", "tvl", "apy_7d", "apy_30d", "momentum", "consistency"] = "quality",
+    sort_by: Literal["quality", "tvl", "est_apy", "apy_7d", "apy_30d", "momentum", "consistency"] = "tvl",
     direction: Literal["asc", "desc"] = "desc",
 ) -> dict[str, object]:
     universe_gate = _resolve_universe_gate(
@@ -1914,16 +1947,15 @@ async def discover(
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
     safe_momentum_sql = _safe_momentum_sql()
-    retired_sql = "COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE)"
-    highlighted_sql = "COALESCE((d.raw->'info'->>'isHighlighted')::boolean, FALSE)"
-    migration_sql = "COALESCE((d.raw->'migration'->>'available')::boolean, FALSE)"
-    risk_level_sql = "COALESCE(NULLIF(d.raw->'info'->>'riskLevel', ''), 'unknown')"
-    strategies_count_sql = (
-        "CASE WHEN jsonb_typeof(d.raw->'strategies') = 'array' THEN jsonb_array_length(d.raw->'strategies') ELSE 0 END"
-    )
+    retired_sql = _raw_retired_sql("d")
+    highlighted_sql = _raw_highlighted_sql("d")
+    migration_sql = _raw_migration_available_sql("d")
+    risk_level_sql = _raw_risk_level_sql("d")
+    strategies_count_sql = _raw_strategies_count_sql("d")
     order_map = {
         "quality": _quality_score_sql(),
         "tvl": "COALESCE(d.tvl_usd, 0.0)",
+        "est_apy": "COALESCE(d.apr_net, -999999.0)",
         "apy_7d": "COALESCE(m.apy_7d, -999999.0)",
         "apy_30d": "COALESCE(m.apy_30d, -999999.0)",
         "momentum": f"COALESCE(({safe_momentum_sql}), -999999.0)",
@@ -2022,16 +2054,23 @@ async def discover(
                     COUNT(DISTINCT LOWER(COALESCE(d.token_symbol, ''))) FILTER (WHERE COALESCE(d.token_symbol, '') <> '') AS tokens,
                     COUNT(DISTINCT LOWER(COALESCE(d.category, ''))) FILTER (WHERE COALESCE(d.category, '') <> '') AS categories,
                     SUM(COALESCE(d.tvl_usd, 0.0)) AS total_tvl_usd,
+                    AVG(d.apr_net) AS avg_est_apy,
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY d.apr_net) AS median_est_apy,
                     AVG({safe_apy_sql}) AS avg_safe_apy_30d,
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {safe_apy_sql}) AS median_safe_apy_30d,
                     AVG({safe_momentum_sql}) AS avg_momentum_7d_30d,
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {safe_momentum_sql}) AS median_momentum_7d_30d,
                     AVG(m.consistency_score) AS avg_consistency_score,
-                    AVG(d.feature_score) AS avg_feature_score,
                     COUNT(*) FILTER (WHERE {retired_sql} = TRUE) AS retired_vaults,
                     COUNT(*) FILTER (WHERE {highlighted_sql} = TRUE) AS highlighted_vaults,
                     COUNT(*) FILTER (WHERE {migration_sql} = TRUE) AS migration_ready_vaults,
                     AVG({strategies_count_sql})::DOUBLE PRECISION AS avg_strategies_per_vault,
+                    CASE
+                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE d.apr_net IS NOT NULL) > 0
+                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * d.apr_net) FILTER (WHERE d.apr_net IS NOT NULL)
+                             / SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE d.apr_net IS NOT NULL)
+                        ELSE NULL
+                    END AS tvl_weighted_est_apy,
                     CASE
                         WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE {safe_apy_sql} IS NOT NULL) > 0
                         THEN SUM(COALESCE(d.tvl_usd, 0.0) * {safe_apy_sql}) FILTER (WHERE {safe_apy_sql} IS NOT NULL)
@@ -2102,7 +2141,7 @@ async def discover(
                     d.version,
                     d.token_symbol,
                     d.tvl_usd,
-                    d.feature_score,
+                    d.apr_net AS est_apy,
                     m.points_count,
                     m.last_point_time,
                     {risk_level_sql} AS risk_level,
@@ -2771,7 +2810,7 @@ async def chains_rollups(
                 SELECT
                     d.chain_id,
                     COUNT(*) AS active_vaults,
-                    COUNT(*) FILTER (WHERE m.vault_address IS NOT NULL) AS with_metrics,
+                    COUNT(*) FILTER (WHERE m.apy_30d IS NOT NULL) AS with_metrics,
                     SUM(COALESCE(d.tvl_usd, 0)) AS total_tvl_usd,
                     CASE
                         WHEN SUM(COALESCE(d.tvl_usd, 0)) FILTER (WHERE m.apy_30d IS NOT NULL) > 0
@@ -3199,7 +3238,7 @@ async def assets(
     order_map = {
         "tvl": "total_tvl_usd",
         "spread": "spread_safe_apy_30d",
-        "best_apy": "best_safe_apy_30d",
+        "best_apy": "best_est_apy",
         "venues": "venues",
     }
     order_expr = order_map[sort_by]
@@ -3225,6 +3264,7 @@ async def assets(
                 {token_type_sql} AS token_type,
                 d.chain_id,
                 COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
+                d.apr_net AS est_apy,
                 {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d
             FROM vault_dim d
             JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
@@ -3255,6 +3295,7 @@ async def assets(
                 t.token_type,
                 f.chain_id,
                 f.tvl_usd,
+                f.est_apy,
                 f.safe_apy_30d
             FROM filtered f
             JOIN scoped_tokens t
@@ -3268,9 +3309,16 @@ async def assets(
                 COUNT(*) AS venues,
                 COUNT(DISTINCT chain_id) AS chains,
                 SUM(tvl_usd) AS total_tvl_usd,
+                MAX(est_apy) AS best_est_apy,
                 MAX(safe_apy_30d) AS best_safe_apy_30d,
                 MIN(safe_apy_30d) AS worst_safe_apy_30d,
                 MAX(safe_apy_30d) - MIN(safe_apy_30d) AS spread_safe_apy_30d,
+                CASE
+                    WHEN SUM(tvl_usd) FILTER (WHERE est_apy IS NOT NULL) > 0
+                    THEN SUM(tvl_usd * est_apy) FILTER (WHERE est_apy IS NOT NULL)
+                         / SUM(tvl_usd) FILTER (WHERE est_apy IS NOT NULL)
+                    ELSE NULL
+                END AS weighted_est_apy,
                 CASE
                     WHEN SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL) > 0
                     THEN SUM(tvl_usd * safe_apy_30d) FILTER (WHERE safe_apy_30d IS NOT NULL)
@@ -3318,9 +3366,11 @@ async def assets(
                     venues,
                     chains,
                     total_tvl_usd,
+                    best_est_apy,
                     best_safe_apy_30d,
                     worst_safe_apy_30d,
                     spread_safe_apy_30d,
+                    weighted_est_apy,
                     weighted_safe_apy_30d
                 FROM final_tokens
                 ORDER BY {order_expr} {order_dir}, total_tvl_usd DESC
@@ -3341,7 +3391,14 @@ async def assets(
                     COUNT(*) FILTER (WHERE chains > 1) AS multi_chain_tokens,
                     COUNT(*) FILTER (WHERE spread_safe_apy_30d >= 0.02) AS high_spread_tokens,
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY spread_safe_apy_30d) AS median_spread_safe_apy_30d,
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY best_est_apy) AS median_best_est_apy,
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY best_safe_apy_30d) AS median_best_safe_apy_30d,
+                    CASE
+                        WHEN SUM(total_tvl_usd) FILTER (WHERE weighted_est_apy IS NOT NULL) > 0
+                        THEN SUM(total_tvl_usd * weighted_est_apy) FILTER (WHERE weighted_est_apy IS NOT NULL)
+                             / SUM(total_tvl_usd) FILTER (WHERE weighted_est_apy IS NOT NULL)
+                        ELSE NULL
+                    END AS tvl_weighted_est_apy,
                     CASE
                         WHEN SUM(total_tvl_usd) FILTER (WHERE weighted_safe_apy_30d IS NOT NULL) > 0
                         THEN SUM(total_tvl_usd * weighted_safe_apy_30d) FILTER (WHERE weighted_safe_apy_30d IS NOT NULL)
@@ -3439,6 +3496,7 @@ async def asset_venues(
                     d.kind,
                     d.version,
                     d.tvl_usd,
+                    d.apr_net AS est_apy,
                     m.points_count,
                     m.last_point_time,
                     m.apy_7d,
@@ -3458,7 +3516,7 @@ async def asset_venues(
                     AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                     AND COALESCE(m.points_count, 0) >= %(min_points)s
                     {rank_clause}
-                ORDER BY safe_apy_30d DESC NULLS LAST, d.tvl_usd DESC
+                ORDER BY d.apr_net DESC NULLS LAST, safe_apy_30d DESC NULLS LAST, d.tvl_usd DESC
                 LIMIT %(limit)s
                 """,
                 params,
@@ -3466,6 +3524,17 @@ async def asset_venues(
             rows = cur.fetchall()
 
     total_tvl = sum(float(row.get("tvl_usd") or 0.0) for row in rows)
+    weighted_est_apy = None
+    est_apy_weight_tvl = sum(float(row.get("tvl_usd") or 0.0) for row in rows if row.get("est_apy") is not None)
+    if est_apy_weight_tvl > 0:
+        weighted_est_apy = (
+            sum(
+                float(row.get("tvl_usd") or 0.0) * float(row.get("est_apy"))
+                for row in rows
+                if row.get("est_apy") is not None
+            )
+            / est_apy_weight_tvl
+        )
     weighted_safe_apy = None
     apy_weight_tvl = sum(float(row.get("tvl_usd") or 0.0) for row in rows if row.get("safe_apy_30d") is not None)
     if apy_weight_tvl > 0:
@@ -3478,12 +3547,15 @@ async def asset_venues(
             / apy_weight_tvl
         )
 
+    est_apy_values = [float(row.get("est_apy")) for row in rows if row.get("est_apy") is not None]
     best_apy_values = [float(row.get("safe_apy_30d")) for row in rows if row.get("safe_apy_30d") is not None]
 
     summary = {
         "venues": len(rows),
         "chains": len({int(row["chain_id"]) for row in rows if row.get("chain_id") is not None}),
         "total_tvl_usd": total_tvl,
+        "best_est_apy": max(est_apy_values) if est_apy_values else None,
+        "weighted_est_apy": weighted_est_apy,
         "best_safe_apy_30d": max(best_apy_values) if best_apy_values else None,
         "worst_safe_apy_30d": min(best_apy_values) if best_apy_values else None,
         "weighted_safe_apy_30d": weighted_safe_apy,
@@ -3506,6 +3578,7 @@ async def asset_venues(
         if momentum is not None and tvl > 0:
             weighted_momentum_num += tvl * momentum
             weighted_momentum_den += tvl
+    summary["median_est_apy"] = _median(est_apy_values)
     summary["median_safe_apy_30d"] = _median(apy_values)
     summary["median_momentum_7d_30d"] = _median(momentum_values)
     summary["tvl_weighted_momentum_7d_30d"] = (
@@ -3787,7 +3860,12 @@ async def changes(
                     AVG(n.safe_apy_window - n.safe_apy_prev_window) AS avg_delta,
                     SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                         WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                    ) AS tracked_tvl_usd
+                    ) AS tracked_tvl_usd,
+                    SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                        WHERE n.apy_window_raw IS NOT NULL
+                          AND n.apy_prev_window_raw IS NOT NULL
+                          AND n.age_seconds > %(stale_threshold_sec)s
+                    ) AS stale_tracked_tvl_usd
                 FROM normalized n
                 """,
                 params,
@@ -3829,6 +3907,7 @@ async def changes(
                     (n.safe_apy_window - n.safe_apy_prev_window) AS delta_apy,
                     n.age_seconds
                 FROM normalized n
+                WHERE n.age_seconds > %(stale_threshold_sec)s
                 ORDER BY n.age_seconds DESC, n.tvl_usd DESC
                 LIMIT %(limit)s
                 """,
@@ -3837,7 +3916,7 @@ async def changes(
             stale = cur.fetchall()
 
             cur.execute(
-                """
+                f"""
                 SELECT
                     COUNT(*) AS vaults,
                     SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
@@ -3846,8 +3925,8 @@ async def changes(
                     d.active = TRUE
                     AND COALESCE(d.chain_id, -1) NOT IN (250)
                     AND COALESCE(d.kind, '') IN ('Multi Strategy', 'Single Strategy')
-                    AND COALESCE((d.raw->'info'->>'isRetired')::boolean, FALSE) = FALSE
-                    AND COALESCE((d.raw->'info'->>'isHidden')::boolean, FALSE) = FALSE
+                    AND {_raw_retired_sql('d')} = FALSE
+                    AND {_raw_hidden_sql('d')} = FALSE
                 """
             )
             yearn_scope = cur.fetchone() or {}

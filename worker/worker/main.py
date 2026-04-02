@@ -15,9 +15,12 @@ import requests
 from eth_utils import keccak
 from psycopg.types.json import Json
 
-YDAEMON_URL = os.getenv("YDAEMON_URL", "https://ydaemon.yearn.fi/vaults/detected?limit=2000")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://yhelper:change_me@yhelper-postgres:5432/yhelper")
-KONG_GQL_URL = os.getenv("KONG_GQL_URL", "https://kong.yearn.farm/api/gql")
+KONG_GQL_URL = os.getenv("KONG_GQL_URL", "https://kong.yearn.fi/api/gql")
+KONG_REST_VAULTS_URL = os.getenv(
+    "KONG_REST_VAULTS_URL",
+    "https://kong.yearn.fi/api/rest/list/vaults?origin=yearn",
+)
 KONG_MAX_VAULTS = int(os.getenv("KONG_MAX_VAULTS", "120"))
 KONG_MIN_TVL_USD = float(os.getenv("KONG_MIN_TVL_USD", "100000"))
 # Keep PPS series length fixed to reduce operator-side tuning overhead.
@@ -38,8 +41,8 @@ STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_D
 STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
 STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
 STYFI_SITE_GLOBAL_DATA_URL = os.getenv("STYFI_SITE_GLOBAL_DATA_URL", "https://styfi.yearn.fi/api/global-data").strip()
-JOB_YDAEMON = "ydaemon_snapshot"
-JOB_KONG = "kong_pps_metrics"
+JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
+JOB_KONG_PPS = "kong_pps_metrics"
 JOB_STYFI = "styfi_snapshot"
 JOB_OVERVIEW_NOTE = "overview_summary_note"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
@@ -97,6 +100,75 @@ query Query($label: String!, $chainId: Int, $address: String, $component: String
 }
 """
 
+KONG_VAULTS_SNAPSHOT_QUERY = """
+query SnapshotVaults($origin: String!) {
+  vaults(origin: $origin) {
+    address
+    chainId
+    name
+    symbol
+    apiVersion
+    category
+    v3
+    yearn
+    origin
+    erc4626
+    decimals
+    asset {
+      chainId
+      address
+      symbol
+      name
+      decimals
+    }
+    meta {
+      kind
+      category
+      isHidden
+      isRetired
+      isHighlighted
+      migration {
+        available
+        target
+      }
+      token {
+        symbol
+        decimals
+        displayName
+        displaySymbol
+        description
+        category
+      }
+    }
+    performance {
+      oracle {
+        apr
+        apy
+        netAPR
+      }
+      historical {
+        net
+        weeklyNet
+        monthlyNet
+        inceptionNet
+      }
+    }
+    risk {
+      riskLevel
+    }
+    tvl {
+      close
+    }
+    strategies
+    debts {
+      strategy
+      currentDebtUsd
+      totalDebtUsd
+    }
+  }
+}
+"""
+
 DDL = """
 CREATE TABLE IF NOT EXISTS vault_dim (
     chain_id INTEGER NOT NULL,
@@ -111,16 +183,12 @@ CREATE TABLE IF NOT EXISTS vault_dim (
     token_name TEXT,
     tvl_usd DOUBLE PRECISION,
     apr_net DOUBLE PRECISION,
-    feature_score DOUBLE PRECISION,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     raw JSONB NOT NULL,
     PRIMARY KEY (chain_id, vault_address)
 );
-CREATE INDEX IF NOT EXISTS idx_vault_dim_active_rank
-    ON vault_dim(feature_score DESC NULLS LAST, tvl_usd DESC NULLS LAST, chain_id, vault_address)
-    WHERE active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_vault_dim_active_tvl
     ON vault_dim(tvl_usd DESC NULLS LAST, chain_id, vault_address)
     WHERE active = TRUE;
@@ -291,7 +359,6 @@ INSERT INTO vault_dim (
     token_name,
     tvl_usd,
     apr_net,
-    feature_score,
     active,
     last_seen_at,
     raw
@@ -308,7 +375,6 @@ INSERT INTO vault_dim (
     %(token_name)s,
     %(tvl_usd)s,
     %(apr_net)s,
-    %(feature_score)s,
     TRUE,
     NOW(),
     %(raw)s
@@ -324,7 +390,6 @@ ON CONFLICT (chain_id, vault_address) DO UPDATE SET
     token_name = EXCLUDED.token_name,
     tvl_usd = EXCLUDED.tvl_usd,
     apr_net = EXCLUDED.apr_net,
-    feature_score = EXCLUDED.feature_score,
     active = TRUE,
     last_seen_at = NOW(),
     raw = EXCLUDED.raw
@@ -408,43 +473,38 @@ def _normalize_optional_address(value: object) -> str | None:
 
 
 def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple[dict, list[str]]:
-    token = vault.get("token")
-    token_obj = token if isinstance(token, dict) else {}
+    asset = vault.get("asset")
+    asset_obj = asset if isinstance(asset, dict) else {}
+    meta = vault.get("meta")
+    meta_obj = meta if isinstance(meta, dict) else {}
     tvl = vault.get("tvl")
     tvl_obj = tvl if isinstance(tvl, dict) else {}
-    apr = vault.get("apr")
-    apr_obj = apr if isinstance(apr, dict) else {}
-    raw_tvl = _first_present(tvl_obj, ("tvl", "tvlUsd", "usd", "totalValueLockedUSD"))
-    if raw_tvl is None:
-        raw_tvl = _first_present(vault, ("tvlUsd", "tvl_usd", "totalValueLockedUSD"))
-    raw_apr = _first_present(apr_obj, ("netAPR", "aprNet", "net"))
-    if raw_apr is None:
-        raw_apr = _first_present(vault, ("aprNet", "netAPR", "apr_net"))
-    raw_feature_score = _first_present(vault, ("featuringScore", "featureScore", "score"))
+    performance = vault.get("performance")
+    performance_obj = performance if isinstance(performance, dict) else {}
+    oracle = performance_obj.get("oracle")
+    oracle_obj = oracle if isinstance(oracle, dict) else {}
+    raw_tvl = _first_present(tvl_obj, ("close", "tvl", "tvlUsd", "usd", "totalValueLockedUSD"))
+    raw_apr = _first_present(oracle_obj, ("apy", "netAPY", "netApy"))
     tvl_usd = _to_float(raw_tvl)
     apr_net = _to_float(raw_apr)
-    feature_score = _to_float(raw_feature_score)
     numeric_parse_failures: list[str] = []
     if tvl_usd is None and _has_raw_numeric_value(raw_tvl):
         numeric_parse_failures.append("tvl_usd")
     if apr_net is None and _has_raw_numeric_value(raw_apr):
         numeric_parse_failures.append("apr_net")
-    if feature_score is None and _has_raw_numeric_value(raw_feature_score):
-        numeric_parse_failures.append("feature_score")
     row = {
         "vault_address": vault_address,
         "chain_id": chain_id,
         "name": vault.get("name"),
         "symbol": vault.get("symbol"),
-        "category": vault.get("category"),
-        "kind": vault.get("kind"),
-        "version": vault.get("version"),
-        "token_address": _normalize_optional_address(_first_present(token_obj, ("address", "tokenAddress"))),
-        "token_symbol": _first_present(token_obj, ("symbol", "tokenSymbol")),
-        "token_name": _first_present(token_obj, ("name", "tokenName")),
+        "category": _first_present(meta_obj, ("category",)) or vault.get("category"),
+        "kind": _first_present(meta_obj, ("kind",)) or vault.get("kind"),
+        "version": _first_present(vault, ("apiVersion", "version")),
+        "token_address": _normalize_optional_address(_first_present(asset_obj, ("address", "tokenAddress"))),
+        "token_symbol": _first_present(asset_obj, ("symbol", "tokenSymbol")),
+        "token_name": _first_present(asset_obj, ("name", "tokenName")),
         "tvl_usd": tvl_usd,
         "apr_net": apr_net,
-        "feature_score": feature_score,
         "raw": Json(vault),
     }
     return row, numeric_parse_failures
@@ -469,24 +529,53 @@ def _fetch_internal_json(path: str, *, params: dict[str, object] | None = None) 
     return payload if isinstance(payload, dict) else {}
 
 
-def _fetch_live_ydaemon_chain_leaders(limit: int = 3) -> list[dict[str, object]]:
-    response = requests.get(YDAEMON_URL, timeout=30)
+def _post_kong_gql_json(query: str, variables: dict[str, object] | None = None) -> dict[str, object]:
+    response = requests.post(
+        KONG_GQL_URL,
+        json={"query": query, "variables": variables or {}},
+        timeout=30,
+        headers={"Content-Type": "application/json"},
+    )
     response.raise_for_status()
     payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError("Kong GraphQL response is not an object")
+    if payload.get("errors"):
+        raise ValueError(f"Kong GraphQL returned errors: {payload['errors']}")
+    return payload
+
+
+def _fetch_kong_rest_vaults() -> list[dict]:
+    response = requests.get(KONG_REST_VAULTS_URL, timeout=30)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, list):
+        raise ValueError("Kong REST vault list response is not a list")
+    return [row for row in payload if isinstance(row, dict)]
+
+
+def _extract_kong_est_apy(vault: dict) -> float | None:
+    performance = vault.get("performance")
+    performance_obj = performance if isinstance(performance, dict) else {}
+    oracle = performance_obj.get("oracle")
+    oracle_obj = oracle if isinstance(oracle, dict) else {}
+    value = _first_present(oracle_obj, ("apy", "netAPY", "netApy", "apr", "netAPR"))
+    return _to_float(value)
+
+
+def _fetch_live_kong_chain_leaders(limit: int = 3) -> list[dict[str, object]]:
+    payload = _fetch_kong_rest_vaults()
     if not isinstance(payload, list):
         return []
     leaders: dict[int, dict[str, object]] = {}
     for vault in payload:
         if not isinstance(vault, dict):
             continue
-        info = vault.get("info") or {}
-        if not isinstance(info, dict):
-            info = {}
-        if info.get("isHidden") or info.get("isRetired"):
+        if bool(vault.get("isHidden")) or bool(vault.get("isRetired")):
             continue
         if vault.get("kind") != "Multi Strategy":
             continue
-        version = str(vault.get("version") or "")
+        version = str(vault.get("apiVersion") or vault.get("version") or "")
         if not version.startswith("3."):
             continue
         try:
@@ -495,26 +584,20 @@ def _fetch_live_ydaemon_chain_leaders(limit: int = 3) -> list[dict[str, object]]
             continue
         if chain_id <= 0 or chain_id == 250:
             continue
-        apr = vault.get("apr") or {}
-        if not isinstance(apr, dict):
-            continue
-        try:
-            net_apr = float(apr.get("netAPR"))
-        except (TypeError, ValueError):
-            continue
-        if net_apr <= 0:
+        est_apy = _extract_kong_est_apy(vault)
+        if est_apy is None or est_apy <= 0:
             continue
         current = leaders.get(chain_id)
-        if current and float(current.get("net_apr") or 0.0) >= net_apr:
+        if current and float(current.get("est_apy") or 0.0) >= est_apy:
             continue
         leaders[chain_id] = {
             "chain": _chain_label(chain_id),
             "chain_id": chain_id,
             "symbol": vault.get("symbol"),
-            "apy_pct": _format_pct(net_apr),
-            "net_apr": net_apr,
+            "apy_pct": _format_pct(est_apy),
+            "est_apy": est_apy,
         }
-    return sorted(leaders.values(), key=lambda row: float(row.get("net_apr") or 0.0), reverse=True)[:limit]
+    return sorted(leaders.values(), key=lambda row: float(row.get("est_apy") or 0.0), reverse=True)[:limit]
 
 
 def _json_hash(payload: dict[str, object]) -> str:
@@ -596,7 +679,7 @@ def _build_overview_note_source() -> tuple[dict[str, object], datetime]:
         if row.get("category") == "Stablecoin"
     )
     eligible_tvl_total = sum(float(row.get("eligible_tvl_usd") or 0.0) for row in category_rows)
-    top_chain_leaders = _fetch_live_ydaemon_chain_leaders(limit=3)
+    top_chain_leaders = _fetch_live_kong_chain_leaders(limit=3)
     needs_freshness_warning = bool(freshness.get("pps_vaults_stale")) or (
         isinstance(kong_job.get("last_success_age_seconds"), (int, float))
         and float(kong_job["last_success_age_seconds"]) > float(ALERT_STALE_SECONDS)
@@ -671,11 +754,11 @@ def _structured_overview_summary(source_payload: dict[str, object]) -> dict[str,
     stablecoin_share = str(macro.get("stablecoin_share_pct") or "").strip()
     if avg_safe_apy and stablecoin_share:
         third_sentence = (
-            f"Across the core set, average safe APY is {avg_safe_apy} and stablecoins account for "
+            f"Across the core set, average realized APY over the 7d window is {avg_safe_apy} and stablecoins account for "
             f"{stablecoin_share} of eligible TVL."
         )
     elif avg_safe_apy:
-        third_sentence = f"Across the core set, average safe APY is {avg_safe_apy}."
+        third_sentence = f"Across the core set, average realized APY over the 7d window is {avg_safe_apy}."
     elif stablecoin_share:
         third_sentence = f"Across the core set, stablecoins account for {stablecoin_share} of eligible TVL."
     else:
@@ -1190,6 +1273,16 @@ def _ensure_schema(conn: psycopg.Connection) -> None:
             BEGIN
                 IF EXISTS (
                     SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'vault_dim'
+                      AND column_name = 'feature_score'
+                ) THEN
+                    ALTER TABLE vault_dim DROP COLUMN feature_score;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
                     FROM pg_constraint
                     WHERE conname = 'vault_dim_pkey'
                       AND conrelid = 'vault_dim'::regclass
@@ -1230,15 +1323,7 @@ def _ensure_schema(conn: psycopg.Connection) -> None:
             DECLARE
                 idx_def TEXT;
             BEGIN
-                SELECT indexdef
-                INTO idx_def
-                FROM pg_indexes
-                WHERE schemaname = 'public' AND indexname = 'idx_vault_dim_active_rank';
-                IF idx_def IS NOT NULL
-                   AND idx_def <> 'CREATE INDEX idx_vault_dim_active_rank ON public.vault_dim USING btree (feature_score DESC NULLS LAST, tvl_usd DESC NULLS LAST, chain_id, vault_address) WHERE (active = true)'
-                THEN
-                    EXECUTE 'DROP INDEX IF EXISTS idx_vault_dim_active_rank';
-                END IF;
+                EXECUTE 'DROP INDEX IF EXISTS idx_vault_dim_active_rank';
 
                 SELECT indexdef
                 INTO idx_def
@@ -1265,9 +1350,6 @@ def _ensure_schema(conn: psycopg.Connection) -> None:
         )
         cur.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_vault_dim_active_rank
-                ON vault_dim(feature_score DESC NULLS LAST, tvl_usd DESC NULLS LAST, chain_id, vault_address)
-                WHERE active = TRUE;
             CREATE INDEX IF NOT EXISTS idx_vault_dim_active_tvl
                 ON vault_dim(tvl_usd DESC NULLS LAST, chain_id, vault_address)
                 WHERE active = TRUE;
@@ -1285,6 +1367,20 @@ def _active_vault_count(conn: psycopg.Connection) -> int:
     return int(row[0] if row else 0)
 
 
+def _has_successful_run(conn: psycopg.Connection, job_name: str) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT 1
+            FROM ingestion_runs
+            WHERE job_name = %s AND status = 'success'
+            LIMIT 1
+            """,
+            (job_name,),
+        )
+        return cur.fetchone() is not None
+
+
 def _assert_snapshot_size_guard(
     conn: psycopg.Connection,
     *,
@@ -1294,6 +1390,16 @@ def _assert_snapshot_size_guard(
 ) -> None:
     previous_active = _active_vault_count(conn)
     if previous_active <= 0 or normalized_count >= previous_active:
+        return
+    if not _has_successful_run(conn, JOB_KONG_SNAPSHOT):
+        logging.warning(
+            "Skipping snapshot size guard for initial Kong snapshot migration "
+            "(previous_active=%s normalized=%s payload=%s skipped_missing_identity=%s)",
+            previous_active,
+            normalized_count,
+            payload_count,
+            skipped_missing_identity,
+        )
         return
     drop_count = previous_active - normalized_count
     min_allowed_rows = max(1, math.ceil(previous_active * SNAPSHOT_MIN_ACTIVE_RATIO))
@@ -1636,33 +1742,24 @@ def _evaluate_job_stale_alert(conn: psycopg.Connection, *, job_name: str) -> Non
 
 
 def _evaluate_alerts(conn: psycopg.Connection) -> None:
-    _evaluate_job_stale_alert(conn, job_name=JOB_YDAEMON)
-    _evaluate_job_stale_alert(conn, job_name=JOB_KONG)
+    _evaluate_job_stale_alert(conn, job_name=JOB_KONG_SNAPSHOT)
+    _evaluate_job_stale_alert(conn, job_name=JOB_KONG_PPS)
 
 
-def _fetch_ydaemon_snapshot() -> list[dict]:
-    response = requests.get(YDAEMON_URL, timeout=30)
-    response.raise_for_status()
-    payload = response.json()
-    if isinstance(payload, list):
-        return payload
-    if isinstance(payload, dict):
-        for key in ("data", "vaults", "items", "results"):
-            candidate = payload.get(key)
-            if isinstance(candidate, list):
-                logging.warning("yDaemon payload is wrapped; using list under key '%s'", key)
-                return candidate
-            if isinstance(candidate, dict):
-                nested = _first_present(candidate, ("vaults", "items", "results"))
-                if isinstance(nested, list):
-                    logging.warning("yDaemon payload is wrapped; using nested list under key '%s'", key)
-                    return nested
-    raise ValueError("yDaemon response does not contain a vault list")
+def _fetch_kong_snapshot() -> list[dict]:
+    payload = _post_kong_gql_json(KONG_VAULTS_SNAPSHOT_QUERY, {"origin": "yearn"})
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise ValueError("Kong snapshot GraphQL response missing data")
+    vaults = data.get("vaults")
+    if not isinstance(vaults, list):
+        raise ValueError("Kong snapshot GraphQL response missing vault list")
+    return [vault for vault in vaults if isinstance(vault, dict)]
 
 
 def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
     rows_by_identity: dict[tuple[int, str], dict] = {}
-    numeric_failures = {"tvl_usd": 0, "apr_net": 0, "feature_score": 0}
+    numeric_failures = {"tvl_usd": 0, "apr_net": 0}
     skipped_missing_identity = 0
     duplicate_identities = 0
     for vault in vaults:
@@ -1707,10 +1804,9 @@ def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
         )
     if any(numeric_failures.values()):
         logging.warning(
-            "Snapshot numeric parse fallbacks: tvl_usd=%s apr_net=%s feature_score=%s",
+            "Snapshot numeric parse fallbacks: tvl_usd=%s apr_net=%s",
             numeric_failures["tvl_usd"],
             numeric_failures["apr_net"],
-            numeric_failures["feature_score"],
         )
     return len(rows)
 
@@ -1722,7 +1818,7 @@ def _select_kong_vaults(conn: psycopg.Connection) -> list[tuple[int, str]]:
             SELECT chain_id, vault_address
             FROM vault_dim
             WHERE active = TRUE AND tvl_usd >= %s
-            ORDER BY feature_score DESC NULLS LAST, tvl_usd DESC
+            ORDER BY tvl_usd DESC NULLS LAST, chain_id, vault_address
             LIMIT %s
             """,
             (KONG_MIN_TVL_USD, KONG_MAX_VAULTS),
@@ -2016,24 +2112,24 @@ def _maybe_cleanup_old_data(conn: psycopg.Connection) -> None:
         logging.info("DB cleanup check completed; no rows removed")
 
 
-def _run_ydaemon_ingestion(conn: psycopg.Connection) -> tuple[int, int]:
+def _run_kong_snapshot_ingestion(conn: psycopg.Connection) -> tuple[int, int]:
     started_at = datetime.now(UTC)
-    run_id = _insert_run(conn, JOB_YDAEMON, started_at)
+    run_id = _insert_run(conn, JOB_KONG_SNAPSHOT, started_at)
     try:
-        vaults = _fetch_ydaemon_snapshot()
+        vaults = _fetch_kong_snapshot()
         stored = _store_snapshot(conn, vaults)
         _complete_run(conn, run_id, "success", stored)
-        logging.info("yDaemon ingestion success: stored %s vault records", stored)
+        logging.info("Kong vault snapshot success: stored %s vault records", stored)
         return run_id, stored
     except Exception as exc:
         _complete_run(conn, run_id, "failed", 0, json.dumps({"error": str(exc)}))
-        logging.exception("yDaemon ingestion failed: %s", exc)
+        logging.exception("Kong vault snapshot failed: %s", exc)
         return run_id, 0
 
 
 def _run_kong_ingestion(conn: psycopg.Connection) -> tuple[int, int, int]:
     started_at = datetime.now(UTC)
-    run_id = _insert_run(conn, JOB_KONG, started_at)
+    run_id = _insert_run(conn, JOB_KONG_PPS, started_at)
     pps_rows_stored = 0
     metrics_rows = 0
     errors: list[str] = []
@@ -2104,17 +2200,17 @@ def _run_styfi_snapshot(conn: psycopg.Connection) -> tuple[int, int, int]:
 
 def run_once() -> None:
     logging.info("Tick at %s", datetime.now(UTC).isoformat())
-    logging.info("Fetching yDaemon snapshot: %s", YDAEMON_URL)
+    logging.info("Fetching Kong vault snapshot: %s", KONG_GQL_URL)
     with _connect() as conn:
         _ensure_schema(conn)
         abandoned = _mark_stale_running_runs(conn)
         if abandoned > 0:
             logging.warning("Marked %s stale running ingestion rows as abandoned", abandoned)
-        _, stored = _run_ydaemon_ingestion(conn)
+        _, stored = _run_kong_snapshot_ingestion(conn)
         if stored > 0:
             _run_kong_ingestion(conn)
         else:
-            logging.warning("Skipping Kong ingestion because yDaemon snapshot stored 0 records")
+            logging.warning("Skipping Kong PPS ingestion because Kong snapshot stored 0 records")
         if STYFI_SYNC_ENABLED:
             _run_styfi_snapshot(conn)
         else:
