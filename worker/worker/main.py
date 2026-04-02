@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import hashlib
 import logging
 import math
 import os
@@ -10,7 +9,6 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import psycopg
-from psycopg.rows import dict_row
 import requests
 from eth_utils import keccak
 from psycopg.types.json import Json
@@ -44,15 +42,12 @@ STYFI_SITE_GLOBAL_DATA_URL = os.getenv("STYFI_SITE_GLOBAL_DATA_URL", "https://st
 JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
 JOB_STYFI = "styfi_snapshot"
-JOB_OVERVIEW_NOTE = "overview_summary_note"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "21600"))
 ALERT_NOTIFY_ON_RECOVERY = os.getenv("ALERT_NOTIFY_ON_RECOVERY", "1") == "1"
 ALERT_TELEGRAM_BOT_TOKEN = os.getenv("ALERT_TELEGRAM_BOT_TOKEN", "").strip()
 ALERT_TELEGRAM_CHAT_ID = os.getenv("ALERT_TELEGRAM_CHAT_ID", "").strip()
 ALERT_DISCORD_WEBHOOK_URL = os.getenv("ALERT_DISCORD_WEBHOOK_URL", "").strip()
-OVERVIEW_NOTE_SOURCE_BASE_URL = os.getenv("OVERVIEW_NOTE_SOURCE_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-OVERVIEW_NOTE_VERSION = "v1"
 # Running jobs older than this are automatically marked stale failed.
 RUNNING_STALE_SECONDS = 1800
 SNAPSHOT_MIN_ACTIVE_RATIO = float(os.getenv("SNAPSHOT_MIN_ACTIVE_RATIO", "0.9"))
@@ -72,23 +67,6 @@ STYFI_CONTRACTS = {
     "styfix_reward_distributor": "0x952b31960c97e76362ac340d07d183ada15e3d6e",
     "veyfi_reward_distributor": "0x2548bf65916fdabb5a5673fc4225011ff29ee884",
     "liquid_locker_reward_distributor": "0x7efc3953bed2fc20b9f825ebffab1cc8b072a000",
-}
-
-CHAIN_NAMES = {
-    1: "Ethereum",
-    10: "Optimism",
-    137: "Polygon",
-    42161: "Arbitrum",
-    8453: "Base",
-    747474: "Katana",
-}
-
-OVERVIEW_NOTE_SPEC = {
-    "view_key": "overview",
-    "page_key": "overview",
-    "tab_key": None,
-    "view_label": "Overview",
-    "scope": {"page": "overview"},
 }
 
 KONG_PPS_QUERY = """
@@ -283,24 +261,6 @@ CREATE TABLE IF NOT EXISTS styfi_sync_state (
     payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE TABLE IF NOT EXISTS llm_view_notes (
-    view_key TEXT PRIMARY KEY,
-    page_key TEXT NOT NULL,
-    tab_key TEXT,
-    view_label TEXT NOT NULL,
-    scope JSONB NOT NULL DEFAULT '{}'::jsonb,
-    source_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-    source_hash TEXT NOT NULL,
-    source_as_of TIMESTAMPTZ,
-    note_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-    model TEXT,
-    prompt_version TEXT NOT NULL,
-    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_llm_view_notes_page_tab
-    ON llm_view_notes(page_key, tab_key, generated_at DESC);
 """
 
 
@@ -514,21 +474,6 @@ def _connect() -> psycopg.Connection:
     return psycopg.connect(DATABASE_URL)
 
 
-def _canonical_core_scope() -> dict[str, object]:
-    return {"universe": "core", "min_tvl_usd": 1_000_000, "min_points": 45, "max_vaults": 250}
-
-
-def _fetch_internal_json(path: str, *, params: dict[str, object] | None = None) -> dict[str, object]:
-    response = requests.get(
-        f"{OVERVIEW_NOTE_SOURCE_BASE_URL}{path}",
-        params=params,
-        timeout=30,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    return payload if isinstance(payload, dict) else {}
-
-
 def _post_kong_gql_json(query: str, variables: dict[str, object] | None = None) -> dict[str, object]:
     response = requests.post(
         KONG_GQL_URL,
@@ -543,385 +488,6 @@ def _post_kong_gql_json(query: str, variables: dict[str, object] | None = None) 
     if payload.get("errors"):
         raise ValueError(f"Kong GraphQL returned errors: {payload['errors']}")
     return payload
-
-
-def _fetch_kong_rest_vaults() -> list[dict]:
-    response = requests.get(KONG_REST_VAULTS_URL, timeout=30)
-    response.raise_for_status()
-    payload = response.json()
-    if not isinstance(payload, list):
-        raise ValueError("Kong REST vault list response is not a list")
-    return [row for row in payload if isinstance(row, dict)]
-
-
-def _extract_kong_est_apy(vault: dict) -> float | None:
-    performance = vault.get("performance")
-    performance_obj = performance if isinstance(performance, dict) else {}
-    oracle = performance_obj.get("oracle")
-    oracle_obj = oracle if isinstance(oracle, dict) else {}
-    value = _first_present(oracle_obj, ("apy", "netAPY", "netApy"))
-    return _to_float(value)
-
-
-def _extract_kong_tvl_usd(vault: dict) -> float | None:
-    tvl = vault.get("tvl")
-    if isinstance(tvl, dict):
-        return _to_float(_first_present(tvl, ("close", "tvl", "tvlUsd", "usd")))
-    return _to_float(tvl)
-
-
-def _fetch_live_kong_chain_leaders(limit: int = 3) -> list[dict[str, object]]:
-    payload = _fetch_kong_rest_vaults()
-    if not isinstance(payload, list):
-        return []
-    leaders: dict[int, dict[str, object]] = {}
-    for vault in payload:
-        if not isinstance(vault, dict):
-            continue
-        if bool(vault.get("isHidden")) or bool(vault.get("isRetired")):
-            continue
-        if vault.get("kind") != "Multi Strategy":
-            continue
-        version = str(vault.get("apiVersion") or vault.get("version") or "")
-        if not version.startswith("3."):
-            continue
-        try:
-            chain_id = int(vault.get("chainID") or vault.get("chainId") or vault.get("chain_id"))
-        except (TypeError, ValueError):
-            continue
-        if chain_id <= 0 or chain_id == 250:
-            continue
-        est_apy = _extract_kong_est_apy(vault)
-        if est_apy is None or est_apy <= 0:
-            continue
-        tvl_usd = _extract_kong_tvl_usd(vault)
-        current = leaders.get(chain_id)
-        if current:
-            current_apy = float(current.get("est_apy") or 0.0)
-            current_tvl = _to_float(current.get("tvl_usd"))
-            candidate_tvl = float("-inf") if tvl_usd is None else tvl_usd
-            current_tvl_value = float("-inf") if current_tvl is None else current_tvl
-            if current_apy > est_apy or (current_apy == est_apy and current_tvl_value >= candidate_tvl):
-                continue
-        leaders[chain_id] = {
-            "chain": _chain_label(chain_id),
-            "chain_id": chain_id,
-            "symbol": vault.get("symbol"),
-            "apy_pct": _format_pct(est_apy),
-            "est_apy": est_apy,
-            "tvl_usd": tvl_usd,
-        }
-    return sorted(leaders.values(), key=lambda row: float(row.get("est_apy") or 0.0), reverse=True)[:limit]
-
-
-def _json_hash(payload: dict[str, object]) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def _as_iso_datetime(value: object) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-
-
-def _chain_label(chain_id: object) -> str:
-    try:
-        numeric = int(chain_id)
-    except (TypeError, ValueError):
-        return "Unknown"
-    return CHAIN_NAMES.get(numeric, f"Chain {numeric}")
-
-
-def _format_pct(value: object, decimals: int = 1) -> str | None:
-    try:
-        numeric = float(value)
-    except (TypeError, ValueError):
-        return None
-    return f"{numeric * 100:.{decimals}f}%"
-
-
-def _format_amount(value: object, decimals: int = 1) -> str | None:
-    try:
-        numeric = float(value)
-    except (TypeError, ValueError):
-        return None
-    return f"{numeric:.{decimals}f}"
-
-
-def _trim_rows(rows: object, limit: int, fields: tuple[str, ...]) -> list[dict[str, object]]:
-    if not isinstance(rows, list):
-        return []
-    out: list[dict[str, object]] = []
-    for row in rows[:limit]:
-        if not isinstance(row, dict):
-            continue
-        out.append({field: row.get(field) for field in fields})
-    return out
-
-
-def _first_non_empty_row(*rows: object) -> dict[str, object]:
-    for row in rows:
-        if isinstance(row, list):
-            for item in row:
-                if isinstance(item, dict):
-                    return item
-    return {}
-
-
-def _build_overview_note_source() -> tuple[dict[str, object], datetime]:
-    scope = _canonical_core_scope()
-    overview = _fetch_internal_json("/api/overview")
-    changes = _fetch_internal_json(
-        "/api/changes",
-        params={**scope, "window": "7d", "limit": 5, "stale_threshold": "auto"},
-    )
-    styfi = _fetch_internal_json("/api/styfi", params={"days": 122, "epoch_limit": 12})
-    freshness = overview.get("freshness") or {}
-    kong_job = (freshness.get("ingestion_jobs") or {}).get("kong_pps_metrics") or {}
-    regime_rows = _trim_rows(overview.get("regime_counts"), 4, ("regime", "vaults", "tvl_usd"))
-    coverage = overview.get("coverage") or {}
-    category_rows = coverage.get("by_category") or []
-    stable_tvl = sum(float(row.get("tvl_usd") or 0.0) for row in regime_rows if row.get("regime") == "stable")
-    regime_tvl_total = sum(float(row.get("tvl_usd") or 0.0) for row in regime_rows)
-    stablecoin_eligible_tvl = sum(
-        float(row.get("eligible_tvl_usd") or 0.0)
-        for row in category_rows
-        if row.get("category") == "Stablecoin"
-    )
-    eligible_tvl_total = sum(float(row.get("eligible_tvl_usd") or 0.0) for row in category_rows)
-    top_chain_leaders = _fetch_live_kong_chain_leaders(limit=3)
-    needs_freshness_warning = bool(freshness.get("pps_vaults_stale")) or (
-        isinstance(kong_job.get("last_success_age_seconds"), (int, float))
-        and float(kong_job["last_success_age_seconds"]) > float(ALERT_STALE_SECONDS)
-    )
-    source = {
-        "chain_leaders": top_chain_leaders,
-        "styfi_snapshot": {
-            "combined_staked_yfi": _format_amount((styfi.get("summary") or {}).get("combined_staked")),
-            "share_of_supply_pct": _format_pct((styfi.get("summary") or {}).get("staked_share_supply"), 2),
-            "current_apr_pct": _format_pct((styfi.get("current_reward_state") or {}).get("styfi_current_apr")),
-        },
-        "macro": {
-            "broader_apy_drift": ((changes.get("summary") or {}).get("avg_delta")),
-            "stablecoin_share": (stablecoin_eligible_tvl / eligible_tvl_total) if eligible_tvl_total > 0 else None,
-            "stablecoin_share_pct": _format_pct(
-                (stablecoin_eligible_tvl / eligible_tvl_total) if eligible_tvl_total > 0 else None,
-                0,
-            ),
-            "avg_realized_apy_pct": _format_pct((changes.get("summary") or {}).get("avg_realized_apy_window")),
-            "stable_tvl_share": (stable_tvl / regime_tvl_total) if regime_tvl_total > 0 else None,
-            "stable_tvl_share_pct": _format_pct((stable_tvl / regime_tvl_total) if regime_tvl_total > 0 else None, 0),
-        },
-    }
-    if needs_freshness_warning:
-        source["freshness_warning"] = {
-            "warning_reason": "freshness degraded",
-            "kong_last_success_age_seconds": kong_job.get("last_success_age_seconds"),
-            "pps_vaults_stale": freshness.get("pps_vaults_stale"),
-        }
-    source_as_of = _as_iso_datetime(overview.get("server_time_utc")) or datetime.now(UTC)
-    return source, source_as_of
-
-
-def _build_view_note_source() -> tuple[dict[str, object], datetime]:
-    return _build_overview_note_source()
-
-
-def _structured_overview_summary(source_payload: dict[str, object]) -> dict[str, object]:
-    leaders = source_payload.get("chain_leaders") or []
-    leader_rows = [row for row in leaders if isinstance(row, dict)][:3]
-    leader_bits: list[str] = []
-    for row in leader_rows:
-        symbol = str(row.get("symbol") or "").strip()
-        chain = str(row.get("chain") or "").strip()
-        apy_pct = str(row.get("apy_pct") or "").strip()
-        if symbol and chain and apy_pct:
-            leader_bits.append(f"{symbol} on {chain} at {apy_pct}")
-    if leader_bits:
-        if len(leader_bits) == 1:
-            first_sentence = f"Top per-chain yield currently sits with {leader_bits[0]}."
-        elif len(leader_bits) == 2:
-            first_sentence = f"Top per-chain yields currently sit with {leader_bits[0]} and {leader_bits[1]}."
-        else:
-            first_sentence = (
-                f"Top per-chain yields currently sit with {leader_bits[0]}, {leader_bits[1]}, "
-                f"and {leader_bits[2]}."
-            )
-    else:
-        first_sentence = "Top per-chain yield leaders are currently unavailable."
-
-    styfi_snapshot = source_payload.get("styfi_snapshot") or {}
-    staked_yfi = str(styfi_snapshot.get("combined_staked_yfi") or "").strip()
-    share_of_supply = str(styfi_snapshot.get("share_of_supply_pct") or "").strip()
-    current_apr = str(styfi_snapshot.get("current_apr_pct") or "").strip()
-    if staked_yfi and share_of_supply and current_apr:
-        second_sentence = f"stYFI has {staked_yfi} YFI staked, {share_of_supply} of supply, at {current_apr} APR."
-    else:
-        second_sentence = "stYFI snapshot data is currently incomplete."
-
-    macro = source_payload.get("macro") or {}
-    avg_safe_apy = str(macro.get("avg_realized_apy_pct") or "").strip()
-    stablecoin_share = str(macro.get("stablecoin_share_pct") or "").strip()
-    if avg_safe_apy and stablecoin_share:
-        third_sentence = (
-            f"Across the core set, average realized APY over the 7d window is {avg_safe_apy} and stablecoins account for "
-            f"{stablecoin_share} of eligible TVL."
-        )
-    elif avg_safe_apy:
-        third_sentence = f"Across the core set, average realized APY over the 7d window is {avg_safe_apy}."
-    elif stablecoin_share:
-        third_sentence = f"Across the core set, stablecoins account for {stablecoin_share} of eligible TVL."
-    else:
-        third_sentence = ""
-
-    summary = " ".join(part for part in (first_sentence, second_sentence, third_sentence) if part).strip()
-    return {"summary": summary[:420]}
-
-
-def _generate_view_note(source_payload: dict[str, object]) -> tuple[dict[str, object], str]:
-    return _structured_overview_summary(source_payload), "structured-overview"
-
-
-def _get_existing_view_note(conn: psycopg.Connection, view_key: str) -> dict[str, object] | None:
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            """
-            SELECT view_key, source_hash, prompt_version, generated_at
-            FROM llm_view_notes
-            WHERE view_key = %s
-            """,
-            (view_key,),
-        )
-        row = cur.fetchone()
-    return dict(row) if row else None
-
-
-def _upsert_view_note(
-    conn: psycopg.Connection,
-    *,
-    spec: dict[str, object],
-    source_payload: dict[str, object],
-    source_hash: str,
-    source_as_of: datetime,
-    note_payload: dict[str, object],
-    model_name: str,
-) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO llm_view_notes (
-                view_key,
-                page_key,
-                tab_key,
-                view_label,
-                scope,
-                source_payload,
-                source_hash,
-                source_as_of,
-                note_json,
-                model,
-                prompt_version,
-                generated_at,
-                updated_at
-            ) VALUES (
-                %(view_key)s,
-                %(page_key)s,
-                %(tab_key)s,
-                %(view_label)s,
-                %(scope)s,
-                %(source_payload)s,
-                %(source_hash)s,
-                %(source_as_of)s,
-                %(note_json)s,
-                %(model)s,
-                %(prompt_version)s,
-                NOW(),
-                NOW()
-            )
-            ON CONFLICT (view_key) DO UPDATE SET
-                page_key = EXCLUDED.page_key,
-                tab_key = EXCLUDED.tab_key,
-                view_label = EXCLUDED.view_label,
-                scope = EXCLUDED.scope,
-                source_payload = EXCLUDED.source_payload,
-                source_hash = EXCLUDED.source_hash,
-                source_as_of = EXCLUDED.source_as_of,
-                note_json = EXCLUDED.note_json,
-                model = EXCLUDED.model,
-                prompt_version = EXCLUDED.prompt_version,
-                generated_at = NOW(),
-                updated_at = NOW()
-            """,
-            {
-                "view_key": spec["view_key"],
-                "page_key": spec["page_key"],
-                "tab_key": spec["tab_key"],
-                "view_label": spec["view_label"],
-                "scope": Json(spec["scope"]),
-                "source_payload": Json(source_payload),
-                "source_hash": source_hash,
-                "source_as_of": source_as_of,
-                "note_json": Json(note_payload),
-                "model": model_name,
-                "prompt_version": OVERVIEW_NOTE_VERSION,
-            },
-        )
-    conn.commit()
-
-
-def _run_overview_note(conn: psycopg.Connection) -> tuple[int, int, int]:
-    started_at = datetime.now(UTC)
-    run_id = _insert_run(conn, JOB_OVERVIEW_NOTE, started_at)
-    generated = 0
-    skipped = 0
-    errors: list[str] = []
-    spec = OVERVIEW_NOTE_SPEC
-    view_key = str(spec["view_key"])
-    try:
-        source_payload, source_as_of = _build_view_note_source()
-        source_hash = _json_hash(source_payload)
-        existing = _get_existing_view_note(conn, view_key)
-        if (
-            existing
-            and existing.get("source_hash") == source_hash
-            and existing.get("prompt_version") == OVERVIEW_NOTE_VERSION
-        ):
-            skipped = 1
-        else:
-            note_payload, model_name = _generate_view_note(source_payload)
-            _upsert_view_note(
-                conn,
-                spec=spec,
-                source_payload=source_payload,
-                source_hash=source_hash,
-                source_as_of=source_as_of,
-                note_payload=note_payload,
-                model_name=model_name,
-            )
-            generated = 1
-        status = "success" if generated > 0 or skipped > 0 else "failed"
-        summary = {
-            "generated": generated,
-            "skipped": skipped,
-            "views": 1,
-            "errors": errors,
-        }
-        _complete_run(conn, run_id, status, generated, json.dumps(summary))
-        logging.info(
-            "Overview summary completed: generated=%s skipped=%s errors=%s",
-            generated,
-            skipped,
-            len(errors),
-        )
-        return run_id, generated, skipped
-    except Exception as exc:
-        _complete_run(conn, run_id, "failed", generated, json.dumps({"error": str(exc), "errors": errors}))
-        logging.exception("Overview summary failed: %s", exc)
-        return run_id, generated, skipped
 
 
 def _eth_rpc(method: str, params: list[object]) -> object:
@@ -1281,6 +847,8 @@ def _upsert_styfi_sync_state(conn: psycopg.Connection, state: dict[str, object])
 def _ensure_schema(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute(DDL)
+        cur.execute("DROP TABLE IF EXISTS llm_view_notes")
+        cur.execute("DELETE FROM ingestion_runs WHERE job_name = 'overview_summary_note'")
         cur.execute(
             """
             DO $$
@@ -2265,7 +1833,6 @@ def run_once() -> None:
             _run_styfi_snapshot(conn)
         else:
             logging.info("Skipping stYFI snapshot because STYFI_SYNC_ENABLED=0")
-        _run_overview_note(conn)
         _evaluate_alerts(conn)
         _maybe_cleanup_old_data(conn)
 
