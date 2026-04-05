@@ -7,11 +7,12 @@ import { Footer } from "./components/footer";
 import { ChunkRecovery } from "./components/chunk-recovery";
 import { PageTransition } from "./components/page-transition";
 import { Providers } from "./providers";
+import { SOCIAL_IMAGE_VERSION } from "./lib/social-image-version";
 
 const siteUrlRaw = process.env.NEXT_PUBLIC_SITE_URL || "https://yhelper.app";
 const siteUrl = siteUrlRaw.startsWith("http://") || siteUrlRaw.startsWith("https://") ? siteUrlRaw : `https://${siteUrlRaw}`;
-const OPEN_GRAPH_IMAGE_URL = `${siteUrl}/opengraph-image`;
-const TWITTER_IMAGE_URL = `${siteUrl}/twitter-image`;
+const OPEN_GRAPH_IMAGE_URL = `${siteUrl}/opengraph-image?v=${SOCIAL_IMAGE_VERSION}`;
+const TWITTER_IMAGE_URL = `${siteUrl}/twitter-image?v=${SOCIAL_IMAGE_VERSION}`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
