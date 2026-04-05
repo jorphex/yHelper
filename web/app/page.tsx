@@ -180,26 +180,26 @@ export default function HomePage() {
             <KpiCardSkeleton />
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-            <div className="kpi-card">
+          <div className="kpi-grid home-overview-summary">
+            <div className="kpi-card home-overview-summary-card">
               <div className="kpi-label">Current Yearn TVL</div>
               <div className="kpi-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0, false)}</div>
               <div className="kpi-hint">Active visible current-scope vaults</div>
             </div>
 
-            <div className="kpi-card">
+            <div className="kpi-card home-overview-summary-card">
               <div className="kpi-label">Current Vaults</div>
               <div className="kpi-value">{currentYearnVaultCount}</div>
               <div className="kpi-hint">In deduped live Yearn universe</div>
             </div>
 
-            <div className="kpi-card">
+            <div className="kpi-card home-overview-summary-card">
               <div className="kpi-label">stYFI APR</div>
               <div className="kpi-value">{formatPct(styfi?.current_reward_state?.styfi_current_apr ?? null, 2)}</div>
               <div className="kpi-hint">Current staking rewards rate</div>
             </div>
 
-            <div className="kpi-card">
+            <div className="kpi-card home-overview-summary-card">
               <div className="kpi-label">Total Staked</div>
               <div className="kpi-value" style={{ fontSize: '20px' }}>
                 {Number.isFinite(styfi?.summary?.combined_staked ?? null)
