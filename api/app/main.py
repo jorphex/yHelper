@@ -751,6 +751,25 @@ def _to_float_or_none(value: object) -> float | None:
         return None
 
 
+def _format_compact_usd(value: float | None) -> str | None:
+    if value is None:
+        return None
+    amount = abs(value)
+    if amount >= 1_000_000_000:
+        return f"${value / 1_000_000_000:.1f}B"
+    if amount >= 1_000_000:
+        return f"${value / 1_000_000:.1f}M"
+    if amount >= 1_000:
+        return f"${value / 1_000:.0f}k"
+    return f"${value:.0f}"
+
+
+def _yearn_vault_url(chain_id: int | None, vault_address: str | None) -> str | None:
+    if chain_id is None or not vault_address:
+        return None
+    return f"https://yearn.fi/vaults/{chain_id}/{vault_address}"
+
+
 def _safe_int(value: object) -> int | None:
     try:
         if value is None:
@@ -1524,6 +1543,7 @@ def _overview_note_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     min_tvl_usd = float(universe_gate["min_tvl_usd"])
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
+    standout_min_tvl_usd = 100_000.0
     params: dict[str, object] = {
         "window_sec": 7 * 86400,
         "min_tvl_usd": min_tvl_usd,
@@ -1531,6 +1551,7 @@ def _overview_note_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
         "apy_min": APY_MIN,
         "apy_max": APY_MAX,
         "now_epoch": int(datetime.now(UTC).timestamp()),
+        "standout_min_tvl_usd": standout_min_tvl_usd,
     }
     if max_vaults is not None:
         params["max_vaults"] = max_vaults
@@ -1582,14 +1603,19 @@ def _overview_note_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     )
     snapshot = cur.fetchone() or {}
     cur.execute(
-        base_cte
-        + """
+        f"""
         SELECT
-            n.est_apy AS top_est_apy,
-            n.tvl_usd AS top_est_tvl_usd
-        FROM normalized n
-        WHERE n.est_apy IS NOT NULL
-        ORDER BY n.est_apy DESC, n.tvl_usd DESC, n.vault_address
+            d.symbol AS standout_est_symbol,
+            d.chain_id AS standout_est_chain_id,
+            d.vault_address AS standout_est_vault_address,
+            d.est_apy AS standout_est_apy,
+            COALESCE(d.tvl_usd, 0.0) AS standout_est_tvl_usd
+        FROM vault_dim d
+        WHERE
+            {_user_visible_filter_sql("d", include_retired=False)}
+            AND COALESCE(d.tvl_usd, 0.0) >= %(standout_min_tvl_usd)s
+            AND d.est_apy IS NOT NULL
+        ORDER BY d.est_apy DESC, COALESCE(d.tvl_usd, 0.0) DESC, d.vault_address
         LIMIT 1
         """,
         params,
@@ -1599,11 +1625,11 @@ def _overview_note_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     return snapshot
 
 
-def _build_overview_note_summary(snapshot: dict[str, object]) -> str | None:
+def _build_overview_note_summary(snapshot: dict[str, object]) -> dict[str, object]:
     eligible = int(snapshot.get("vaults_eligible") or 0)
     with_change = int(snapshot.get("vaults_with_change") or 0)
     if eligible <= 0 or with_change <= 0:
-        return None
+        return {"summary": None, "mentioned_vault": None}
 
     weighted_realized_window = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_window"))
     weighted_realized_prev = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_prev_window"))
@@ -1620,8 +1646,17 @@ def _build_overview_note_summary(snapshot: dict[str, object]) -> str | None:
     avg_est = _to_float_or_none(snapshot.get("avg_est_apy"))
     total_tvl = _to_float_or_none(snapshot.get("total_tvl_usd"))
     changed_tvl = _to_float_or_none(snapshot.get("changed_tvl_usd"))
-    top_est_apy = _to_float_or_none(snapshot.get("top_est_apy"))
-    top_est_tvl = _to_float_or_none(snapshot.get("top_est_tvl_usd"))
+    standout_est_symbol = (
+        snapshot.get("standout_est_symbol") if isinstance(snapshot.get("standout_est_symbol"), str) else None
+    )
+    standout_est_chain_id = _safe_int(snapshot.get("standout_est_chain_id"))
+    standout_est_vault_address = (
+        snapshot.get("standout_est_vault_address")
+        if isinstance(snapshot.get("standout_est_vault_address"), str)
+        else None
+    )
+    standout_est_apy = _to_float_or_none(snapshot.get("standout_est_apy"))
+    standout_est_tvl = _to_float_or_none(snapshot.get("standout_est_tvl_usd"))
     est_reference = weighted_est if weighted_est is not None else avg_est
     realized_delta = (realized_window - realized_prev) if realized_window is not None and realized_prev is not None else avg_delta
     baseline_gap = (
@@ -1644,128 +1679,92 @@ def _build_overview_note_summary(snapshot: dict[str, object]) -> str | None:
         and (baseline_gap is None or abs(baseline_gap) < low_signal_gap_threshold)
         and (est_gap is None or abs(est_gap) < low_signal_gap_threshold)
     ):
-        return None
+        return {"summary": None, "mentioned_vault": None}
 
     breadth_ratio = tvl_breadth_ratio if tvl_breadth_ratio is not None else row_breadth_ratio
     broad_move = breadth_ratio >= 0.75
     if breadth_ratio >= 0.95:
-        breadth_label = "nearly all tracked TVL"
+        breadth_label = "Nearly all tracked vault TVL"
     elif breadth_ratio >= 0.75:
-        breadth_label = "most tracked TVL"
+        breadth_label = "Most tracked vault TVL"
     elif breadth_ratio >= 0.4:
-        breadth_label = "a meaningful share of tracked TVL"
+        breadth_label = "A meaningful share of tracked vault TVL"
     else:
-        breadth_label = "a narrow slice of tracked TVL"
+        breadth_label = "A narrow slice of tracked vault TVL"
 
-    if est_gap is None or abs(est_gap) < est_gap_threshold:
-        confirmation_weaker = "Estimated APY is confirming that weaker run rate"
-        confirmation_stronger = "Estimated APY is confirming that stronger run rate"
-        confirmation_flat = "Estimated APY remains close to the current run rate"
-    elif est_gap > 0:
-        confirmation_weaker = "Estimated APY is still running ahead of that weaker run rate"
-        confirmation_stronger = "Estimated APY is still running ahead of that stronger run rate"
-        confirmation_flat = "Estimated APY is still running ahead of the current run rate"
-    else:
-        confirmation_weaker = "Estimated APY is lagging that weaker run rate"
-        confirmation_stronger = "Estimated APY is lagging that stronger run rate"
-        confirmation_flat = "Estimated APY is lagging the current run rate"
+    standout_tvl_share = (
+        standout_est_tvl / total_tvl
+        if standout_est_tvl is not None and total_tvl and total_tvl > 0
+        else None
+    )
+    standout_not_representative = (
+        standout_est_apy is not None
+        and est_reference is not None
+        and standout_tvl_share is not None
+        and standout_tvl_share < 0.05
+        and (standout_est_apy - est_reference) >= 0.03
+    )
+    named_standout = None
+    if standout_est_symbol and not standout_est_symbol.startswith("0x"):
+        named_standout = standout_est_symbol.strip()
+    standout_tvl_text = _format_compact_usd(standout_est_tvl)
+    mention_named_vault = bool(standout_not_representative and named_standout and standout_tvl_text)
+    mentioned_vault: dict[str, str] | None = None
 
     if baseline_gap is None or abs(baseline_gap) < baseline_gap_threshold:
-        weaker_baseline_phrase = "and remains close to the 30d realized baseline"
-        stronger_baseline_phrase = "and remains close to the 30d realized baseline"
-        flat_baseline_phrase = "and remains close to the 30d realized baseline"
-    elif baseline_gap > 0:
-        weaker_baseline_phrase = "but still sits above the 30d realized baseline"
-        stronger_baseline_phrase = "and now sits above the 30d realized baseline"
-        flat_baseline_phrase = "and still sits above the 30d realized baseline"
-    else:
-        weaker_baseline_phrase = "and now sits below the 30d realized baseline"
-        stronger_baseline_phrase = "but still sits below the 30d realized baseline"
-        flat_baseline_phrase = "and still sits below the 30d realized baseline"
-
-    top_est_tvl_share = (top_est_tvl / total_tvl) if top_est_tvl is not None and total_tvl and total_tvl > 0 else None
-    outlier_not_representative = (
-        top_est_apy is not None
-        and est_reference is not None
-        and top_est_tvl_share is not None
-        and top_est_tvl_share < 0.05
-        and (top_est_apy - est_reference) >= 0.01
-    )
-    baseline_gap_bps_text = None
-    if baseline_gap is not None and abs(baseline_gap) >= baseline_gap_threshold:
-        baseline_gap_bps = abs(baseline_gap) * 10000.0
-        baseline_gap_bps_text = f"about {int(round(baseline_gap_bps / 10.0) * 10)} bps"
-    if top_est_tvl_share is None:
-        top_est_tvl_share_text = "too little tracked TVL to represent the set"
-    elif top_est_tvl_share < 0.01:
-        top_est_tvl_share_text = "under 1% of tracked TVL"
-    elif top_est_tvl_share < 0.02:
-        top_est_tvl_share_text = "just 1% of tracked TVL"
-    elif top_est_tvl_share < 0.05:
-        top_est_tvl_share_text = "only a small share of tracked TVL"
-    else:
-        top_est_tvl_share_text = "enough tracked TVL to matter on its own"
-
-    if realized_delta is None:
-        first_sentence = "Realized APY is mixed across the tracked set."
-    elif realized_delta <= -delta_threshold:
-        if baseline_gap_bps_text and baseline_gap is not None and baseline_gap < 0:
-            first_sentence = (
-                f"Realized APY slipped across {breadth_label} and now sits {baseline_gap_bps_text} below the "
-                "30d realized baseline."
-            )
+        if realized_delta is not None and realized_delta <= -delta_threshold:
+            first_sentence = f"{breadth_label} is still earning about what it was a month ago, but the last week softened."
+        elif realized_delta is not None and realized_delta >= delta_threshold:
+            first_sentence = f"{breadth_label} is still earning about what it was a month ago, but the last week improved."
         else:
-            first_sentence = f"Realized APY slipped across {breadth_label} {weaker_baseline_phrase}."
-    elif realized_delta >= delta_threshold:
-        if baseline_gap_bps_text and baseline_gap is not None and baseline_gap > 0:
-            first_sentence = (
-                f"Realized APY improved across {breadth_label} and now sits {baseline_gap_bps_text} above the "
-                "30d realized baseline."
-            )
-        else:
-            first_sentence = f"Realized APY improved across {breadth_label} {stronger_baseline_phrase}."
+            first_sentence = f"{breadth_label} is earning about what it was a month ago."
+    elif baseline_gap < 0:
+        first_sentence = f"{breadth_label} is earning less than it was a month ago."
     else:
-        first_sentence = f"Realized APY was roughly flat across {breadth_label} {flat_baseline_phrase}."
+        first_sentence = f"{breadth_label} is earning more than it was a month ago."
 
-    if realized_delta is None:
-        second_sentence = "The signal is too patchy to say more than that."
-    elif realized_delta <= -delta_threshold and outlier_not_representative:
-        second_sentence = f"{confirmation_weaker}, and the top estimated APY still sits in {top_est_tvl_share_text}."
-    elif realized_delta >= delta_threshold and outlier_not_representative:
-        second_sentence = f"{confirmation_stronger}, and the top estimated APY still sits in {top_est_tvl_share_text}."
-    elif abs(realized_delta) < delta_threshold and outlier_not_representative:
-        second_sentence = f"{confirmation_flat}, and the top estimated APY still sits in {top_est_tvl_share_text}."
+    if standout_not_representative and mention_named_vault and named_standout and standout_tvl_text:
+        second_sentence = (
+            f"{named_standout} still shows the highest estimated APY, but its {standout_tvl_text} pool is too small to change the broader picture."
+        )
+        mentioned_vault_href = _yearn_vault_url(standout_est_chain_id, standout_est_vault_address)
+        if mentioned_vault_href:
+            mentioned_vault = {"symbol": named_standout, "href": mentioned_vault_href}
+    elif standout_not_representative:
+        second_sentence = "A few standout estimated APYs remain too isolated to represent where most TVL is earning."
+    elif realized_delta is None:
+        second_sentence = "The current mix is too patchy to say much more than that."
     elif realized_delta <= -delta_threshold and broad_move:
         if est_gap is not None and est_gap > est_gap_threshold:
-            second_sentence = "Estimated APY still runs ahead of the realized data, but the weakening looks set-wide rather than isolated."
+            second_sentence = "A few names still show stronger estimated APY, but not enough of the set is moving with them."
         else:
-            second_sentence = "That looks like set-level softening rather than a few isolated laggards."
+            second_sentence = "Estimated APY is softening with the set rather than offsetting it."
     elif realized_delta <= -delta_threshold:
-        second_sentence = "The weakness is still too narrow to treat as a set-wide shift."
+        second_sentence = "The weaker yields are still concentrated rather than broad across the set."
     elif realized_delta >= delta_threshold and broad_move:
         if est_gap is not None and est_gap < -est_gap_threshold:
-            second_sentence = "The improvement is broad, but estimated APY still has not caught up to the stronger realized data."
+            second_sentence = "Realized yields have improved across the set, even if estimated APY has not fully caught up yet."
         else:
-            second_sentence = "That looks broad enough to matter at the set level, not just in a few outliers."
+            second_sentence = "Estimated APY is improving with the set rather than in just a few names."
     elif realized_delta >= delta_threshold:
-        second_sentence = "The improvement is still too narrow to reset the overall read."
+        second_sentence = "The stronger yields are still concentrated rather than broad across the set."
     elif broad_move:
-        second_sentence = "The set is moving, but not enough to call it a broader turn yet."
+        second_sentence = "High estimated APYs are still concentrated rather than broadening the set."
     else:
-        second_sentence = "The move is still too narrow to matter much beyond the current leaders."
+        second_sentence = "The broader picture is steady, even if a few names still stand out."
 
-    return f"{first_sentence} {second_sentence}"
+    return {"summary": f"{first_sentence} {second_sentence}", "mentioned_vault": mentioned_vault}
 
 
 def _overview_note_response() -> JSONResponse:
     try:
         with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
-                summary = _build_overview_note_summary(_overview_note_snapshot(cur))
+                payload = _build_overview_note_summary(_overview_note_snapshot(cur))
     except Exception as exc:
-        return JSONResponse(status_code=503, content={"summary": None, "error": str(exc)})
+        return JSONResponse(status_code=503, content={"summary": None, "mentioned_vault": None, "error": str(exc)})
 
-    return JSONResponse(status_code=200, content={"summary": summary})
+    return JSONResponse(status_code=200, content=payload)
 
 
 @app.get("/api/overview-note")

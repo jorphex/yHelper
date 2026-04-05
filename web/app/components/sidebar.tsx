@@ -19,11 +19,26 @@ const externalLinks = [
 
 type OverviewNoteResponse = {
   summary?: string | null;
+  mentioned_vault?: {
+    symbol: string;
+    href: string;
+  } | null;
 };
+
+function ExternalLinkIcon() {
+  return (
+    <span className="external-arrow" aria-hidden="true" style={{ display: "inline-flex", verticalAlign: "text-bottom", marginLeft: 4, opacity: 0.72 }}>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3.5 8.5L8.5 3.5M5.25 3.5H8.5V6.75" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </span>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [summary, setSummary] = useState<string | null>(null);
+  const [mentionedVault, setMentionedVault] = useState<OverviewNoteResponse["mentioned_vault"]>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +51,7 @@ export function Sidebar() {
         const data: OverviewNoteResponse = await res.json();
         if (!cancelled) {
           setSummary(data.summary || null);
+          setMentionedVault(data.mentioned_vault || null);
         }
       } catch {
         // Silently fail - box will be hidden
@@ -68,7 +84,26 @@ export function Sidebar() {
       {summary && (
         <div className="sidebar-note">
           <div className="sidebar-note-title">Summary</div>
-          <div className="sidebar-note-content">{summary}</div>
+          <div className="sidebar-note-content">
+            {mentionedVault && summary.includes(mentionedVault.symbol) ? (
+              <>
+                {summary.slice(0, summary.indexOf(mentionedVault.symbol))}
+                <a
+                  href={mentionedVault.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="external-link"
+                  style={{ color: "var(--accent)" }}
+                >
+                  {mentionedVault.symbol}
+                  <ExternalLinkIcon />
+                </a>
+                {summary.slice(summary.indexOf(mentionedVault.symbol) + mentionedVault.symbol.length)}
+              </>
+            ) : (
+              summary
+            )}
+          </div>
         </div>
       )}
 
@@ -84,12 +119,7 @@ export function Sidebar() {
             className="sidebar-link sidebar-link-external"
           >
             {item.label}
-            <span className="external-arrow" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4.5 9.5L9.5 4.5M9.5 4.5V8.5M9.5 4.5H5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
-            </span>
+            <ExternalLinkIcon />
           </a>
         ))}
       </nav>
