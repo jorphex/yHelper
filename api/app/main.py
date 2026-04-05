@@ -1772,6 +1772,116 @@ async def overview_note() -> JSONResponse:
     return _overview_note_response()
 
 
+def _dau_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
+    cur.execute(
+        """
+        SELECT status, started_at, ended_at, records, error_summary
+        FROM ingestion_runs
+        WHERE job_name = 'product_dau'
+        ORDER BY id DESC
+        LIMIT 1
+        """
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "status": row["status"],
+        "started_at": row["started_at"].isoformat() if row["started_at"] else None,
+        "ended_at": row["ended_at"].isoformat() if row["ended_at"] else None,
+        "records": row["records"],
+        "error_summary": row["error_summary"],
+    }
+
+
+def _dau_trailing_24h(cur: psycopg.Cursor) -> dict[str, object]:
+    cur.execute(
+        """
+        SELECT
+            COUNT(DISTINCT user_account) AS dau_total,
+            COUNT(DISTINCT CASE WHEN product_type = 'vault' THEN user_account END) AS dau_vaults,
+            COUNT(DISTINCT CASE WHEN product_type = 'styfi' THEN user_account END) AS dau_styfi,
+            COUNT(DISTINCT CASE WHEN product_type = 'styfix' THEN user_account END) AS dau_styfix
+        FROM product_interactions
+        WHERE block_time >= NOW() - INTERVAL '24 hours'
+        """
+    )
+    row = cur.fetchone() or {}
+    return {
+        "dau_total": int(row.get("dau_total") or 0),
+        "dau_vaults": int(row.get("dau_vaults") or 0),
+        "dau_styfi": int(row.get("dau_styfi") or 0),
+        "dau_styfix": int(row.get("dau_styfix") or 0),
+    }
+
+
+def _dau_daily_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, object]]:
+    cur.execute(
+        """
+        WITH day_series AS (
+            SELECT generate_series(
+                (CURRENT_DATE - (%(days)s::int - 1)),
+                CURRENT_DATE,
+                INTERVAL '1 day'
+            )::date AS day_utc
+        )
+        SELECT
+            s.day_utc,
+            COALESCE(d.dau_total, 0) AS dau_total,
+            COALESCE(d.dau_vaults, 0) AS dau_vaults,
+            COALESCE(d.dau_styfi, 0) AS dau_styfi,
+            COALESCE(d.dau_styfix, 0) AS dau_styfix
+        FROM day_series s
+        LEFT JOIN product_dau_daily d ON d.day_utc = s.day_utc
+        ORDER BY s.day_utc
+        """,
+        {"days": days},
+    )
+    rows = cur.fetchall()
+    return [
+        {
+            "day_utc": row["day_utc"].isoformat() if row["day_utc"] else None,
+            "dau_total": int(row["dau_total"] or 0),
+            "dau_vaults": int(row["dau_vaults"] or 0),
+            "dau_styfi": int(row["dau_styfi"] or 0),
+            "dau_styfix": int(row["dau_styfix"] or 0),
+        }
+        for row in rows
+    ]
+
+
+@app.get("/api/dau")
+async def dau(days: int = Query(default=30, ge=7, le=180)) -> dict[str, object]:
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            trailing_24h = _dau_trailing_24h(cur)
+            daily = _dau_daily_series(cur, days=days)
+            last_run = _dau_last_run(cur)
+    return {
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "metric": {
+            "name": "active_accounts",
+            "headline_label": "Active Accounts (24h)",
+            "history_label": "Daily Active Accounts",
+            "history_window_label": f"Last {days}d",
+            "series_label": "Daily Active Accounts",
+        },
+        "window": {
+            "headline": "24h",
+            "history_days": days,
+            "history_granularity": "day_utc",
+        },
+        "scope": {
+            "vaults": "all supported-chain vaults with current activity status or nonzero TVL, including hidden and retired",
+            "styfi": "stYFI/stYFIx product interactions",
+            "attribution": "root transaction sender from product event logs",
+        },
+        "trailing_24h": trailing_24h,
+        "daily": daily,
+        "last_run": last_run,
+    }
+
+
 @app.get("/api/overview")
 async def overview() -> dict[str, object]:
     active_vaults = None
@@ -1787,7 +1897,9 @@ async def overview() -> dict[str, object]:
         "kong_vault_snapshot": None,
         "kong_pps_metrics": None,
         "styfi_snapshot": None,
+        "product_dau": None,
     }
+    dau_summary: dict[str, object] | None = None
     try:
         with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
@@ -1843,6 +1955,7 @@ async def overview() -> dict[str, object]:
                             "error_summary": row["error_summary"],
                         }
                 tracked_scope = _tracked_scope_snapshot(cur)
+                dau_summary = _dau_trailing_24h(cur)
             freshness = _freshness_snapshot(
                 conn,
                 stale_threshold_seconds=24 * 3600,
@@ -1902,6 +2015,8 @@ async def overview() -> dict[str, object]:
         "coverage": coverage,
         "protocol_context": protocol_context,
         "tracked_scope": tracked_scope,
+        "dau": dau_summary,
+        "active_accounts_24h": dau_summary,
         "lifecycle": lifecycle,
         "message": "Phase 6 hardening is in progress: freshness calibration, trust diagnostics, UX consistency, and data-quality safeguards are actively being refined.",
     }

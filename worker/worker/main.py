@@ -33,15 +33,27 @@ INGESTION_RUN_RETENTION_DAYS = int(os.getenv("INGESTION_RUN_RETENTION_DAYS", "30
 DB_CLEANUP_MIN_INTERVAL_SEC = int(os.getenv("DB_CLEANUP_MIN_INTERVAL_SEC", "21600"))
 DB_CLEANUP_ENABLED = os.getenv("DB_CLEANUP_ENABLED", "1") == "1"
 ETH_RPC_URL = os.getenv("ETH_RPC_URL", "").strip()
+OPTIMISM_RPC_URL = os.getenv("OPTIMISM_RPC_URL", "").strip()
+POLYGON_RPC_URL = os.getenv("POLYGON_RPC_URL", "").strip()
+ARBITRUM_RPC_URL = os.getenv("ARBITRUM_RPC_URL", "").strip()
+BASE_RPC_URL = os.getenv("BASE_RPC_URL", "").strip()
+GNOSIS_RPC_URL = os.getenv("GNOSIS_RPC_URL", "").strip()
+KATANA_RPC_URL = os.getenv("KATANA_RPC_URL", "").strip()
+SONIC_RPC_URL = os.getenv("SONIC_RPC_URL", "").strip()
 STYFI_SYNC_ENABLED = os.getenv("STYFI_SYNC_ENABLED", "0") == "1"
 STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
 STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_DAYS)))
 STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
 STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
 STYFI_SITE_GLOBAL_DATA_URL = os.getenv("STYFI_SITE_GLOBAL_DATA_URL", "https://styfi.yearn.fi/api/global-data").strip()
+PRODUCT_ACTIVITY_RETENTION_DAYS = int(os.getenv("PRODUCT_ACTIVITY_RETENTION_DAYS", "180"))
+PRODUCT_ACTIVITY_BACKFILL_DAYS = int(os.getenv("PRODUCT_ACTIVITY_BACKFILL_DAYS", "35"))
+PRODUCT_ACTIVITY_BLOCK_SPAN = int(os.getenv("PRODUCT_ACTIVITY_BLOCK_SPAN", "50000"))
+PRODUCT_ACTIVITY_BLOCK_SPAN_BY_CHAIN = {100: 10000, 747474: 10000}
 JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
 JOB_STYFI = "styfi_snapshot"
+JOB_PRODUCT_DAU = "product_dau"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "21600"))
 ALERT_NOTIFY_ON_RECOVERY = os.getenv("ALERT_NOTIFY_ON_RECOVERY", "1") == "1"
@@ -53,10 +65,23 @@ RUNNING_STALE_SECONDS = 1800
 SNAPSHOT_MIN_ACTIVE_RATIO = float(os.getenv("SNAPSHOT_MIN_ACTIVE_RATIO", "0.9"))
 SNAPSHOT_MIN_DROP_COUNT = int(os.getenv("SNAPSHOT_MIN_DROP_COUNT", "25"))
 LAST_CLEANUP_AT: datetime | None = None
-ETH_CALL_TIMEOUT_SEC = 12
+ETH_CALL_TIMEOUT_SEC = 20
+ETH_RPC_MAX_ATTEMPTS = 3
+ETH_RPC_RETRY_SLEEP_SEC = 1.0
+ETH_TX_BATCH_SIZE = 50
 STYFI_DECIMALS = 10**18
 STYFI_EPOCH_LENGTH_SEC = 14 * 24 * 60 * 60
 STYFI_STREAM_STATE = "styfi_reward_epoch"
+CHAIN_RPC_URLS = {
+    1: ETH_RPC_URL,
+    10: OPTIMISM_RPC_URL,
+    137: POLYGON_RPC_URL,
+    42161: ARBITRUM_RPC_URL,
+    8453: BASE_RPC_URL,
+    100: GNOSIS_RPC_URL,
+    747474: KATANA_RPC_URL,
+    146: SONIC_RPC_URL,
+}
 
 STYFI_CONTRACTS = {
     "yfi": "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e",
@@ -67,6 +92,13 @@ STYFI_CONTRACTS = {
     "styfix_reward_distributor": "0x952b31960c97e76362ac340d07d183ada15e3d6e",
     "veyfi_reward_distributor": "0x2548bf65916fdabb5a5673fc4225011ff29ee884",
     "liquid_locker_reward_distributor": "0x7efc3953bed2fc20b9f825ebffab1cc8b072a000",
+}
+
+EVENT_TOPIC_DEPOSIT = f"0x{keccak(text='Deposit(address,address,uint256,uint256)').hex()}"
+EVENT_TOPIC_WITHDRAW = f"0x{keccak(text='Withdraw(address,address,address,uint256,uint256)').hex()}"
+PRODUCT_ACTIVITY_TOPICS = {
+    EVENT_TOPIC_DEPOSIT: "deposit",
+    EVENT_TOPIC_WITHDRAW: "withdraw",
 }
 
 KONG_PPS_QUERY = """
@@ -261,6 +293,44 @@ CREATE TABLE IF NOT EXISTS styfi_sync_state (
     payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS product_activity_sync_state (
+    chain_id INTEGER PRIMARY KEY,
+    cursor BIGINT,
+    observed_at TIMESTAMPTZ,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS product_interactions (
+    chain_id INTEGER NOT NULL,
+    block_number BIGINT NOT NULL,
+    block_time TIMESTAMPTZ NOT NULL,
+    tx_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    product_type TEXT NOT NULL,
+    product_contract TEXT NOT NULL,
+    event_kind TEXT NOT NULL,
+    event_topic0 TEXT NOT NULL,
+    tx_from TEXT NOT NULL,
+    user_account TEXT NOT NULL,
+    attribution_kind TEXT NOT NULL,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (chain_id, tx_hash, log_index)
+);
+CREATE INDEX IF NOT EXISTS idx_product_interactions_time
+    ON product_interactions(block_time DESC, chain_id, product_type);
+CREATE INDEX IF NOT EXISTS idx_product_interactions_user
+    ON product_interactions(user_account, block_time DESC);
+
+CREATE TABLE IF NOT EXISTS product_dau_daily (
+    day_utc DATE PRIMARY KEY,
+    dau_total INTEGER NOT NULL,
+    dau_vaults INTEGER NOT NULL,
+    dau_styfi INTEGER NOT NULL,
+    dau_styfix INTEGER NOT NULL,
+    computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 
@@ -293,6 +363,21 @@ def _validate_data_policy_config() -> None:
         raise ValueError(
             "Invalid stYFI config: STYFI_EPOCH_LOOKBACK must be > 0 "
             f"(got {STYFI_EPOCH_LOOKBACK})"
+        )
+    if PRODUCT_ACTIVITY_RETENTION_DAYS < 0:
+        raise ValueError(
+            "Invalid DAU retention: PRODUCT_ACTIVITY_RETENTION_DAYS must be >= 0 "
+            f"(got {PRODUCT_ACTIVITY_RETENTION_DAYS})"
+        )
+    if PRODUCT_ACTIVITY_BACKFILL_DAYS <= 0:
+        raise ValueError(
+            "Invalid DAU backfill: PRODUCT_ACTIVITY_BACKFILL_DAYS must be > 0 "
+            f"(got {PRODUCT_ACTIVITY_BACKFILL_DAYS})"
+        )
+    if PRODUCT_ACTIVITY_BLOCK_SPAN <= 0:
+        raise ValueError(
+            "Invalid DAU block span: PRODUCT_ACTIVITY_BLOCK_SPAN must be > 0 "
+            f"(got {PRODUCT_ACTIVITY_BLOCK_SPAN})"
         )
     if not 0 < SNAPSHOT_MIN_ACTIVE_RATIO <= 1:
         raise ValueError(
@@ -490,17 +575,47 @@ def _post_kong_gql_json(query: str, variables: dict[str, object] | None = None) 
     return payload
 
 
+def _rpc_url_for_chain(chain_id: int) -> str | None:
+    url = CHAIN_RPC_URLS.get(chain_id)
+    if url and url.strip():
+        return url.strip()
+    return None
+
+
+def _eth_rpc_to_url(rpc_url: str, method: str, params: list[object]) -> object:
+    last_error: Exception | None = None
+    for attempt in range(1, ETH_RPC_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.post(
+                rpc_url,
+                json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+                timeout=ETH_CALL_TIMEOUT_SEC,
+            )
+            if response.status_code >= 500 or response.status_code == 429:
+                response.raise_for_status()
+            if response.status_code >= 400:
+                response.raise_for_status()
+            payload = response.json()
+            if payload.get("error"):
+                raise ValueError(f"Ethereum RPC error: {payload['error']}")
+            return payload.get("result")
+        except (requests.RequestException, ValueError) as exc:
+            last_error = exc
+            is_retryable = isinstance(exc, requests.RequestException) and (
+                getattr(exc.response, "status_code", None) in {429}
+                or getattr(exc.response, "status_code", 0) >= 500
+                or exc.response is None
+            )
+            if attempt >= ETH_RPC_MAX_ATTEMPTS or not is_retryable:
+                raise
+            time.sleep(ETH_RPC_RETRY_SLEEP_SEC * attempt)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(f"Ethereum RPC call failed without error for method {method}")
+
+
 def _eth_rpc(method: str, params: list[object]) -> object:
-    response = requests.post(
-        ETH_RPC_URL,
-        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-        timeout=ETH_CALL_TIMEOUT_SEC,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if payload.get("error"):
-        raise ValueError(f"Ethereum RPC error: {payload['error']}")
-    return payload.get("result")
+    return _eth_rpc_to_url(ETH_RPC_URL, method, params)
 
 
 def _eth_selector(signature: str) -> str:
@@ -589,6 +704,156 @@ def _eth_call_string(address: str, signature: str, *args: tuple[str, str] | tupl
         else:
             raise ValueError(f"Unsupported abi arg type: {arg_type}")
     return _eth_decode_string(_eth_call(address, signature, encoded))
+
+
+def _hex_to_int(value: str | None) -> int | None:
+    if not value or not isinstance(value, str):
+        return None
+    return int(value, 16)
+
+
+def _eth_block_number_for_chain(chain_id: int) -> int:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    block_number = _eth_rpc_to_url(rpc_url, "eth_blockNumber", [])
+    if not isinstance(block_number, str):
+        raise ValueError(f"Unexpected eth_blockNumber result for chain {chain_id}: {block_number!r}")
+    return int(block_number, 16)
+
+
+def _eth_get_block_for_chain(chain_id: int, block_number: int) -> dict[str, object]:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    payload = _eth_rpc_to_url(rpc_url, "eth_getBlockByNumber", [hex(block_number), False])
+    if not isinstance(payload, dict):
+        raise ValueError(f"Unexpected eth_getBlockByNumber result for chain {chain_id}: {payload!r}")
+    return payload
+
+
+def _eth_get_transaction_for_chain(chain_id: int, tx_hash: str) -> dict[str, object]:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    payload = _eth_rpc_to_url(rpc_url, "eth_getTransactionByHash", [tx_hash])
+    if not isinstance(payload, dict):
+        raise ValueError(f"Unexpected eth_getTransactionByHash result for chain {chain_id}: {payload!r}")
+    return payload
+
+
+def _eth_get_transactions_for_chain(chain_id: int, tx_hashes: list[str]) -> dict[str, dict[str, object]]:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    if not tx_hashes:
+        return {}
+    transactions: dict[str, dict[str, object]] = {}
+    for start in range(0, len(tx_hashes), ETH_TX_BATCH_SIZE):
+        batch_tx_hashes = tx_hashes[start : start + ETH_TX_BATCH_SIZE]
+        batch_payload = [
+            {"jsonrpc": "2.0", "id": idx, "method": "eth_getTransactionByHash", "params": [tx_hash]}
+            for idx, tx_hash in enumerate(batch_tx_hashes, start=1)
+        ]
+        last_error: Exception | None = None
+        payload: object | None = None
+        try:
+            for attempt in range(1, ETH_RPC_MAX_ATTEMPTS + 1):
+                try:
+                    response = requests.post(rpc_url, json=batch_payload, timeout=ETH_CALL_TIMEOUT_SEC)
+                    if response.status_code >= 500 or response.status_code == 429:
+                        response.raise_for_status()
+                    if response.status_code >= 400:
+                        response.raise_for_status()
+                    payload = response.json()
+                    break
+                except requests.RequestException as exc:
+                    last_error = exc
+                    is_retryable = (
+                        getattr(exc.response, "status_code", None) in {429}
+                        or getattr(exc.response, "status_code", 0) >= 500
+                        or exc.response is None
+                    )
+                    if attempt >= ETH_RPC_MAX_ATTEMPTS or not is_retryable:
+                        raise
+                    time.sleep(ETH_RPC_RETRY_SLEEP_SEC * attempt)
+            if payload is None:
+                if last_error is not None:
+                    raise last_error
+                raise RuntimeError(f"Missing batched eth_getTransactionByHash payload for chain {chain_id}")
+            if not isinstance(payload, list):
+                raise ValueError(f"Unexpected batched eth_getTransactionByHash result for chain {chain_id}: {payload!r}")
+            by_id = {idx: tx_hash for idx, tx_hash in enumerate(batch_tx_hashes, start=1)}
+            for row in payload:
+                if not isinstance(row, dict):
+                    continue
+                if row.get("error"):
+                    raise ValueError(f"Ethereum RPC batch error on chain {chain_id}: {row['error']}")
+                tx_hash = by_id.get(int(row.get("id") or 0))
+                result = row.get("result")
+                if tx_hash and isinstance(result, dict):
+                    transactions[tx_hash] = result
+        except (requests.RequestException, ValueError):
+            for tx_hash in batch_tx_hashes:
+                result = _eth_get_transaction_for_chain(chain_id, tx_hash)
+                if isinstance(result, dict):
+                    transactions[tx_hash] = result
+    return transactions
+
+
+def _eth_get_logs_for_chain(
+    chain_id: int,
+    *,
+    addresses: list[str],
+    from_block: int,
+    to_block: int,
+    topics: list[list[str] | str | None],
+) -> list[dict[str, object]]:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    payload = _eth_rpc_to_url(
+        rpc_url,
+        "eth_getLogs",
+        [
+            {
+                "fromBlock": hex(from_block),
+                "toBlock": hex(to_block),
+                "address": addresses,
+                "topics": topics,
+            }
+        ],
+    )
+    if not isinstance(payload, list):
+        raise ValueError(f"Unexpected eth_getLogs result for chain {chain_id}: {payload!r}")
+    return [row for row in payload if isinstance(row, dict)]
+
+
+def _find_block_at_or_after(chain_id: int, target_ts: int) -> int:
+    latest = _eth_block_number_for_chain(chain_id)
+    low = 0
+    high = latest
+    candidate = latest
+    while low <= high:
+        mid = (low + high) // 2
+        block = _eth_get_block_for_chain(chain_id, mid)
+        block_ts = _hex_to_int(block.get("timestamp")) if isinstance(block, dict) else None
+        if block_ts is None:
+            raise ValueError(f"Missing timestamp for chain {chain_id} block {mid}")
+        if block_ts >= target_ts:
+            candidate = mid
+            high = mid - 1
+        else:
+            low = mid + 1
+    return candidate
+
+
+def _chunked(items: list[str], size: int) -> list[list[str]]:
+    return [items[idx : idx + size] for idx in range(0, len(items), size)]
+
+
+def _product_activity_block_span_for_chain(chain_id: int) -> int:
+    return max(1, PRODUCT_ACTIVITY_BLOCK_SPAN_BY_CHAIN.get(chain_id, PRODUCT_ACTIVITY_BLOCK_SPAN))
 
 
 def _safe_int(value: object) -> int | None:
@@ -844,11 +1109,372 @@ def _upsert_styfi_sync_state(conn: psycopg.Connection, state: dict[str, object])
         )
     conn.commit()
 
+
+def _select_product_activity_contracts(conn: psycopg.Connection) -> dict[int, dict[str, str]]:
+    targets: dict[int, dict[str, str]] = {}
+    supported_chain_ids = sorted(CHAIN_RPC_URLS)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT chain_id, vault_address
+            FROM vault_dim
+            WHERE
+                (active = TRUE OR COALESCE(tvl_usd, 0) > 0)
+                AND chain_id = ANY(%(supported_chain_ids)s)
+            ORDER BY chain_id, vault_address
+            """,
+            {"supported_chain_ids": supported_chain_ids},
+        )
+        for chain_id, vault_address in cur.fetchall():
+            chain_targets = targets.setdefault(int(chain_id), {})
+            chain_targets[str(vault_address).lower()] = "vault"
+    conn.commit()
+    ethereum_targets = targets.setdefault(STYFI_CHAIN_ID, {})
+    ethereum_targets[STYFI_CONTRACTS["styfi"]] = "styfi"
+    ethereum_targets[STYFI_CONTRACTS["styfix"]] = "styfix"
+    return {chain_id: mapping for chain_id, mapping in targets.items() if mapping}
+
+
+def _product_activity_cursor(conn: psycopg.Connection, chain_id: int) -> int | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT cursor
+            FROM product_activity_sync_state
+            WHERE chain_id = %s
+            """,
+            (chain_id,),
+        )
+        row = cur.fetchone()
+    conn.commit()
+    if not row:
+        return None
+    value = row[0]
+    return int(value) if value is not None else None
+
+
+def _upsert_product_activity_sync_state(
+    conn: psycopg.Connection,
+    *,
+    chain_id: int,
+    cursor: int,
+    observed_at: datetime,
+    payload: dict[str, object],
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO product_activity_sync_state (
+                chain_id,
+                cursor,
+                observed_at,
+                payload,
+                updated_at
+            ) VALUES (
+                %(chain_id)s,
+                %(cursor)s,
+                %(observed_at)s,
+                %(payload)s,
+                NOW()
+            )
+            ON CONFLICT (chain_id) DO UPDATE SET
+                cursor = EXCLUDED.cursor,
+                observed_at = EXCLUDED.observed_at,
+                payload = EXCLUDED.payload,
+                updated_at = NOW()
+            """,
+            {
+                "chain_id": chain_id,
+                "cursor": cursor,
+                "observed_at": observed_at,
+                "payload": Json(payload),
+            },
+        )
+    conn.commit()
+
+
+def _upsert_product_interactions(conn: psycopg.Connection, rows: list[dict[str, object]]) -> int:
+    if not rows:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            INSERT INTO product_interactions (
+                chain_id,
+                block_number,
+                block_time,
+                tx_hash,
+                log_index,
+                product_type,
+                product_contract,
+                event_kind,
+                event_topic0,
+                tx_from,
+                user_account,
+                attribution_kind
+            ) VALUES (
+                %(chain_id)s,
+                %(block_number)s,
+                %(block_time)s,
+                %(tx_hash)s,
+                %(log_index)s,
+                %(product_type)s,
+                %(product_contract)s,
+                %(event_kind)s,
+                %(event_topic0)s,
+                %(tx_from)s,
+                %(user_account)s,
+                %(attribution_kind)s
+            )
+            ON CONFLICT (chain_id, tx_hash, log_index) DO NOTHING
+            """,
+            rows,
+        )
+        inserted = cur.rowcount
+    conn.commit()
+    return inserted
+
+
+def _recompute_product_dau_daily(conn: psycopg.Connection, *, from_day: datetime) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM product_dau_daily
+            WHERE day_utc >= %s::date
+            """,
+            (from_day.date(),),
+        )
+        cur.execute(
+            """
+            INSERT INTO product_dau_daily (
+                day_utc,
+                dau_total,
+                dau_vaults,
+                dau_styfi,
+                dau_styfix,
+                computed_at
+            )
+            SELECT
+                (block_time AT TIME ZONE 'UTC')::date AS day_utc,
+                COUNT(DISTINCT user_account) AS dau_total,
+                COUNT(DISTINCT CASE WHEN product_type = 'vault' THEN user_account END) AS dau_vaults,
+                COUNT(DISTINCT CASE WHEN product_type = 'styfi' THEN user_account END) AS dau_styfi,
+                COUNT(DISTINCT CASE WHEN product_type = 'styfix' THEN user_account END) AS dau_styfix,
+                NOW()
+            FROM product_interactions
+            WHERE block_time >= %s::date
+            GROUP BY 1
+            ORDER BY 1
+            """,
+            (from_day.date(),),
+        )
+        inserted = cur.rowcount
+    conn.commit()
+    return inserted
+
+
+def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
+    started_at = datetime.now(UTC)
+    run_id = _insert_run(conn, JOB_PRODUCT_DAU, started_at)
+    inserted_total = 0
+    recomputed_days = 0
+    earliest_seen: datetime | None = None
+    errors: list[str] = []
+    try:
+        targets = _select_product_activity_contracts(conn)
+        for chain_id, contracts in targets.items():
+            try:
+                rpc_url = _rpc_url_for_chain(chain_id)
+                if not rpc_url:
+                    errors.append(f"{chain_id}:missing_rpc")
+                    continue
+                latest_block = _eth_block_number_for_chain(chain_id)
+                cursor = _product_activity_cursor(conn, chain_id)
+                if cursor is None:
+                    backfill_start = int((datetime.now(UTC) - timedelta(days=PRODUCT_ACTIVITY_BACKFILL_DAYS)).timestamp())
+                    start_block = _find_block_at_or_after(chain_id, backfill_start)
+                else:
+                    start_block = cursor + 1
+                if start_block > latest_block:
+                    _upsert_product_activity_sync_state(
+                        conn,
+                        chain_id=chain_id,
+                        cursor=latest_block,
+                        observed_at=datetime.now(UTC),
+                        payload={"status": "up_to_date", "contracts": len(contracts)},
+                    )
+                    continue
+                logging.info(
+                    "Product DAU sync: chain=%s contracts=%s from_block=%s to_block=%s",
+                    chain_id,
+                    len(contracts),
+                    start_block,
+                    latest_block,
+                )
+                tx_cache: dict[str, dict[str, object]] = {}
+                chain_inserted = 0
+                chain_first_seen: datetime | None = None
+                contract_chunks = _chunked(sorted(contracts.keys()), 100)
+                max_block_span = _product_activity_block_span_for_chain(chain_id)
+                block_span = max_block_span
+                current_block = start_block
+                while current_block <= latest_block:
+                    end_block = min(latest_block, current_block + block_span - 1)
+                    try:
+                        for address_chunk in contract_chunks:
+                            logs = _eth_get_logs_for_chain(
+                                chain_id,
+                                addresses=address_chunk,
+                                from_block=current_block,
+                                to_block=end_block,
+                                topics=[[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW]],
+                            )
+                            missing_hashes = sorted(
+                                {
+                                    str(log.get("transactionHash", "")).lower()
+                                    for log in logs
+                                    if isinstance(log, dict)
+                                    and str(log.get("transactionHash", "")).lower()
+                                    and str(log.get("transactionHash", "")).lower() not in tx_cache
+                                }
+                            )
+                            if missing_hashes:
+                                tx_cache.update(_eth_get_transactions_for_chain(chain_id, missing_hashes))
+                            rows: list[dict[str, object]] = []
+                            for log in logs:
+                                topics = log.get("topics")
+                                if not isinstance(topics, list) or not topics:
+                                    continue
+                                topic0 = str(topics[0]).lower()
+                                event_kind = PRODUCT_ACTIVITY_TOPICS.get(topic0)
+                                if not event_kind:
+                                    continue
+                                product_contract = str(log.get("address", "")).lower()
+                                product_type = contracts.get(product_contract)
+                                if not product_type:
+                                    continue
+                                tx_hash = str(log.get("transactionHash", "")).lower()
+                                if not tx_hash:
+                                    continue
+                                tx = tx_cache.get(tx_hash)
+                                if tx is None:
+                                    continue
+                                tx_from = str(tx.get("from", "")).lower()
+                                if not tx_from:
+                                    continue
+                                block_number = _hex_to_int(log.get("blockNumber"))
+                                log_index = _hex_to_int(log.get("logIndex"))
+                                block_timestamp = _hex_to_int(log.get("blockTimestamp"))
+                                if block_number is None or log_index is None:
+                                    continue
+                                if block_timestamp is None:
+                                    block = _eth_get_block_for_chain(chain_id, block_number)
+                                    block_timestamp = _hex_to_int(block.get("timestamp")) if isinstance(block, dict) else None
+                                if block_timestamp is None:
+                                    continue
+                                block_time = datetime.fromtimestamp(block_timestamp, tz=UTC)
+                                if chain_first_seen is None or block_time < chain_first_seen:
+                                    chain_first_seen = block_time
+                                rows.append(
+                                    {
+                                        "chain_id": chain_id,
+                                        "block_number": block_number,
+                                        "block_time": block_time,
+                                        "tx_hash": tx_hash,
+                                        "log_index": log_index,
+                                        "product_type": product_type,
+                                        "product_contract": product_contract,
+                                        "event_kind": event_kind,
+                                        "event_topic0": topic0,
+                                        "tx_from": tx_from,
+                                        "user_account": tx_from,
+                                        "attribution_kind": "root_tx",
+                                    }
+                                )
+                            chain_inserted += _upsert_product_interactions(conn, rows)
+                    except Exception as window_exc:
+                        if block_span <= 1:
+                            raise
+                        next_block_span = max(1, block_span // 2)
+                        logging.warning(
+                            "Product DAU log window retry: chain=%s from_block=%s to_block=%s span=%s next_span=%s error=%s",
+                            chain_id,
+                            current_block,
+                            end_block,
+                            block_span,
+                            next_block_span,
+                            window_exc,
+                        )
+                        block_span = next_block_span
+                        continue
+                    current_block = end_block + 1
+                    if block_span < max_block_span:
+                        block_span = min(max_block_span, block_span + math.ceil((max_block_span - block_span) / 2))
+                _upsert_product_activity_sync_state(
+                    conn,
+                    chain_id=chain_id,
+                    cursor=latest_block,
+                    observed_at=datetime.now(UTC),
+                    payload={
+                        "status": "success",
+                        "contracts": len(contracts),
+                        "from_block": start_block,
+                        "to_block": latest_block,
+                        "inserted": chain_inserted,
+                    },
+                )
+                logging.info(
+                    "Product DAU chain complete: chain=%s inserted=%s",
+                    chain_id,
+                    chain_inserted,
+                )
+                inserted_total += chain_inserted
+                if chain_first_seen is not None and (earliest_seen is None or chain_first_seen < earliest_seen):
+                    earliest_seen = chain_first_seen
+            except Exception as chain_exc:
+                errors.append(f"{chain_id}:{chain_exc}")
+                _upsert_product_activity_sync_state(
+                    conn,
+                    chain_id=chain_id,
+                    cursor=_product_activity_cursor(conn, chain_id),
+                    observed_at=datetime.now(UTC),
+                    payload={"status": "failed", "contracts": len(contracts), "error": str(chain_exc)},
+                )
+                logging.exception("Product DAU chain failed: chain=%s error=%s", chain_id, chain_exc)
+                continue
+        if earliest_seen is None:
+            earliest_seen = datetime.now(UTC) - timedelta(days=1)
+        recomputed_days = _recompute_product_dau_daily(conn, from_day=earliest_seen)
+        status = "partial_success" if errors else "success"
+        _complete_run(
+            conn,
+            run_id,
+            status,
+            inserted_total,
+            json.dumps({"inserted": inserted_total, "recomputed_days": recomputed_days, "errors": errors}),
+        )
+        logging.info(
+            "Product DAU sync complete: status=%s inserted=%s recomputed_days=%s errors=%s",
+            status,
+            inserted_total,
+            recomputed_days,
+            len(errors),
+        )
+        return run_id, inserted_total
+    except Exception as exc:
+        _complete_run(
+            conn,
+            run_id,
+            "failed",
+            inserted_total,
+            json.dumps({"error": str(exc), "inserted": inserted_total, "recomputed_days": recomputed_days, "errors": errors}),
+        )
+        logging.exception("Product DAU sync failed: %s", exc)
+        return run_id, inserted_total
+
 def _ensure_schema(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute(DDL)
-        cur.execute("DROP TABLE IF EXISTS llm_view_notes")
-        cur.execute("DELETE FROM ingestion_runs WHERE job_name = 'overview_summary_note'")
         cur.execute(
             """
             DO $$
@@ -1344,7 +1970,7 @@ def _prune_obsolete_alert_state(conn: psycopg.Connection, *, active_job_names: t
         cur.execute(
             """
             DELETE FROM alert_state
-            WHERE alert_key LIKE 'ingestion_stale:%'
+            WHERE alert_key LIKE 'ingestion_stale:%%'
               AND NOT (job_name = ANY(%s))
             """,
             (list(active_job_names),),
@@ -1356,9 +1982,10 @@ def _prune_obsolete_alert_state(conn: psycopg.Connection, *, active_job_names: t
 
 
 def _evaluate_alerts(conn: psycopg.Connection) -> None:
-    active_job_names = (JOB_KONG_SNAPSHOT, JOB_KONG_PPS)
+    active_job_names = (JOB_KONG_SNAPSHOT, JOB_KONG_PPS, JOB_PRODUCT_DAU)
     _evaluate_job_stale_alert(conn, job_name=JOB_KONG_SNAPSHOT)
     _evaluate_job_stale_alert(conn, job_name=JOB_KONG_PPS)
+    _evaluate_job_stale_alert(conn, job_name=JOB_PRODUCT_DAU)
     deleted = _prune_obsolete_alert_state(conn, active_job_names=active_job_names)
     if deleted:
         logging.info("Pruned %s obsolete alert_state rows", deleted)
@@ -1675,6 +2302,7 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
     deleted_runs = 0
     deleted_styfi_snapshots = 0
     deleted_styfi_epochs = 0
+    deleted_product_interactions = 0
     with conn.cursor() as cur:
         if PPS_RETENTION_DAYS > 0:
             cutoff_ts = int((datetime.now(UTC) - timedelta(days=PPS_RETENTION_DAYS)).timestamp())
@@ -1698,12 +2326,19 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
                 (INGESTION_RUN_RETENTION_DAYS,),
             )
             deleted_runs = cur.rowcount
+        if PRODUCT_ACTIVITY_RETENTION_DAYS > 0:
+            cur.execute(
+                "DELETE FROM product_interactions WHERE block_time < NOW() - (%s * INTERVAL '1 day')",
+                (PRODUCT_ACTIVITY_RETENTION_DAYS,),
+            )
+            deleted_product_interactions = cur.rowcount
     conn.commit()
     return {
         "pps_timeseries": deleted_pps,
         "styfi_snapshots": deleted_styfi_snapshots,
         "styfi_epoch_stats": deleted_styfi_epochs,
         "ingestion_runs": deleted_runs,
+        "product_interactions": deleted_product_interactions,
     }
 
 
@@ -1720,11 +2355,12 @@ def _maybe_cleanup_old_data(conn: psycopg.Connection) -> None:
     LAST_CLEANUP_AT = now
     if any(value > 0 for value in result.values()):
         logging.info(
-            "DB cleanup removed rows: pps_timeseries=%s styfi_snapshots=%s styfi_epoch_stats=%s ingestion_runs=%s",
+            "DB cleanup removed rows: pps_timeseries=%s styfi_snapshots=%s styfi_epoch_stats=%s ingestion_runs=%s product_interactions=%s",
             result["pps_timeseries"],
             result["styfi_snapshots"],
             result["styfi_epoch_stats"],
             result["ingestion_runs"],
+            result["product_interactions"],
         )
     else:
         logging.info("DB cleanup check completed; no rows removed")
@@ -1833,6 +2469,7 @@ def run_once() -> None:
             _run_styfi_snapshot(conn)
         else:
             logging.info("Skipping stYFI snapshot because STYFI_SYNC_ENABLED=0")
+        _run_product_dau(conn)
         _evaluate_alerts(conn)
         _maybe_cleanup_old_data(conn)
 
