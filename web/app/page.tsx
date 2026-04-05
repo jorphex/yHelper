@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
+import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
 import { KpiCardSkeleton } from "./components/skeleton";
 import { useHomeData } from "./hooks/use-home-data";
+import { useDauData } from "./hooks/use-dau-data";
+import { MiniLineChart } from "./components/mini-line-chart";
 
 type ChangeMoverRow = {
   vault_address?: string | null;
@@ -51,6 +53,7 @@ function compactTitle(value: string | null | undefined, max = 18): string {
 
 export default function HomePage() {
   const { data, isLoading } = useHomeData();
+  const { data: dauData, isLoading: isDauLoading } = useDauData(30);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -76,20 +79,21 @@ export default function HomePage() {
     : null;
   const highestYieldName = compactTitle(highestYieldVault?.name ?? highestYieldVault?.symbol ?? null);
   const highestYieldApy = formatPct(highestYieldVault?.est_apy ?? null, 1);
-  const ppsStaleRatio = overview?.freshness?.pps_stale_ratio ?? null;
-  const ppsStaleVaults = overview?.freshness?.pps_vaults_stale ?? null;
-  const ppsTrackedVaults = overview?.freshness?.pps_vaults_total ?? null;
-  const ppsFreshRatio = Number.isFinite(ppsStaleRatio) ? Math.max(0, 1 - Number(ppsStaleRatio)) : null;
-  const ppsFreshVaults = Number.isFinite(ppsTrackedVaults) && Number.isFinite(ppsStaleVaults)
-    ? Math.max(0, Number(ppsTrackedVaults) - Number(ppsStaleVaults))
-    : null;
-  const ppsFreshnessHint = Number.isFinite(ppsFreshVaults) && Number.isFinite(ppsTrackedVaults)
-    ? `${ppsFreshVaults} / ${ppsTrackedVaults} V3 allocator vaults over $100k TVL within 24h`
-    : "V3 allocator vaults over $100k TVL within 24h";
 
   const currentYearnVaultCount = Number.isFinite(overview?.protocol_context?.current_yearn?.vaults ?? null)
     ? `${overview?.protocol_context?.current_yearn?.vaults}`
     : "n/a";
+
+  // DAU data formatting
+  const dauHeadline = dauData?.trailing_24h?.dau_total ?? null;
+  const dauHeadlineLabel = dauData?.metric?.headline_label ?? "Active Accounts (24h)";
+  const dauChartLabel = dauData?.metric?.history_label ?? "Daily Active Accounts";
+  const dauWindowLabel = dauData?.metric?.history_window_label ?? "Last 30d";
+  const dauChartData = (dauData?.daily ?? [])
+    .filter((d): d is { day_utc: string; dau_total: number } => !!d && typeof d.dau_total === "number")
+    .map((d) => ({ x: d.day_utc, y: d.dau_total }));
+  const hasDauHistory = dauChartData.some((point) => point.y > 0);
+  const isDauBackfilling = dauData?.last_run?.status === "running" && !hasDauHistory;
 
   return (
     <div className={`transition-opacity duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
@@ -148,10 +152,42 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="kpi-card">
-              <div className="kpi-label">PPS Freshness</div>
-              <div className="kpi-value">{formatPct(ppsFreshRatio, 1)}</div>
-              <div className="kpi-hint">{ppsFreshnessHint}</div>
+            <div className="kpi-card" style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <div>
+                  <div className="kpi-label" style={{ marginBottom: '4px' }}>{dauHeadlineLabel}</div>
+                  <div className="kpi-value" style={{ fontSize: '28px', fontWeight: 700 }}>
+                    {!isDauLoading && Number.isFinite(dauHeadline) ? (dauHeadline as number).toLocaleString() : "—"}
+                  </div>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {dauWindowLabel}
+                </div>
+              </div>
+              <div style={{ marginTop: '8px', minHeight: '50px' }}>
+                {!isDauLoading && hasDauHistory && dauChartData.length >= 2 ? (
+                  <MiniLineChart
+                    data={dauChartData}
+                    color="var(--accent, #0657E9)"
+                    height={50}
+                    width={280}
+                    strokeWidth={2}
+                  />
+                ) : (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      height: '50px',
+                      borderRadius: '10px',
+                      background:
+                        'linear-gradient(90deg, rgba(6,87,233,0.08) 0%, rgba(6,87,233,0.16) 50%, rgba(6,87,233,0.08) 100%)',
+                    }}
+                  />
+                )}
+              </div>
+              <div className="kpi-hint" style={{ marginTop: '8px' }}>
+                {isDauLoading || isDauBackfilling ? 'Backfilling daily history…' : dauChartLabel}
+              </div>
             </div>
 
             <div className="kpi-card">
