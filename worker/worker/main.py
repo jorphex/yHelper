@@ -96,10 +96,14 @@ STYFI_CONTRACTS = {
 
 EVENT_TOPIC_DEPOSIT = f"0x{keccak(text='Deposit(address,address,uint256,uint256)').hex()}"
 EVENT_TOPIC_WITHDRAW = f"0x{keccak(text='Withdraw(address,address,address,uint256,uint256)').hex()}"
+EVENT_TOPIC_TRANSFER = f"0x{keccak(text='Transfer(address,address,uint256)').hex()}"
 PRODUCT_ACTIVITY_TOPICS = {
     EVENT_TOPIC_DEPOSIT: "deposit",
     EVENT_TOPIC_WITHDRAW: "withdraw",
+    EVENT_TOPIC_TRANSFER: "unstake",
 }
+
+STYFI_EVENT_CONTRACTS = {STYFI_CONTRACTS["styfi"], STYFI_CONTRACTS["styfix"]}
 
 KONG_PPS_QUERY = """
 query Query($label: String!, $chainId: Int, $address: String, $component: String, $limit: Int, $timestamp: BigInt) {
@@ -1119,6 +1123,8 @@ def _select_product_activity_contracts(conn: psycopg.Connection) -> dict[int, di
             SELECT chain_id, vault_address
             FROM vault_dim
             WHERE
+                version LIKE '3.%%'
+                AND
                 (active = TRUE OR COALESCE(tvl_usd, 0) > 0)
                 AND chain_id = ANY(%(supported_chain_ids)s)
             ORDER BY chain_id, vault_address
@@ -1133,6 +1139,37 @@ def _select_product_activity_contracts(conn: psycopg.Connection) -> dict[int, di
     ethereum_targets[STYFI_CONTRACTS["styfi"]] = "styfi"
     ethereum_targets[STYFI_CONTRACTS["styfix"]] = "styfix"
     return {chain_id: mapping for chain_id, mapping in targets.items() if mapping}
+
+
+def _topic_address(topics: list[object], index: int) -> str | None:
+    if index >= len(topics):
+        return None
+    topic = str(topics[index] or "").lower()
+    if not topic.startswith("0x") or len(topic) < 42:
+        return None
+    return f"0x{topic[-40:]}"
+
+
+def _product_activity_accounts(
+    *,
+    product_type: str,
+    event_kind: str,
+    topics: list[object],
+) -> tuple[str | None, str | None, str | None]:
+    if event_kind == "deposit":
+        sender = _topic_address(topics, 1)
+        owner = _topic_address(topics, 2)
+        return sender, owner, "event_owner"
+    if event_kind == "withdraw":
+        sender = _topic_address(topics, 1)
+        owner = _topic_address(topics, 3)
+        return sender, owner, "event_owner"
+    if event_kind == "unstake" and product_type in {"styfi", "styfix"}:
+        from_account = _topic_address(topics, 1)
+        to_account = _topic_address(topics, 2)
+        if from_account and to_account == "0x0000000000000000000000000000000000000000":
+            return from_account, from_account, "event_burn_from"
+    return None, None, None
 
 
 def _product_activity_cursor(conn: psycopg.Connection, chain_id: int) -> int | None:
@@ -1311,87 +1348,93 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                     start_block,
                     latest_block,
                 )
-                tx_cache: dict[str, dict[str, object]] = {}
                 chain_inserted = 0
                 chain_first_seen: datetime | None = None
-                contract_chunks = _chunked(sorted(contracts.keys()), 100)
+                vault_addresses = sorted(address for address, product_type in contracts.items() if product_type == "vault")
+                styfi_addresses = sorted(address for address in contracts if address in STYFI_EVENT_CONTRACTS)
                 max_block_span = _product_activity_block_span_for_chain(chain_id)
                 block_span = max_block_span
                 current_block = start_block
                 while current_block <= latest_block:
                     end_block = min(latest_block, current_block + block_span - 1)
                     try:
-                        for address_chunk in contract_chunks:
-                            logs = _eth_get_logs_for_chain(
-                                chain_id,
-                                addresses=address_chunk,
-                                from_block=current_block,
-                                to_block=end_block,
-                                topics=[[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW]],
-                            )
-                            missing_hashes = sorted(
-                                {
-                                    str(log.get("transactionHash", "")).lower()
-                                    for log in logs
-                                    if isinstance(log, dict)
-                                    and str(log.get("transactionHash", "")).lower()
-                                    and str(log.get("transactionHash", "")).lower() not in tx_cache
-                                }
-                            )
-                            if missing_hashes:
-                                tx_cache.update(_eth_get_transactions_for_chain(chain_id, missing_hashes))
-                            rows: list[dict[str, object]] = []
-                            for log in logs:
-                                topics = log.get("topics")
-                                if not isinstance(topics, list) or not topics:
-                                    continue
-                                topic0 = str(topics[0]).lower()
-                                event_kind = PRODUCT_ACTIVITY_TOPICS.get(topic0)
-                                if not event_kind:
-                                    continue
-                                product_contract = str(log.get("address", "")).lower()
-                                product_type = contracts.get(product_contract)
-                                if not product_type:
-                                    continue
-                                tx_hash = str(log.get("transactionHash", "")).lower()
-                                if not tx_hash:
-                                    continue
-                                tx = tx_cache.get(tx_hash)
-                                if tx is None:
-                                    continue
-                                tx_from = str(tx.get("from", "")).lower()
-                                if not tx_from:
-                                    continue
-                                block_number = _hex_to_int(log.get("blockNumber"))
-                                log_index = _hex_to_int(log.get("logIndex"))
-                                block_timestamp = _hex_to_int(log.get("blockTimestamp"))
-                                if block_number is None or log_index is None:
-                                    continue
-                                if block_timestamp is None:
-                                    block = _eth_get_block_for_chain(chain_id, block_number)
-                                    block_timestamp = _hex_to_int(block.get("timestamp")) if isinstance(block, dict) else None
-                                if block_timestamp is None:
-                                    continue
-                                block_time = datetime.fromtimestamp(block_timestamp, tz=UTC)
-                                if chain_first_seen is None or block_time < chain_first_seen:
-                                    chain_first_seen = block_time
-                                rows.append(
-                                    {
-                                        "chain_id": chain_id,
-                                        "block_number": block_number,
-                                        "block_time": block_time,
-                                        "tx_hash": tx_hash,
-                                        "log_index": log_index,
-                                        "product_type": product_type,
-                                        "product_contract": product_contract,
-                                        "event_kind": event_kind,
-                                        "event_topic0": topic0,
-                                        "tx_from": tx_from,
-                                        "user_account": tx_from,
-                                        "attribution_kind": "root_tx",
-                                    }
+                        query_groups: list[tuple[list[str], list[list[str]]]] = []
+                        if vault_addresses:
+                            query_groups.append(
+                                (
+                                    vault_addresses,
+                                    [[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW]],
                                 )
-                            chain_inserted += _upsert_product_interactions(conn, rows)
+                            )
+                        if styfi_addresses:
+                            query_groups.append(
+                                (
+                                    styfi_addresses,
+                                    [[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW, EVENT_TOPIC_TRANSFER]],
+                                )
+                            )
+                        for addresses, topics_filter in query_groups:
+                            for address_chunk in _chunked(addresses, 100):
+                                logs = _eth_get_logs_for_chain(
+                                    chain_id,
+                                    addresses=address_chunk,
+                                    from_block=current_block,
+                                    to_block=end_block,
+                                    topics=topics_filter,
+                                )
+                                rows: list[dict[str, object]] = []
+                                for log in logs:
+                                    topics = log.get("topics")
+                                    if not isinstance(topics, list) or not topics:
+                                        continue
+                                    topic0 = str(topics[0]).lower()
+                                    event_kind = PRODUCT_ACTIVITY_TOPICS.get(topic0)
+                                    if not event_kind:
+                                        continue
+                                    product_contract = str(log.get("address", "")).lower()
+                                    product_type = contracts.get(product_contract)
+                                    if not product_type:
+                                        continue
+                                    event_sender, user_account, attribution_kind = _product_activity_accounts(
+                                        product_type=product_type,
+                                        event_kind=event_kind,
+                                        topics=topics,
+                                    )
+                                    if not event_sender or not user_account or not attribution_kind:
+                                        continue
+                                    tx_hash = str(log.get("transactionHash", "")).lower()
+                                    if not tx_hash:
+                                        continue
+                                    block_number = _hex_to_int(log.get("blockNumber"))
+                                    log_index = _hex_to_int(log.get("logIndex"))
+                                    block_timestamp = _hex_to_int(log.get("blockTimestamp"))
+                                    if block_number is None or log_index is None:
+                                        continue
+                                    if block_timestamp is None:
+                                        block = _eth_get_block_for_chain(chain_id, block_number)
+                                        block_timestamp = _hex_to_int(block.get("timestamp")) if isinstance(block, dict) else None
+                                    if block_timestamp is None:
+                                        continue
+                                    block_time = datetime.fromtimestamp(block_timestamp, tz=UTC)
+                                    if chain_first_seen is None or block_time < chain_first_seen:
+                                        chain_first_seen = block_time
+                                    rows.append(
+                                        {
+                                            "chain_id": chain_id,
+                                            "block_number": block_number,
+                                            "block_time": block_time,
+                                            "tx_hash": tx_hash,
+                                            "log_index": log_index,
+                                            "product_type": product_type,
+                                            "product_contract": product_contract,
+                                            "event_kind": event_kind,
+                                            "event_topic0": topic0,
+                                            "tx_from": event_sender,
+                                            "user_account": user_account,
+                                            "attribution_kind": attribution_kind,
+                                        }
+                                    )
+                                chain_inserted += _upsert_product_interactions(conn, rows)
                     except Exception as window_exc:
                         if block_span <= 1:
                             raise

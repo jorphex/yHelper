@@ -1872,9 +1872,9 @@ async def dau(days: int = Query(default=30, ge=7, le=180)) -> dict[str, object]:
             "history_granularity": "day_utc",
         },
         "scope": {
-            "vaults": "all supported-chain vaults with current activity status or nonzero TVL, including hidden and retired",
-            "styfi": "stYFI/stYFIx product interactions",
-            "attribution": "root transaction sender from product event logs",
+            "vaults": "supported-chain V3 vault Deposit/Withdraw events",
+            "styfi": "stYFI/stYFIx Deposit/Withdraw plus burn Transfer unstake events",
+            "attribution": "indexed account fields from product event logs",
         },
         "trailing_24h": trailing_24h,
         "daily": daily,
