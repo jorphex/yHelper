@@ -49,7 +49,7 @@ STYFI_SITE_GLOBAL_DATA_URL = os.getenv("STYFI_SITE_GLOBAL_DATA_URL", "https://st
 PRODUCT_ACTIVITY_RETENTION_DAYS = int(os.getenv("PRODUCT_ACTIVITY_RETENTION_DAYS", "180"))
 PRODUCT_ACTIVITY_BACKFILL_DAYS = int(os.getenv("PRODUCT_ACTIVITY_BACKFILL_DAYS", "35"))
 PRODUCT_ACTIVITY_BLOCK_SPAN = int(os.getenv("PRODUCT_ACTIVITY_BLOCK_SPAN", "50000"))
-PRODUCT_ACTIVITY_BLOCK_SPAN_BY_CHAIN = {100: 10000, 747474: 10000}
+PRODUCT_ACTIVITY_BLOCK_SPAN_BY_CHAIN = {100: 10000, 747474: 10000, 146: 5000}
 JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
 JOB_STYFI = "styfi_snapshot"
@@ -90,6 +90,7 @@ STYFI_CONTRACTS = {
     "reward_distributor": "0xd31911a33a5577be233dc096f6f5a7e496ff5934",
     "styfi_reward_distributor": "0x95547ede56cf74b73dd78a37f547127dffda6113",
     "styfix_reward_distributor": "0x952b31960c97e76362ac340d07d183ada15e3d6e",
+    "reward_claimer": "0xa82454009e01ae697012a73cb232d85e61b05e50",
     "veyfi_reward_distributor": "0x2548bf65916fdabb5a5673fc4225011ff29ee884",
     "liquid_locker_reward_distributor": "0x7efc3953bed2fc20b9f825ebffab1cc8b072a000",
 }
@@ -97,13 +98,26 @@ STYFI_CONTRACTS = {
 EVENT_TOPIC_DEPOSIT = f"0x{keccak(text='Deposit(address,address,uint256,uint256)').hex()}"
 EVENT_TOPIC_WITHDRAW = f"0x{keccak(text='Withdraw(address,address,address,uint256,uint256)').hex()}"
 EVENT_TOPIC_TRANSFER = f"0x{keccak(text='Transfer(address,address,uint256)').hex()}"
+EVENT_TOPIC_CLAIM = f"0x{keccak(text='Claim(address,uint256)').hex()}"
 PRODUCT_ACTIVITY_TOPICS = {
     EVENT_TOPIC_DEPOSIT: "deposit",
     EVENT_TOPIC_WITHDRAW: "withdraw",
     EVENT_TOPIC_TRANSFER: "unstake",
+    EVENT_TOPIC_CLAIM: "claim",
 }
 
 STYFI_EVENT_CONTRACTS = {STYFI_CONTRACTS["styfi"], STYFI_CONTRACTS["styfix"]}
+STYFI_CLAIM_SOURCES = {
+    STYFI_CONTRACTS["styfi_reward_distributor"]: "styfi",
+    STYFI_CONTRACTS["styfix_reward_distributor"]: "styfix",
+    STYFI_CONTRACTS["liquid_locker_reward_distributor"]: "liquid_locker",
+    STYFI_CONTRACTS["reward_claimer"]: "generic",
+}
+STYFI_CLAIM_IGNORED_ACCOUNTS = {
+    *STYFI_EVENT_CONTRACTS,
+    *STYFI_CLAIM_SOURCES.keys(),
+    STYFI_CONTRACTS["reward_distributor"],
+}
 
 KONG_PPS_QUERY = """
 query Query($label: String!, $chainId: Int, $address: String, $component: String, $limit: Int, $timestamp: BigInt) {
@@ -1169,7 +1183,92 @@ def _product_activity_accounts(
         to_account = _topic_address(topics, 2)
         if from_account and to_account == "0x0000000000000000000000000000000000000000":
             return from_account, from_account, "event_burn_from"
+    if event_kind == "claim" and product_type in {"styfi", "styfix"}:
+        account = _topic_address(topics, 1)
+        if account and account not in STYFI_CLAIM_IGNORED_ACCOUNTS:
+            return account, account, "event_claim_account"
     return None, None, None
+
+
+def _product_activity_claim_rows(
+    *,
+    claim_logs: list[dict[str, object]],
+    chain_id: int,
+) -> list[dict[str, object]]:
+    if not claim_logs:
+        return []
+    candidates_by_tx: dict[str, list[dict[str, object]]] = {}
+    for log in claim_logs:
+        topics = log.get("topics")
+        if not isinstance(topics, list) or not topics:
+            continue
+        product_contract = str(log.get("address", "")).lower()
+        source_kind = STYFI_CLAIM_SOURCES.get(product_contract)
+        if not source_kind:
+            continue
+        account = _topic_address(topics, 1)
+        if not account or account in STYFI_CLAIM_IGNORED_ACCOUNTS:
+            continue
+        tx_hash = str(log.get("transactionHash", "")).lower()
+        if not tx_hash:
+            continue
+        block_number = _hex_to_int(log.get("blockNumber"))
+        log_index = _hex_to_int(log.get("logIndex"))
+        block_timestamp = _hex_to_int(log.get("blockTimestamp"))
+        if block_number is None or log_index is None:
+            continue
+        if block_timestamp is None:
+            block = _eth_get_block_for_chain(chain_id, block_number)
+            block_timestamp = _hex_to_int(block.get("timestamp")) if isinstance(block, dict) else None
+        if block_timestamp is None:
+            continue
+        block_time = datetime.fromtimestamp(block_timestamp, tz=UTC)
+        candidates_by_tx.setdefault(tx_hash, []).append(
+            {
+                "chain_id": chain_id,
+                "block_number": block_number,
+                "block_time": block_time,
+                "tx_hash": tx_hash,
+                "log_index": log_index,
+                "source_kind": source_kind,
+                "product_contract": product_contract,
+                "event_topic0": EVENT_TOPIC_CLAIM,
+                "account": account,
+            }
+        )
+    rows: list[dict[str, object]] = []
+    for tx_hash, candidates in candidates_by_tx.items():
+        by_account: dict[str, list[dict[str, object]]] = {}
+        for candidate in candidates:
+            by_account.setdefault(str(candidate["account"]), []).append(candidate)
+        for account, account_candidates in by_account.items():
+            specific = [c for c in account_candidates if c["source_kind"] in {"styfi", "styfix"}]
+            if not specific:
+                continue
+            kept_by_product: dict[str, dict[str, object]] = {}
+            for candidate in specific:
+                product_type = str(candidate["source_kind"])
+                current = kept_by_product.get(product_type)
+                if current is None or int(candidate["log_index"]) < int(current["log_index"]):
+                    kept_by_product[product_type] = candidate
+            for product_type, candidate in kept_by_product.items():
+                rows.append(
+                    {
+                        "chain_id": int(candidate["chain_id"]),
+                        "block_number": int(candidate["block_number"]),
+                        "block_time": candidate["block_time"],
+                        "tx_hash": tx_hash,
+                        "log_index": int(candidate["log_index"]),
+                        "product_type": product_type,
+                        "product_contract": str(candidate["product_contract"]),
+                        "event_kind": "claim",
+                        "event_topic0": str(candidate["event_topic0"]),
+                        "tx_from": account,
+                        "user_account": account,
+                        "attribution_kind": "event_claim_tx_account",
+                    }
+                )
+    return rows
 
 
 def _product_activity_cursor(conn: psycopg.Connection, chain_id: int) -> int | None:
@@ -1352,6 +1451,7 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                 chain_first_seen: datetime | None = None
                 vault_addresses = sorted(address for address, product_type in contracts.items() if product_type == "vault")
                 styfi_addresses = sorted(address for address in contracts if address in STYFI_EVENT_CONTRACTS)
+                styfi_claim_addresses = sorted(STYFI_CLAIM_SOURCES) if chain_id == STYFI_CHAIN_ID else []
                 max_block_span = _product_activity_block_span_for_chain(chain_id)
                 block_span = max_block_span
                 current_block = start_block
@@ -1373,6 +1473,13 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                                     [[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW, EVENT_TOPIC_TRANSFER]],
                                 )
                             )
+                        if styfi_claim_addresses:
+                            query_groups.append(
+                                (
+                                    styfi_claim_addresses,
+                                    [[EVENT_TOPIC_CLAIM]],
+                                )
+                            )
                         for addresses, topics_filter in query_groups:
                             for address_chunk in _chunked(addresses, 100):
                                 logs = _eth_get_logs_for_chain(
@@ -1390,6 +1497,8 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                                     topic0 = str(topics[0]).lower()
                                     event_kind = PRODUCT_ACTIVITY_TOPICS.get(topic0)
                                     if not event_kind:
+                                        continue
+                                    if event_kind == "claim":
                                         continue
                                     product_contract = str(log.get("address", "")).lower()
                                     product_type = contracts.get(product_contract)
@@ -1435,6 +1544,10 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                                         }
                                     )
                                 chain_inserted += _upsert_product_interactions(conn, rows)
+                                if topics_filter == [[EVENT_TOPIC_CLAIM]]:
+                                    claim_rows = _product_activity_claim_rows(claim_logs=logs, chain_id=chain_id)
+                                    if claim_rows:
+                                        chain_inserted += _upsert_product_interactions(conn, claim_rows)
                     except Exception as window_exc:
                         if block_span <= 1:
                             raise

@@ -1873,7 +1873,7 @@ async def dau(days: int = Query(default=30, ge=7, le=180)) -> dict[str, object]:
         },
         "scope": {
             "vaults": "supported-chain V3 vault Deposit/Withdraw events",
-            "styfi": "stYFI/stYFIx Deposit/Withdraw plus burn Transfer unstake events",
+            "styfi": "stYFI/stYFIx Deposit/Withdraw, burn Transfer unstake, plus tx-deduped mapped staking Claim events",
             "attribution": "indexed account fields from product event logs",
         },
         "trailing_24h": trailing_24h,
