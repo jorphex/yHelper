@@ -9,6 +9,7 @@ import statistics
 import threading
 import time
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from urllib.parse import urlparse
 
 import psycopg
@@ -87,11 +88,99 @@ ALERT_NOTIFY_ON_RECOVERY = os.getenv("ALERT_NOTIFY_ON_RECOVERY", "1") == "1"
 ALERT_TELEGRAM_BOT_TOKEN = os.getenv("ALERT_TELEGRAM_BOT_TOKEN", "").strip()
 ALERT_TELEGRAM_CHAT_ID = os.getenv("ALERT_TELEGRAM_CHAT_ID", "").strip()
 ALERT_DISCORD_WEBHOOK_URL = os.getenv("ALERT_DISCORD_WEBHOOK_URL", "").strip()
+PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "https://yhelper.app").strip().rstrip("/")
+DISCORD_HARVEST_WEBHOOK_ETHEREUM = os.getenv("DISCORD_HARVEST_WEBHOOK_ETHEREUM", "").strip()
+DISCORD_HARVEST_WEBHOOK_BASE = os.getenv("DISCORD_HARVEST_WEBHOOK_BASE", "").strip()
+DISCORD_HARVEST_WEBHOOK_ARBITRUM = os.getenv("DISCORD_HARVEST_WEBHOOK_ARBITRUM", "").strip()
+DISCORD_HARVEST_WEBHOOK_OPTIMISM = os.getenv("DISCORD_HARVEST_WEBHOOK_OPTIMISM", "").strip()
+DISCORD_HARVEST_WEBHOOK_KATANA = os.getenv("DISCORD_HARVEST_WEBHOOK_KATANA", "").strip()
+DISCORD_HARVEST_WEBHOOK_SONIC = os.getenv("DISCORD_HARVEST_WEBHOOK_SONIC", "").strip()
+DISCORD_HARVEST_WEBHOOK_POLYGON = os.getenv("DISCORD_HARVEST_WEBHOOK_POLYGON", "").strip()
+DISCORD_STYFI_WEBHOOK_URL = os.getenv("DISCORD_STYFI_WEBHOOK_URL", "").strip()
+DISCORD_NOTIFICATION_RETRY_LIMIT = int(os.getenv("DISCORD_NOTIFICATION_RETRY_LIMIT", "5"))
+DISCORD_NOTIFICATION_RETRY_COOLDOWN_SEC = int(os.getenv("DISCORD_NOTIFICATION_RETRY_COOLDOWN_SEC", "120"))
 # Running jobs older than this are automatically marked stale failed.
 RUNNING_STALE_SECONDS = 1800
 SNAPSHOT_MIN_ACTIVE_RATIO = float(os.getenv("SNAPSHOT_MIN_ACTIVE_RATIO", "0.9"))
 SNAPSHOT_MIN_DROP_COUNT = int(os.getenv("SNAPSHOT_MIN_DROP_COUNT", "25"))
 LAST_CLEANUP_AT: datetime | None = None
+
+CHAIN_LABELS = {
+    1: "Ethereum",
+    10: "Optimism",
+    137: "Polygon",
+    146: "Sonic",
+    8453: "Base",
+    42161: "Arbitrum",
+    747474: "Katana",
+}
+EXPLORER_BASE_URLS = {
+    1: "https://etherscan.io",
+    10: "https://optimistic.etherscan.io",
+    137: "https://polygonscan.com",
+    146: "https://sonicscan.org",
+    8453: "https://basescan.org",
+    42161: "https://arbiscan.io",
+    747474: "https://katanascan.com",
+}
+HARVEST_DISCORD_DESTINATIONS = {
+    1: {
+        "destination_key": "harvest:ethereum",
+        "username": "Ethereum Harvest",
+        "avatar_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png",
+        "webhook_url": DISCORD_HARVEST_WEBHOOK_ETHEREUM,
+        "color": 0x627EEA,
+    },
+    10: {
+        "destination_key": "harvest:optimism",
+        "username": "Optimism Harvest",
+        "avatar_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/optimism/info/logo.png",
+        "webhook_url": DISCORD_HARVEST_WEBHOOK_OPTIMISM,
+        "color": 0xFF0420,
+    },
+    137: {
+        "destination_key": "harvest:polygon",
+        "username": "Polygon Harvest",
+        "avatar_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/info/logo.png",
+        "webhook_url": DISCORD_HARVEST_WEBHOOK_POLYGON,
+        "color": 0x8247E5,
+    },
+    146: {
+        "destination_key": "harvest:sonic",
+        "username": "Sonic Harvest",
+        "avatar_url": "https://www.soniclabs.com/apple-icon.png?0afb6d97a9fd9393",
+        "webhook_url": DISCORD_HARVEST_WEBHOOK_SONIC,
+        "color": 0x00E5FF,
+    },
+    8453: {
+        "destination_key": "harvest:base",
+        "username": "Base Harvest",
+        "avatar_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/info/logo.png",
+        "webhook_url": DISCORD_HARVEST_WEBHOOK_BASE,
+        "color": 0x0052FF,
+    },
+    42161: {
+        "destination_key": "harvest:arbitrum",
+        "username": "Arbitrum Harvest",
+        "avatar_url": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/info/logo.png",
+        "webhook_url": DISCORD_HARVEST_WEBHOOK_ARBITRUM,
+        "color": 0x28A0F0,
+    },
+    747474: {
+        "destination_key": "harvest:katana",
+        "username": "Katana Harvest",
+        "avatar_url": "https://katanascan.com/assets/katana/images/og-preview.jpg",
+        "webhook_url": DISCORD_HARVEST_WEBHOOK_KATANA,
+        "color": 0xE0B060,
+    },
+}
+STYFI_DISCORD_DESTINATION = {
+    "destination_key": "styfi",
+    "username": "stYFI",
+    "avatar_url": "https://images.weserv.nl/?url=raw.githubusercontent.com/yearn/governance-apps/1236da71420b931e0efe66bcf0438dd3cb4f99fb/public/stYFI-logo.svg&output=png",
+    "webhook_url": DISCORD_STYFI_WEBHOOK_URL,
+    "color": 0x0657E9,
+}
 ETH_CALL_TIMEOUT_SEC = 20
 ETH_RPC_MAX_ATTEMPTS = 3
 ETH_RPC_RETRY_SLEEP_SEC = 1.0
@@ -321,6 +410,23 @@ CREATE TABLE IF NOT EXISTS alert_state (
     last_notify_result JSONB
 );
 
+CREATE TABLE IF NOT EXISTS notification_deliveries (
+    source_type TEXT NOT NULL,
+    chain_id INTEGER NOT NULL,
+    tx_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    destination_key TEXT NOT NULL,
+    status TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_attempted_at TIMESTAMPTZ,
+    delivered_at TIMESTAMPTZ,
+    last_error TEXT,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    PRIMARY KEY (source_type, chain_id, tx_hash, log_index, destination_key)
+);
+CREATE INDEX IF NOT EXISTS idx_notification_deliveries_status
+    ON notification_deliveries(status, last_attempted_at DESC);
+
 CREATE TABLE IF NOT EXISTS styfi_snapshots (
     chain_id INTEGER NOT NULL,
     observed_at TIMESTAMPTZ NOT NULL,
@@ -531,6 +637,16 @@ def _validate_data_policy_config() -> None:
         raise ValueError(
             "Invalid harvest WSS subscription chunk: HARVEST_WSS_SUBSCRIPTION_CHUNK must be > 0 "
             f"(got {HARVEST_WSS_SUBSCRIPTION_CHUNK})"
+        )
+    if DISCORD_NOTIFICATION_RETRY_LIMIT <= 0:
+        raise ValueError(
+            "Invalid Discord retry config: DISCORD_NOTIFICATION_RETRY_LIMIT must be > 0 "
+            f"(got {DISCORD_NOTIFICATION_RETRY_LIMIT})"
+        )
+    if DISCORD_NOTIFICATION_RETRY_COOLDOWN_SEC <= 0:
+        raise ValueError(
+            "Invalid Discord retry config: DISCORD_NOTIFICATION_RETRY_COOLDOWN_SEC must be > 0 "
+            f"(got {DISCORD_NOTIFICATION_RETRY_COOLDOWN_SEC})"
         )
     if not 0 < SNAPSHOT_MIN_ACTIVE_RATIO <= 1:
         raise ValueError(
@@ -911,6 +1027,30 @@ def _eth_call_string(address: str, signature: str, *args: tuple[str, str] | tupl
         else:
             raise ValueError(f"Unsupported abi arg type: {arg_type}")
     return _eth_decode_string(_eth_call(address, signature, encoded))
+
+
+def _eth_call_string_for_chain(chain_id: int, address: str, signature: str) -> str:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    data = f"0x{_eth_selector(signature)}"
+    result = _eth_rpc_to_url(rpc_url, "eth_call", [{"to": address, "data": data}, "latest"])
+    if not isinstance(result, str) or not result.startswith("0x"):
+        raise ValueError(f"Unexpected eth_call result for {signature} on chain {chain_id}: {result!r}")
+    return _eth_decode_string(result)
+
+
+@lru_cache(maxsize=2048)
+def _strategy_display_label(chain_id: int, strategy_address: str) -> str:
+    normalized = strategy_address.lower()
+    for signature in ("symbol()", "name()"):
+        try:
+            label = _eth_call_string_for_chain(chain_id, normalized, signature).strip()
+        except Exception:
+            continue
+        if label:
+            return label
+    return _short_hex(normalized)
 
 
 def _hex_to_int(value: str | None) -> int | None:
@@ -1427,7 +1567,7 @@ def _refresh_vault_harvest_daily_chain_keys(
                     AND block_time < (%s::date + INTERVAL '1 day')
                 GROUP BY chain_id
                 """,
-                (day_utc, chain_id, chain_id, day_utc, day_utc),
+                (day_utc, chain_id, day_utc, day_utc),
             )
             inserted += cur.rowcount
     conn.commit()
@@ -1671,6 +1811,7 @@ class HarvestWssListener(threading.Thread):
                 conn,
                 day_keys={(block_time.date(), self.chain_id)},
             )
+            _notify_harvest_rows(conn, [row])
         seen_at = datetime.now(UTC)
         _upsert_harvest_sync_state(
             conn,
@@ -1726,6 +1867,7 @@ def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
                 now = datetime.now(UTC)
                 latest_block = _eth_block_number_for_chain(chain_id)
                 cursor, sync_payload, _ = _harvest_sync_state(conn, chain_id)
+                notifications_primed = bool(sync_payload.get("notifications_primed")) if isinstance(sync_payload, dict) else False
                 wss_url = _wss_url_for_chain(chain_id) if HARVEST_WSS_ENABLED else None
                 wss_healthy = bool(wss_url) and _harvest_wss_is_healthy(sync_payload, now)
                 should_reconcile = not bool(wss_url) or cursor is None or not wss_healthy or _harvest_wss_reconcile_due(sync_payload, now)
@@ -1759,6 +1901,7 @@ def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
                             "contracts": len(contracts),
                             "last_http_reconcile_at": now.isoformat(),
                             "wss_connected": wss_healthy,
+                            "notifications_primed": True if cursor is not None else notifications_primed,
                         },
                     )
                     continue
@@ -1808,6 +1951,8 @@ def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
                                     chain_first_seen = block_time
                                 rows.append(row)
                             chain_inserted += _upsert_vault_harvests(conn, rows)
+                            if cursor is not None and notifications_primed and rows:
+                                _notify_harvest_rows(conn, rows)
                     except Exception as window_exc:
                         if block_span <= 1:
                             raise
@@ -1840,6 +1985,7 @@ def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
                         "last_http_reconcile_at": datetime.now(UTC).isoformat(),
                         "last_http_mode": "backfill" if cursor is None else ("catchup" if not wss_healthy else "reconcile"),
                         "wss_connected": wss_healthy,
+                        "notifications_primed": True,
                         "last_http_error": None,
                     },
                 )
@@ -2581,6 +2727,10 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                                         }
                                     )
                                 chain_inserted += _upsert_product_interactions(conn, rows)
+                                if chain_id == STYFI_CHAIN_ID and cursor is not None and rows:
+                                    styfi_rows = [row for row in rows if str(row.get("product_type")) in {"styfi", "styfix"}]
+                                    if styfi_rows:
+                                        _notify_styfi_activity_rows(conn, styfi_rows)
                                 if topics_filter == [[EVENT_TOPIC_CLAIM]]:
                                     claim_rows = _product_activity_claim_rows(
                                         claim_logs=logs,
@@ -2589,6 +2739,8 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                                     )
                                     if claim_rows:
                                         chain_inserted += _upsert_product_interactions(conn, claim_rows)
+                                        if chain_id == STYFI_CHAIN_ID and cursor is not None:
+                                            _notify_styfi_activity_rows(conn, claim_rows)
                     except Exception as window_exc:
                         if block_span <= 1:
                             raise
@@ -3013,6 +3165,462 @@ def _complete_run(conn: psycopg.Connection, run_id: int, status: str, records: i
     conn.commit()
 
 
+def _chain_label(chain_id: int) -> str:
+    return CHAIN_LABELS.get(chain_id, str(chain_id))
+
+
+def _explorer_base_url(chain_id: int) -> str | None:
+    return EXPLORER_BASE_URLS.get(chain_id)
+
+
+def _explorer_tx_url(chain_id: int, tx_hash: str) -> str | None:
+    base = _explorer_base_url(chain_id)
+    if not base:
+        return None
+    return f"{base}/tx/{tx_hash}"
+
+
+def _explorer_address_url(chain_id: int, address: str) -> str | None:
+    base = _explorer_base_url(chain_id)
+    if not base:
+        return None
+    return f"{base}/address/{address}"
+
+
+def _yearn_vault_url(chain_id: int, vault_address: str) -> str:
+    return f"https://yearn.fi/vaults/{chain_id}/{vault_address}"
+
+
+def _short_hex(value: str, *, left: int = 6, right: int = 4) -> str:
+    if len(value) <= left + right + 2:
+        return value
+    return f"{value[: left + 2]}…{value[-right:]}"
+
+
+def _discord_timestamp(dt: datetime) -> str:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    ts = int(dt.timestamp())
+    return f"<t:{ts}:f> (<t:{ts}:R>)"
+
+
+def _format_amount(raw_value: object, decimals: int | None, symbol: str | None) -> str:
+    if raw_value is None:
+        return "n/a"
+    digits = str(raw_value).strip()
+    if not digits:
+        return "n/a"
+    normalized = digits.lstrip("0") or "0"
+    scale = max(0, decimals or 0)
+    padded = normalized.rjust(scale + 1, "0")
+    whole = padded[:-scale] if scale > 0 else padded
+    fraction = padded[-scale:] if scale > 0 else ""
+    whole_with_commas = f"{int(whole):,}"
+    if not fraction:
+        return f"{whole_with_commas} {symbol}".strip()
+    trimmed_fraction = fraction.rstrip("0")
+    if not trimmed_fraction:
+        return f"{whole_with_commas} {symbol}".strip()
+    visible_fraction = trimmed_fraction[:6]
+    suffix = "…" if len(trimmed_fraction) > 6 else ""
+    return f"{whole_with_commas}.{visible_fraction}{suffix} {symbol}".strip()
+
+
+def _harvest_destination(chain_id: int) -> dict[str, object] | None:
+    destination = HARVEST_DISCORD_DESTINATIONS.get(chain_id)
+    if not destination or not destination.get("webhook_url"):
+        return None
+    return destination
+
+
+def _notification_webhook_url(destination_key: str) -> str | None:
+    if destination_key == STYFI_DISCORD_DESTINATION["destination_key"]:
+        webhook_url = STYFI_DISCORD_DESTINATION.get("webhook_url")
+        return str(webhook_url) if webhook_url else None
+    for destination in HARVEST_DISCORD_DESTINATIONS.values():
+        if destination["destination_key"] == destination_key:
+            webhook_url = destination.get("webhook_url")
+            return str(webhook_url) if webhook_url else None
+    return None
+
+
+def _get_notification_delivery(
+    conn: psycopg.Connection,
+    *,
+    source_type: str,
+    chain_id: int,
+    tx_hash: str,
+    log_index: int,
+    destination_key: str,
+) -> dict[str, object] | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT status, attempts, payload
+            FROM notification_deliveries
+            WHERE
+                source_type = %s
+                AND chain_id = %s
+                AND tx_hash = %s
+                AND log_index = %s
+                AND destination_key = %s
+            """,
+            (source_type, chain_id, tx_hash, log_index, destination_key),
+        )
+        row = cur.fetchone()
+    conn.commit()
+    if not row:
+        return None
+    return {"status": row[0], "attempts": int(row[1] or 0), "payload": row[2]}
+
+
+def _upsert_notification_delivery(
+    conn: psycopg.Connection,
+    *,
+    source_type: str,
+    chain_id: int,
+    tx_hash: str,
+    log_index: int,
+    destination_key: str,
+    status: str,
+    payload: dict[str, object],
+    error: str | None,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO notification_deliveries (
+                source_type,
+                chain_id,
+                tx_hash,
+                log_index,
+                destination_key,
+                status,
+                attempts,
+                last_attempted_at,
+                delivered_at,
+                last_error,
+                payload
+            ) VALUES (
+                %(source_type)s,
+                %(chain_id)s,
+                %(tx_hash)s,
+                %(log_index)s,
+                %(destination_key)s,
+                %(status)s,
+                1,
+                NOW(),
+                CASE WHEN %(status)s = 'sent' THEN NOW() ELSE NULL END,
+                %(error)s,
+                %(payload)s
+            )
+            ON CONFLICT (source_type, chain_id, tx_hash, log_index, destination_key) DO UPDATE SET
+                status = EXCLUDED.status,
+                attempts = notification_deliveries.attempts + 1,
+                last_attempted_at = NOW(),
+                delivered_at = CASE
+                    WHEN EXCLUDED.status = 'sent' THEN NOW()
+                    ELSE notification_deliveries.delivered_at
+                END,
+                last_error = EXCLUDED.last_error,
+                payload = EXCLUDED.payload
+            """,
+            {
+                "source_type": source_type,
+                "chain_id": chain_id,
+                "tx_hash": tx_hash,
+                "log_index": log_index,
+                "destination_key": destination_key,
+                "status": status,
+                "error": error,
+                "payload": Json(payload),
+            },
+        )
+    conn.commit()
+
+
+def _send_discord_payload(webhook_url: str, payload: dict[str, object]) -> None:
+    response = requests.post(webhook_url, json=payload, timeout=10)
+    response.raise_for_status()
+
+
+def _deliver_discord_notification(
+    conn: psycopg.Connection,
+    *,
+    source_type: str,
+    chain_id: int,
+    tx_hash: str,
+    log_index: int,
+    destination_key: str,
+    payload: dict[str, object],
+) -> bool:
+    existing = _get_notification_delivery(
+        conn,
+        source_type=source_type,
+        chain_id=chain_id,
+        tx_hash=tx_hash,
+        log_index=log_index,
+        destination_key=destination_key,
+    )
+    if existing and existing.get("status") == "sent":
+        return False
+    webhook_url = _notification_webhook_url(destination_key)
+    if not webhook_url:
+        return False
+    try:
+        _send_discord_payload(webhook_url, payload)
+        _upsert_notification_delivery(
+            conn,
+            source_type=source_type,
+            chain_id=chain_id,
+            tx_hash=tx_hash,
+            log_index=log_index,
+            destination_key=destination_key,
+            status="sent",
+            payload=payload,
+            error=None,
+        )
+        return True
+    except Exception as exc:
+        _upsert_notification_delivery(
+            conn,
+            source_type=source_type,
+            chain_id=chain_id,
+            tx_hash=tx_hash,
+            log_index=log_index,
+            destination_key=destination_key,
+            status="failed",
+            payload=payload,
+            error=str(exc),
+        )
+        logging.warning(
+            "Discord delivery failed: source=%s chain=%s tx=%s log_index=%s destination=%s error=%s",
+            source_type,
+            chain_id,
+            tx_hash,
+            log_index,
+            destination_key,
+            exc,
+        )
+        return False
+
+
+def _harvest_vault_meta(conn: psycopg.Connection, *, chain_id: int, vault_address: str) -> dict[str, object]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT name, symbol, token_symbol, token_decimals
+            FROM vault_dim
+            WHERE chain_id = %s AND vault_address = %s
+            """,
+            (chain_id, vault_address),
+        )
+        row = cur.fetchone()
+    conn.commit()
+    if not row:
+        return {"name": None, "symbol": None, "token_symbol": None, "token_decimals": None}
+    return {
+        "name": row[0],
+        "symbol": row[1],
+        "token_symbol": row[2],
+        "token_decimals": _to_int_or_none(row[3]),
+    }
+
+
+def _build_harvest_discord_payload(
+    conn: psycopg.Connection,
+    *,
+    row: dict[str, object],
+) -> tuple[str, dict[str, object]] | None:
+    chain_id = int(row["chain_id"])
+    destination = _harvest_destination(chain_id)
+    if not destination:
+        return None
+    vault_address = str(row["vault_address"]).lower()
+    strategy_address = str(row["strategy_address"]).lower()
+    tx_hash = str(row["tx_hash"]).lower()
+    block_time = row["block_time"]
+    if not isinstance(block_time, datetime):
+        return None
+    meta = _harvest_vault_meta(conn, chain_id=chain_id, vault_address=vault_address)
+    vault_symbol = str(meta.get("symbol") or _short_hex(vault_address))
+    token_symbol = str(meta.get("token_symbol") or "")
+    token_decimals = _to_int_or_none(meta.get("token_decimals"))
+    gain_text = _format_amount(row.get("gain"), token_decimals, token_symbol)
+    fee_text = _format_amount(row.get("fee_assets"), token_decimals, token_symbol)
+    tx_url = _explorer_tx_url(chain_id, tx_hash)
+    vault_address_url = _explorer_address_url(chain_id, vault_address)
+    strategy_url = _explorer_address_url(chain_id, strategy_address)
+    vault_url = _yearn_vault_url(chain_id, vault_address)
+    strategy_label = _strategy_display_label(chain_id, strategy_address)
+    details_lines = [
+        f"🏦 [{vault_symbol}]({vault_url}) ({f'[{_short_hex(vault_address)}]({vault_address_url})' if vault_address_url else _short_hex(vault_address)})",
+        f"🧠 {strategy_label} ({f'[{_short_hex(strategy_address)}]({strategy_url})' if strategy_url else _short_hex(strategy_address)})",
+        f"📅 {_discord_timestamp(block_time)}",
+        f"💰 Gain: {gain_text}",
+        f"💸 Fees: {fee_text}",
+    ]
+    embed = {
+        "title": f"{_chain_label(chain_id)} Harvest",
+        "color": int(destination["color"]),
+        "fields": [
+            {"name": "\u200b", "value": "\n".join(details_lines), "inline": False},
+            {"name": "\u200b", "value": f"🔗 [View on Explorer]({tx_url})" if tx_url else "Explorer unavailable", "inline": False},
+        ],
+    }
+    payload = {
+        "username": destination["username"],
+        "embeds": [embed],
+    }
+    avatar_url = str(destination.get("avatar_url") or "").strip()
+    if avatar_url:
+        payload["avatar_url"] = avatar_url
+    return str(destination["destination_key"]), payload
+
+
+def _product_label(product_type: str) -> str:
+    return STYFI_PRODUCT_SYMBOLS.get(product_type, product_type)
+
+
+def _action_label(event_kind: str) -> str:
+    return {
+        "deposit": "Stake",
+        "unstake": "Unstake",
+        "withdraw": "Withdraw",
+        "claim": "Claim",
+    }.get(event_kind, event_kind.title())
+
+
+def _styfi_action_color(event_kind: str) -> int:
+    return {
+        "claim": 0x0657E9,
+        "withdraw": 0x5A544E,
+        "unstake": 0x9A5B23,
+        "deposit": 0x0657E9,
+    }.get(event_kind, int(STYFI_DISCORD_DESTINATION["color"]))
+
+
+def _build_styfi_discord_payload(row: dict[str, object]) -> tuple[str, dict[str, object]] | None:
+    webhook_url = STYFI_DISCORD_DESTINATION.get("webhook_url")
+    if not webhook_url:
+        return None
+    chain_id = int(row["chain_id"])
+    tx_hash = str(row["tx_hash"]).lower()
+    account = str(row["user_account"]).lower()
+    event_kind = str(row["event_kind"])
+    product_type = str(row["product_type"])
+    block_time = row["block_time"]
+    if not isinstance(block_time, datetime):
+        return None
+    tx_url = _explorer_tx_url(chain_id, tx_hash)
+    account_url = _explorer_address_url(chain_id, account)
+    amount_text = _format_amount(row.get("amount_raw"), _to_int_or_none(row.get("amount_decimals")), row.get("amount_symbol"))
+    details_lines = [
+        f"👤 {f'[{_short_hex(account)}]({account_url})' if account_url else _short_hex(account)}",
+        f"📅 {_discord_timestamp(block_time)}",
+        f"💰 {amount_text}",
+    ]
+    embed = {
+        "title": f"{_product_label(product_type)} {_action_label(event_kind)}",
+        "color": _styfi_action_color(event_kind),
+        "fields": [
+            {"name": "\u200b", "value": "\n".join(details_lines), "inline": False},
+            {"name": "\u200b", "value": f"🔗 [View on Explorer]({tx_url})" if tx_url else "Explorer unavailable", "inline": False},
+        ],
+    }
+    payload = {
+        "username": STYFI_DISCORD_DESTINATION["username"],
+        "embeds": [embed],
+    }
+    avatar_url = str(STYFI_DISCORD_DESTINATION.get("avatar_url") or "").strip()
+    if avatar_url:
+        payload["avatar_url"] = avatar_url
+    return str(STYFI_DISCORD_DESTINATION["destination_key"]), payload
+
+
+def _notify_harvest_rows(conn: psycopg.Connection, rows: list[dict[str, object]]) -> int:
+    delivered = 0
+    for row in rows:
+        built = _build_harvest_discord_payload(conn, row=row)
+        if not built:
+            continue
+        destination_key, payload = built
+        if _deliver_discord_notification(
+            conn,
+            source_type="vault_harvest",
+            chain_id=int(row["chain_id"]),
+            tx_hash=str(row["tx_hash"]).lower(),
+            log_index=int(row["log_index"]),
+            destination_key=destination_key,
+            payload=payload,
+        ):
+            delivered += 1
+    return delivered
+
+
+def _notify_styfi_activity_rows(conn: psycopg.Connection, rows: list[dict[str, object]]) -> int:
+    delivered = 0
+    for row in rows:
+        built = _build_styfi_discord_payload(row)
+        if not built:
+            continue
+        destination_key, payload = built
+        if _deliver_discord_notification(
+            conn,
+            source_type="styfi_activity",
+            chain_id=int(row["chain_id"]),
+            tx_hash=str(row["tx_hash"]).lower(),
+            log_index=int(row["log_index"]),
+            destination_key=destination_key,
+            payload=payload,
+        ):
+            delivered += 1
+    return delivered
+
+
+def _retry_failed_discord_notifications(conn: psycopg.Connection, *, limit: int = 50) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT source_type, chain_id, tx_hash, log_index, destination_key, payload
+            FROM notification_deliveries
+            WHERE
+                status = 'failed'
+                AND attempts < %(retry_limit)s
+                AND (
+                    last_attempted_at IS NULL
+                    OR last_attempted_at <= NOW() - (%(cooldown)s * INTERVAL '1 second')
+                )
+            ORDER BY last_attempted_at NULLS FIRST
+            LIMIT %(limit)s
+            """,
+            {
+                "retry_limit": DISCORD_NOTIFICATION_RETRY_LIMIT,
+                "cooldown": DISCORD_NOTIFICATION_RETRY_COOLDOWN_SEC,
+                "limit": limit,
+            },
+        )
+        rows = cur.fetchall()
+    conn.commit()
+    delivered = 0
+    for source_type, chain_id, tx_hash, log_index, destination_key, payload in rows:
+        if not isinstance(payload, dict):
+            continue
+        if _deliver_discord_notification(
+            conn,
+            source_type=str(source_type),
+            chain_id=int(chain_id),
+            tx_hash=str(tx_hash),
+            log_index=int(log_index),
+            destination_key=str(destination_key),
+            payload=payload,
+        ):
+            delivered += 1
+    if delivered > 0:
+        logging.info("Retried Discord notifications delivered=%s", delivered)
+    return delivered
+
+
 def _send_telegram(message: str) -> bool:
     if not ALERT_TELEGRAM_BOT_TOKEN or not ALERT_TELEGRAM_CHAT_ID:
         return False
@@ -3028,8 +3636,7 @@ def _send_telegram(message: str) -> bool:
 def _send_discord(message: str) -> bool:
     if not ALERT_DISCORD_WEBHOOK_URL:
         return False
-    response = requests.post(ALERT_DISCORD_WEBHOOK_URL, json={"content": message}, timeout=10)
-    response.raise_for_status()
+    _send_discord_payload(ALERT_DISCORD_WEBHOOK_URL, {"content": message})
     return True
 
 
@@ -3784,6 +4391,7 @@ def run_once() -> None:
         if HARVEST_WSS_MANAGER is not None:
             HARVEST_WSS_MANAGER.refresh(_select_harvest_contracts(conn))
         _run_vault_harvests(conn)
+        _retry_failed_discord_notifications(conn)
         _evaluate_alerts(conn)
         _maybe_cleanup_old_data(conn)
 
