@@ -23,7 +23,7 @@ export type DauResponse = {
   }> | null;
 };
 
-async function fetchDauData(days: number = 30): Promise<DauResponse | null> {
+export async function fetchDauData(days: number = 30): Promise<DauResponse | null> {
   const res = await fetch(apiUrl("/dau", { days }), { cache: "no-store" });
   if (!res.ok) return null;
   return (await res.json()) as DauResponse;

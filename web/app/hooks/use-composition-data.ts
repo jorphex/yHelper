@@ -52,7 +52,7 @@ interface UseCompositionDataParams {
   minTvl: number;
 }
 
-async function fetchCompositionData(params: UseCompositionDataParams): Promise<CompositionResponse> {
+export async function fetchCompositionData(params: UseCompositionDataParams): Promise<CompositionResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
@@ -68,6 +68,6 @@ export function useCompositionData(params: UseCompositionDataParams) {
     queryKey: ["composition", params],
     queryFn: () => fetchCompositionData(params),
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }

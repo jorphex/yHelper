@@ -76,41 +76,54 @@ interface UseRegimesDataParams {
   universe: UniverseKind;
   minTvl: number;
   minPoints: number;
+  limit?: number;
+  chainId?: number | null;
+  days?: number;
+  groupBy?: "none" | "chain" | "category";
+  groupLimit?: number;
+  enabled?: boolean;
 }
 
-async function fetchRegimesData(params: UseRegimesDataParams): Promise<RegimeResponse> {
+export async function fetchRegimesData(params: UseRegimesDataParams): Promise<RegimeResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
     min_points: String(params.minPoints),
   });
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  if ((params.chainId ?? 0) > 0) searchParams.set("chain_id", String(params.chainId));
 
   const res = await fetch(apiUrl("/regimes", searchParams), { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json() as Promise<RegimeResponse>;
 }
 
-async function fetchTransitionsData(params: UseRegimesDataParams): Promise<TransitionResponse> {
+export async function fetchTransitionsData(params: UseRegimesDataParams): Promise<TransitionResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
     min_points: String(params.minPoints),
   });
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  if ((params.chainId ?? 0) > 0) searchParams.set("chain_id", String(params.chainId));
 
-  const res = await fetch(apiUrl("/transitions", searchParams), { cache: "no-store" });
+  const res = await fetch(apiUrl("/regimes/transitions", searchParams), { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json() as Promise<TransitionResponse>;
 }
 
-async function fetchTransitionsDailyData(params: UseRegimesDataParams): Promise<TransitionDailyResponse> {
+export async function fetchTransitionsDailyData(params: UseRegimesDataParams): Promise<TransitionDailyResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
     min_points: String(params.minPoints),
-    days: "90",
+    days: String(params.days ?? 90),
   });
+  if (params.groupBy) searchParams.set("group_by", params.groupBy);
+  if (params.groupLimit) searchParams.set("group_limit", String(params.groupLimit));
+  if ((params.chainId ?? 0) > 0) searchParams.set("chain_id", String(params.chainId));
 
-  const res = await fetch(apiUrl("/transitions/daily", searchParams), { cache: "no-store" });
+  const res = await fetch(apiUrl("/regimes/transitions/daily", searchParams), { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json() as Promise<TransitionDailyResponse>;
 }
@@ -119,8 +132,9 @@ export function useRegimesData(params: UseRegimesDataParams) {
   return useQuery({
     queryKey: ["regimes", params],
     queryFn: () => fetchRegimesData(params),
+    enabled: params.enabled ?? true,
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }
 
@@ -128,8 +142,9 @@ export function useTransitionsData(params: UseRegimesDataParams) {
   return useQuery({
     queryKey: ["transitions", params],
     queryFn: () => fetchTransitionsData(params),
+    enabled: params.enabled ?? true,
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }
 
@@ -137,7 +152,8 @@ export function useTransitionsDailyData(params: UseRegimesDataParams) {
   return useQuery({
     queryKey: ["transitions-daily", params],
     queryFn: () => fetchTransitionsDailyData(params),
+    enabled: params.enabled ?? true,
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }

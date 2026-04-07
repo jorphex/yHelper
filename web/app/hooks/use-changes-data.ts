@@ -87,6 +87,32 @@ type ChangesResponse = {
   stale?: ChangeRow[];
 };
 
+type TrendDailyRow = {
+  day: string;
+  weighted_apy_7d?: number | null;
+  weighted_apy_30d?: number | null;
+  weighted_momentum_7d_30d?: number | null;
+  riser_ratio?: number | null;
+  faller_ratio?: number | null;
+  bucket_high_ratio?: number | null;
+};
+
+type GroupedTrendRow = {
+  day: string;
+  group_key: string;
+  total_tvl_usd?: number | null;
+  weighted_apy_30d?: number | null;
+  weighted_momentum_7d_30d?: number | null;
+};
+
+export type TrendDailyResponse = {
+  rows?: TrendDailyRow[];
+  grouped?: {
+    latest?: GroupedTrendRow[];
+    series?: Record<string, GroupedTrendRow[]>;
+  };
+};
+
 interface UseChangesDataParams {
   universe: UniverseKind;
   minTvl: number;
@@ -95,7 +121,17 @@ interface UseChangesDataParams {
   staleThreshold: StaleThresholdKey;
 }
 
-async function fetchChangesData(params: UseChangesDataParams): Promise<ChangesResponse> {
+interface UseTrendDailyParams {
+  universe: UniverseKind;
+  minTvl: number;
+  minPoints: number;
+  days: number;
+  groupBy?: "chain" | "category" | null;
+  groupLimit?: number;
+  enabled?: boolean;
+}
+
+export async function fetchChangesData(params: UseChangesDataParams): Promise<ChangesResponse> {
   const searchParams = new URLSearchParams({
     window: params.window,
     stale_threshold: params.staleThreshold,
@@ -110,11 +146,36 @@ async function fetchChangesData(params: UseChangesDataParams): Promise<ChangesRe
   return res.json() as Promise<ChangesResponse>;
 }
 
+export async function fetchTrendDailyData(params: UseTrendDailyParams): Promise<TrendDailyResponse> {
+  const searchParams = new URLSearchParams({
+    universe: params.universe,
+    min_tvl_usd: String(params.minTvl),
+    min_points: String(params.minPoints),
+    days: String(params.days),
+  });
+  if (params.groupBy) searchParams.set("group_by", params.groupBy);
+  if (params.groupLimit) searchParams.set("group_limit", String(params.groupLimit));
+
+  const res = await fetch(apiUrl("/trends/daily", searchParams), { cache: "no-store" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json() as Promise<TrendDailyResponse>;
+}
+
 export function useChangesData(params: UseChangesDataParams) {
   return useQuery({
     queryKey: ["changes", params],
     queryFn: () => fetchChangesData(params),
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+  });
+}
+
+export function useTrendDailyData(params: UseTrendDailyParams) {
+  return useQuery({
+    queryKey: ["trend-daily", params],
+    queryFn: () => fetchTrendDailyData(params),
+    enabled: params.enabled ?? true,
+    staleTime: 30_000,
+    gcTime: 30 * 60_000,
   });
 }

@@ -75,7 +75,7 @@ interface UseDiscoverDataParams {
   token?: string | null;
 }
 
-async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<DiscoverResponse> {
+export async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<DiscoverResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
@@ -98,6 +98,6 @@ export function useDiscoverData(params: UseDiscoverDataParams) {
     queryKey: ["discover", params],
     queryFn: () => fetchDiscoverData(params),
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }

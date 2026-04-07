@@ -84,7 +84,7 @@ type HomeData = {
   socialPreview: SocialPreviewResponse | null;
 };
 
-async function fetchHomeData(): Promise<HomeData> {
+export async function fetchHomeData(): Promise<HomeData> {
   const [overviewRes, changesRes, styfiRes, socialRes] = await Promise.allSettled([
     fetch(apiUrl("/overview"), { cache: "no-store" }),
     fetch(apiUrl("/changes", { window: "24h", universe: "core", limit: 1 }), { cache: "no-store" }),

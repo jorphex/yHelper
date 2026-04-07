@@ -35,7 +35,7 @@ interface UseChainsDataParams {
   minTvl: number;
 }
 
-async function fetchChainsData(params: UseChainsDataParams): Promise<ChainsResponse> {
+export async function fetchChainsData(params: UseChainsDataParams): Promise<ChainsResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
@@ -51,6 +51,6 @@ export function useChainsData(params: UseChainsDataParams) {
     queryKey: ["chains", params],
     queryFn: () => fetchChainsData(params),
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }

@@ -104,7 +104,7 @@ interface UseStYfiDataParams {
   epochLimit?: number;
 }
 
-async function fetchStYfiData(params: UseStYfiDataParams): Promise<StYfiResponse> {
+export async function fetchStYfiData(params: UseStYfiDataParams): Promise<StYfiResponse> {
   const searchParams = new URLSearchParams();
   if (params.days) searchParams.set("days", String(params.days));
   if (params.epochLimit) searchParams.set("epoch_limit", String(params.epochLimit));
@@ -119,6 +119,6 @@ export function useStYfiData(params: UseStYfiDataParams = {}) {
     queryKey: ["styfi", params],
     queryFn: () => fetchStYfiData(params),
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }

@@ -92,7 +92,7 @@ interface UseAssetsDataParams {
   apiDir: string;
 }
 
-async function fetchAssetsData(params: UseAssetsDataParams): Promise<AssetsResponse> {
+export async function fetchAssetsData(params: UseAssetsDataParams): Promise<AssetsResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
@@ -108,7 +108,7 @@ async function fetchAssetsData(params: UseAssetsDataParams): Promise<AssetsRespo
   return res.json() as Promise<AssetsResponse>;
 }
 
-async function fetchAssetVenues(
+export async function fetchAssetVenues(
   token: string,
   params: { universe: UniverseKind; minTvl: number; minPoints: number }
 ): Promise<AssetVenuesResponse> {
@@ -130,7 +130,7 @@ export function useAssetsData(params: UseAssetsDataParams) {
     queryKey: ["assets", params],
     queryFn: () => fetchAssetsData(params),
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }
 
@@ -143,6 +143,6 @@ export function useAssetVenues(token: string | null, params: { universe: Univers
     },
     enabled: !!token,
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }

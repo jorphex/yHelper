@@ -3,9 +3,9 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { apiUrl } from "../lib/api";
 import { chainLabel, compactChainLabel, formatHours, formatPct, formatUsd, regimeLabel, yearnVaultUrl } from "../lib/format";
-import { useChangesData } from "../hooks/use-changes-data";
+import { useChangesData, useTrendDailyData } from "../hooks/use-changes-data";
+import { useRegimesData, useTransitionsData, useTransitionsDailyData } from "../hooks/use-regimes-data";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
 import { BarList, HeatGrid, ScatterPlot, ShareMeter, TrendStrips, useInViewOnce } from "../components/visuals";
@@ -388,23 +388,10 @@ function MomentumPageContent() {
   const [activeTab, setActiveTab] = useState<TabKey>("changes");
 
   // Trend analysis state
-  const [trends, setTrends] = useState<DailyTrendRow[]>([]);
-  const [chainTrendLatest, setChainTrendLatest] = useState<GroupedTrendRow[]>([]);
-  const [categoryTrendLatest, setCategoryTrendLatest] = useState<GroupedTrendRow[]>([]);
-  const [chainTrendSeries, setChainTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
-  const [categoryTrendSeries, setCategoryTrendSeries] = useState<Record<string, GroupedTrendRow[]>>({});
-  const [trendError, setTrendError] = useState<string | null>(null);
   const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [staleSort, setStaleSort] = useState<SortState<StaleSortKey>>({ key: "ratio", direction: "desc" });
   const [staleCatSort, setStaleCatSort] = useState<SortState<StaleCatSortKey>>({ key: "ratio", direction: "desc" });
 
-  // Regime state
-  const [regimeData, setRegimeData] = useState<RegimeResponse | null>(null);
-  const [transitionData, setTransitionData] = useState<TransitionResponse | null>(null);
-  const [transitionDaily, setTransitionDaily] = useState<TransitionDailyRow[]>([]);
-  const [transitionDailyGrouped, setTransitionDailyGrouped] = useState<TransitionDailyResponse["grouped"] | null>(null);
-  const [regimeError, setRegimeError] = useState<string | null>(null);
-  const [regimeLoading, setRegimeLoading] = useState(false);
   const [summarySort, setSummarySort] = useState<SortState<RegimeSummarySortKey>>({ key: "vaults", direction: "desc" });
   const [regimeMoverSort, setRegimeMoverSort] = useState<SortState<RegimeMoverSortKey>>({ key: "momentum", direction: "desc" });
   const [splitSnapshotSort, setSplitSnapshotSort] = useState<SortState<SplitSnapshotSortKey>>({ key: "churn", direction: "desc" });
@@ -452,117 +439,62 @@ function MomentumPageContent() {
     staleThreshold: "auto",
   });
 
-  // Trend data fetching
-  useEffect(() => {
-    if (activeTab !== "changes") return;
-    let active = true;
-    const load = async () => {
-      try {
-        const baseParams = new URLSearchParams({
-          universe: query.universe,
-          min_tvl_usd: String(query.minTvl),
-          min_points: String(query.minPoints),
-        });
-        const globalParams = new URLSearchParams(baseParams);
-        globalParams.set("days", "90");
-        const chainParams = new URLSearchParams(baseParams);
-        chainParams.set("days", "90");
-        chainParams.set("group_by", "chain");
-        chainParams.set("group_limit", "10");
-        const categoryParams = new URLSearchParams(baseParams);
-        categoryParams.set("days", "90");
-        categoryParams.set("group_by", "category");
-        categoryParams.set("group_limit", "10");
+  const { data: trendGlobalData, error: trendGlobalError } = useTrendDailyData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: query.minPoints,
+    days: 90,
+    enabled: activeTab === "changes",
+  });
+  const { data: trendChainData, error: trendChainError } = useTrendDailyData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: query.minPoints,
+    days: 90,
+    groupBy: "chain",
+    groupLimit: 10,
+    enabled: activeTab === "changes",
+  });
+  const { data: trendCategoryData, error: trendCategoryError } = useTrendDailyData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: query.minPoints,
+    days: 90,
+    groupBy: "category",
+    groupLimit: 10,
+    enabled: activeTab === "changes",
+  });
 
-        const requests = [
-          fetch(apiUrl("/trends/daily", globalParams), { cache: "no-store" }),
-          fetch(apiUrl("/trends/daily", chainParams), { cache: "no-store" }),
-          fetch(apiUrl("/trends/daily", categoryParams), { cache: "no-store" }),
-        ];
-
-        const responses = await Promise.all(requests);
-        if (!active) return;
-
-        const [globalRes, chainRes, categoryRes] = responses;
-        if (!globalRes.ok || !chainRes.ok || !categoryRes.ok) {
-          setTrendError("Trends API error");
-          return;
-        }
-
-        const [globalPayload, chainPayload, categoryPayload] = await Promise.all([
-          globalRes.json(),
-          chainRes.json(),
-          categoryRes.json(),
-        ]);
-
-        if (!active) return;
-        setTrends(globalPayload.rows || []);
-        setChainTrendLatest(chainPayload.grouped?.latest?.filter((r: GroupedTrendRow) => r.group_key && r.group_key !== "unknown") || []);
-        setCategoryTrendLatest(categoryPayload.grouped?.latest?.filter((r: GroupedTrendRow) => r.group_key && r.group_key !== "unknown") || []);
-        setChainTrendSeries(chainPayload.grouped?.series || {});
-        setCategoryTrendSeries(categoryPayload.grouped?.series || {});
-        setTrendError(null);
-      } catch (err) {
-        if (active) setTrendError(`Trends load failed: ${String(err)}`);
-      }
-    };
-    void load();
-    return () => { active = false; };
-  }, [activeTab, query.universe, query.minTvl, query.minPoints]);
-
-  // Regime data fetching
-  useEffect(() => {
-    if (activeTab !== "regimes") return;
-    let active = true;
-    const run = async () => {
-      setRegimeLoading(true);
-      try {
-        const params = new URLSearchParams({
-          universe: query.universe,
-          limit: String(query.limit),
-          min_tvl_usd: String(query.minTvl),
-          min_points: String(query.minPoints),
-        });
-        if (query.chain > 0) params.set("chain_id", String(query.chain));
-        const transitionsParams = new URLSearchParams(params);
-        transitionsParams.set("limit", String(Math.min(query.limit, 30)));
-        const dailyParams = new URLSearchParams(params);
-        dailyParams.set("days", query.transitionDays);
-        dailyParams.set("group_by", query.transitionSplit);
-        dailyParams.set("group_limit", "8");
-        const [regimesRes, transitionsRes, transitionsDailyRes] = await Promise.all([
-          fetch(apiUrl("/regimes", params), { cache: "no-store" }),
-          fetch(apiUrl("/regimes/transitions", transitionsParams), { cache: "no-store" }),
-          fetch(apiUrl("/regimes/transitions/daily", dailyParams), { cache: "no-store" }),
-        ]);
-        if (!regimesRes.ok || !transitionsRes.ok || !transitionsDailyRes.ok) {
-          const status = !regimesRes.ok ? regimesRes.status : !transitionsRes.ok ? transitionsRes.status : transitionsDailyRes.status;
-          if (active) setRegimeError(`API error: ${status}`);
-          return;
-        }
-        const [payload, transitionsPayload, transitionsDailyPayload] = (await Promise.all([
-          regimesRes.json(),
-          transitionsRes.json(),
-          transitionsDailyRes.json(),
-        ])) as [RegimeResponse, TransitionResponse, TransitionDailyResponse];
-        if (active) {
-          setRegimeData(payload);
-          setTransitionData(transitionsPayload);
-          setTransitionDaily(Array.isArray(transitionsDailyPayload.rows) ? transitionsDailyPayload.rows : []);
-          setTransitionDailyGrouped(transitionsDailyPayload.grouped ?? null);
-          setRegimeError(null);
-        }
-      } catch (err) {
-        if (active) setRegimeError(`Load failed: ${String(err)}`);
-      } finally {
-        if (active) setRegimeLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      active = false;
-    };
-  }, [activeTab, query.universe, query.chain, query.minTvl, query.minPoints, query.limit, query.transitionSplit, query.transitionDays]);
+  const {
+    data: regimeData,
+    error: regimeDataError,
+    isLoading: regimeLoading,
+  } = useRegimesData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: query.minPoints,
+    limit: query.limit,
+    chainId: query.chain > 0 ? query.chain : null,
+    enabled: activeTab === "regimes",
+  });
+  const { data: transitionData, error: transitionError } = useTransitionsData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: query.minPoints,
+    limit: Math.min(query.limit, 30),
+    chainId: query.chain > 0 ? query.chain : null,
+    enabled: activeTab === "regimes",
+  });
+  const { data: transitionsDailyData, error: transitionsDailyError } = useTransitionsDailyData({
+    universe: query.universe,
+    minTvl: query.minTvl,
+    minPoints: query.minPoints,
+    chainId: query.chain > 0 ? query.chain : null,
+    days: Number(query.transitionDays),
+    groupBy: query.transitionSplit,
+    groupLimit: 8,
+    enabled: activeTab === "regimes",
+  });
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");
@@ -571,6 +503,35 @@ function MomentumPageContent() {
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, []);
+
+  const trends = useMemo<DailyTrendRow[]>(() => trendGlobalData?.rows ?? [], [trendGlobalData?.rows]);
+  const chainTrendLatest = useMemo<GroupedTrendRow[]>(
+    () => (trendChainData?.grouped?.latest ?? []).filter((row) => row.group_key && row.group_key !== "unknown"),
+    [trendChainData?.grouped?.latest],
+  );
+  const categoryTrendLatest = useMemo<GroupedTrendRow[]>(
+    () => (trendCategoryData?.grouped?.latest ?? []).filter((row) => row.group_key && row.group_key !== "unknown"),
+    [trendCategoryData?.grouped?.latest],
+  );
+  const chainTrendSeries = useMemo<Record<string, GroupedTrendRow[]>>(
+    () => trendChainData?.grouped?.series ?? {},
+    [trendChainData?.grouped?.series],
+  );
+  const categoryTrendSeries = useMemo<Record<string, GroupedTrendRow[]>>(
+    () => trendCategoryData?.grouped?.series ?? {},
+    [trendCategoryData?.grouped?.series],
+  );
+  const trendError = trendGlobalError || trendChainError || trendCategoryError
+    ? "Trend data is temporarily unavailable."
+    : null;
+  const transitionDaily = useMemo<TransitionDailyRow[]>(
+    () => Array.isArray(transitionsDailyData?.rows) ? transitionsDailyData.rows : [],
+    [transitionsDailyData?.rows],
+  );
+  const transitionDailyGrouped = transitionsDailyData?.grouped ?? null;
+  const regimeError = regimeDataError || transitionError || transitionsDailyError
+    ? "Regime data is temporarily unavailable."
+    : null;
 
   // Changes computed data
   const summary = changesData?.summary;

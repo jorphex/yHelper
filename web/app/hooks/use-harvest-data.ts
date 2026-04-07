@@ -69,7 +69,7 @@ export type HarvestQuery = {
   limit?: number;
 };
 
-async function fetchHarvestData(query: HarvestQuery): Promise<HarvestResponse> {
+export async function fetchHarvestData(query: HarvestQuery): Promise<HarvestResponse> {
   const res = await fetch(
     apiUrl("/harvests", {
       days: query.days ?? 90,

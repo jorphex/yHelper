@@ -1,11 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { apiUrl } from "../lib/api";
+import { Suspense, useMemo } from "react";
 import { formatHours, formatPct, formatUtcDateTime } from "../lib/format";
 import { BarList, TrendStrips } from "../components/visuals";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
+import { useStYfiData } from "../hooks/use-styfi-data";
 
 type StYfiSnapshotPoint = {
   observed_at?: string | null;
@@ -102,34 +102,7 @@ function formatUtcDate(value: string | null | undefined): string {
 }
 
 function StYfiPageContent() {
-  const [data, setData] = useState<StYfiResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const run = async () => {
-      try {
-        const params = new URLSearchParams({ days: "122", epoch_limit: "12" });
-        const res = await fetch(apiUrl("/styfi", params), { cache: "no-store" });
-        if (!res.ok) {
-          if (active) setError(`API error: ${res.status}`);
-          return;
-        }
-        const payload = await res.json() as StYfiResponse;
-        if (active) {
-          setData(payload);
-          setError(null);
-        }
-      } catch (err) {
-        if (active) setError(`Load failed: ${String(err)}`);
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-    void run();
-    return () => { active = false; };
-  }, []);
+  const { data, isLoading, error, refetch } = useStYfiData({ days: 122, epochLimit: 12 });
 
   const rewardSymbol = data?.reward_token?.symbol?.trim() || "yvUSDC-1";
   const summary = data?.summary ?? null;
@@ -214,7 +187,7 @@ function StYfiPageContent() {
           The stYFI data feed failed to load. Please try again later.
         </p>
         <button 
-          onClick={() => window.location.reload()} 
+          onClick={() => void refetch()}
           className="button button-primary"
           style={{ padding: "12px 24px" }}
         >
