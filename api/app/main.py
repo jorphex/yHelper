@@ -30,6 +30,16 @@ DAILY_APY_LOOKBACK_DAYS = DAILY_APY_MAX_WINDOW_DAYS + DAILY_APY_LOOKBACK_BUFFER_
 USER_VISIBLE_KIND = "Multi Strategy"
 USER_VISIBLE_VERSION_PREFIX = "3."
 EXCLUDED_CHAIN_IDS = (250,)  # Fantom deprecated
+CHAIN_LABELS = {
+    1: "Ethereum",
+    10: "Optimism",
+    100: "Gnosis",
+    137: "Polygon",
+    146: "Sonic",
+    8453: "Base",
+    42161: "Arbitrum",
+    747474: "Katana",
+}
 DEFAULT_MIN_TVL_USD = 100000.0
 DEFAULT_MIN_POINTS = 30
 UNIVERSE_CORE_MIN_TVL_USD = 1000000.0
@@ -109,12 +119,30 @@ app.add_middleware(
 )
 
 
+def _ensure_schema_columns() -> None:
+    with psycopg.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS token_decimals INTEGER")
+        conn.commit()
+
+
+@app.on_event("startup")
+def _on_startup() -> None:
+    _ensure_schema_columns()
+
+
 def _seconds_since(ts: datetime | None, now: datetime) -> int | None:
     if ts is None:
         return None
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=UTC)
     return max(0, int((now - ts).total_seconds()))
+
+
+def _chain_label(chain_id: int | None) -> str | None:
+    if chain_id is None:
+        return None
+    return CHAIN_LABELS.get(chain_id, str(chain_id))
 
 
 def _resolve_universe_gate(
@@ -1878,6 +1906,328 @@ async def dau(days: int = Query(default=30, ge=7, le=180)) -> dict[str, object]:
         },
         "trailing_24h": trailing_24h,
         "daily": daily,
+        "last_run": last_run,
+    }
+
+
+def _harvest_where_clause(*, chain_id: int | None, vault_address: str | None) -> tuple[str, dict[str, object]]:
+    clauses: list[str] = []
+    params: dict[str, object] = {}
+    if chain_id is not None:
+        clauses.append("h.chain_id = %(chain_id)s")
+        params["chain_id"] = chain_id
+    if vault_address:
+        clauses.append("LOWER(h.vault_address) = %(vault_address)s")
+        params["vault_address"] = vault_address.lower()
+    if not clauses:
+        return "", params
+    return " AND " + " AND ".join(clauses), params
+
+
+def _harvest_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
+    cur.execute(
+        """
+        SELECT status, started_at, ended_at, records, error_summary
+        FROM ingestion_runs
+        WHERE job_name = 'vault_harvests'
+        ORDER BY id DESC
+        LIMIT 1
+        """
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "status": row["status"],
+        "started_at": row["started_at"].isoformat() if row["started_at"] else None,
+        "ended_at": row["ended_at"].isoformat() if row["ended_at"] else None,
+        "records": row["records"],
+        "error_summary": row["error_summary"],
+    }
+
+
+def _harvest_trailing_24h(
+    cur: psycopg.Cursor,
+    *,
+    chain_id: int | None,
+    vault_address: str | None,
+) -> dict[str, object]:
+    where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
+    cur.execute(
+        f"""
+        SELECT
+            COUNT(*) AS harvest_count,
+            COUNT(DISTINCT h.vault_address) AS vault_count,
+            COUNT(DISTINCT h.strategy_address) AS strategy_count
+        FROM vault_harvests h
+        WHERE h.block_time >= NOW() - INTERVAL '24 hours'
+        {where_sql}
+        """,
+        params,
+    )
+    row = cur.fetchone() or {}
+    return {
+        "harvest_count": int(row.get("harvest_count") or 0),
+        "vault_count": int(row.get("vault_count") or 0),
+        "strategy_count": int(row.get("strategy_count") or 0),
+    }
+
+
+def _harvest_chain_rollups(
+    cur: psycopg.Cursor,
+    *,
+    days: int,
+    chain_id: int | None,
+    vault_address: str | None,
+) -> list[dict[str, object]]:
+    where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
+    params["days"] = days
+    cur.execute(
+        f"""
+        SELECT
+            h.chain_id,
+            COUNT(*) AS harvest_count,
+            COUNT(DISTINCT h.vault_address) AS vault_count,
+            COUNT(DISTINCT h.strategy_address) AS strategy_count,
+            MAX(h.block_time) AS last_harvest_at
+        FROM vault_harvests h
+        WHERE h.block_time >= NOW() - (%(days)s * INTERVAL '1 day')
+        {where_sql}
+        GROUP BY h.chain_id
+        ORDER BY harvest_count DESC, h.chain_id
+        """,
+        params,
+    )
+    rows = cur.fetchall()
+    return [
+        {
+            "chain_id": int(row["chain_id"]),
+            "chain_label": _chain_label(int(row["chain_id"])),
+            "harvest_count": int(row["harvest_count"] or 0),
+            "vault_count": int(row["vault_count"] or 0),
+            "strategy_count": int(row["strategy_count"] or 0),
+            "last_harvest_at": row["last_harvest_at"].isoformat() if row["last_harvest_at"] else None,
+        }
+        for row in rows
+    ]
+
+
+def _harvest_daily_by_chain(
+    cur: psycopg.Cursor,
+    *,
+    days: int,
+    chain_id: int | None,
+    vault_address: str | None,
+) -> list[dict[str, object]]:
+    if vault_address:
+        where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
+        params["days"] = days
+        cur.execute(
+            f"""
+            WITH day_series AS (
+                SELECT generate_series(
+                    (CURRENT_DATE - (%(days)s::int - 1)),
+                    CURRENT_DATE,
+                    INTERVAL '1 day'
+                )::date AS day_utc
+            ),
+            chain_series AS (
+                SELECT DISTINCT h.chain_id
+                FROM vault_harvests h
+                WHERE TRUE
+                {where_sql}
+            )
+            SELECT
+                s.day_utc,
+                c.chain_id,
+                COALESCE(COUNT(h.tx_hash), 0) AS harvest_count,
+                COALESCE(COUNT(DISTINCT h.vault_address), 0) AS vault_count,
+                COALESCE(COUNT(DISTINCT h.strategy_address), 0) AS strategy_count
+            FROM day_series s
+            CROSS JOIN chain_series c
+            LEFT JOIN vault_harvests h
+              ON (h.block_time AT TIME ZONE 'UTC')::date = s.day_utc
+             AND h.chain_id = c.chain_id
+             AND h.block_time >= CURRENT_DATE - (%(days)s::int - 1)
+             {where_sql}
+            GROUP BY s.day_utc, c.chain_id
+            ORDER BY s.day_utc, c.chain_id
+            """,
+            params,
+        )
+    else:
+        params = {"days": days}
+        where_sql = ""
+        if chain_id is not None:
+            where_sql = "WHERE d.chain_id = %(chain_id)s"
+            params["chain_id"] = chain_id
+        cur.execute(
+            f"""
+            WITH day_series AS (
+                SELECT generate_series(
+                    (CURRENT_DATE - (%(days)s::int - 1)),
+                    CURRENT_DATE,
+                    INTERVAL '1 day'
+                )::date AS day_utc
+            ),
+            chain_series AS (
+                SELECT DISTINCT chain_id
+                FROM vault_harvest_daily_chain d
+                {where_sql}
+            )
+            SELECT
+                s.day_utc,
+                c.chain_id,
+                COALESCE(d.harvest_count, 0) AS harvest_count,
+                COALESCE(d.vault_count, 0) AS vault_count,
+                COALESCE(d.strategy_count, 0) AS strategy_count
+            FROM day_series s
+            CROSS JOIN chain_series c
+            LEFT JOIN vault_harvest_daily_chain d
+              ON d.day_utc = s.day_utc
+             AND d.chain_id = c.chain_id
+            ORDER BY s.day_utc, c.chain_id
+            """,
+            params,
+        )
+    rows = cur.fetchall()
+    return [
+        {
+            "day_utc": row["day_utc"].isoformat() if row["day_utc"] else None,
+            "chain_id": int(row["chain_id"]),
+            "chain_label": _chain_label(int(row["chain_id"])),
+            "harvest_count": int(row["harvest_count"] or 0),
+            "vault_count": int(row["vault_count"] or 0),
+            "strategy_count": int(row["strategy_count"] or 0),
+        }
+        for row in rows
+    ]
+
+
+def _harvest_recent(
+    cur: psycopg.Cursor,
+    *,
+    days: int,
+    chain_id: int | None,
+    vault_address: str | None,
+    limit: int,
+) -> list[dict[str, object]]:
+    where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
+    params["days"] = days
+    params["limit"] = limit
+    cur.execute(
+        f"""
+        SELECT
+            h.chain_id,
+            h.block_time,
+            h.tx_hash,
+            h.vault_address,
+            d.symbol AS vault_symbol,
+            d.token_symbol,
+            COALESCE(
+                d.token_decimals,
+                CASE
+                    WHEN jsonb_typeof(d.raw -> 'asset' -> 'decimals') IN ('number', 'string')
+                    THEN NULLIF(d.raw -> 'asset' ->> 'decimals', '')::int
+                    ELSE NULL
+                END,
+                CASE
+                    WHEN jsonb_typeof(d.raw -> 'meta' -> 'token' -> 'decimals') IN ('number', 'string')
+                    THEN NULLIF(d.raw -> 'meta' -> 'token' ->> 'decimals', '')::int
+                    ELSE NULL
+                END
+            ) AS token_decimals,
+            h.vault_version,
+            h.strategy_address,
+            h.gain::text AS gain,
+            h.loss::text AS loss,
+            h.debt_after::text AS debt_after,
+            h.fee_assets::text AS fee_assets,
+            h.refund_assets::text AS refund_assets
+        FROM vault_harvests h
+        LEFT JOIN vault_dim d
+          ON d.chain_id = h.chain_id
+         AND LOWER(d.vault_address) = LOWER(h.vault_address)
+        WHERE h.block_time >= NOW() - (%(days)s * INTERVAL '1 day')
+        {where_sql}
+        ORDER BY h.block_time DESC, h.chain_id, h.log_index DESC
+        LIMIT %(limit)s
+        """,
+        params,
+    )
+    rows = cur.fetchall()
+    return [
+        {
+            "chain_id": int(row["chain_id"]),
+            "chain_label": _chain_label(int(row["chain_id"])),
+            "block_time": row["block_time"].isoformat() if row["block_time"] else None,
+            "tx_hash": row["tx_hash"],
+            "vault_address": row["vault_address"],
+            "vault_symbol": row["vault_symbol"],
+            "token_symbol": row["token_symbol"],
+            "token_decimals": row["token_decimals"],
+            "vault_version": row["vault_version"],
+            "strategy_address": row["strategy_address"],
+            "gain": row["gain"],
+            "loss": row["loss"],
+            "debt_after": row["debt_after"],
+            "fee_assets": row["fee_assets"],
+            "refund_assets": row["refund_assets"],
+        }
+        for row in rows
+    ]
+
+
+@app.get("/api/harvests")
+async def harvests(
+    days: int = Query(default=30, ge=7, le=365),
+    chain_id: int | None = Query(default=None, ge=1),
+    vault_address: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, object]:
+    normalized_vault = vault_address.lower() if vault_address else None
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            trailing_24h = _harvest_trailing_24h(cur, chain_id=chain_id, vault_address=normalized_vault)
+            chain_rollups = _harvest_chain_rollups(cur, days=days, chain_id=chain_id, vault_address=normalized_vault)
+            daily_by_chain = _harvest_daily_by_chain(cur, days=days, chain_id=chain_id, vault_address=normalized_vault)
+            recent = _harvest_recent(
+                cur,
+                days=days,
+                chain_id=chain_id,
+                vault_address=normalized_vault,
+                limit=limit,
+            )
+            last_run = _harvest_last_run(cur)
+    return {
+        "generated_at_utc": datetime.now(UTC).isoformat(),
+        "metric": {
+            "name": "vault_harvests",
+            "headline_label": "Vault Harvests (24h)",
+            "history_label": "Daily Vault Harvests",
+            "history_window_label": f"Last {days}d",
+            "series_label": "Daily Vault Harvests",
+        },
+        "window": {
+            "headline": "24h",
+            "history_days": days,
+            "history_granularity": "day_utc",
+        },
+        "scope": {
+            "vaults": "supported-chain legacy/V3 vault StrategyReported events",
+            "level": "vault",
+            "attribution": "vault report logs only; strategy-level Reported events are excluded",
+        },
+        "filters": {
+            "chain_id": chain_id,
+            "chain_label": _chain_label(chain_id),
+            "vault_address": normalized_vault,
+            "limit": limit,
+        },
+        "trailing_24h": trailing_24h,
+        "chain_rollups": chain_rollups,
+        "daily_by_chain": daily_by_chain,
+        "recent": recent,
         "last_run": last_run,
     }
 

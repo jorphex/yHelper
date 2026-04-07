@@ -50,10 +50,15 @@ PRODUCT_ACTIVITY_RETENTION_DAYS = int(os.getenv("PRODUCT_ACTIVITY_RETENTION_DAYS
 PRODUCT_ACTIVITY_BACKFILL_DAYS = int(os.getenv("PRODUCT_ACTIVITY_BACKFILL_DAYS", "35"))
 PRODUCT_ACTIVITY_BLOCK_SPAN = int(os.getenv("PRODUCT_ACTIVITY_BLOCK_SPAN", "50000"))
 PRODUCT_ACTIVITY_BLOCK_SPAN_BY_CHAIN = {100: 10000, 747474: 10000, 146: 5000}
+HARVEST_RETENTION_DAYS = int(os.getenv("HARVEST_RETENTION_DAYS", "0"))
+HARVEST_BACKFILL_DAYS = int(os.getenv("HARVEST_BACKFILL_DAYS", "90"))
+HARVEST_BLOCK_SPAN = int(os.getenv("HARVEST_BLOCK_SPAN", "50000"))
+HARVEST_BLOCK_SPAN_BY_CHAIN = {100: 10000, 747474: 10000, 146: 5000}
 JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
 JOB_STYFI = "styfi_snapshot"
 JOB_PRODUCT_DAU = "product_dau"
+JOB_VAULT_HARVESTS = "vault_harvests"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "21600"))
 ALERT_NOTIFY_ON_RECOVERY = os.getenv("ALERT_NOTIFY_ON_RECOVERY", "1") == "1"
@@ -99,6 +104,12 @@ EVENT_TOPIC_DEPOSIT = f"0x{keccak(text='Deposit(address,address,uint256,uint256)
 EVENT_TOPIC_WITHDRAW = f"0x{keccak(text='Withdraw(address,address,address,uint256,uint256)').hex()}"
 EVENT_TOPIC_TRANSFER = f"0x{keccak(text='Transfer(address,address,uint256)').hex()}"
 EVENT_TOPIC_CLAIM = f"0x{keccak(text='Claim(address,uint256)').hex()}"
+EVENT_TOPIC_STRATEGY_REPORTED_V2 = (
+    f"0x{keccak(text='StrategyReported(address,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)').hex()}"
+)
+EVENT_TOPIC_STRATEGY_REPORTED_V3 = (
+    f"0x{keccak(text='StrategyReported(address,uint256,uint256,uint256,uint256,uint256,uint256)').hex()}"
+)
 PRODUCT_ACTIVITY_TOPICS = {
     EVENT_TOPIC_DEPOSIT: "deposit",
     EVENT_TOPIC_WITHDRAW: "withdraw",
@@ -209,6 +220,7 @@ CREATE TABLE IF NOT EXISTS vault_dim (
     token_address TEXT,
     token_symbol TEXT,
     token_name TEXT,
+    token_decimals INTEGER,
     tvl_usd DOUBLE PRECISION,
     est_apy DOUBLE PRECISION,
     active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -220,6 +232,9 @@ CREATE TABLE IF NOT EXISTS vault_dim (
 CREATE INDEX IF NOT EXISTS idx_vault_dim_active_tvl
     ON vault_dim(tvl_usd DESC NULLS LAST, chain_id, vault_address)
     WHERE active = TRUE;
+
+ALTER TABLE vault_dim
+    ADD COLUMN IF NOT EXISTS token_decimals INTEGER;
 
 CREATE TABLE IF NOT EXISTS ingestion_runs (
     id BIGSERIAL PRIMARY KEY,
@@ -349,6 +364,50 @@ CREATE TABLE IF NOT EXISTS product_dau_daily (
     dau_styfix INTEGER NOT NULL,
     computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS vault_harvest_sync_state (
+    chain_id INTEGER PRIMARY KEY,
+    cursor BIGINT,
+    observed_at TIMESTAMPTZ,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS vault_harvests (
+    chain_id INTEGER NOT NULL,
+    block_number BIGINT NOT NULL,
+    block_time TIMESTAMPTZ NOT NULL,
+    tx_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    vault_address TEXT NOT NULL,
+    vault_version TEXT NOT NULL,
+    strategy_address TEXT NOT NULL,
+    gain NUMERIC NOT NULL,
+    loss NUMERIC NOT NULL,
+    debt_after NUMERIC,
+    fee_assets NUMERIC,
+    refund_assets NUMERIC,
+    event_topic0 TEXT NOT NULL,
+    raw_event JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (chain_id, tx_hash, log_index)
+);
+CREATE INDEX IF NOT EXISTS idx_vault_harvests_time
+    ON vault_harvests(block_time DESC, chain_id);
+CREATE INDEX IF NOT EXISTS idx_vault_harvests_vault
+    ON vault_harvests(vault_address, block_time DESC);
+CREATE INDEX IF NOT EXISTS idx_vault_harvests_strategy
+    ON vault_harvests(strategy_address, block_time DESC);
+
+CREATE TABLE IF NOT EXISTS vault_harvest_daily_chain (
+    day_utc DATE NOT NULL,
+    chain_id INTEGER NOT NULL,
+    harvest_count INTEGER NOT NULL,
+    vault_count INTEGER NOT NULL,
+    strategy_count INTEGER NOT NULL,
+    computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (day_utc, chain_id)
+);
 """
 
 
@@ -397,6 +456,21 @@ def _validate_data_policy_config() -> None:
             "Invalid DAU block span: PRODUCT_ACTIVITY_BLOCK_SPAN must be > 0 "
             f"(got {PRODUCT_ACTIVITY_BLOCK_SPAN})"
         )
+    if HARVEST_RETENTION_DAYS < 0:
+        raise ValueError(
+            "Invalid harvest retention: HARVEST_RETENTION_DAYS must be >= 0 "
+            f"(got {HARVEST_RETENTION_DAYS})"
+        )
+    if HARVEST_BACKFILL_DAYS <= 0:
+        raise ValueError(
+            "Invalid harvest backfill: HARVEST_BACKFILL_DAYS must be > 0 "
+            f"(got {HARVEST_BACKFILL_DAYS})"
+        )
+    if HARVEST_BLOCK_SPAN <= 0:
+        raise ValueError(
+            "Invalid harvest block span: HARVEST_BLOCK_SPAN must be > 0 "
+            f"(got {HARVEST_BLOCK_SPAN})"
+        )
     if not 0 < SNAPSHOT_MIN_ACTIVE_RATIO <= 1:
         raise ValueError(
             "Invalid snapshot guard: SNAPSHOT_MIN_ACTIVE_RATIO must be in (0, 1] "
@@ -420,6 +494,7 @@ INSERT INTO vault_dim (
     token_address,
     token_symbol,
     token_name,
+    token_decimals,
     tvl_usd,
     est_apy,
     active,
@@ -436,6 +511,7 @@ INSERT INTO vault_dim (
     %(token_address)s,
     %(token_symbol)s,
     %(token_name)s,
+    %(token_decimals)s,
     %(tvl_usd)s,
     %(est_apy)s,
     TRUE,
@@ -451,6 +527,7 @@ ON CONFLICT (chain_id, vault_address) DO UPDATE SET
     token_address = EXCLUDED.token_address,
     token_symbol = EXCLUDED.token_symbol,
     token_name = EXCLUDED.token_name,
+    token_decimals = EXCLUDED.token_decimals,
     tvl_usd = EXCLUDED.tvl_usd,
     est_apy = EXCLUDED.est_apy,
     active = TRUE,
@@ -526,6 +603,21 @@ def _parse_chain_id(value: object) -> int | None:
     return chain_id if chain_id > 0 else None
 
 
+def _to_int_or_none(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        value = cleaned
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
 def _normalize_optional_address(value: object) -> str | None:
     if value is None:
         return None
@@ -540,6 +632,8 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
     asset_obj = asset if isinstance(asset, dict) else {}
     meta = vault.get("meta")
     meta_obj = meta if isinstance(meta, dict) else {}
+    meta_token = meta_obj.get("token")
+    meta_token_obj = meta_token if isinstance(meta_token, dict) else {}
     tvl = vault.get("tvl")
     tvl_obj = tvl if isinstance(tvl, dict) else {}
     performance = vault.get("performance")
@@ -566,6 +660,10 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
         "token_address": _normalize_optional_address(_first_present(asset_obj, ("address", "tokenAddress"))),
         "token_symbol": _first_present(asset_obj, ("symbol", "tokenSymbol")),
         "token_name": _first_present(asset_obj, ("name", "tokenName")),
+        "token_decimals": _to_int_or_none(
+            _first_present(asset_obj, ("decimals", "tokenDecimals"))
+            or _first_present(meta_token_obj, ("decimals",))
+        ),
         "tvl_usd": tvl_usd,
         "est_apy": est_apy,
         "raw": Json(vault),
@@ -872,6 +970,397 @@ def _chunked(items: list[str], size: int) -> list[list[str]]:
 
 def _product_activity_block_span_for_chain(chain_id: int) -> int:
     return max(1, PRODUCT_ACTIVITY_BLOCK_SPAN_BY_CHAIN.get(chain_id, PRODUCT_ACTIVITY_BLOCK_SPAN))
+
+
+def _harvest_block_span_for_chain(chain_id: int) -> int:
+    return max(1, HARVEST_BLOCK_SPAN_BY_CHAIN.get(chain_id, HARVEST_BLOCK_SPAN))
+
+
+def _decode_uint256_words(data: object) -> list[int]:
+    if not isinstance(data, str) or not data.startswith("0x"):
+        return []
+    payload = data[2:]
+    if not payload:
+        return []
+    if len(payload) % 64 != 0:
+        return []
+    return [int(payload[idx : idx + 64], 16) for idx in range(0, len(payload), 64)]
+
+
+def _select_harvest_contracts(conn: psycopg.Connection) -> dict[int, dict[str, str]]:
+    targets: dict[int, dict[str, str]] = {}
+    supported_chain_ids = sorted(CHAIN_RPC_URLS)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT chain_id, vault_address, version
+            FROM vault_dim
+            WHERE
+                COALESCE(TRIM(version), '') <> ''
+                AND chain_id = ANY(%(supported_chain_ids)s)
+            ORDER BY chain_id, vault_address
+            """,
+            {"supported_chain_ids": supported_chain_ids},
+        )
+        for chain_id, vault_address, version in cur.fetchall():
+            if not vault_address or not version:
+                continue
+            chain_targets = targets.setdefault(int(chain_id), {})
+            chain_targets[str(vault_address).lower()] = str(version)
+    conn.commit()
+    return {chain_id: mapping for chain_id, mapping in targets.items() if mapping}
+
+
+def _harvest_cursor(conn: psycopg.Connection, chain_id: int) -> int | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT cursor
+            FROM vault_harvest_sync_state
+            WHERE chain_id = %s
+            """,
+            (chain_id,),
+        )
+        row = cur.fetchone()
+    conn.commit()
+    if not row:
+        return None
+    value = row[0]
+    return int(value) if value is not None else None
+
+
+def _upsert_harvest_sync_state(
+    conn: psycopg.Connection,
+    *,
+    chain_id: int,
+    cursor: int | None,
+    observed_at: datetime,
+    payload: dict[str, object],
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO vault_harvest_sync_state (
+                chain_id,
+                cursor,
+                observed_at,
+                payload,
+                updated_at
+            ) VALUES (
+                %(chain_id)s,
+                %(cursor)s,
+                %(observed_at)s,
+                %(payload)s,
+                NOW()
+            )
+            ON CONFLICT (chain_id) DO UPDATE SET
+                cursor = EXCLUDED.cursor,
+                observed_at = EXCLUDED.observed_at,
+                payload = EXCLUDED.payload,
+                updated_at = NOW()
+            """,
+            {
+                "chain_id": chain_id,
+                "cursor": cursor,
+                "observed_at": observed_at,
+                "payload": Json(payload),
+            },
+        )
+    conn.commit()
+
+
+def _parse_harvest_row(
+    *,
+    chain_id: int,
+    vault_address: str,
+    vault_version: str,
+    log: dict[str, object],
+) -> dict[str, object] | None:
+    topics = log.get("topics")
+    if not isinstance(topics, list) or not topics:
+        return None
+    topic0 = str(topics[0] or "").lower()
+    strategy_address = _topic_address(topics, 1)
+    if not strategy_address:
+        return None
+    values = _decode_uint256_words(log.get("data"))
+    if topic0 == EVENT_TOPIC_STRATEGY_REPORTED_V3:
+        if len(values) != 6:
+            return None
+        gain, loss, current_debt, _protocol_fees, total_fees, total_refunds = values
+        debt_after = current_debt
+        fee_assets = total_fees
+        refund_assets = total_refunds
+    elif topic0 == EVENT_TOPIC_STRATEGY_REPORTED_V2:
+        if len(values) != 8:
+            return None
+        gain, loss, _debt_paid, _total_gain, _total_loss, total_debt, _debt_added, _debt_ratio = values
+        debt_after = total_debt
+        fee_assets = None
+        refund_assets = None
+    else:
+        return None
+    tx_hash = str(log.get("transactionHash", "")).lower()
+    if not tx_hash:
+        return None
+    block_number = _hex_to_int(log.get("blockNumber"))
+    log_index = _hex_to_int(log.get("logIndex"))
+    block_timestamp = _hex_to_int(log.get("blockTimestamp"))
+    if block_number is None or log_index is None:
+        return None
+    if block_timestamp is None:
+        block = _eth_get_block_for_chain(chain_id, block_number)
+        block_timestamp = _hex_to_int(block.get("timestamp")) if isinstance(block, dict) else None
+    if block_timestamp is None:
+        return None
+    return {
+        "chain_id": chain_id,
+        "block_number": block_number,
+        "block_time": datetime.fromtimestamp(block_timestamp, tz=UTC),
+        "tx_hash": tx_hash,
+        "log_index": log_index,
+        "vault_address": vault_address,
+        "vault_version": vault_version,
+        "strategy_address": strategy_address,
+        "gain": gain,
+        "loss": loss,
+        "debt_after": debt_after,
+        "fee_assets": fee_assets,
+        "refund_assets": refund_assets,
+        "event_topic0": topic0,
+        "raw_event": Json(log),
+    }
+
+
+def _upsert_vault_harvests(conn: psycopg.Connection, rows: list[dict[str, object]]) -> int:
+    if not rows:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            INSERT INTO vault_harvests (
+                chain_id,
+                block_number,
+                block_time,
+                tx_hash,
+                log_index,
+                vault_address,
+                vault_version,
+                strategy_address,
+                gain,
+                loss,
+                debt_after,
+                fee_assets,
+                refund_assets,
+                event_topic0,
+                raw_event
+            ) VALUES (
+                %(chain_id)s,
+                %(block_number)s,
+                %(block_time)s,
+                %(tx_hash)s,
+                %(log_index)s,
+                %(vault_address)s,
+                %(vault_version)s,
+                %(strategy_address)s,
+                %(gain)s,
+                %(loss)s,
+                %(debt_after)s,
+                %(fee_assets)s,
+                %(refund_assets)s,
+                %(event_topic0)s,
+                %(raw_event)s
+            )
+            ON CONFLICT (chain_id, tx_hash, log_index) DO NOTHING
+            """,
+            rows,
+        )
+        inserted = cur.rowcount
+    conn.commit()
+    return inserted
+
+
+def _recompute_vault_harvest_daily_chain(conn: psycopg.Connection, *, from_day: datetime) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM vault_harvest_daily_chain
+            WHERE day_utc >= %s::date
+            """,
+            (from_day.date(),),
+        )
+        cur.execute(
+            """
+            INSERT INTO vault_harvest_daily_chain (
+                day_utc,
+                chain_id,
+                harvest_count,
+                vault_count,
+                strategy_count,
+                computed_at
+            )
+            SELECT
+                (block_time AT TIME ZONE 'UTC')::date AS day_utc,
+                chain_id,
+                COUNT(*) AS harvest_count,
+                COUNT(DISTINCT vault_address) AS vault_count,
+                COUNT(DISTINCT strategy_address) AS strategy_count,
+                NOW()
+            FROM vault_harvests
+            WHERE block_time >= %s::date
+            GROUP BY 1, 2
+            ORDER BY 1, 2
+            """,
+            (from_day.date(),),
+        )
+        inserted = cur.rowcount
+    conn.commit()
+    return inserted
+
+
+def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
+    started_at = datetime.now(UTC)
+    run_id = _insert_run(conn, JOB_VAULT_HARVESTS, started_at)
+    inserted_total = 0
+    recomputed_days = 0
+    earliest_seen: datetime | None = None
+    errors: list[str] = []
+    try:
+        targets = _select_harvest_contracts(conn)
+        for chain_id, contracts in targets.items():
+            try:
+                if not _rpc_url_for_chain(chain_id):
+                    errors.append(f"{chain_id}:missing_rpc")
+                    continue
+                latest_block = _eth_block_number_for_chain(chain_id)
+                cursor = _harvest_cursor(conn, chain_id)
+                if cursor is None:
+                    backfill_start = int((datetime.now(UTC) - timedelta(days=HARVEST_BACKFILL_DAYS)).timestamp())
+                    start_block = _find_block_at_or_after(chain_id, backfill_start)
+                else:
+                    start_block = cursor + 1
+                if start_block > latest_block:
+                    _upsert_harvest_sync_state(
+                        conn,
+                        chain_id=chain_id,
+                        cursor=latest_block,
+                        observed_at=datetime.now(UTC),
+                        payload={"status": "up_to_date", "contracts": len(contracts)},
+                    )
+                    continue
+                logging.info(
+                    "Vault harvest sync: chain=%s contracts=%s from_block=%s to_block=%s",
+                    chain_id,
+                    len(contracts),
+                    start_block,
+                    latest_block,
+                )
+                chain_inserted = 0
+                chain_first_seen: datetime | None = None
+                block_span = _harvest_block_span_for_chain(chain_id)
+                max_block_span = block_span
+                current_block = start_block
+                addresses = sorted(contracts)
+                while current_block <= latest_block:
+                    end_block = min(latest_block, current_block + block_span - 1)
+                    try:
+                        for address_chunk in _chunked(addresses, 100):
+                            logs = _eth_get_logs_for_chain(
+                                chain_id,
+                                addresses=address_chunk,
+                                from_block=current_block,
+                                to_block=end_block,
+                                topics=[[EVENT_TOPIC_STRATEGY_REPORTED_V2, EVENT_TOPIC_STRATEGY_REPORTED_V3]],
+                            )
+                            rows: list[dict[str, object]] = []
+                            for log in logs:
+                                vault_address = str(log.get("address", "")).lower()
+                                vault_version = contracts.get(vault_address)
+                                if not vault_version:
+                                    continue
+                                row = _parse_harvest_row(
+                                    chain_id=chain_id,
+                                    vault_address=vault_address,
+                                    vault_version=vault_version,
+                                    log=log,
+                                )
+                                if row is None:
+                                    continue
+                                block_time = row["block_time"]
+                                if isinstance(block_time, datetime) and (
+                                    chain_first_seen is None or block_time < chain_first_seen
+                                ):
+                                    chain_first_seen = block_time
+                                rows.append(row)
+                            chain_inserted += _upsert_vault_harvests(conn, rows)
+                    except Exception as window_exc:
+                        if block_span <= 1:
+                            raise
+                        next_block_span = max(1, block_span // 2)
+                        logging.warning(
+                            "Vault harvest log window retry: chain=%s from_block=%s to_block=%s span=%s next_span=%s error=%s",
+                            chain_id,
+                            current_block,
+                            end_block,
+                            block_span,
+                            next_block_span,
+                            window_exc,
+                        )
+                        block_span = next_block_span
+                        continue
+                    current_block = end_block + 1
+                    if block_span < max_block_span:
+                        block_span = min(max_block_span, block_span + math.ceil((max_block_span - block_span) / 2))
+                _upsert_harvest_sync_state(
+                    conn,
+                    chain_id=chain_id,
+                    cursor=latest_block,
+                    observed_at=datetime.now(UTC),
+                    payload={
+                        "status": "success",
+                        "contracts": len(contracts),
+                        "from_block": start_block,
+                        "to_block": latest_block,
+                        "inserted": chain_inserted,
+                    },
+                )
+                inserted_total += chain_inserted
+                if chain_first_seen is not None and (earliest_seen is None or chain_first_seen < earliest_seen):
+                    earliest_seen = chain_first_seen
+            except Exception as chain_exc:
+                errors.append(f"{chain_id}:{chain_exc}")
+                _upsert_harvest_sync_state(
+                    conn,
+                    chain_id=chain_id,
+                    cursor=_harvest_cursor(conn, chain_id),
+                    observed_at=datetime.now(UTC),
+                    payload={"status": "failed", "contracts": len(contracts), "error": str(chain_exc)},
+                )
+                logging.exception("Vault harvest chain failed: chain=%s error=%s", chain_id, chain_exc)
+                continue
+        if earliest_seen is None:
+            earliest_seen = datetime.now(UTC) - timedelta(days=1)
+        recomputed_days = _recompute_vault_harvest_daily_chain(conn, from_day=earliest_seen)
+        status = "partial_success" if errors else "success"
+        _complete_run(
+            conn,
+            run_id,
+            status,
+            inserted_total,
+            json.dumps({"inserted": inserted_total, "recomputed_days": recomputed_days, "errors": errors}),
+        )
+        logging.info(
+            "Vault harvest sync complete: status=%s inserted=%s recomputed_days=%s errors=%s",
+            status,
+            inserted_total,
+            recomputed_days,
+            len(errors),
+        )
+        return inserted_total, recomputed_days
+    except Exception as exc:
+        _complete_run(conn, run_id, "failed", inserted_total, json.dumps({"error": str(exc), "errors": errors}))
+        logging.exception("Vault harvest sync failed: %s", exc)
+        return inserted_total, recomputed_days
 
 
 def _safe_int(value: object) -> int | None:
@@ -2459,6 +2948,7 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
     deleted_styfi_snapshots = 0
     deleted_styfi_epochs = 0
     deleted_product_interactions = 0
+    deleted_vault_harvests = 0
     with conn.cursor() as cur:
         if PPS_RETENTION_DAYS > 0:
             cutoff_ts = int((datetime.now(UTC) - timedelta(days=PPS_RETENTION_DAYS)).timestamp())
@@ -2488,6 +2978,12 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
                 (PRODUCT_ACTIVITY_RETENTION_DAYS,),
             )
             deleted_product_interactions = cur.rowcount
+        if HARVEST_RETENTION_DAYS > 0:
+            cur.execute(
+                "DELETE FROM vault_harvests WHERE block_time < NOW() - (%s * INTERVAL '1 day')",
+                (HARVEST_RETENTION_DAYS,),
+            )
+            deleted_vault_harvests = cur.rowcount
     conn.commit()
     return {
         "pps_timeseries": deleted_pps,
@@ -2495,6 +2991,7 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
         "styfi_epoch_stats": deleted_styfi_epochs,
         "ingestion_runs": deleted_runs,
         "product_interactions": deleted_product_interactions,
+        "vault_harvests": deleted_vault_harvests,
     }
 
 
@@ -2511,12 +3008,13 @@ def _maybe_cleanup_old_data(conn: psycopg.Connection) -> None:
     LAST_CLEANUP_AT = now
     if any(value > 0 for value in result.values()):
         logging.info(
-            "DB cleanup removed rows: pps_timeseries=%s styfi_snapshots=%s styfi_epoch_stats=%s ingestion_runs=%s product_interactions=%s",
+            "DB cleanup removed rows: pps_timeseries=%s styfi_snapshots=%s styfi_epoch_stats=%s ingestion_runs=%s product_interactions=%s vault_harvests=%s",
             result["pps_timeseries"],
             result["styfi_snapshots"],
             result["styfi_epoch_stats"],
             result["ingestion_runs"],
             result["product_interactions"],
+            result["vault_harvests"],
         )
     else:
         logging.info("DB cleanup check completed; no rows removed")
@@ -2626,6 +3124,7 @@ def run_once() -> None:
         else:
             logging.info("Skipping stYFI snapshot because STYFI_SYNC_ENABLED=0")
         _run_product_dau(conn)
+        _run_vault_harvests(conn)
         _evaluate_alerts(conn)
         _maybe_cleanup_old_data(conn)
 
