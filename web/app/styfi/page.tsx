@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Suspense, useMemo } from "react";
-import { formatHours, formatPct, formatUtcDateTime } from "../lib/format";
+import { explorerAddressUrl, explorerTxUrl, formatHours, formatPct, formatUtcDateTime } from "../lib/format";
 import { BarList, TrendStrips } from "../components/visuals";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { useStYfiData } from "../hooks/use-styfi-data";
@@ -24,6 +24,21 @@ type StYfiEpochPoint = {
   reward_styfix?: number | null;
   reward_veyfi?: number | null;
   reward_liquid_lockers?: number | null;
+};
+
+type StYfiRecentActivityPoint = {
+  chain_id?: number | null;
+  block_time?: string | null;
+  tx_hash?: string | null;
+  user_account?: string | null;
+  product_type?: string | null;
+  product_label?: string | null;
+  event_kind?: string | null;
+  action_label?: string | null;
+  product_contract?: string | null;
+  amount_raw?: string | null;
+  amount_decimals?: number | null;
+  amount_symbol?: string | null;
 };
 
 type StYfiResponse = {
@@ -52,6 +67,7 @@ type StYfiResponse = {
     snapshots?: StYfiSnapshotPoint[];
     epochs?: StYfiEpochPoint[];
   };
+  recent_activity?: StYfiRecentActivityPoint[];
   freshness?: {
     latest_snapshot_age_seconds?: number | null;
     latest_snapshot_at?: string | null;
@@ -101,6 +117,35 @@ function formatUtcDate(value: string | null | undefined): string {
   return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" }).format(date);
 }
 
+function shortHex(value: string | null | undefined, left = 6, right = 4): string {
+  if (!value || value.length <= left + right + 2) return value ?? "n/a";
+  return `${value.slice(0, left + 2)}…${value.slice(-right)}`;
+}
+
+function addThousandsSeparators(rawDigits: string): string {
+  const digits = rawDigits.replace(/^0+(?=\d)/, "") || "0";
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function formatRawAmount(raw: string | null | undefined, decimals: number | null | undefined, symbol: string | null | undefined): string {
+  if (!raw) return "n/a";
+  const digitsOnly = raw.replace(/\D/g, "");
+  if (!digitsOnly) return "n/a";
+  const resolvedDecimals = Math.max(0, decimals ?? 0);
+  const padded = digitsOnly.padStart(resolvedDecimals + 1, "0");
+  const wholeDigits = resolvedDecimals > 0 ? padded.slice(0, -resolvedDecimals) : padded;
+  const fractionalDigits = resolvedDecimals > 0 ? padded.slice(-resolvedDecimals) : "";
+  const whole = addThousandsSeparators(wholeDigits);
+  const trimmedFraction = fractionalDigits.replace(/0+$/, "");
+  let value = whole;
+  if (trimmedFraction) {
+    const visibleFraction = trimmedFraction.slice(0, 6);
+    const hasMore = trimmedFraction.length > 6;
+    value = `${whole}.${visibleFraction}${hasMore ? "…" : ""}`;
+  }
+  return symbol ? `${value} ${symbol}` : value;
+}
+
 function StYfiPageContent() {
   const { data, isLoading, error, refetch } = useStYfiData({ days: 122, epochLimit: 12 });
 
@@ -108,6 +153,7 @@ function StYfiPageContent() {
   const summary = data?.summary ?? null;
   const epochSeries = useMemo<StYfiEpochPoint[]>(() => data?.series?.epochs ?? [], [data?.series?.epochs]);
   const snapshotSeries = useMemo<StYfiSnapshotPoint[]>(() => data?.series?.snapshots ?? [], [data?.series?.snapshots]);
+  const recentActivity = useMemo<StYfiRecentActivityPoint[]>(() => data?.recent_activity ?? [], [data?.recent_activity]);
   const currentEpoch = summary?.reward_epoch ?? null;
   const historySpan = formatRollingSpan(summary?.first_snapshot_at ?? null, summary?.latest_snapshot_at ?? null);
   const snapshotCountValue = summary?.snapshots_count ?? "n/a";
@@ -211,7 +257,7 @@ function StYfiPageContent() {
             Track Yearn staking balance, reward epochs, and protocol-level yield.
           </p>
           <a
-            href="https://yearn.finance/stake-yfi"
+            href="https://styfi.yearn.fi"
             target="_blank"
             rel="noopener noreferrer"
             className="button button-primary"
@@ -277,6 +323,111 @@ function StYfiPageContent() {
           columns={3}
           emptyText="Snapshot history is still warming up."
         />
+      </section>
+
+      <section className="section" style={{ marginBottom: "48px" }}>
+        <div className="card-header">
+          <h2 className="card-title">Recent Activity</h2>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+            Latest 10 stYFI and stYFIx stake, unstake, withdraw, and claim actions.
+          </p>
+        </div>
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: "22%" }}>Time</th>
+                <th style={{ width: "14%" }}>Product</th>
+                <th style={{ width: "14%" }}>Action</th>
+                <th style={{ width: "22%" }}>Amount</th>
+                <th style={{ width: "16%" }}>Account</th>
+                <th style={{ width: "12%" }}>Tx</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <TableSkeleton rows={6} columns={6} />
+              ) : recentActivity.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: "18px", color: "var(--text-secondary)" }}>
+                    Recent activity is still warming up.
+                  </td>
+                </tr>
+              ) : (
+                recentActivity.map((row) => {
+                  const chainId = row.chain_id ?? 1;
+                  const accountHref = row.user_account ? explorerAddressUrl(chainId, row.user_account) : null;
+                  const txHref = row.tx_hash ? explorerTxUrl(chainId, row.tx_hash) : null;
+                  const actionTone =
+                    row.event_kind === "claim"
+                      ? "var(--accent)"
+                      : row.event_kind === "withdraw"
+                        ? "var(--ink-subtle)"
+                        : row.event_kind === "unstake"
+                          ? "#9a5b23"
+                          : "var(--accent)";
+                  const actionBackground =
+                    row.event_kind === "claim"
+                      ? "rgba(6, 87, 233, 0.12)"
+                      : row.event_kind === "withdraw"
+                        ? "rgba(90, 84, 78, 0.10)"
+                        : row.event_kind === "unstake"
+                          ? "rgba(154, 91, 35, 0.12)"
+                          : "rgba(6, 87, 233, 0.12)";
+                  return (
+                    <tr key={`${row.tx_hash}-${row.product_type}-${row.event_kind}-${row.user_account}`}>
+                      <td style={{ whiteSpace: "nowrap" }}>{formatUtcDateTime(row.block_time ?? null)}</td>
+                      <td>{row.product_label ?? "Unknown"}</td>
+                      <td>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: "4px 10px",
+                            borderRadius: "999px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            background: actionBackground,
+                            color: actionTone,
+                          }}
+                        >
+                          {row.action_label ?? "Activity"}
+                        </span>
+                      </td>
+                      <td className="data-value">
+                        {formatRawAmount(row.amount_raw, row.amount_decimals, row.amount_symbol)}
+                      </td>
+                      <td>
+                        {accountHref ? (
+                          <a href={accountHref} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+                            {shortHex(row.user_account)}
+                          </a>
+                        ) : (
+                          shortHex(row.user_account)
+                        )}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {txHref ? (
+                          <a
+                            href={txHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "var(--accent)", whiteSpace: "nowrap" }}
+                          >
+                            {shortHex(row.tx_hash)}
+                          </a>
+                        ) : (
+                          shortHex(row.tx_hash)
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {/* Epoch Detail Table */}

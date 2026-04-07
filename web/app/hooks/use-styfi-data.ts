@@ -22,6 +22,21 @@ type StYfiEpochPoint = {
   reward_liquid_lockers?: number | null;
 };
 
+type StYfiRecentActivityPoint = {
+  chain_id?: number | null;
+  block_time?: string | null;
+  tx_hash?: string | null;
+  user_account?: string | null;
+  product_type?: string | null;
+  product_label?: string | null;
+  event_kind?: string | null;
+  action_label?: string | null;
+  product_contract?: string | null;
+  amount_raw?: string | null;
+  amount_decimals?: number | null;
+  amount_symbol?: string | null;
+};
+
 type StYfiResponse = {
   filters?: {
     days?: number;
@@ -76,6 +91,7 @@ type StYfiResponse = {
       reward: number | null;
     }>;
   };
+  recent_activity?: StYfiRecentActivityPoint[];
   freshness?: {
     latest_snapshot_at?: string | null;
     latest_snapshot_age_seconds?: number | null;
