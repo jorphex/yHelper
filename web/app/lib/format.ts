@@ -132,6 +132,29 @@ export function yearnVaultUrl(chainId: number, address: string): string {
   return `https://yearn.fi/vaults/${chainId}/${encodeURIComponent(address)}`;
 }
 
+const CHAIN_EXPLORER_BASES: Record<number, string> = {
+  1: "https://etherscan.io",
+  10: "https://optimistic.etherscan.io",
+  100: "https://gnosisscan.io",
+  137: "https://polygonscan.com",
+  146: "https://sonicscan.org",
+  8453: "https://basescan.org",
+  42161: "https://arbiscan.io",
+  747474: "https://katanascan.com",
+};
+
+export function explorerAddressUrl(chainId: number, address: string): string | null {
+  const base = CHAIN_EXPLORER_BASES[chainId];
+  if (!base) return null;
+  return `${base}/address/${encodeURIComponent(address)}`;
+}
+
+export function explorerTxUrl(chainId: number, txHash: string): string | null {
+  const base = CHAIN_EXPLORER_BASES[chainId];
+  if (!base) return null;
+  return `${base}/tx/${encodeURIComponent(txHash)}`;
+}
+
 export function regimeLabel(value: string | null | undefined): string {
   if (!value) return "Unknown";
   const key = value.toLowerCase();
