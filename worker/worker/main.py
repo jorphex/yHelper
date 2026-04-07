@@ -58,6 +58,10 @@ STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_D
 STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
 STYFI_EPOCH_LOOKBACK = int(os.getenv("STYFI_EPOCH_LOOKBACK", "12"))
 STYFI_SITE_GLOBAL_DATA_URL = os.getenv("STYFI_SITE_GLOBAL_DATA_URL", "https://styfi.yearn.fi/api/global-data").strip()
+STYFI_REWARD_TOKEN_DEFAULT = {"address": None, "symbol": "yvUSDC-1", "decimals": 6}
+STYFI_ASSET_SYMBOL = "YFI"
+STYFI_ASSET_DECIMALS = 18
+STYFI_PRODUCT_SYMBOLS = {"styfi": "stYFI", "styfix": "stYFIx"}
 PRODUCT_ACTIVITY_RETENTION_DAYS = int(os.getenv("PRODUCT_ACTIVITY_RETENTION_DAYS", "180"))
 PRODUCT_ACTIVITY_BACKFILL_DAYS = int(os.getenv("PRODUCT_ACTIVITY_BACKFILL_DAYS", "35"))
 PRODUCT_ACTIVITY_BLOCK_SPAN = int(os.getenv("PRODUCT_ACTIVITY_BLOCK_SPAN", "50000"))
@@ -377,6 +381,9 @@ CREATE TABLE IF NOT EXISTS product_interactions (
     tx_from TEXT NOT NULL,
     user_account TEXT NOT NULL,
     attribution_kind TEXT NOT NULL,
+    amount_raw NUMERIC(78, 0),
+    amount_decimals INTEGER,
+    amount_symbol TEXT,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (chain_id, tx_hash, log_index)
 );
@@ -942,6 +949,16 @@ def _eth_get_transaction_for_chain(chain_id: int, tx_hash: str) -> dict[str, obj
     return payload
 
 
+def _eth_get_transaction_receipt_for_chain(chain_id: int, tx_hash: str) -> dict[str, object]:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    payload = _eth_rpc_to_url(rpc_url, "eth_getTransactionReceipt", [tx_hash])
+    if not isinstance(payload, dict):
+        raise ValueError(f"Unexpected eth_getTransactionReceipt result for chain {chain_id}: {payload!r}")
+    return payload
+
+
 def _eth_get_transactions_for_chain(chain_id: int, tx_hashes: list[str]) -> dict[str, dict[str, object]]:
     rpc_url = _rpc_url_for_chain(chain_id)
     if not rpc_url:
@@ -1069,6 +1086,66 @@ def _decode_uint256_words(data: object) -> list[int]:
     if len(payload) % 64 != 0:
         return []
     return [int(payload[idx : idx + 64], 16) for idx in range(0, len(payload), 64)]
+
+
+def _product_activity_reward_token_meta(conn: psycopg.Connection) -> dict[str, object]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT payload
+            FROM styfi_sync_state
+            WHERE stream_name = 'styfi_reward_epoch'
+            """,
+        )
+        row = cur.fetchone()
+    conn.commit()
+    payload = row[0] if row else {}
+    reward_token = payload.get("reward_token") if isinstance(payload, dict) else {}
+    if not isinstance(reward_token, dict):
+        reward_token = {}
+    symbol = str(reward_token.get("symbol") or STYFI_REWARD_TOKEN_DEFAULT["symbol"])
+    decimals = _to_int_or_none(reward_token.get("decimals"))
+    return {
+        "address": _normalize_optional_address(reward_token.get("address") or STYFI_REWARD_TOKEN_DEFAULT["address"]),
+        "symbol": symbol,
+        "decimals": STYFI_REWARD_TOKEN_DEFAULT["decimals"] if decimals is None else decimals,
+    }
+
+
+def _product_activity_amount_payload(
+    *,
+    product_type: str,
+    event_kind: str,
+    data: object,
+    reward_token_meta: dict[str, object],
+) -> dict[str, object | None]:
+    words = _decode_uint256_words(data)
+    if event_kind in {"deposit", "withdraw"} and product_type in {"styfi", "styfix"}:
+        amount_raw = words[0] if words else None
+        return {
+            "amount_raw": amount_raw,
+            "amount_decimals": STYFI_ASSET_DECIMALS,
+            "amount_symbol": STYFI_ASSET_SYMBOL,
+        }
+    if event_kind == "unstake" and product_type in {"styfi", "styfix"}:
+        amount_raw = words[0] if words else None
+        return {
+            "amount_raw": amount_raw,
+            "amount_decimals": STYFI_ASSET_DECIMALS,
+            "amount_symbol": STYFI_PRODUCT_SYMBOLS.get(product_type),
+        }
+    if event_kind == "claim" and product_type in {"styfi", "styfix"}:
+        amount_raw = words[0] if words else None
+        return {
+            "amount_raw": amount_raw,
+            "amount_decimals": _to_int_or_none(reward_token_meta.get("decimals")),
+            "amount_symbol": reward_token_meta.get("symbol"),
+        }
+    return {
+        "amount_raw": None,
+        "amount_decimals": None,
+        "amount_symbol": None,
+    }
 
 
 def _select_harvest_contracts(conn: psycopg.Connection) -> dict[int, dict[str, str]]:
@@ -2130,6 +2207,7 @@ def _product_activity_claim_rows(
     *,
     claim_logs: list[dict[str, object]],
     chain_id: int,
+    reward_token_meta: dict[str, object],
 ) -> list[dict[str, object]]:
     if not claim_logs:
         return []
@@ -2170,6 +2248,7 @@ def _product_activity_claim_rows(
                 "product_contract": product_contract,
                 "event_topic0": EVENT_TOPIC_CLAIM,
                 "account": account,
+                "data": log.get("data"),
             }
         )
     rows: list[dict[str, object]] = []
@@ -2202,6 +2281,12 @@ def _product_activity_claim_rows(
                         "tx_from": account,
                         "user_account": account,
                         "attribution_kind": "event_claim_tx_account",
+                        **_product_activity_amount_payload(
+                            product_type=product_type,
+                            event_kind="claim",
+                            data=candidate.get("data"),
+                            reward_token_meta=reward_token_meta,
+                        ),
                     }
                 )
     return rows
@@ -2283,7 +2368,10 @@ def _upsert_product_interactions(conn: psycopg.Connection, rows: list[dict[str, 
                 event_topic0,
                 tx_from,
                 user_account,
-                attribution_kind
+                attribution_kind,
+                amount_raw,
+                amount_decimals,
+                amount_symbol
             ) VALUES (
                 %(chain_id)s,
                 %(block_number)s,
@@ -2296,9 +2384,15 @@ def _upsert_product_interactions(conn: psycopg.Connection, rows: list[dict[str, 
                 %(event_topic0)s,
                 %(tx_from)s,
                 %(user_account)s,
-                %(attribution_kind)s
+                %(attribution_kind)s,
+                %(amount_raw)s,
+                %(amount_decimals)s,
+                %(amount_symbol)s
             )
-            ON CONFLICT (chain_id, tx_hash, log_index) DO NOTHING
+            ON CONFLICT (chain_id, tx_hash, log_index) DO UPDATE SET
+                amount_raw = COALESCE(product_interactions.amount_raw, EXCLUDED.amount_raw),
+                amount_decimals = COALESCE(product_interactions.amount_decimals, EXCLUDED.amount_decimals),
+                amount_symbol = COALESCE(product_interactions.amount_symbol, EXCLUDED.amount_symbol)
             """,
             rows,
         )
@@ -2354,6 +2448,7 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
     errors: list[str] = []
     try:
         targets = _select_product_activity_contracts(conn)
+        reward_token_meta = _product_activity_reward_token_meta(conn)
         for chain_id, contracts in targets.items():
             try:
                 rpc_url = _rpc_url_for_chain(chain_id)
@@ -2477,11 +2572,21 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                                             "tx_from": event_sender,
                                             "user_account": user_account,
                                             "attribution_kind": attribution_kind,
+                                            **_product_activity_amount_payload(
+                                                product_type=product_type,
+                                                event_kind=event_kind,
+                                                data=log.get("data"),
+                                                reward_token_meta=reward_token_meta,
+                                            ),
                                         }
                                     )
                                 chain_inserted += _upsert_product_interactions(conn, rows)
                                 if topics_filter == [[EVENT_TOPIC_CLAIM]]:
-                                    claim_rows = _product_activity_claim_rows(claim_logs=logs, chain_id=chain_id)
+                                    claim_rows = _product_activity_claim_rows(
+                                        claim_logs=logs,
+                                        chain_id=chain_id,
+                                        reward_token_meta=reward_token_meta,
+                                    )
                                     if claim_rows:
                                         chain_inserted += _upsert_product_interactions(conn, claim_rows)
                     except Exception as window_exc:
@@ -2564,9 +2669,112 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
         logging.exception("Product DAU sync failed: %s", exc)
         return run_id, inserted_total
 
+
+def _backfill_styfi_activity_amounts(conn: psycopg.Connection, *, limit: int = 500) -> int:
+    reward_token_meta = _product_activity_reward_token_meta(conn)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                chain_id,
+                tx_hash,
+                log_index,
+                product_type,
+                event_kind,
+                product_contract
+            FROM product_interactions
+            WHERE
+                chain_id = %(chain_id)s
+                AND product_type IN ('styfi', 'styfix')
+                AND (amount_raw IS NULL OR amount_decimals IS NULL OR COALESCE(amount_symbol, '') = '')
+            ORDER BY block_time DESC, tx_hash DESC, log_index DESC
+            LIMIT %(limit)s
+            """,
+            {"chain_id": STYFI_CHAIN_ID, "limit": limit},
+        )
+        pending = cur.fetchall()
+    conn.commit()
+    if not pending:
+        return 0
+    by_tx: dict[str, list[dict[str, object]]] = {}
+    for chain_id, tx_hash, log_index, product_type, event_kind, product_contract in pending:
+        by_tx.setdefault(str(tx_hash), []).append(
+            {
+                "chain_id": int(chain_id),
+                "tx_hash": str(tx_hash),
+                "log_index": int(log_index),
+                "product_type": str(product_type),
+                "event_kind": str(event_kind),
+                "product_contract": str(product_contract).lower(),
+            }
+        )
+    updates: list[dict[str, object]] = []
+    for tx_hash, rows in by_tx.items():
+        chain_id = int(rows[0]["chain_id"])
+        try:
+            receipt = _eth_get_transaction_receipt_for_chain(chain_id, tx_hash)
+        except Exception as exc:
+            logging.warning("stYFI amount backfill receipt fetch failed: tx=%s error=%s", tx_hash, exc)
+            continue
+        logs = receipt.get("logs")
+        if not isinstance(logs, list):
+            continue
+        logs_by_index = {
+            _hex_to_int(log.get("logIndex")): log
+            for log in logs
+            if isinstance(log, dict) and _hex_to_int(log.get("logIndex")) is not None
+        }
+        for row in rows:
+            log = logs_by_index.get(int(row["log_index"]))
+            if not isinstance(log, dict):
+                continue
+            payload = _product_activity_amount_payload(
+                product_type=str(row["product_type"]),
+                event_kind=str(row["event_kind"]),
+                data=log.get("data"),
+                reward_token_meta=reward_token_meta,
+            )
+            if payload["amount_raw"] is None and payload["amount_decimals"] is None and payload["amount_symbol"] is None:
+                continue
+            updates.append(
+                {
+                    "chain_id": chain_id,
+                    "tx_hash": tx_hash,
+                    "log_index": int(row["log_index"]),
+                    "amount_raw": payload["amount_raw"],
+                    "amount_decimals": payload["amount_decimals"],
+                    "amount_symbol": payload["amount_symbol"],
+                }
+            )
+    if not updates:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            UPDATE product_interactions
+            SET
+                amount_raw = COALESCE(amount_raw, %(amount_raw)s),
+                amount_decimals = COALESCE(amount_decimals, %(amount_decimals)s),
+                amount_symbol = COALESCE(amount_symbol, %(amount_symbol)s)
+            WHERE
+                chain_id = %(chain_id)s
+                AND tx_hash = %(tx_hash)s
+                AND log_index = %(log_index)s
+            """,
+            updates,
+        )
+        updated = cur.rowcount
+    conn.commit()
+    if updated > 0:
+        logging.info("stYFI activity amount backfill updated=%s pending=%s", updated, len(pending))
+    return updated
+
 def _ensure_schema(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute(DDL)
+        cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_raw NUMERIC(78, 0)")
+        cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_decimals INTEGER")
+        cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_symbol TEXT")
         cur.execute(
             """
             DO $$
@@ -3572,6 +3780,7 @@ def run_once() -> None:
         else:
             logging.info("Skipping stYFI snapshot because STYFI_SYNC_ENABLED=0")
         _run_product_dau(conn)
+        _backfill_styfi_activity_amounts(conn)
         if HARVEST_WSS_MANAGER is not None:
             HARVEST_WSS_MANAGER.refresh(_select_harvest_contracts(conn))
         _run_vault_harvests(conn)

@@ -72,6 +72,16 @@ STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
 STYFI_TOKEN_SCALE = float(10**18)
 STYFI_SITE_REWARD_SCALE = float(10**18)
 STYFI_REWARD_TOKEN_DEFAULT = {"address": None, "symbol": "yvUSDC-1", "decimals": 6}
+STYFI_INTERNAL_ACTIVITY_ACCOUNTS = {
+    "0x42b25284e8ae427d79da78b65dffc232aaecc016",
+    "0x9c42461aa8422926e3aef7b1c6e3743597149d79",
+    "0x95547ede56cf74b73dd78a37f547127dffda6113",
+    "0x952b31960c97e76362ac340d07d183ada15e3d6e",
+    "0xa82454009e01ae697012a73cb232d85e61b05e50",
+    "0xd31911a33a5577be233dc096f6f5a7e496ff5934",
+    "0x2548bf65916fdabb5a5673fc4225011ff29ee884",
+    "0x7efc3953bed2fc20b9f825ebffab1cc8b072a000",
+}
 _SOCIAL_PREVIEW_LIVE_CACHE: dict[str, float | dict[str, object] | None] = {"fetched_at": 0.0, "highest_est_apy_vault": None}
 
 
@@ -123,6 +133,9 @@ def _ensure_schema_columns() -> None:
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS token_decimals INTEGER")
+            cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_raw NUMERIC(78, 0)")
+            cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_decimals INTEGER")
+            cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_symbol TEXT")
         conn.commit()
 
 
@@ -1364,6 +1377,61 @@ def _styfi_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
     }
 
 
+def _styfi_recent_activity(cur: psycopg.Cursor, *, limit: int = 10) -> list[dict[str, object]]:
+    cur.execute(
+        """
+        SELECT
+            chain_id,
+            block_time,
+            tx_hash,
+            user_account,
+            product_type,
+            event_kind,
+            product_contract,
+            amount_raw,
+            amount_decimals,
+            amount_symbol
+        FROM product_interactions
+        WHERE
+            chain_id = %(chain_id)s
+            AND product_type IN ('styfi', 'styfix')
+            AND event_kind IN ('deposit', 'unstake', 'withdraw', 'claim')
+            AND NOT (LOWER(user_account) = ANY(%(ignored_accounts)s))
+        ORDER BY block_time DESC, tx_hash DESC, log_index DESC
+        LIMIT %(limit)s
+        """,
+        {"chain_id": STYFI_CHAIN_ID, "limit": limit, "ignored_accounts": sorted(STYFI_INTERNAL_ACTIVITY_ACCOUNTS)},
+    )
+    rows = cur.fetchall()
+    action_labels = {
+        "deposit": "Stake",
+        "unstake": "Unstake",
+        "withdraw": "Withdraw",
+        "claim": "Claim",
+    }
+    product_labels = {
+        "styfi": "stYFI",
+        "styfix": "stYFIx",
+    }
+    return [
+        {
+            "chain_id": int(row.get("chain_id") or STYFI_CHAIN_ID),
+            "block_time": row["block_time"].isoformat() if row.get("block_time") else None,
+            "tx_hash": row.get("tx_hash"),
+            "user_account": row.get("user_account"),
+            "product_type": row.get("product_type"),
+            "product_label": product_labels.get(str(row.get("product_type") or ""), str(row.get("product_type") or "").upper()),
+            "event_kind": row.get("event_kind"),
+            "action_label": action_labels.get(str(row.get("event_kind") or ""), str(row.get("event_kind") or "").title()),
+            "product_contract": row.get("product_contract"),
+            "amount_raw": str(row["amount_raw"]) if row.get("amount_raw") is not None else None,
+            "amount_decimals": int(row["amount_decimals"]) if row.get("amount_decimals") is not None else None,
+            "amount_symbol": row.get("amount_symbol"),
+        }
+        for row in rows
+    ]
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -2401,6 +2469,7 @@ async def styfi(
                 reward_scale=reward_scale,
             )
             last_run = _styfi_last_run(cur)
+            recent_activity = _styfi_recent_activity(cur)
 
     latest_snapshot_at = summary.get("latest_snapshot_at")
     latest_snapshot_dt = datetime.fromisoformat(latest_snapshot_at) if isinstance(latest_snapshot_at, str) else None
@@ -2418,6 +2487,7 @@ async def styfi(
             "epochs": epochs,
         },
         "component_split_latest_completed": component_split,
+        "recent_activity": recent_activity,
         "freshness": {
             "latest_snapshot_at": latest_snapshot_at,
             "latest_snapshot_age_seconds": _seconds_since(latest_snapshot_dt, datetime.now(UTC)),
