@@ -11,6 +11,7 @@ import { fetchDauData } from "./hooks/use-dau-data";
 import { fetchDiscoverData } from "./hooks/use-discover-data";
 import { fetchHarvestData } from "./hooks/use-harvest-data";
 import { fetchHomeData } from "./hooks/use-home-data";
+import { fetchRegimesData, fetchTransitionsDailyData, fetchTransitionsData } from "./hooks/use-regimes-data";
 import { fetchStYfiData } from "./hooks/use-styfi-data";
 import { queryClient } from "./lib/query-client";
 
@@ -171,6 +172,67 @@ function GlobalPrefetch() {
             days: 90,
             groupBy: "category",
             groupLimit: 10,
+            enabled: true,
+          }),
+          staleTime: 30_000,
+        }),
+        () => client.prefetchQuery({
+          queryKey: ["regimes", {
+            universe: "core",
+            minTvl: 1000000,
+            minPoints: 45,
+            limit: 30,
+            chainId: null,
+            enabled: true,
+          }],
+          queryFn: () => fetchRegimesData({
+            universe: "core",
+            minTvl: 1000000,
+            minPoints: 45,
+            limit: 30,
+            chainId: null,
+            enabled: true,
+          }),
+          staleTime: 30_000,
+        }),
+        () => client.prefetchQuery({
+          queryKey: ["transitions", {
+            universe: "core",
+            minTvl: 1000000,
+            minPoints: 45,
+            limit: 30,
+            chainId: null,
+            enabled: true,
+          }],
+          queryFn: () => fetchTransitionsData({
+            universe: "core",
+            minTvl: 1000000,
+            minPoints: 45,
+            limit: 30,
+            chainId: null,
+            enabled: true,
+          }),
+          staleTime: 30_000,
+        }),
+        () => client.prefetchQuery({
+          queryKey: ["transitions-daily", {
+            universe: "core",
+            minTvl: 1000000,
+            minPoints: 45,
+            chainId: null,
+            days: 120,
+            groupBy: "none",
+            groupLimit: 8,
+            enabled: true,
+          }],
+          queryFn: () => fetchTransitionsDailyData({
+            universe: "core",
+            minTvl: 1000000,
+            minPoints: 45,
+            chainId: null,
+            days: 120,
+            groupBy: "none",
+            groupLimit: 8,
             enabled: true,
           }),
           staleTime: 30_000,
