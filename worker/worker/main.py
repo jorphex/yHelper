@@ -630,6 +630,8 @@ def _normalize_optional_address(value: object) -> str | None:
 def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple[dict, list[str]]:
     asset = vault.get("asset")
     asset_obj = asset if isinstance(asset, dict) else {}
+    token = vault.get("token")
+    token_obj = token if isinstance(token, dict) else {}
     meta = vault.get("meta")
     meta_obj = meta if isinstance(meta, dict) else {}
     meta_token = meta_obj.get("token")
@@ -657,12 +659,17 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
         "category": _first_present(meta_obj, ("category",)) or vault.get("category"),
         "kind": _first_present(meta_obj, ("kind",)) or vault.get("kind"),
         "version": _first_present(vault, ("apiVersion", "version")),
-        "token_address": _normalize_optional_address(_first_present(asset_obj, ("address", "tokenAddress"))),
-        "token_symbol": _first_present(asset_obj, ("symbol", "tokenSymbol")),
-        "token_name": _first_present(asset_obj, ("name", "tokenName")),
+        "token_address": _normalize_optional_address(
+            _first_present(asset_obj, ("address", "tokenAddress"))
+            or _first_present(token_obj, ("address", "tokenAddress"))
+        ),
+        "token_symbol": _first_present(asset_obj, ("symbol", "tokenSymbol")) or _first_present(token_obj, ("symbol",)),
+        "token_name": _first_present(asset_obj, ("name", "tokenName")) or _first_present(token_obj, ("name",)),
         "token_decimals": _to_int_or_none(
             _first_present(asset_obj, ("decimals", "tokenDecimals"))
             or _first_present(meta_token_obj, ("decimals",))
+            or _first_present(token_obj, ("decimals",))
+            or _first_present(vault, ("decimals",))
         ),
         "tvl_usd": tvl_usd,
         "est_apy": est_apy,

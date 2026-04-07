@@ -2135,6 +2135,16 @@ def _harvest_recent(
                     WHEN jsonb_typeof(d.raw -> 'meta' -> 'token' -> 'decimals') IN ('number', 'string')
                     THEN NULLIF(d.raw -> 'meta' -> 'token' ->> 'decimals', '')::int
                     ELSE NULL
+                END,
+                CASE
+                    WHEN jsonb_typeof(d.raw -> 'token' -> 'decimals') IN ('number', 'string')
+                    THEN NULLIF(d.raw -> 'token' ->> 'decimals', '')::int
+                    ELSE NULL
+                END,
+                CASE
+                    WHEN jsonb_typeof(d.raw -> 'decimals') IN ('number', 'string')
+                    THEN NULLIF(d.raw ->> 'decimals', '')::int
+                    ELSE NULL
                 END
             ) AS token_decimals,
             h.vault_version,
