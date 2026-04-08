@@ -251,6 +251,15 @@ STYFI_CLAIM_IGNORED_ACCOUNTS = {
     *STYFI_CLAIM_SOURCES.keys(),
     STYFI_CONTRACTS["reward_distributor"],
 }
+STYFI_INTERNAL_ACTIVITY_ACCOUNTS = {
+    *STYFI_EVENT_CONTRACTS,
+    STYFI_CONTRACTS["styfi_reward_distributor"],
+    STYFI_CONTRACTS["styfix_reward_distributor"],
+    STYFI_CONTRACTS["reward_claimer"],
+    STYFI_CONTRACTS["reward_distributor"],
+    STYFI_CONTRACTS["veyfi_reward_distributor"],
+    STYFI_CONTRACTS["liquid_locker_reward_distributor"],
+}
 
 KONG_PPS_QUERY = """
 query Query($label: String!, $chainId: Int, $address: String, $component: String, $limit: Int, $timestamp: BigInt) {
@@ -3204,7 +3213,14 @@ def _discord_timestamp(dt: datetime) -> str:
     return f"<t:{ts}:f> (<t:{ts}:R>)"
 
 
-def _format_amount(raw_value: object, decimals: int | None, symbol: str | None) -> str:
+def _format_amount(
+    raw_value: object,
+    decimals: int | None,
+    symbol: str | None,
+    *,
+    max_fraction_digits: int = 6,
+    use_ellipsis: bool = True,
+) -> str:
     if raw_value is None:
         return "n/a"
     digits = str(raw_value).strip()
@@ -3221,8 +3237,8 @@ def _format_amount(raw_value: object, decimals: int | None, symbol: str | None) 
     trimmed_fraction = fraction.rstrip("0")
     if not trimmed_fraction:
         return f"{whole_with_commas} {symbol}".strip()
-    visible_fraction = trimmed_fraction[:6]
-    suffix = "…" if len(trimmed_fraction) > 6 else ""
+    visible_fraction = trimmed_fraction[:max_fraction_digits]
+    suffix = "…" if use_ellipsis and len(trimmed_fraction) > max_fraction_digits else ""
     return f"{whole_with_commas}.{visible_fraction}{suffix} {symbol}".strip()
 
 
@@ -3427,6 +3443,33 @@ def _harvest_vault_meta(conn: psycopg.Connection, *, chain_id: int, vault_addres
     }
 
 
+def _styfi_totals_summary(conn: psycopg.Connection) -> str | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT combined_staked_raw, styfi_total_assets_raw, styfix_total_assets_raw
+            FROM styfi_snapshots
+            WHERE chain_id = %s
+            ORDER BY observed_at DESC
+            LIMIT 1
+            """,
+            (STYFI_CHAIN_ID,),
+        )
+        row = cur.fetchone()
+    conn.commit()
+    if not row:
+        return None
+    combined_raw, styfi_raw, styfix_raw = row
+    combined_text = _format_amount(
+        combined_raw, STYFI_ASSET_DECIMALS, STYFI_ASSET_SYMBOL, max_fraction_digits=2, use_ellipsis=False
+    )
+    styfi_text = _format_amount(styfi_raw, STYFI_ASSET_DECIMALS, "stYFI", max_fraction_digits=2, use_ellipsis=False)
+    styfix_text = _format_amount(
+        styfix_raw, STYFI_ASSET_DECIMALS, "stYFIx", max_fraction_digits=2, use_ellipsis=False
+    )
+    return f"{combined_text} | {styfi_text}, {styfix_text}"
+
+
 def _build_harvest_discord_payload(
     conn: psycopg.Connection,
     *,
@@ -3500,7 +3543,10 @@ def _styfi_action_color(event_kind: str) -> int:
     }.get(event_kind, int(STYFI_DISCORD_DESTINATION["color"]))
 
 
-def _build_styfi_discord_payload(row: dict[str, object]) -> tuple[str, dict[str, object]] | None:
+def _build_styfi_discord_payload(
+    conn: psycopg.Connection,
+    row: dict[str, object],
+) -> tuple[str, dict[str, object]] | None:
     webhook_url = STYFI_DISCORD_DESTINATION.get("webhook_url")
     if not webhook_url:
         return None
@@ -3528,6 +3574,9 @@ def _build_styfi_discord_payload(row: dict[str, object]) -> tuple[str, dict[str,
             {"name": "\u200b", "value": f"🔗 [View on Explorer]({tx_url})" if tx_url else "Explorer unavailable", "inline": False},
         ],
     }
+    totals_summary = _styfi_totals_summary(conn)
+    if totals_summary:
+        embed["description"] = totals_summary
     payload = {
         "username": STYFI_DISCORD_DESTINATION["username"],
         "embeds": [embed],
@@ -3561,7 +3610,10 @@ def _notify_harvest_rows(conn: psycopg.Connection, rows: list[dict[str, object]]
 def _notify_styfi_activity_rows(conn: psycopg.Connection, rows: list[dict[str, object]]) -> int:
     delivered = 0
     for row in rows:
-        built = _build_styfi_discord_payload(row)
+        account = str(row.get("user_account") or "").lower()
+        if account in STYFI_INTERNAL_ACTIVITY_ACCOUNTS:
+            continue
+        built = _build_styfi_discord_payload(conn, row)
         if not built:
             continue
         destination_key, payload = built
