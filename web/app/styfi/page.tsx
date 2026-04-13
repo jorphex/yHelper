@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Suspense, useMemo } from "react";
-import { explorerAddressUrl, explorerTxUrl, formatHours, formatPct, formatUtcDateTime } from "../lib/format";
+import { explorerAddressUrl, explorerTxUrl, formatPct, formatUtcDateTime } from "../lib/format";
 import { BarList, TrendStrips } from "../components/visuals";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { useStYfiData } from "../hooks/use-styfi-data";
@@ -12,6 +12,8 @@ type StYfiSnapshotPoint = {
   reward_epoch?: number | null;
   styfi_staked?: number | null;
   styfix_staked?: number | null;
+  liquid_lockers_staked?: number | null;
+  migrated_yfi?: number | null;
   combined_staked?: number | null;
   staked_share_supply?: number | null;
 };
@@ -47,6 +49,8 @@ type StYfiResponse = {
     yfi_total_supply?: number | null;
     styfi_staked?: number | null;
     styfix_staked?: number | null;
+    liquid_lockers_staked?: number | null;
+    migrated_yfi?: number | null;
     combined_staked?: number | null;
     staked_share_supply?: number | null;
     net_flow_24h?: number | null;
@@ -55,13 +59,14 @@ type StYfiResponse = {
     first_snapshot_at?: string | null;
     latest_snapshot_at?: string | null;
   };
-  reward_token?: { symbol?: string | null };
   current_reward_state?: {
     epoch?: number | null;
     styfi_current_apr?: number | null;
     styfix_current_apr?: number | null;
     styfi_current_reward?: number | null;
     styfix_current_reward?: number | null;
+    liquid_lockers_staked?: number | null;
+    migrated_yfi?: number | null;
   } | null;
   series?: {
     snapshots?: StYfiSnapshotPoint[];
@@ -101,6 +106,13 @@ function percentShare(value: number | null | undefined, total: number | null | u
   return `${formatPct(value / total, 0)} of total`;
 }
 
+function formatUtcDate(value: string | null | undefined): string {
+  if (!value) return "n/a";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "n/a";
+  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" }).format(date);
+}
+
 function formatRollingSpan(start: string | null | undefined, end: string | null | undefined): string {
   if (!start || !end) return "n/a";
   const diffMs = new Date(end).getTime() - new Date(start).getTime();
@@ -108,13 +120,6 @@ function formatRollingSpan(start: string | null | undefined, end: string | null 
   const diffHours = diffMs / (1000 * 60 * 60);
   if (diffHours < 24) return `${diffHours.toFixed(1)}h`;
   return `${(diffHours / 24).toFixed(1)}d`;
-}
-
-function formatUtcDate(value: string | null | undefined): string {
-  if (!value) return "n/a";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "n/a";
-  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" }).format(date);
 }
 
 function shortHex(value: string | null | undefined, left = 6, right = 4): string {
@@ -156,7 +161,6 @@ function StYfiPageContent() {
   const recentActivity = useMemo<StYfiRecentActivityPoint[]>(() => data?.recent_activity ?? [], [data?.recent_activity]);
   const currentEpoch = summary?.reward_epoch ?? null;
   const historySpan = formatRollingSpan(summary?.first_snapshot_at ?? null, summary?.latest_snapshot_at ?? null);
-  const snapshotCountValue = summary?.snapshots_count ?? "n/a";
   const hasNetFlow24h = summary?.net_flow_24h !== null && summary?.net_flow_24h !== undefined && Number.isFinite(summary.net_flow_24h);
   const hasNetFlow7d = summary?.net_flow_7d !== null && summary?.net_flow_7d !== undefined && Number.isFinite(summary.net_flow_7d);
 
@@ -165,7 +169,7 @@ function StYfiPageContent() {
       {
         label: "Combined Staked",
         value: formatTokenCompact(summary?.combined_staked ?? null, "YFI"),
-        hint: "Total stYFI plus stYFIx balance.",
+        hint: "Total stYFI, stYFIx, liquid lockers, and migrated veYFI.",
       },
       {
         label: "Share of Supply",
@@ -173,36 +177,36 @@ function StYfiPageContent() {
         hint: `${formatToken(summary?.yfi_total_supply ?? null, "YFI", 0)} total supply`,
       },
       {
-        label: "Snapshot Freshness",
-        value: formatHours(data?.freshness?.latest_snapshot_age_seconds ?? null, 1),
-        hint: formatUtcDateTime(data?.freshness?.latest_snapshot_at ?? null),
+        label: "stYFI APR",
+        value: formatPct(data?.current_reward_state?.styfi_current_apr ?? null, 2),
+        hint: Number.isFinite(data?.current_reward_state?.styfix_current_apr ?? null)
+          ? `stYFIx ${formatPct(data?.current_reward_state?.styfix_current_apr ?? null, 2)} APR`
+          : "Current staking rewards rate",
       },
-      hasNetFlow24h ? {
+      {
         label: "Net Flow 24h",
-        value: formatSignedToken(summary?.net_flow_24h ?? null, "YFI"),
-        hint: "Snapshot derived, not gross stake/unstake",
-      } : {
-        label: "History Warm-Up",
-        value: `${snapshotCountValue} captures`,
-        hint: "Protocol stake balances and reward epoch state.",
+        value: hasNetFlow24h ? formatSignedToken(summary?.net_flow_24h ?? null, "YFI") : "Syncing",
+        hint: hasNetFlow24h
+          ? "Snapshot derived, not gross stake/unstake"
+          : "Waiting for a corrected 24h comparison snapshot after the total-count fix",
       },
-      hasNetFlow7d ? {
+      {
         label: "Net Flow 7d",
-        value: formatSignedToken(summary?.net_flow_7d ?? null, "YFI"),
-        hint: "Compared with snapshot seven days back",
-      } : {
-        label: "Reward Token",
-        value: rewardSymbol,
-        hint: `History span ${historySpan}`,
+        value: hasNetFlow7d ? formatSignedToken(summary?.net_flow_7d ?? null, "YFI") : "Syncing",
+        hint: hasNetFlow7d
+          ? "Compared with snapshot seven days back"
+          : "Waiting for a corrected 7d comparison snapshot after the total-count fix",
       },
     ];
     return items;
-  }, [summary, data?.freshness, rewardSymbol, hasNetFlow24h, hasNetFlow7d, historySpan, snapshotCountValue]);
+  }, [summary, data?.current_reward_state, hasNetFlow24h, hasNetFlow7d]);
 
   const stakeTrendItems = useMemo(() => [
     { id: "combined", label: "Total", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest combined balance vs previous snapshot" },
     { id: "styfi", label: "stYFI", points: snapshotSeries.map((r) => r.styfi_staked), note: "Latest stYFI balance vs previous snapshot" },
     { id: "styfix", label: "stYFIx", points: snapshotSeries.map((r) => r.styfix_staked), note: "Latest stYFIx balance vs previous snapshot" },
+    { id: "liquid-lockers", label: "Liquid lockers", points: snapshotSeries.map((r) => r.liquid_lockers_staked), note: "Latest liquid-locker balance from stYFI global state" },
+    { id: "migrated-yfi", label: "Migrated veYFI", points: snapshotSeries.map((r) => r.migrated_yfi), note: "Latest migrated veYFI balance from stYFI global state" },
   ], [snapshotSeries]);
 
   const rewardBars = useMemo(() => [

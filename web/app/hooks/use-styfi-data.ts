@@ -8,6 +8,8 @@ type StYfiSnapshotPoint = {
   reward_epoch?: number | null;
   styfi_staked?: number | null;
   styfix_staked?: number | null;
+  liquid_lockers_staked?: number | null;
+  migrated_yfi?: number | null;
   combined_staked?: number | null;
   staked_share_supply?: number | null;
 };
@@ -51,6 +53,8 @@ type StYfiResponse = {
     styfi_supply?: number | null;
     styfix_staked?: number | null;
     styfix_supply?: number | null;
+    liquid_lockers_staked?: number | null;
+    migrated_yfi?: number | null;
     combined_staked?: number | null;
     staked_share_supply?: number | null;
     net_flow_24h?: number | null;
@@ -79,6 +83,8 @@ type StYfiResponse = {
     styfix_current_apr?: number | null;
     styfix_projected_reward?: number | null;
     styfix_projected_apr?: number | null;
+    liquid_lockers_staked?: number | null;
+    migrated_yfi?: number | null;
   } | null;
   series?: {
     snapshots?: StYfiSnapshotPoint[];
