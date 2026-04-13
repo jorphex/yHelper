@@ -1,157 +1,26 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
-import Link from "next/link";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
+import { chainLabel } from "../lib/format";
 import { useCompositionData } from "../hooks/use-composition-data";
 import { useChainsData } from "../hooks/use-chains-data";
-import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
+import { sortRows, type SortState } from "../lib/sort";
 import { queryChoice, queryFloat, queryInt, replaceQuery } from "../lib/url";
-import { BarList, HeatGrid, ScatterPlot, useInViewOnce } from "../components/visuals";
-import { VaultLink } from "../components/vault-link";
-import { UniverseKind, universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
-import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
-
-type TabKey = "overview" | "chains" | "crowding";
-type ChainSortKey = "chain" | "vaults" | "with_realized_apy" | "tvl" | "apy" | "momentum" | "consistency";
-type CategorySortKey = "category" | "vaults" | "tvl" | "share" | "apy";
-type TokenSortKey = "token" | "vaults" | "tvl" | "share" | "apy";
-type CrowdingSortKey = "vault" | "chain" | "token" | "category" | "tvl" | "apy" | "crowding";
-
-type BreakdownRow = {
-  chain_id?: number;
-  category?: string;
-  token_symbol?: string;
-  vaults: number;
-  tvl_usd: number | null;
-  share_tvl?: number | null;
-  weighted_realized_apy_30d?: number | null;
-};
-
-type CrowdingRow = {
-  vault_address: string;
-  chain_id: number;
-  symbol: string | null;
-  token_symbol: string | null;
-  category: string | null;
-  tvl_usd: number | null;
-  realized_apy_30d: number | null;
-  crowding_index: number | null;
-};
-
-function formatUsdCompact(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function TvlTreemap({
-  title,
-  chains,
-  categories,
-  tokens,
-}: {
-  title: string;
-  chains: BreakdownRow[];
-  categories: BreakdownRow[];
-  tokens: BreakdownRow[];
-}) {
-  const { ref, isInView } = useInViewOnce<HTMLElement>();
-  const width = 820;
-  const height = 168;
-  const topChains = [...chains]
-    .filter((row) => (row.tvl_usd ?? 0) > 0)
-    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
-    .slice(0, 6);
-  const topCategories = [...categories]
-    .filter((row) => (row.tvl_usd ?? 0) > 0)
-    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
-    .slice(0, 6);
-  const topTokens = [...tokens]
-    .filter((row) => (row.tvl_usd ?? 0) > 0)
-    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
-    .slice(0, 8);
-  const groups = [
-    { key: "chain", label: "Chain", color: "rgba(100, 150, 255, 0.78)", rows: topChains, text: (row: BreakdownRow) => chainLabel(row.chain_id) },
-    { key: "category", label: "Category", color: "rgba(100, 200, 180, 0.7)", rows: topCategories, text: (row: BreakdownRow) => row.category || "unknown" },
-    { key: "token", label: "Token", color: "rgba(180, 120, 220, 0.72)", rows: topTokens, text: (row: BreakdownRow) => row.token_symbol || "unknown" },
-  ];
-  const validGroups = groups.filter((group) => group.rows.length > 0);
-  if (validGroups.length === 0) {
-    return (
-      <section style={{ padding: "24px" }}>
-        <h3>{title}</h3>
-        <p style={{ color: "var(--text-secondary)" }}>No composition rows available.</p>
-      </section>
-    );
-  }
-  const laneGap = Math.max(7, Math.round(height * 0.04));
-  const laneHeight = (height - 12 - (validGroups.length - 1) * laneGap) / validGroups.length;
-
-  return (
-    <section ref={ref} style={{ padding: "24px", opacity: isInView ? 1 : 0.9, transition: "opacity 0.3s" }}>
-      <h3 className="card-title">{title}</h3>
-      <div style={{ overflowX: "auto" }}>
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title} style={{ width: "100%", minWidth: "600px", height: "auto" }}>
-          {validGroups.map((group, groupIndex) => {
-            const y = 5 + groupIndex * (laneHeight + laneGap);
-            const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
-            const labelOffset = Math.max(68, Math.min(98, Math.round(width * 0.095)));
-            const laneWidth = width - labelOffset - 8;
-            const scaledWidths = group.rows.map((row) => {
-              const value = Number(row.tvl_usd ?? 0);
-              return total > 0 ? (value / total) * laneWidth : 0;
-            });
-            let x = 0;
-            return (
-              <g key={group.key}>
-                <text x={2} y={y + laneHeight / 2 + 0.5} style={{ fontSize: "11px", fill: "var(--text-secondary)" }} dominantBaseline="central">
-                  {group.label}
-                </text>
-                {group.rows.map((row, rowIndex) => {
-                  const targetWidth = scaledWidths[rowIndex] ?? 0;
-                  const w = rowIndex === group.rows.length - 1 ? Math.max(0, laneWidth - x) : Math.max(0, targetWidth);
-                  const rectX = labelOffset + x;
-                  x += w;
-                  const name = group.text(row);
-                  const maxChars = Math.max(0, Math.floor((w - 10) / 5.8));
-                  const compactName = maxChars > 0 ? (name.length > maxChars ? `${name.slice(0, Math.max(2, maxChars - 1))}…` : name) : "";
-                  return (
-                    <g key={`${group.key}-${name}`}>
-                      <rect
-                        x={rectX}
-                        y={y}
-                        width={w}
-                        height={laneHeight}
-                        fill={group.color}
-                        opacity={0.85}
-                        stroke="var(--border)"
-                        style={{ transition: "all 0.2s" } as CSSProperties}
-                      />
-                      {w >= 54 && compactName ? (
-                        <text x={rectX + 5} y={y + Math.min(18, laneHeight - 6)} style={{ fontSize: "10px", fill: "var(--text-primary)" }}>
-                          {compactName}
-                        </text>
-                      ) : null}
-                      <title>{`${group.label}: ${name}\nTVL: ${formatUsd(row.tvl_usd)}\nShare: ${formatPct(row.share_tvl, 1)}`}</title>
-                    </g>
-                  );
-                })}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "12px" }}>
-        Treemap lanes show top TVL contributors by chain, category, and token.
-      </p>
-    </section>
-  );
-}
+import { universeDefaults, universeLabel, UNIVERSE_VALUES } from "../lib/universe";
+import { OverviewTab } from "./overview-tab";
+import { ChainsTab } from "./chains-tab";
+import { CrowdingTab } from "./crowding-tab";
+import type {
+  BreakdownRow,
+  CategorySortKey,
+  ChainSortKey,
+  CrowdingRow,
+  CrowdingSortKey,
+  StructureQuery,
+  TabKey,
+  TokenSortKey,
+} from "./types";
 
 function StructurePageContent() {
   const router = useRouter();
@@ -165,8 +34,8 @@ function StructurePageContent() {
   const [uncrowdedSort, setUncrowdedSort] = useState<SortState<CrowdingSortKey>>({ key: "crowding", direction: "asc" });
   const [isCompactViewport, setIsCompactViewport] = useState(false);
 
-  const query = useMemo(() => {
-    const universe = queryChoice<UniverseKind>(searchParams, "universe", UNIVERSE_VALUES, "core");
+  const query = useMemo<StructureQuery>(() => {
+    const universe = queryChoice(searchParams, "universe", UNIVERSE_VALUES, "core");
     const defaults = universeDefaults(universe);
     return {
       universe,
@@ -178,8 +47,8 @@ function StructurePageContent() {
     };
   }, [searchParams]);
 
-  useMemo(() => {
-    if (query.tab && ["overview", "chains", "crowding"].includes(query.tab)) {
+  useEffect(() => {
+    if (query.tab === "overview" || query.tab === "chains" || query.tab === "crowding") {
       setActiveTab(query.tab);
     }
   }, [query.tab]);
@@ -195,32 +64,22 @@ function StructurePageContent() {
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
 
-  const setTab = (tab: TabKey) => {
-    setActiveTab(tab);
-    updateQuery({ tab });
-  };
-
-  // Composition data
   const { data: compData, isLoading: isLoadingComp } = useCompositionData({
     universe: query.universe,
     minTvl: query.minTvl,
   });
-
-  // Chains data
   const { data: chainsData, isLoading: isLoadingChains } = useChainsData({
     universe: query.universe,
     minTvl: query.minTvl,
   });
 
-  const chainRows = useMemo(
+  const chainRows = useMemo<BreakdownRow[]>(
     () =>
       [...(compData?.chains ?? [])].sort(
         (left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY),
       ),
     [compData?.chains],
   );
-
-  // Chain rows for Chains tab (from chains data API with extra columns)
   const chainsTabRows = sortRows(chainsData?.rows ?? [], chainSort, {
     chain: (row) => chainLabel(row.chain_id),
     vaults: (row) => row.active_vaults,
@@ -230,7 +89,6 @@ function StructurePageContent() {
     momentum: (row) => row.avg_momentum_7d_30d ?? Number.NEGATIVE_INFINITY,
     consistency: (row) => row.avg_consistency ?? Number.NEGATIVE_INFINITY,
   });
-
   const categoryRows = sortRows(compData?.categories ?? [], categorySort, {
     category: (row) => row.category ?? "",
     vaults: (row) => row.vaults,
@@ -238,7 +96,6 @@ function StructurePageContent() {
     share: (row) => row.share_tvl ?? Number.NEGATIVE_INFINITY,
     apy: (row) => row.weighted_realized_apy_30d ?? Number.NEGATIVE_INFINITY,
   });
-
   const tokenRows = sortRows(compData?.tokens ?? [], tokenSort, {
     token: (row) => row.token_symbol ?? "",
     vaults: (row) => row.vaults,
@@ -246,7 +103,6 @@ function StructurePageContent() {
     share: (row) => row.share_tvl ?? Number.NEGATIVE_INFINITY,
     apy: (row) => row.weighted_realized_apy_30d ?? Number.NEGATIVE_INFINITY,
   });
-
   const crowdedRows = sortRows(compData?.crowding.most_crowded ?? [], crowdingSort, {
     vault: (row) => row.symbol ?? row.vault_address,
     chain: (row) => chainLabel(row.chain_id),
@@ -256,7 +112,6 @@ function StructurePageContent() {
     apy: (row) => row.realized_apy_30d ?? Number.NEGATIVE_INFINITY,
     crowding: (row) => row.crowding_index ?? Number.NEGATIVE_INFINITY,
   });
-
   const uncrowdedRows = sortRows(compData?.crowding.least_crowded ?? [], uncrowdedSort, {
     vault: (row) => row.symbol ?? row.vault_address,
     chain: (row) => chainLabel(row.chain_id),
@@ -266,8 +121,7 @@ function StructurePageContent() {
     apy: (row) => row.realized_apy_30d ?? Number.NEGATIVE_INFINITY,
     crowding: (row) => row.crowding_index ?? Number.NEGATIVE_INFINITY,
   });
-
-  const crowdingScatterRows = useMemo(() => {
+  const crowdingScatterRows = useMemo<CrowdingRow[]>(() => {
     const index = new Map<string, CrowdingRow>();
     for (const row of [...(compData?.crowding.most_crowded ?? []), ...(compData?.crowding.least_crowded ?? [])]) {
       const key = `${row.chain_id}:${row.vault_address}`;
@@ -283,9 +137,13 @@ function StructurePageContent() {
 
   const isLoading = isLoadingComp || isLoadingChains;
 
+  const setTab = (tab: TabKey) => {
+    setActiveTab(tab);
+    updateQuery({ tab });
+  };
+
   return (
     <div>
-      {/* Header */}
       <section className="page-header" style={{ borderBottom: "none" }}>
         <h1 className="page-title">
           Structure
@@ -295,55 +153,33 @@ function StructurePageContent() {
         <p className="page-description">
           Map where TVL concentrates and how realized APY 30d is distributed.
         </p>
-
-        {/* Tab Navigation */}
         <div style={{ display: "flex", gap: "8px", marginTop: "24px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "16px" }}>
-          <button
-            onClick={() => setTab("overview")}
-            className={`button ${activeTab === "overview" ? "button-primary" : "button-ghost"}`}
-          >
+          <button onClick={() => setTab("overview")} className={`button ${activeTab === "overview" ? "button-primary" : "button-ghost"}`}>
             Overview
           </button>
-          <button
-            onClick={() => setTab("chains")}
-            className={`button ${activeTab === "chains" ? "button-primary" : "button-ghost"}`}
-          >
+          <button onClick={() => setTab("chains")} className={`button ${activeTab === "chains" ? "button-primary" : "button-ghost"}`}>
             Chains
           </button>
-          <button
-            onClick={() => setTab("crowding")}
-            className={`button ${activeTab === "crowding" ? "button-primary" : "button-ghost"}`}
-          >
+          <button onClick={() => setTab("crowding")} className={`button ${activeTab === "crowding" ? "button-primary" : "button-ghost"}`}>
             Crowding
           </button>
         </div>
       </section>
 
-      {/* Shared Filters */}
       <section className="section" style={{ marginBottom: "32px" }}>
         <div className="card">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
-              <select
-                value={query.universe}
-                onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null })}
-                style={{ width: "100%", marginTop: "6px" }}
-              >
-                {UNIVERSE_VALUES.map((v) => (
-                  <option key={v} value={v}>{universeLabel(v)}</option>
+              <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null })} style={{ width: "100%", marginTop: "6px" }}>
+                {UNIVERSE_VALUES.map((value) => (
+                  <option key={value} value={value}>{universeLabel(value)}</option>
                 ))}
               </select>
             </label>
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Min TVL (USD)</span>
-              <input
-                type="number"
-                min={0}
-                value={query.minTvl}
-                onChange={(e) => updateQuery({ min_tvl: Number(e.target.value || 0) })}
-                style={{ width: "100%", marginTop: "6px" }}
-              />
+              <input type="number" min={0} value={query.minTvl} onChange={(e) => updateQuery({ min_tvl: Number(e.target.value || 0) })} style={{ width: "100%", marginTop: "6px" }} />
             </label>
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Top Groups</span>
@@ -358,485 +194,46 @@ function StructurePageContent() {
         </div>
       </section>
 
-      {/* OVERVIEW TAB */}
       {activeTab === "overview" && (
-        <>
-          {/* KPIs */}
-          <section className="section" style={{ marginBottom: "48px" }}>
-            {isLoading ? (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
-                {Array(5).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
-              </div>
-            ) : (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
-                <div className="kpi-card">
-                  <div className="kpi-label">Vaults</div>
-                  <div className="kpi-value">{compData?.summary.vaults ?? "n/a"}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-label">Average Realized APY 30d</div>
-                  <div className="kpi-value">{formatPct(compData?.summary.avg_realized_apy_30d)}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-label">Chain HHI</div>
-                  <div className="kpi-value">{compData?.concentration.chain_hhi?.toFixed(3) ?? "n/a"}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-label">Category HHI</div>
-                  <div className="kpi-value">{compData?.concentration.category_hhi?.toFixed(3) ?? "n/a"}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-label">Token HHI</div>
-                  <div className="kpi-value">{compData?.concentration.token_hhi?.toFixed(3) ?? "n/a"}</div>
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* TVL Treemap */}
-          <section className="section" style={{ marginBottom: "48px" }}>
-            <TvlTreemap 
-              title="TVL Treemap (Chain → Category → Token Lens)" 
-              chains={chainRows} 
-              categories={categoryRows} 
-              tokens={tokenRows} 
-            />
-          </section>
-
-          {/* Category Table */}
-          <section className="section" style={{ marginBottom: "48px" }}>
-            <div className="card-header">
-              <h2 className="card-title">Category Concentration</h2>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>
-                      <button className="th-button" onClick={() => { const next = toggleSort(categorySort, "category"); setCategorySort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Category {sortIndicator(categorySort, "category")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(categorySort, "vaults"); setCategorySort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Vaults {sortIndicator(categorySort, "vaults")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(categorySort, "tvl"); setCategorySort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        TVL {sortIndicator(categorySort, "tvl")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(categorySort, "share"); setCategorySort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Share {sortIndicator(categorySort, "share")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(categorySort, "apy"); setCategorySort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Realized APY 30d {sortIndicator(categorySort, "apy")}
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <TableSkeleton rows={5} columns={5} />
-                  ) : (
-                    categoryRows.map((row) => (
-                      <tr key={row.category}>
-                        <td>
-                          {row.category ? (
-                            <Link href={`/explore?category=${encodeURIComponent(row.category)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                              {row.category}
-                            </Link>
-                          ) : "Unknown"}
-                        </td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.share_tvl)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* Top Tokens */}
-          <section className="section">
-            <div className="card-header">
-              <h2 className="card-title">Top Tokens by TVL</h2>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>
-                      <button className="th-button" onClick={() => { const next = toggleSort(tokenSort, "token"); setTokenSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Token {sortIndicator(tokenSort, "token")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(tokenSort, "vaults"); setTokenSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Vaults {sortIndicator(tokenSort, "vaults")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(tokenSort, "tvl"); setTokenSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        TVL {sortIndicator(tokenSort, "tvl")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(tokenSort, "share"); setTokenSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Share {sortIndicator(tokenSort, "share")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(tokenSort, "apy"); setTokenSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Realized APY 30d {sortIndicator(tokenSort, "apy")}
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <TableSkeleton rows={5} columns={5} />
-                  ) : (
-                    tokenRows.slice(0, query.topN).map((row) => (
-                      <tr key={row.token_symbol}>
-                        <td>
-                          {row.token_symbol ? (
-                            <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                              {row.token_symbol}
-                            </Link>
-                          ) : "Unknown"}
-                        </td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.share_tvl)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </>
+        <OverviewTab
+          isLoading={isLoading}
+          query={query}
+          summary={compData?.summary}
+          concentration={compData?.concentration}
+          chainRows={chainRows}
+          categoryRows={categoryRows}
+          tokenRows={tokenRows}
+          categorySort={categorySort}
+          setCategorySort={setCategorySort}
+          tokenSort={tokenSort}
+          setTokenSort={setTokenSort}
+        />
       )}
 
-      {/* CHAINS TAB */}
       {activeTab === "chains" && (
-        <>
-          <section className="section" style={{ marginBottom: "48px" }}>
-            {isLoading ? (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-                {Array(3).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
-              </div>
-            ) : (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-                <div className="kpi-card">
-                  <div className="kpi-label">With Realized APY</div>
-                  <div className="kpi-value">{chainsData?.summary?.with_realized_apy ?? "n/a"}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-label">Coverage Ratio</div>
-                  <div className="kpi-value">{formatPct(chainsData?.summary?.metrics_coverage_ratio)}</div>
-                </div>
-                <div className="kpi-card">
-                  <div className="kpi-label">Median Chain Realized APY 30d</div>
-                  <div className="kpi-value">{formatPct(chainsData?.summary?.median_chain_realized_apy_30d)}</div>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="section">
-            <div className="card-header">
-              <h2 className="card-title">Chain Comparison</h2>
-            </div>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px", marginBottom: "48px" }}>
-              <HeatGrid
-                title="By Chain"
-                items={chainsTabRows.slice(0, 6).map((row) => ({
-                  id: String(row.chain_id),
-                  label: chainLabel(row.chain_id),
-                  value: row.active_vaults,
-                  note: formatUsd(row.total_tvl_usd),
-                }))}
-                valueFormatter={(v) => String(v ?? "n/a")}
-              />
-              <BarList
-                title="TVL Distribution"
-                items={chainsTabRows.map((row) => ({
-                  id: String(row.chain_id),
-                  label: chainLabel(row.chain_id),
-                  value: row.total_tvl_usd,
-                }))}
-                valueFormatter={(v) => formatUsd(v)}
-              />
-            </div>
-
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "chain"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Chain {sortIndicator(chainSort, "chain")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "vaults"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Vaults {sortIndicator(chainSort, "vaults")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "with_realized_apy"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        With Realized APY {sortIndicator(chainSort, "with_realized_apy")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "tvl"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        TVL {sortIndicator(chainSort, "tvl")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "apy"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Realized APY 30d {sortIndicator(chainSort, "apy")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "momentum"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Avg Momentum {sortIndicator(chainSort, "momentum")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(chainSort, "consistency"); setChainSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Avg Consistency {sortIndicator(chainSort, "consistency")}
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <TableSkeleton rows={5} columns={7} />
-                  ) : (
-                    chainsTabRows.map((row) => (
-                      <tr key={row.chain_id}>
-                        <td>
-                          <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                            {chainLabel(row.chain_id)}
-                          </Link>
-                        </td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.active_vaults}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.with_realized_apy}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.total_tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.avg_momentum_7d_30d)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.avg_consistency?.toFixed(2) ?? "n/a"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </>
+        <ChainsTab
+          isLoading={isLoading}
+          query={query}
+          summary={chainsData?.summary}
+          rows={chainsTabRows}
+          chainSort={chainSort}
+          setChainSort={setChainSort}
+        />
       )}
 
-      {/* CROWDING TAB */}
       {activeTab === "crowding" && (
-        <>
-          <section className="section" style={{ marginBottom: "48px" }}>
-            <div className="card-header">
-              <h2 className="card-title">Realized APY vs TVL Map</h2>
-            </div>
-            <ScatterPlot
-              title=""
-              xLabel="Realized APY 30d"
-              yLabel="TVL (USD)"
-              points={crowdingScatterRows.map((row) => ({
-                id: `${row.chain_id}:${row.vault_address}`,
-                x: row.realized_apy_30d,
-                y: row.tvl_usd,
-                size: row.crowding_index,
-                href: yearnVaultUrl(row.chain_id, row.vault_address),
-                tone: (row.crowding_index ?? 0) >= 0 ? "negative" : "positive",
-              }))}
-              xFormatter={(value) => formatPct(value, 1)}
-              yFormatter={(value) => formatUsd(value)}
-            />
-          </section>
-
-          <section className="section" style={{ marginBottom: "48px" }}>
-            <div className="card-header">
-              <h2 className="card-title">Most Crowded</h2>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>
-                      <button className="th-button" onClick={() => { const next = toggleSort(crowdingSort, "vault"); setCrowdingSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Vault {sortIndicator(crowdingSort, "vault")}
-                      </button>
-                    </th>
-                    <th>
-                      <button className="th-button" onClick={() => { const next = toggleSort(crowdingSort, "chain"); setCrowdingSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Chain {sortIndicator(crowdingSort, "chain")}
-                      </button>
-                    </th>
-                    {!isCompactViewport && (
-                      <th>
-                        <button className="th-button" onClick={() => { const next = toggleSort(crowdingSort, "token"); setCrowdingSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                          Token {sortIndicator(crowdingSort, "token")}
-                        </button>
-                      </th>
-                    )}
-                    {!isCompactViewport && (
-                      <th>
-                        <button className="th-button" onClick={() => { const next = toggleSort(crowdingSort, "category"); setCrowdingSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                          Category {sortIndicator(crowdingSort, "category")}
-                        </button>
-                      </th>
-                    )}
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(crowdingSort, "tvl"); setCrowdingSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        TVL {sortIndicator(crowdingSort, "tvl")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(crowdingSort, "apy"); setCrowdingSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Realized APY 30d {sortIndicator(crowdingSort, "apy")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(crowdingSort, "crowding"); setCrowdingSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Crowding {sortIndicator(crowdingSort, "crowding")}
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <TableSkeleton rows={5} columns={isCompactViewport ? 5 : 7} />
-                  ) : (
-                    crowdedRows.slice(0, query.crowdingLimit).map((row) => (
-                      <tr key={row.vault_address}>
-                        <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                        <td>
-                          <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                            {chainLabel(row.chain_id)}
-                          </Link>
-                        </td>
-                        {!isCompactViewport && (
-                          <td>
-                            {row.token_symbol ? (
-                              <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                                {row.token_symbol}
-                              </Link>
-                            ) : "n/a"}
-                          </td>
-                        )}
-                        {!isCompactViewport && <td>{row.category || "n/a"}</td>}
-                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_30d)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.crowding_index?.toFixed(2) ?? "n/a"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* Least Crowded */}
-          <section className="section">
-            <div className="card-header">
-              <h2 className="card-title">Least Crowded</h2>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>
-                      <button className="th-button" onClick={() => { const next = toggleSort(uncrowdedSort, "vault"); setUncrowdedSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Vault {sortIndicator(uncrowdedSort, "vault")}
-                      </button>
-                    </th>
-                    <th>
-                      <button className="th-button" onClick={() => { const next = toggleSort(uncrowdedSort, "chain"); setUncrowdedSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Chain {sortIndicator(uncrowdedSort, "chain")}
-                      </button>
-                    </th>
-                    {!isCompactViewport && (
-                      <th>
-                        <button className="th-button" onClick={() => { const next = toggleSort(uncrowdedSort, "token"); setUncrowdedSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                          Token {sortIndicator(uncrowdedSort, "token")}
-                        </button>
-                      </th>
-                    )}
-                    {!isCompactViewport && (
-                      <th>
-                        <button className="th-button" onClick={() => { const next = toggleSort(uncrowdedSort, "category"); setUncrowdedSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                          Category {sortIndicator(uncrowdedSort, "category")}
-                        </button>
-                      </th>
-                    )}
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(uncrowdedSort, "tvl"); setUncrowdedSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        TVL {sortIndicator(uncrowdedSort, "tvl")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(uncrowdedSort, "apy"); setUncrowdedSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Realized APY 30d {sortIndicator(uncrowdedSort, "apy")}
-                      </button>
-                    </th>
-                    <th style={{ textAlign: "right" }}>
-                      <button className="th-button" onClick={() => { const next = toggleSort(uncrowdedSort, "crowding"); setUncrowdedSort(next); }} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
-                        Crowding {sortIndicator(uncrowdedSort, "crowding")}
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <TableSkeleton rows={5} columns={isCompactViewport ? 5 : 7} />
-                  ) : (
-                    uncrowdedRows.slice(0, query.crowdingLimit).map((row) => (
-                      <tr key={row.vault_address}>
-                        <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                        <td>
-                          <Link href={`/explore?chain=${row.chain_id}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                            {chainLabel(row.chain_id)}
-                          </Link>
-                        </td>
-                        {!isCompactViewport && (
-                          <td>
-                            {row.token_symbol ? (
-                              <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                                {row.token_symbol}
-                              </Link>
-                            ) : "n/a"}
-                          </td>
-                        )}
-                        {!isCompactViewport && <td>{row.category || "n/a"}</td>}
-                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_30d)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{row.crowding_index?.toFixed(2) ?? "n/a"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </>
+        <CrowdingTab
+          isLoading={isLoading}
+          query={query}
+          isCompactViewport={isCompactViewport}
+          crowdingScatterRows={crowdingScatterRows}
+          crowdedRows={crowdedRows}
+          uncrowdedRows={uncrowdedRows}
+          crowdingSort={crowdingSort}
+          setCrowdingSort={setCrowdingSort}
+          uncrowdedSort={uncrowdedSort}
+          setUncrowdedSort={setUncrowdedSort}
+        />
       )}
     </div>
   );

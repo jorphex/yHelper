@@ -1,4 +1,5 @@
 import "./globals-editorial.css";
+import "./globals-editorial-viz.css";
 import "./globals-fixes.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode, Suspense } from "react";
