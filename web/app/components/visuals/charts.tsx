@@ -100,7 +100,7 @@ export function ScatterPlot({
                     cx={x}
                     cy={y}
                     r={Math.max(cellW, cellH) * 0.72}
-                    fill="rgba(var(--accent-2-rgb), 1)"
+                    fill="rgba(59, 130, 246, 1)"
                     opacity={alpha}
                   />
                 );
@@ -152,7 +152,7 @@ export function ScatterPlot({
             const pointTitle = point.tooltip ?? `${xLabel}: ${xFormatter(x)}\n${yLabel}: ${yFormatter(y)}`;
             if (point.href) {
               return (
-                <a key={point.id} href={point.href} target="_blank" rel="noreferrer noopener" className="viz-point-link">
+                <a key={point.id} href={point.href} target="_blank">
                   <title>{pointTitle}</title>
                   <circle
                     cx={cx}

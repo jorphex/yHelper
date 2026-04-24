@@ -120,7 +120,7 @@ function DailyMatrix({
           gap: "6px",
           alignItems: "center",
           fontSize: "11px",
-          color: "var(--ink-muted)",
+          color: "var(--text-tertiary)",
         }}
       >
         <div />
@@ -144,7 +144,7 @@ function DailyMatrix({
             alignItems: "center",
           }}
         >
-          <div style={{ fontSize: "12px", color: "var(--ink-soft)" }}>{chain.chain_label}</div>
+          <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{chain.chain_label}</div>
           {matrixDays.map((day) => {
             const label = dayLabelParts(day);
             const value = chain.points.get(day) ?? 0;
@@ -160,11 +160,11 @@ function DailyMatrix({
                   border: value > 0
                     ? `1px solid rgba(var(--accent-rgb), ${Math.min(0.28 + intensity * 0.42, 0.66)})`
                     : "1px solid color-mix(in oklab, var(--border-subtle) 88%, var(--accent) 12%)",
-                  background: value > 0 ? `rgba(var(--accent-rgb), ${fillAlpha.toFixed(3)})` : "var(--surface-secondary)",
+                  background: value > 0 ? `rgba(var(--accent-rgb), ${fillAlpha.toFixed(3)})` : "var(--bg-elevated)",
                   display: "grid",
                   placeItems: "center",
                   fontSize: "11px",
-                  color: value > 0 ? "white" : "var(--ink-muted)",
+                  color: value > 0 ? "white" : "var(--text-tertiary)",
                 }}
               >
                 {value > 0 ? value : ""}
@@ -247,7 +247,7 @@ function HarvestsPageContent() {
           <br />
           <em className="page-title-accent">Vault report flow</em>
         </h1>
-        <p style={{ maxWidth: "66ch", color: "var(--ink-soft)", marginTop: "14px" }}>
+        <p style={{ maxWidth: "66ch", color: "var(--text-secondary)", marginTop: "14px" }}>
           Track vault-level strategy reports across chains, then narrow the event stream down to a single vault when you want exact gain, loss, and fee rows.
         </p>
       </section>
@@ -288,7 +288,7 @@ function HarvestsPageContent() {
                   height: "40px",
                   borderRadius: "12px",
                   border: vaultFocused ? "1px solid var(--accent)" : "1px solid var(--border-soft)",
-                  background: "linear-gradient(180deg, var(--surface-secondary) 0%, color-mix(in oklab, var(--surface-secondary) 84%, var(--accent) 16%) 100%)",
+                  background: "linear-gradient(180deg, var(--bg-elevated) 0%, color-mix(in oklab, var(--bg-elevated) 84%, var(--accent) 16%) 100%)",
                   boxShadow: vaultFocused
                     ? "0 0 0 3px rgba(6, 87, 233, 0.12)"
                     : "inset 0 1px 0 rgba(250, 248, 245, 0.03)",
@@ -339,8 +339,8 @@ function HarvestsPageContent() {
                 padding: "14px 16px",
                 borderRadius: "14px",
                 border: "1px solid var(--border-subtle)",
-                background: "color-mix(in oklab, var(--surface-secondary) 84%, var(--accent) 16%)",
-                color: "var(--ink-soft)",
+                background: "color-mix(in oklab, var(--bg-elevated) 84%, var(--accent) 16%)",
+                color: "var(--text-secondary)",
                 fontSize: "13px",
               }}
             >
@@ -370,7 +370,7 @@ function HarvestsPageContent() {
       >
         <section className="section-card subtle-card" style={{ padding: "24px" }}>
           <h2 className="card-title">Chain Split</h2>
-          <p style={{ color: "var(--ink-muted)", margin: "6px 0 18px", fontSize: "13px" }}>
+          <p style={{ color: "var(--text-tertiary)", margin: "6px 0 18px", fontSize: "13px" }}>
             Bars and numbers show total harvest reports per chain for the selected window.
           </p>
           {isLoading && !data ? (
@@ -387,7 +387,7 @@ function HarvestsPageContent() {
 
         <section className="section-card visual-card" style={{ padding: "24px" }}>
           <h2 className="card-title">Daily Activity</h2>
-          <p style={{ color: "var(--ink-muted)", margin: "6px 0 18px", fontSize: "13px" }}>
+          <p style={{ color: "var(--text-tertiary)", margin: "6px 0 18px", fontSize: "13px" }}>
             Last 14 daily buckets for the selected scope. Each cell shows the report count, and brighter blue means more reports landed that day.
           </p>
           {isLoading && !data ? (
@@ -402,7 +402,7 @@ function HarvestsPageContent() {
         <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "baseline", marginBottom: "16px", flexWrap: "wrap" }}>
           <div>
             <h2 className="card-title" style={{ marginBottom: "6px" }}>Recent Reports</h2>
-            <p style={{ color: "var(--ink-muted)", fontSize: "13px" }}>
+            <p style={{ color: "var(--text-tertiary)", fontSize: "13px" }}>
               Showing the latest {query.limit} rows. Gain and fee values are raw underlying-asset units from the report event.
             </p>
           </div>
@@ -434,7 +434,7 @@ function HarvestsPageContent() {
               ) : (
                 data?.recent?.map((row) => (
                   <tr key={`${row.tx_hash}-${row.vault_address}`} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap", color: "var(--ink-soft)" }}>
+                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap", color: "var(--text-secondary)" }}>
                       <div style={{ display: "grid", gap: "4px" }}>
                         <span>{formatUtcDateTime(row.block_time)}</span>
                         {explorerTxUrl(row.chain_id, row.tx_hash) ? (
@@ -447,11 +447,11 @@ function HarvestsPageContent() {
                             {shortHash(row.tx_hash)}
                           </a>
                         ) : (
-                          <span style={{ color: "var(--ink-muted)", fontSize: "12px" }}>{shortHash(row.tx_hash)}</span>
+                          <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>{shortHash(row.tx_hash)}</span>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: "12px 10px", color: "var(--ink-soft)" }}>
+                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
                       {row.chain_label || chainLabel(row.chain_id)}
                     </td>
                     <td style={{ padding: "12px 10px" }}>
@@ -474,17 +474,17 @@ function HarvestsPageContent() {
                             {shortHash(row.vault_address)}
                           </a>
                         ) : (
-                          <span style={{ color: "var(--ink-muted)", fontSize: "12px" }}>{shortHash(row.vault_address)}</span>
+                          <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>{shortHash(row.vault_address)}</span>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: "12px 10px", color: "var(--ink-soft)", fontFeatureSettings: "\"tnum\" 1" }}>
+                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)", fontFeatureSettings: "\"tnum\" 1" }}>
                       {explorerAddressUrl(row.chain_id, row.strategy_address) ? (
                         <a
                           href={explorerAddressUrl(row.chain_id, row.strategy_address)!}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: "var(--ink-soft)", textDecoration: "none" }}
+                          style={{ color: "var(--text-secondary)", textDecoration: "none" }}
                         >
                           {shortHash(row.strategy_address)}
                         </a>
@@ -492,10 +492,10 @@ function HarvestsPageContent() {
                         shortHash(row.strategy_address)
                       )}
                     </td>
-                    <td style={{ padding: "12px 10px", color: "var(--ink-soft)" }}>
+                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
                       {amountWithUnit(row.gain, row.token_symbol, row.token_decimals)}
                     </td>
-                    <td style={{ padding: "12px 10px", color: "var(--ink-soft)" }}>
+                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
                       {amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals)}
                     </td>
                   </tr>

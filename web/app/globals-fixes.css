@@ -26,7 +26,7 @@
 }
 
 .kpi-card.home-overview-summary-card .kpi-label {
-  color: var(--ink-muted) !important;
+  color: var(--text-tertiary) !important;
 }
 
 .sidebar-note {
@@ -35,5 +35,5 @@
 }
 
 .sidebar-note-title {
-  color: var(--ink-muted) !important;
+  color: var(--text-tertiary) !important;
 }

@@ -103,15 +103,6 @@ interface TableSkeletonProps {
 export function TableSkeleton({ rows = 5, columns = 6 }: TableSkeletonProps) {
   return (
     <>
-      {/* Header */}
-      <tr style={{ background: "var(--bg-elevated)" }}>
-        {Array.from({ length: columns }).map((_, i) => (
-          <th key={i} style={{ padding: "12px 16px" }}>
-            <Skeleton width={60} height={10} style={{ borderRadius: "2px" }} />
-          </th>
-        ))}
-      </tr>
-      {/* Rows */}
       {Array.from({ length: rows }).map((_, rowIdx) => (
         <tr key={rowIdx}>
           {Array.from({ length: columns }).map((_, colIdx) => (

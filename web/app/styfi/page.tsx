@@ -367,7 +367,7 @@ function StYfiPageContent() {
                     row.event_kind === "claim"
                       ? "var(--accent)"
                       : row.event_kind === "withdraw"
-                        ? "var(--ink-subtle)"
+                        ? "var(--text-secondary)"
                         : row.event_kind === "unstake"
                           ? "#9a5b23"
                           : "var(--accent)";

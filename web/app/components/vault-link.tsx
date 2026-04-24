@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { shortVaultLabel, yearnVaultUrl } from "../lib/format";
 
 export function VaultLink({
@@ -11,7 +10,7 @@ export function VaultLink({
   symbol: string | null | undefined;
 }) {
   return (
-    <Link
+    <a
       href={yearnVaultUrl(chainId, vaultAddress)}
       target="_blank"
       rel="noopener noreferrer"
@@ -20,6 +19,6 @@ export function VaultLink({
       aria-label={`Open ${shortVaultLabel(symbol, vaultAddress)} on Yearn`}
     >
       {shortVaultLabel(symbol, vaultAddress)}
-    </Link>
+    </a>
   );
 }

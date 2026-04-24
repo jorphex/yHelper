@@ -110,7 +110,7 @@ export function RegimesTab({
       </section>
 
       <section className="section" style={{ marginBottom: "32px" }}>
-        <div className="card" style={{ background: "var(--surface-secondary)" }}>
+        <div className="card" style={{ background: "var(--bg-elevated)" }}>
           <h3 style={{ fontSize: "14px", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)" }}>Transition Analysis</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
             <label>

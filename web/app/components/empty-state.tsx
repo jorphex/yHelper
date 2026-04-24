@@ -55,12 +55,12 @@ export function EmptyState({
         justifyContent: "center",
         padding: "var(--space-12)",
         textAlign: "center",
-        color: "var(--ink-dim)",
+        color: "var(--text-secondary)",
       }}
     >
       <div
         style={{
-          color: "var(--ink-muted)",
+          color: "var(--text-tertiary)",
           marginBottom: "var(--space-4)",
         }}
       >
@@ -70,7 +70,7 @@ export function EmptyState({
         style={{
           fontSize: "var(--text-lg)",
           fontWeight: 600,
-          color: "var(--ink)",
+          color: "var(--text-primary)",
           marginBottom: "var(--space-2)",
         }}
       >
@@ -79,7 +79,7 @@ export function EmptyState({
       <p
         style={{
           fontSize: "var(--text-sm)",
-          color: "var(--ink-dim)",
+          color: "var(--text-secondary)",
           maxWidth: "40ch",
           marginBottom: actionLabel ? "var(--space-4)" : 0,
         }}
@@ -92,10 +92,10 @@ export function EmptyState({
           className="btn btn-secondary"
           style={{
             padding: "var(--space-2) var(--space-4)",
-            background: "var(--surface-secondary)",
+            background: "var(--bg-elevated)",
             border: "1px solid var(--border-soft)",
             borderRadius: "var(--radius-md)",
-            color: "var(--ink)",
+            color: "var(--text-primary)",
             fontSize: "var(--text-sm)",
             fontWeight: 500,
             cursor: "pointer",

@@ -38,7 +38,7 @@ export function ErrorState({
           width: 64,
           height: 64,
           borderRadius: "50%",
-          background: "var(--surface-secondary)",
+          background: "var(--bg-elevated)",
           border: "1px solid var(--negative)",
           display: "flex",
           alignItems: "center",
@@ -58,7 +58,7 @@ export function ErrorState({
         style={{
           fontSize: "var(--text-xl)",
           fontWeight: 600,
-          color: "var(--ink)",
+          color: "var(--text-primary)",
           marginBottom: "var(--space-2)",
         }}
       >
@@ -68,7 +68,7 @@ export function ErrorState({
       <p
         style={{
           fontSize: "var(--text-base)",
-          color: "var(--ink-dim)",
+          color: "var(--text-secondary)",
           maxWidth: "50ch",
           marginBottom: errorMessage ? "var(--space-2)" : "var(--space-4)",
         }}
@@ -81,8 +81,8 @@ export function ErrorState({
           style={{
             display: "block",
             fontSize: "var(--text-xs)",
-            color: "var(--ink-muted)",
-            background: "var(--surface-secondary)",
+            color: "var(--text-tertiary)",
+            background: "var(--bg-elevated)",
             padding: "var(--space-2) var(--space-3)",
             borderRadius: "var(--radius-md)",
             marginBottom: "var(--space-4)",
@@ -138,7 +138,7 @@ export function ErrorState({
               background: "transparent",
               border: "1px solid var(--border-soft)",
               borderRadius: "var(--radius-md)",
-              color: "var(--ink-soft)",
+              color: "var(--text-secondary)",
               fontSize: "var(--text-sm)",
               fontWeight: 500,
               textDecoration: "none",
