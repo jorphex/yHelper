@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd } from "../lib/format";
+import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { useDiscoverData } from "../hooks/use-discover-data";
 import { useAssetsData, useAssetVenues } from "../hooks/use-assets-data";
 import type { UniverseKind } from "../lib/universe";
@@ -176,7 +176,7 @@ function ExplorePageContent() {
         y: row.realized_apy_30d ?? 0,
         size: row.tvl_usd ?? 0,
         tone: (row.momentum_7d_30d ?? 0) >= 0 ? "positive" as const : "negative" as const,
-        href: `https://yearn.fi/v3/${row.chain_id}/${row.vault_address}`,
+        href: yearnVaultUrl(row.chain_id, row.vault_address),
         tooltip: `${row.symbol || row.vault_address}\nRealized APY 30d: ${formatPct(row.realized_apy_30d)}\nRealized Momentum: ${formatPct(row.momentum_7d_30d)}`,
       })),
   [discoverRows]);
@@ -266,7 +266,7 @@ function ExplorePageContent() {
         </p>
 
         {/* Tab Navigation */}
-        <div style={{ display: "flex", gap: "8px", marginTop: "24px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "16px" }}>
+        <div className="tab-bar">
           <button
             onClick={() => setTab("vaults")}
             className={`button ${query.tab === "vaults" ? "button-primary" : "button-ghost"}`}
@@ -283,7 +283,7 @@ function ExplorePageContent() {
       </section>
 
       {/* Shared Filters */}
-      <section className="section" style={{ marginBottom: "32px" }}>
+      <section className="section section-md">
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <span className="card-title">Filters</span>
@@ -380,7 +380,7 @@ function ExplorePageContent() {
           </div>
 
           {showFilters && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginTop: "16px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)" }}>
+            <div className="filter-grid" style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)" }}>
               <label>
                 <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Chain</span>
                 <select
@@ -444,15 +444,15 @@ function ExplorePageContent() {
       {query.tab === "vaults" && (
         <>
           {/* KPIs */}
-          <section className="section" style={{ marginBottom: "48px" }}>
+          <section className="section section-lg">
             {isLoadingDiscover ? (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+              <div className="kpi-grid kpi-grid-5">
                 {Array(5).fill(null).map((_, i) => (
                   <div key={i} className="kpi-card"><KpiGridSkeleton count={1} /></div>
                 ))}
               </div>
             ) : (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+              <div className="kpi-grid kpi-grid-5">
                 {vaultKpiItems.map((item) => (
                   <div key={item.label} className="kpi-card">
                     <div className="kpi-label">{item.label}</div>
@@ -560,7 +560,7 @@ function ExplorePageContent() {
                 valueLabel="Realized APY 30d"
               />
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+              <div className="cols-2">
                 <BarList
                   title="Realized APY 30d Buckets"
                   items={[
@@ -597,11 +597,11 @@ function ExplorePageContent() {
             </div>
 
             {isLoadingVenues ? (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "24px" }}>
+              <div className="kpi-grid kpi-grid-4 section-sm">
                 {Array(4).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
               </div>
             ) : selectedSymbol ? (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "24px" }}>
+              <div className="kpi-grid kpi-grid-4 section-sm">
                 <div className="kpi-card">
                   <div className="kpi-label">Venues</div>
                   <div className="kpi-value">{venueData?.summary.venues ?? "n/a"}</div>
@@ -668,7 +668,7 @@ function ExplorePageContent() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px", marginBottom: "32px" }}>
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+              <div className="kpi-grid kpi-grid-2">
                 <div className="kpi-card">
                   <div className="kpi-label">Multi-Chain</div>
                   <div className="kpi-value">{assetData?.summary?.multi_chain_tokens ?? "n/a"}</div>

@@ -153,7 +153,7 @@ function StructurePageContent() {
         <p className="page-description">
           Map where TVL concentrates and how realized APY 30d is distributed.
         </p>
-        <div style={{ display: "flex", gap: "8px", marginTop: "24px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "16px" }}>
+        <div className="tab-bar">
           <button onClick={() => setTab("overview")} className={`button ${activeTab === "overview" ? "button-primary" : "button-ghost"}`}>
             Overview
           </button>
@@ -166,9 +166,9 @@ function StructurePageContent() {
         </div>
       </section>
 
-      <section className="section" style={{ marginBottom: "32px" }}>
+      <section className="section section-md">
         <div className="card">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+          <div className="filter-grid">
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
               <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null })} style={{ width: "100%", marginTop: "6px" }}>

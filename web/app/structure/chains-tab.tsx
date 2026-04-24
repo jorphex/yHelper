@@ -42,11 +42,11 @@ export function ChainsTab({
     <>
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-3">
             {Array(3).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-3">
             <div className="kpi-card">
               <div className="kpi-label">With Realized APY</div>
               <div className="kpi-value">{summary?.with_realized_apy ?? "n/a"}</div>

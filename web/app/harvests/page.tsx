@@ -352,7 +352,7 @@ function HarvestsPageContent() {
 
       <div style={{ height: "1px", background: "var(--border-subtle)", margin: "0 0 28px" }} />
 
-      <section style={{ marginBottom: "28px" }}>
+      <section className="section section-sm">
         <div className="kpi-grid">
           {isLoading && !data ? <KpiGridSkeleton count={4} /> : <KpiGrid items={kpiItems} />}
         </div>

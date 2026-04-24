@@ -567,7 +567,7 @@ function MomentumPageContent() {
         <p className="page-description">
           Track realized APY changes and regime transitions to time allocation decisions.
         </p>
-        <div style={{ display: "flex", gap: "8px", marginTop: "24px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "16px" }}>
+        <div className="tab-bar">
           <button onClick={() => setTab("changes")} className={`button ${activeTab === "changes" ? "button-primary" : "button-ghost"}`}>
             Changes
           </button>

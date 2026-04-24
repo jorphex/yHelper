@@ -90,9 +90,9 @@ export function ChangesTab({
 }) {
   return (
     <>
-      <section className="section" style={{ marginBottom: "32px" }}>
+      <section className="section section-md">
         <div className="card">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px" }}>
+          <div className="filter-grid">
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Window</span>
               <select value={query.window} onChange={(e) => updateQuery({ window: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
@@ -132,18 +132,18 @@ export function ChangesTab({
         </div>
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Window Summary</h2>
         </div>
         {changesLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-4">
             {Array(4).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
           <>
             {query.tvlView === "filtered" ? (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+              <div className="kpi-grid kpi-grid-4">
                 <div className="kpi-card">
                   <div className="kpi-label">Filtered Universe TVL</div>
                   <div className="kpi-value">{formatUsd(filteredTvl)}</div>
@@ -163,7 +163,7 @@ export function ChangesTab({
                 </div>
               </div>
             ) : (
-              <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+              <div className="kpi-grid kpi-grid-4">
                 <div className="kpi-card">
                   <div className="kpi-label">Yearn-Aligned TVL</div>
                   <div className="kpi-value">{formatUsd(yearnTvl)}</div>
@@ -182,7 +182,7 @@ export function ChangesTab({
                 </div>
               </div>
             )}
-            <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginTop: "16px" }}>
+            <div className="kpi-grid kpi-grid-4" style={{ marginTop: "16px" }}>
               <div className="kpi-card">
                 <div className="kpi-label">Avg Delta</div>
                 <div className="kpi-value" style={{ color: (summary?.avg_delta ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }}>
@@ -206,11 +206,11 @@ export function ChangesTab({
         )}
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Window Coverage</h2>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+        <div className="cols-2">
           <ShareMeter
             title="By Vaults"
             segments={vaultCoverageSegments}
@@ -228,24 +228,24 @@ export function ChangesTab({
         </div>
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Stale Ratio Heatmaps</h2>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+        <div className="cols-2">
           <HeatGrid title="By Chain" items={staleChainHeatItems} valueFormatter={(value) => formatPct(value, 1)} legend="Stale vault ratio by chain" />
           <HeatGrid title="By Category" items={staleCategoryHeatItems} valueFormatter={(value) => formatPct(value, 1)} legend="Stale vault ratio by category" />
         </div>
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Grouped Momentum Snapshot (Latest Day)</h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginTop: "8px" }}>
             TVL-weighted momentum by chain/category (realized 7d APY minus realized 30d APY). Positive values indicate short-term strengthening.
           </p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+        <div className="cols-2">
           <HeatGrid
             title="By Chain"
             items={chainMomentumHeat}
@@ -261,7 +261,7 @@ export function ChangesTab({
         </div>
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Freshness by Chain</h2>
         </div>
@@ -319,7 +319,7 @@ export function ChangesTab({
         </div>
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Movers</h2>
         </div>
@@ -344,7 +344,7 @@ export function ChangesTab({
         </div>
         {trendError ? <div className="card" style={{ padding: "24px", marginBottom: "24px" }}>{trendError}</div> : null}
         <div style={{ display: "grid", gap: "24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+          <div className="cols-2">
             <TrendStrips
               title="Riser/Faller Drift (60 Days)"
               items={moverDriftTrendItems}
@@ -375,7 +375,7 @@ export function ChangesTab({
             xFormatter={(value) => formatPct(value, 1)}
             yFormatter={(value) => formatPct(value, 1)}
           />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+          <div className="cols-2">
             <BarList title="Delta Distribution" items={deltaBandItems} valueFormatter={(value) => String(value ?? 0)} />
             <HeatGrid title="Momentum by Category" items={categoryMomentumHeat} valueFormatter={(value) => formatPct(value, 1)} legend="Compare category momentum drift" />
           </div>

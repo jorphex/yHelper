@@ -283,15 +283,15 @@ function StYfiPageContent() {
       </section>
 
       {/* Summary KPIs - 5 cards */}
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-5">
             {Array(5).fill(null).map((_, i) => (
               <KpiGridSkeleton key={i} count={1} />
             ))}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-5">
             {summaryItems.map((item) => (
               <div key={item.label} className="kpi-card">
                 <div className="kpi-label">{item.label}</div>
@@ -304,7 +304,7 @@ function StYfiPageContent() {
       </section>
 
       {/* Reward Split */}
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <BarList
           title={`Current Reward Split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
           items={rewardBars}
@@ -314,7 +314,7 @@ function StYfiPageContent() {
       </section>
 
       {/* Stake Trend */}
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Stake Trend</h2>
           <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{snapshotSeries.length} snapshots across {historySpan}</p>
@@ -329,7 +329,7 @@ function StYfiPageContent() {
         />
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Recent Activity</h2>
           <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>

@@ -47,11 +47,11 @@ export function OverviewTab({
     <>
       <section className="section" style={{ marginBottom: "48px" }}>
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-5">
             {Array(5).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-5">
             <div className="kpi-card">
               <div className="kpi-label">Vaults</div>
               <div className="kpi-value">{summary?.vaults ?? "n/a"}</div>

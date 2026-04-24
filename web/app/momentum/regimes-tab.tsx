@@ -77,9 +77,9 @@ export function RegimesTab({
 }) {
   return (
     <>
-      <section className="section" style={{ marginBottom: "32px" }}>
+      <section className="section section-md">
         <div className="card">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+          <div className="filter-grid">
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
               <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null, min_points: null })} style={{ width: "100%", marginTop: "6px" }}>
@@ -109,10 +109,10 @@ export function RegimesTab({
         </div>
       </section>
 
-      <section className="section" style={{ marginBottom: "32px" }}>
+      <section className="section section-md">
         <div className="card" style={{ background: "var(--bg-elevated)" }}>
           <h3 style={{ fontSize: "14px", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)" }}>Transition Analysis</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+          <div className="filter-grid">
             <label>
               <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Movers Limit</span>
               <select value={query.limit} onChange={(e) => updateQuery({ limit: Number(e.target.value) })} style={{ width: "100%", marginTop: "6px" }}>
@@ -147,13 +147,13 @@ export function RegimesTab({
         </div>
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         {regimeLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-6">
             {Array(6).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(6, 1fr)" }}>
+          <div className="kpi-grid kpi-grid-6">
             <div className="kpi-card">
               <div className="kpi-label">Regimes Tracked</div>
               <div className="kpi-value">{summaryRows.length}</div>
@@ -325,7 +325,7 @@ export function RegimesTab({
           </p>
         </div>
 
-        <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "24px" }}>
+        <div className="kpi-grid kpi-grid-4 section-sm">
           <div className="kpi-card">
             <div className="kpi-label">Vaults Tracked</div>
             <div className="kpi-value">{transitionSummary?.vaults_total ?? "n/a"}</div>
@@ -348,7 +348,7 @@ export function RegimesTab({
           {query.transitionSplit === "none" ? (
             <HeatGrid title="Transition Matrix" items={transitionHeat} valueFormatter={(value) => formatUsd(value)} legend="Higher intensity means more TVL moved between regime states." />
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+            <div className="cols-2">
               <HeatGrid
                 title={`Latest Churn TVL Share by ${query.transitionSplit === "chain" ? "Chain" : "Category"}`}
                 items={groupedLatestChurnHeat}

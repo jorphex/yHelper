@@ -36,10 +36,34 @@ function ExternalLinkIcon() {
   );
 }
 
+function MenuIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {open ? (
+        <>
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </>
+      ) : (
+        <>
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [mentionedVault, setMentionedVault] = useState<OverviewNoteResponse["mentioned_vault"]>(null);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +87,25 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside className="sidebar">
+    <>
+      <button
+        type="button"
+        className="sidebar-toggle"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label={isOpen ? "Close navigation" : "Open navigation"}
+        aria-expanded={isOpen}
+        aria-controls="sidebar-nav"
+      >
+        <MenuIcon open={isOpen} />
+      </button>
+      {isOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside className={`sidebar ${isOpen ? "is-open" : ""}`} id="sidebar-nav">
       <div className="sidebar-header">
         <Link href="/" className="sidebar-logo">
           yHelper
@@ -126,5 +168,6 @@ export function Sidebar() {
       </nav>
 
     </aside>
+    </>
   );
 }
