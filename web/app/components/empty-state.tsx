@@ -89,7 +89,7 @@ export function EmptyState({
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="btn btn-secondary"
+          className="button button-secondary"
           style={{
             padding: "var(--space-2) var(--space-4)",
             background: "var(--bg-elevated)",

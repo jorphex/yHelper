@@ -61,25 +61,16 @@ export const viewport: Viewport = {
   themeColor: "#0a0a0a",
 };
 
-// Ambient background component (preserved film grain + haze)
-function AmbientBackground() {
-  return (
-    <>
-      <div className="ambient-bg" aria-hidden="true">
-        <div className="ambient-orb ambient-orb-1" />
-        <div className="ambient-orb ambient-orb-2" />
-        <div className="ambient-orb ambient-orb-3" />
-      </div>
-      <div className="noise-overlay" aria-hidden="true" />
-    </>
-  );
+// Film grain overlay (ambient radial gradients are on body::before)
+function NoiseOverlay() {
+  return <div className="noise-overlay" aria-hidden="true" />;
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <AmbientBackground />
+        <NoiseOverlay />
         <ChunkRecovery />
         <a className="skip-link" href="#main-content">
           Skip to main content

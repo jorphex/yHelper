@@ -271,32 +271,32 @@ export function ChangesTab({
           <table>
             <thead>
               <tr>
-                <th>
+                <th aria-sort={staleSort.key === "chain" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Chain {sortIndicator(staleSort, "chain")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "vaults" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Vaults {sortIndicator(staleSort, "vaults")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "stale" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "stale"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Stale {sortIndicator(staleSort, "stale")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "ratio" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "ratio"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Stale % {sortIndicator(staleSort, "ratio")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "tvl" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     TVL {sortIndicator(staleSort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "stale_tvl" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "stale_tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Stale TVL {sortIndicator(staleSort, "stale_tvl")}
                   </button>

@@ -48,37 +48,37 @@ export function MoverTable({
         <table>
           <thead>
             <tr>
-              <th>
+              <th aria-sort={sort.key === "vault" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "vault"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Vault {sortIndicator(sort, "vault")}
                 </button>
               </th>
-              <th>
+              <th aria-sort={sort.key === "chain" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Chain {sortIndicator(sort, "chain")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }}>
+              <th style={{ textAlign: "right" }} aria-sort={sort.key === "tvl" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   TVL {sortIndicator(sort, "tvl")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }}>
+              <th style={{ textAlign: "right" }} aria-sort={sort.key === "current" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "current"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Current Realized APY {sortIndicator(sort, "current")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }}>
+              <th style={{ textAlign: "right" }} aria-sort={sort.key === "previous" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "previous"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Previous Realized APY {sortIndicator(sort, "previous")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }}>
+              <th style={{ textAlign: "right" }} aria-sort={sort.key === "delta" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "delta"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Delta {sortIndicator(sort, "delta")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }}>
+              <th style={{ textAlign: "right" }} aria-sort={sort.key === "age" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
                 <button className="th-button" onClick={() => setSort(toggleSort(sort, "age"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                   Age {sortIndicator(sort, "age")}
                 </button>

@@ -89,27 +89,27 @@ export function OverviewTab({
           <table>
             <thead>
               <tr>
-                <th>
+                <th aria-sort={categorySort.key === "category" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "category"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Category {sortIndicator(categorySort, "category")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={categorySort.key === "vaults" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Vaults {sortIndicator(categorySort, "vaults")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={categorySort.key === "tvl" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     TVL {sortIndicator(categorySort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={categorySort.key === "share" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "share"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Share {sortIndicator(categorySort, "share")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={categorySort.key === "apy" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Realized APY 30d {sortIndicator(categorySort, "apy")}
                   </button>
@@ -149,27 +149,27 @@ export function OverviewTab({
           <table>
             <thead>
               <tr>
-                <th>
+                <th aria-sort={tokenSort.key === "token" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "token"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Token {sortIndicator(tokenSort, "token")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={tokenSort.key === "vaults" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Vaults {sortIndicator(tokenSort, "vaults")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={tokenSort.key === "tvl" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     TVL {sortIndicator(tokenSort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={tokenSort.key === "share" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "share"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Share {sortIndicator(tokenSort, "share")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={tokenSort.key === "apy" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Realized APY 30d {sortIndicator(tokenSort, "apy")}
                   </button>

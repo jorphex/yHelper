@@ -105,7 +105,7 @@ export function ErrorState({
         {onRetry && (
           <button
             onClick={onRetry}
-            className="btn btn-primary"
+            className="button button-primary"
             style={{
               padding: "var(--space-3) var(--space-5)",
               background: "var(--accent)",
@@ -132,7 +132,7 @@ export function ErrorState({
         {showHomeLink && (
           <a
             href="/"
-            className="btn btn-ghost"
+            className="button button-ghost"
             style={{
               padding: "var(--space-3) var(--space-5)",
               background: "transparent",

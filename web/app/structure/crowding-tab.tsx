@@ -63,41 +63,41 @@ export function CrowdingTab({
           <table>
             <thead>
               <tr>
-                <th>
+                <th aria-sort={crowdingSort.key === "vault" ? (crowdingSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "vault"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Vault {sortIndicator(crowdingSort, "vault")}
                   </button>
                 </th>
-                <th>
+                <th aria-sort={crowdingSort.key === "chain" ? (crowdingSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Chain {sortIndicator(crowdingSort, "chain")}
                   </button>
                 </th>
                 {!isCompactViewport && (
-                  <th>
-                    <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "token"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <th aria-sort={crowdingSort.key === "token" ? (crowdingSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "token"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                       Token {sortIndicator(crowdingSort, "token")}
                     </button>
                   </th>
                 )}
                 {!isCompactViewport && (
-                  <th>
-                    <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "category"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <th aria-sort={crowdingSort.key === "category" ? (crowdingSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "category"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                       Category {sortIndicator(crowdingSort, "category")}
                     </button>
                   </th>
                 )}
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={crowdingSort.key === "tvl" ? (crowdingSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     TVL {sortIndicator(crowdingSort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={crowdingSort.key === "apy" ? (crowdingSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Realized APY 30d {sortIndicator(crowdingSort, "apy")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={crowdingSort.key === "crowding" ? (crowdingSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setCrowdingSort(toggleSort(crowdingSort, "crowding"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Crowding {sortIndicator(crowdingSort, "crowding")}
                   </button>
@@ -145,41 +145,41 @@ export function CrowdingTab({
           <table>
             <thead>
               <tr>
-                <th>
+                <th aria-sort={uncrowdedSort.key === "vault" ? (uncrowdedSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "vault"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Vault {sortIndicator(uncrowdedSort, "vault")}
                   </button>
                 </th>
-                <th>
+                <th aria-sort={uncrowdedSort.key === "chain" ? (uncrowdedSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Chain {sortIndicator(uncrowdedSort, "chain")}
                   </button>
                 </th>
                 {!isCompactViewport && (
-                  <th>
-                    <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "token"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <th aria-sort={uncrowdedSort.key === "token" ? (uncrowdedSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "token"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                       Token {sortIndicator(uncrowdedSort, "token")}
                     </button>
                   </th>
                 )}
                 {!isCompactViewport && (
-                  <th>
-                    <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "category"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <th aria-sort={uncrowdedSort.key === "category" ? (uncrowdedSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "category"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                       Category {sortIndicator(uncrowdedSort, "category")}
                     </button>
                   </th>
                 )}
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={uncrowdedSort.key === "tvl" ? (uncrowdedSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     TVL {sortIndicator(uncrowdedSort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={uncrowdedSort.key === "apy" ? (uncrowdedSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Realized APY 30d {sortIndicator(uncrowdedSort, "apy")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={uncrowdedSort.key === "crowding" ? (uncrowdedSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setUncrowdedSort(toggleSort(uncrowdedSort, "crowding"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Crowding {sortIndicator(uncrowdedSort, "crowding")}
                   </button>

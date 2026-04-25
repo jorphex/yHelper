@@ -95,37 +95,37 @@ export function ChainsTab({
           <table>
             <thead>
               <tr>
-                <th>
+                <th aria-sort={chainSort.key === "chain" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Chain {sortIndicator(chainSort, "chain")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "vaults" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Vaults {sortIndicator(chainSort, "vaults")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "with_realized_apy" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "with_realized_apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     With Realized APY {sortIndicator(chainSort, "with_realized_apy")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "tvl" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     TVL {sortIndicator(chainSort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "apy" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Realized APY 30d {sortIndicator(chainSort, "apy")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "momentum" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "momentum"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Avg Momentum {sortIndicator(chainSort, "momentum")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "consistency" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "consistency"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Avg Consistency {sortIndicator(chainSort, "consistency")}
                   </button>

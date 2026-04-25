@@ -208,17 +208,17 @@ export function RegimesTab({
           <table>
             <thead>
               <tr>
-                <th>
+                <th aria-sort={summarySort.key === "regime" ? (summarySort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setSummarySort(toggleSort(summarySort, "regime"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Regime <span>{sortIndicator(summarySort, "regime")}</span>
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={summarySort.key === "vaults" ? (summarySort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setSummarySort(toggleSort(summarySort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Vaults <span>{sortIndicator(summarySort, "vaults")}</span>
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={summarySort.key === "tvl" ? (summarySort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setSummarySort(toggleSort(summarySort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     TVL <span>{sortIndicator(summarySort, "tvl")}</span>
                   </button>
@@ -248,40 +248,40 @@ export function RegimesTab({
           <table>
             <thead>
               <tr>
-                <th>
+                <th aria-sort={regimeMoverSort.key === "vault" ? (regimeMoverSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setRegimeMoverSort(toggleSort(regimeMoverSort, "vault"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Vault <span>{sortIndicator(regimeMoverSort, "vault")}</span>
                   </button>
                 </th>
-                <th>
+                <th aria-sort={regimeMoverSort.key === "chain" ? (regimeMoverSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setRegimeMoverSort(toggleSort(regimeMoverSort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Chain <span>{sortIndicator(regimeMoverSort, "chain")}</span>
                   </button>
                 </th>
                 {!isCompactViewport && (
-                  <th>
-                    <button className="th-button" onClick={() => setRegimeMoverSort(toggleSort(regimeMoverSort, "token"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <th aria-sort={regimeMoverSort.key === "token" ? (regimeMoverSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setRegimeMoverSort(toggleSort(regimeMoverSort, "token"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                       Token <span>{sortIndicator(regimeMoverSort, "token")}</span>
                     </button>
                   </th>
                 )}
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={regimeMoverSort.key === "tvl" ? (regimeMoverSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setRegimeMoverSort(toggleSort(regimeMoverSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     TVL <span>{sortIndicator(regimeMoverSort, "tvl")}</span>
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={regimeMoverSort.key === "apy" ? (regimeMoverSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setRegimeMoverSort(toggleSort(regimeMoverSort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Realized APY 30d <span>{sortIndicator(regimeMoverSort, "apy")}</span>
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }}>
+                <th style={{ textAlign: "right" }} aria-sort={regimeMoverSort.key === "momentum" ? (regimeMoverSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                   <button className="th-button" onClick={() => setRegimeMoverSort(toggleSort(regimeMoverSort, "momentum"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                     Momentum <span>{sortIndicator(regimeMoverSort, "momentum")}</span>
                   </button>
                 </th>
                 {!isCompactViewport && (
-                  <th style={{ textAlign: "right" }}>
+                  <th style={{ textAlign: "right" }} aria-sort={regimeMoverSort.key === "regime" ? (regimeMoverSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                     <button className="th-button" onClick={() => setRegimeMoverSort(toggleSort(regimeMoverSort, "regime"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                       Regime <span>{sortIndicator(regimeMoverSort, "regime")}</span>
                     </button>
@@ -425,27 +425,27 @@ export function RegimesTab({
               <table>
                 <thead>
                   <tr>
-                    <th>
+                    <th aria-sort={splitSnapshotSort.key === "cohort" ? (splitSnapshotSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                       <button className="th-button" onClick={() => setSplitSnapshotSort(toggleSort(splitSnapshotSort, "cohort"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                         Cohort <span>{sortIndicator(splitSnapshotSort, "cohort")}</span>
                       </button>
                     </th>
-                    <th style={{ textAlign: "right" }}>
+                    <th style={{ textAlign: "right" }} aria-sort={splitSnapshotSort.key === "churn" ? (splitSnapshotSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                       <button className="th-button" onClick={() => setSplitSnapshotSort(toggleSort(splitSnapshotSort, "churn"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                         Churn % <span>{sortIndicator(splitSnapshotSort, "churn")}</span>
                       </button>
                     </th>
-                    <th style={{ textAlign: "right" }}>
+                    <th style={{ textAlign: "right" }} aria-sort={splitSnapshotSort.key === "churn_tvl" ? (splitSnapshotSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                       <button className="th-button" onClick={() => setSplitSnapshotSort(toggleSort(splitSnapshotSort, "churn_tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                         Churn TVL % <span>{sortIndicator(splitSnapshotSort, "churn_tvl")}</span>
                       </button>
                     </th>
-                    <th style={{ textAlign: "right" }}>
+                    <th style={{ textAlign: "right" }} aria-sort={splitSnapshotSort.key === "momentum" ? (splitSnapshotSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                       <button className="th-button" onClick={() => setSplitSnapshotSort(toggleSort(splitSnapshotSort, "momentum"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                         Momentum <span>{sortIndicator(splitSnapshotSort, "momentum")}</span>
                       </button>
                     </th>
-                    <th style={{ textAlign: "right" }}>
+                    <th style={{ textAlign: "right" }} aria-sort={splitSnapshotSort.key === "tvl" ? (splitSnapshotSort.direction === "asc" ? "ascending" : "descending") : "none"}>
                       <button className="th-button" onClick={() => setSplitSnapshotSort(toggleSort(splitSnapshotSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
                         TVL <span>{sortIndicator(splitSnapshotSort, "tvl")}</span>
                       </button>
