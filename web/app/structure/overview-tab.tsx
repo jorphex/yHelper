@@ -46,7 +46,7 @@ export function OverviewTab({
 }) {
   return (
     <>
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         {isLoading ? (
           <div className="kpi-grid kpi-grid-5">
             {Array(5).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
@@ -77,11 +77,11 @@ export function OverviewTab({
         )}
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         <TvlTreemap title="TVL Treemap (Chain -> Category -> Token Lens)" chains={chainRows} categories={categoryRows} tokens={tokenRows} />
       </section>
 
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section">
         <div className="card-header">
           <h2 className="card-title">Category Concentration</h2>
         </div>
@@ -90,27 +90,27 @@ export function OverviewTab({
             <thead>
               <tr>
                 <th aria-sort={categorySort.key === "category" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "category"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "category"))}>
                     Category {sortIndicator(categorySort, "category")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={categorySort.key === "vaults" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={categorySort.key === "vaults" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "vaults"))}>
                     Vaults {sortIndicator(categorySort, "vaults")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={categorySort.key === "tvl" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={categorySort.key === "tvl" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "tvl"))}>
                     TVL {sortIndicator(categorySort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={categorySort.key === "share" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "share"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={categorySort.key === "share" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "share"))}>
                     Share {sortIndicator(categorySort, "share")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={categorySort.key === "apy" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={categorySort.key === "apy" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "apy"))}>
                     Realized APY 30d {sortIndicator(categorySort, "apy")}
                   </button>
                 </th>
@@ -129,10 +129,10 @@ export function OverviewTab({
                         </Link>
                       ) : "Unknown"}
                     </td>
-                    <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.share_tvl)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
+                    <td className="data-value numeric">{row.vaults}</td>
+                    <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
+                    <td className="data-value numeric">{formatPct(row.share_tvl)}</td>
+                    <td className="data-value numeric">{formatPct(row.weighted_realized_apy_30d)}</td>
                   </tr>
                 ))
               )}
@@ -150,27 +150,27 @@ export function OverviewTab({
             <thead>
               <tr>
                 <th aria-sort={tokenSort.key === "token" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "token"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "token"))}>
                     Token {sortIndicator(tokenSort, "token")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={tokenSort.key === "vaults" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={tokenSort.key === "vaults" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "vaults"))}>
                     Vaults {sortIndicator(tokenSort, "vaults")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={tokenSort.key === "tvl" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={tokenSort.key === "tvl" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "tvl"))}>
                     TVL {sortIndicator(tokenSort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={tokenSort.key === "share" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "share"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={tokenSort.key === "share" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "share"))}>
                     Share {sortIndicator(tokenSort, "share")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={tokenSort.key === "apy" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={tokenSort.key === "apy" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "apy"))}>
                     Realized APY 30d {sortIndicator(tokenSort, "apy")}
                   </button>
                 </th>
@@ -189,10 +189,10 @@ export function OverviewTab({
                         </Link>
                       ) : "Unknown"}
                     </td>
-                    <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.share_tvl)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
+                    <td className="data-value numeric">{row.vaults}</td>
+                    <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
+                    <td className="data-value numeric">{formatPct(row.share_tvl)}</td>
+                    <td className="data-value numeric">{formatPct(row.weighted_realized_apy_30d)}</td>
                   </tr>
                 ))
               )}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiUrl } from "../lib/api";
 
 const navItems = [
@@ -60,6 +60,8 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [mentionedVault, setMentionedVault] = useState<OverviewNoteResponse["mentioned_vault"]>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setIsOpen(false);
@@ -86,9 +88,49 @@ export function Sidebar() {
     return () => { cancelled = true; };
   }, []);
 
+  // Focus trap for mobile sidebar
+  useEffect(() => {
+    if (!isOpen) return;
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+
+    const focusableSelectors = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const focusables = Array.from(sidebar.querySelectorAll<HTMLElement>(focusableSelectors));
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    // Focus first element when opening
+    first?.focus();
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+        toggleRef.current?.focus();
+        return;
+      }
+      if (e.key !== "Tab" || focusables.length === 0) return;
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
   return (
     <>
       <button
+        ref={toggleRef}
         type="button"
         className="sidebar-toggle"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -101,11 +143,14 @@ export function Sidebar() {
       {isOpen && (
         <div
           className="sidebar-overlay"
-          onClick={() => setIsOpen(false)}
+          onClick={() => {
+            setIsOpen(false);
+            toggleRef.current?.focus();
+          }}
           aria-hidden="true"
         />
       )}
-      <aside className={`sidebar ${isOpen ? "is-open" : ""}`} id="sidebar-nav">
+      <aside ref={sidebarRef} className={`sidebar ${isOpen ? "is-open" : ""}`} id="sidebar-nav">
       <div className="sidebar-header">
         <Link href="/" className="sidebar-logo">
           yHelper
@@ -135,8 +180,7 @@ export function Sidebar() {
                   href={mentionedVault.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="external-link"
-                  style={{ color: "var(--accent)" }}
+                  className="external-link text-accent"
                 >
                   {mentionedVault.symbol}
                   <ExternalLinkIcon />

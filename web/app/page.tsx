@@ -98,7 +98,7 @@ export default function HomePage() {
   return (
     <div className={`transition-opacity duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
       {/* Hero Section */}
-      <section className="page-header page-header-hero" style={{ borderBottom: 'none' }}>
+      <section className="page-header page-header-hero page-header-no-border">
         <div>
           <h1 className="page-title">
             Find the best<br />
@@ -107,7 +107,7 @@ export default function HomePage() {
           <p className="page-description">
             Move from raw yield data to calm, defensible allocation decisions in minutes. Track shifts, compare venues, and time your moves.
           </p>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+          <div className="tab-bar-plain">
             <Link href="/explore" className="button button-primary">
               Start in Explore
             </Link>
@@ -116,7 +116,7 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-        <div style={{ position: 'relative', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="hero-image">
           <Image
             src="/home-assets-yearn-blender/hero-yearn-blender-coins.png"
             alt="Yearn Finance"
@@ -129,15 +129,15 @@ export default function HomePage() {
       </section>
 
       {/* Quick Stats Row */}
-      <section className="section" style={{ marginBottom: '48px' }}>
+      <section className="section section-lg">
         {isLoading ? (
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="kpi-grid kpi-grid-3">
             <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
           </div>
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="kpi-grid kpi-grid-3">
             <div className="kpi-card">
               <div className="kpi-label">Largest Shift</div>
               <div className={`kpi-value ${(topMover?.delta_apy ?? 0) >= 0 ? 'text-positive delta-positive' : 'text-negative delta-negative'}`}>
@@ -145,7 +145,7 @@ export default function HomePage() {
               </div>
               <div className="kpi-hint">
                 {liveShiftHref ? (
-                  <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="external-link" style={{ color: 'var(--accent)' }}>
+                  <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="external-link text-accent">
                     {topMoverName}
                   </a>
                 ) : topMoverName} · Realized APY 30d now {liveShiftApy}
@@ -153,24 +153,24 @@ export default function HomePage() {
             </div>
 
             <div className="kpi-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div className="kpi-card-head">
                 <div>
-                  <div className="kpi-label" style={{ marginBottom: '4px' }}>{dauHeadlineLabel}</div>
-                  <div className="kpi-value" style={{ fontSize: '28px', fontWeight: 700 }}>
+                  <div className="kpi-label">{dauHeadlineLabel}</div>
+                  <div className="kpi-value kpi-value-lg">
                     {!isDauLoading && Number.isFinite(dauHeadline) ? (dauHeadline as number).toLocaleString() : "—"}
                   </div>
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div className="kpi-meta">
                   {dauWindowLabel}
                 </div>
               </div>
-              <div style={{ marginTop: '8px', minHeight: '50px' }}>
+              <div className="kpi-chart-wrap">
                 {!isDauLoading && hasDauHistory && dauChartData.length >= 2 ? (
                   <MiniLineChart
                     data={dauChartData}
                     color="var(--accent, #0657E9)"
                     height={50}
-                    width={280}
+                    width="100%"
                     strokeWidth={2}
                   />
                 ) : (
@@ -185,16 +185,16 @@ export default function HomePage() {
                   />
                 )}
               </div>
-              <div className="kpi-hint" style={{ marginTop: '8px' }}>
+              <div className="kpi-hint kpi-hint-sm">
                 {isDauLoading || isDauBackfilling ? 'Backfilling daily history…' : dauChartLabel}
               </div>
             </div>
 
             <div className="kpi-card">
               <div className="kpi-label">Highest Est. APY</div>
-              <div className="kpi-value" style={{ fontSize: '20px' }}>
+              <div className="kpi-value kpi-value-md">
                 {highestYieldHref ? (
-                  <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="external-link" style={{ color: 'var(--accent)' }}>
+                  <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="external-link text-accent">
                     {highestYieldName}
                   </a>
                 ) : highestYieldName}
@@ -237,7 +237,7 @@ export default function HomePage() {
 
             <div className="kpi-card home-overview-summary-card">
               <div className="kpi-label">Total Staked</div>
-              <div className="kpi-value" style={{ fontSize: '20px' }}>
+              <div className="kpi-value kpi-value-md">
                 {Number.isFinite(styfi?.summary?.combined_staked ?? null)
                   ? `${Math.round((styfi?.summary?.combined_staked ?? 0)).toLocaleString()} YFI`
                   : "n/a"}
@@ -260,27 +260,16 @@ export default function HomePage() {
             { href: "/momentum", title: "Momentum", desc: "Track realized APY changes and regime shifts.", tag: "Timing matters" },
             { href: "/styfi", title: "stYFI", desc: "Track stake balances and reward epochs.", tag: "Governance" },
           ].map((item) => (
-            <Link 
-              key={item.href} 
+            <Link
+              key={item.href}
               href={item.href}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                padding: '20px',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-lg)',
-                textDecoration: 'none',
-                transition: 'all 150ms ease-out',
-              }}
-              className="hover-card"
+              className="hover-card card-grid-link"
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>{item.title}</span>
-                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-tertiary)' }}>{item.tag}</span>
+              <div className="card-grid-link-head">
+                <span className="card-grid-link-title">{item.title}</span>
+                <span className="card-grid-link-tag">{item.tag}</span>
               </div>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>{item.desc}</p>
+              <p className="card-grid-link-desc">{item.desc}</p>
             </Link>
           ))}
         </div>

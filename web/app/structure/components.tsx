@@ -39,9 +39,9 @@ export function TvlTreemap({
   const validGroups = groups.filter((group) => group.rows.length > 0);
   if (validGroups.length === 0) {
     return (
-      <section style={{ padding: "24px" }}>
+      <section className="viz-panel">
         <h3>{title}</h3>
-        <p style={{ color: "var(--text-secondary)" }}>No composition rows available.</p>
+        <p className="text-secondary">No composition rows available.</p>
       </section>
     );
   }
@@ -65,7 +65,7 @@ export function TvlTreemap({
             let x = 0;
             return (
               <g key={group.key}>
-                <text x={2} y={y + laneHeight / 2 + 0.5} style={{ fontSize: "11px", fill: "var(--text-secondary)" }} dominantBaseline="central">
+                <text x={2} y={y + laneHeight / 2 + 0.5} className="svg-label" dominantBaseline="central">
                   {group.label}
                 </text>
                 {group.rows.map((row, rowIndex) => {
@@ -89,7 +89,7 @@ export function TvlTreemap({
                         style={{ transition: "all 0.2s" } as CSSProperties}
                       />
                       {widthPx >= 54 && compactName ? (
-                        <text x={rectX + 5} y={y + Math.min(18, laneHeight - 6)} style={{ fontSize: "10px", fill: "var(--text-primary)" }}>
+                        <text x={rectX + 5} y={y + Math.min(18, laneHeight - 6)} className="svg-label-small">
                           {compactName}
                         </text>
                       ) : null}
@@ -102,7 +102,7 @@ export function TvlTreemap({
           })}
         </svg>
       </div>
-      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "12px" }}>
+      <p className="text-sm text-secondary section-sm">
         Treemap lanes show top TVL contributors by chain, category, and token.
       </p>
     </section>

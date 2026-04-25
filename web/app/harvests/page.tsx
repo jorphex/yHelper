@@ -3,8 +3,10 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DataLoadError } from "../components/error-state";
+import { EmptyState } from "../components/empty-state";
 import { KpiGrid, BarList } from "../components/visuals";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
+import { TableWrap } from "../components/table-wrap";
 import { useHarvestData, type HarvestResponse } from "../hooks/use-harvest-data";
 import { chainLabel, explorerAddressUrl, explorerTxUrl, formatUtcDateTime, yearnVaultUrl } from "../lib/format";
 import { queryInt, queryString, replaceQuery } from "../lib/url";
@@ -195,7 +197,6 @@ function HarvestsPageContent() {
     limit: query.limit,
   });
   const [vaultDraft, setVaultDraft] = useState(query.vaultAddress);
-  const [vaultFocused, setVaultFocused] = useState(false);
 
   useEffect(() => {
     setVaultDraft(query.vaultAddress);
@@ -241,7 +242,7 @@ function HarvestsPageContent() {
 
   return (
     <div>
-      <section className="page-header" style={{ borderBottom: "none" }}>
+      <section className="page-header page-header-no-border">
         <h1 className="page-title">
           Harvests
           <br />
@@ -252,23 +253,15 @@ function HarvestsPageContent() {
         </p>
       </section>
 
-      <section className="section" style={{ marginBottom: "24px" }}>
+      <section className="section section-sm">
         <div className="card">
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "16px",
-              alignItems: "end",
-              maxWidth: "760px",
-            }}
-          >
-            <label style={{ width: "160px", maxWidth: "100%" }}>
+          <div className="filter-bar">
+            <label style={{ width: "160px", maxWidth: "100%", flexShrink: 0 }}>
               <span className="filter-label">Chain</span>
               <select
                 value={query.chainId ?? ""}
                 onChange={(event) => updateQuery({ chain_id: event.target.value ? Number(event.target.value) : null })}
-                style={{ width: "100%", marginTop: "6px", height: "40px" }}
+                className="filter-control"
               >
                 <option value="">All chains</option>
                 {chainOptions.map((option) => (
@@ -276,55 +269,29 @@ function HarvestsPageContent() {
                 ))}
               </select>
             </label>
-            <label style={{ width: "420px", maxWidth: "100%" }}>
+            <label style={{ flex: "1 1 280px", maxWidth: "100%" }}>
               <span className="filter-label">Vault Filter</span>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) auto",
-                  gap: "8px",
-                  marginTop: "6px",
-                  padding: "1px",
-                  height: "40px",
-                  borderRadius: "12px",
-                  border: vaultFocused ? "1px solid var(--accent)" : "1px solid var(--border-soft)",
-                  background: "linear-gradient(180deg, var(--bg-elevated) 0%, color-mix(in oklab, var(--bg-elevated) 84%, var(--accent) 16%) 100%)",
-                  boxShadow: vaultFocused
-                    ? "0 0 0 3px rgba(6, 87, 233, 0.12)"
-                    : "inset 0 1px 0 rgba(250, 248, 245, 0.03)",
-                }}
-              >
+              <div className="input-composite">
                 <input
                   value={vaultDraft}
                   onChange={(event) => setVaultDraft(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") applyVaultFilter();
                   }}
-                  onFocus={() => setVaultFocused(true)}
-                  onBlur={() => setVaultFocused(false)}
                   placeholder="Paste a vault address"
                   spellCheck={false}
-                  style={{
-                    width: "100%",
-                    minWidth: 0,
-                    border: "none",
-                    background: "transparent",
-                    boxShadow: "none",
-                    padding: "0 12px",
-                    height: "100%",
-                  }}
                 />
                 <button
                   className="button button-ghost"
                   onClick={applyVaultFilter}
-                  style={{ whiteSpace: "nowrap", borderRadius: "10px", alignSelf: "stretch", height: "100%" }}
+                  style={{ borderRadius: "10px", alignSelf: "stretch", height: "100%" }}
                 >
                   Apply
                 </button>
               </div>
             </label>
             {(query.chainId || query.vaultAddress) ? (
-              <div style={{ display: "flex", alignItems: "end", height: "100%" }}>
+              <div style={{ display: "flex", alignItems: "end" }}>
                 <button className="button button-ghost" onClick={() => updateQuery({ chain_id: null, vault_address: null })}>
                   Clear filters
                 </button>
@@ -333,24 +300,14 @@ function HarvestsPageContent() {
           </div>
 
           {backfillNote ? (
-            <div
-              style={{
-                marginTop: "18px",
-                padding: "14px 16px",
-                borderRadius: "14px",
-                border: "1px solid var(--border-subtle)",
-                background: "color-mix(in oklab, var(--bg-elevated) 84%, var(--accent) 16%)",
-                color: "var(--text-secondary)",
-                fontSize: "13px",
-              }}
-            >
+            <div className="info-banner">
               Initial backfill is still moving through older harvest rows, so shorter windows can stay empty until the scan reaches recent blocks.
             </div>
           ) : null}
         </div>
       </section>
 
-      <div style={{ height: "1px", background: "var(--border-subtle)", margin: "0 0 28px" }} />
+      <div className="section-divider" />
 
       <section className="section section-sm">
         <div className="kpi-grid">
@@ -358,19 +315,12 @@ function HarvestsPageContent() {
         </div>
       </section>
 
-      <div style={{ height: "1px", background: "var(--border-subtle)", margin: "0 0 28px" }} />
+      <div className="section-divider" />
 
-      <div
-        style={{
-          display: "grid",
-          gap: "24px",
-          gridTemplateColumns: "minmax(0, 0.92fr) minmax(0, 1.08fr)",
-          alignItems: "start",
-        }}
-      >
-        <section className="section-card subtle-card" style={{ padding: "24px" }}>
+      <div className="cols-responsive-2">
+        <section className="card">
           <h2 className="card-title">Chain Split</h2>
-          <p style={{ color: "var(--text-tertiary)", margin: "6px 0 18px", fontSize: "13px" }}>
+          <p className="card-description">
             Bars and numbers show total harvest reports per chain for the selected window.
           </p>
           {isLoading && !data ? (
@@ -385,9 +335,9 @@ function HarvestsPageContent() {
           )}
         </section>
 
-        <section className="section-card visual-card" style={{ padding: "24px" }}>
+        <section className="card">
           <h2 className="card-title">Daily Activity</h2>
-          <p style={{ color: "var(--text-tertiary)", margin: "6px 0 18px", fontSize: "13px" }}>
+          <p className="card-description">
             Last 14 daily buckets for the selected scope. Each cell shows the report count, and brighter blue means more reports landed that day.
           </p>
           {isLoading && !data ? (
@@ -398,26 +348,26 @@ function HarvestsPageContent() {
         </section>
       </div>
 
-      <section className="section-card subtle-card table-card" style={{ marginTop: "24px", padding: "24px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "baseline", marginBottom: "16px", flexWrap: "wrap" }}>
+      <section className="section">
+        <div className="card-header">
           <div>
-            <h2 className="card-title" style={{ marginBottom: "6px" }}>Recent Reports</h2>
-            <p style={{ color: "var(--text-tertiary)", fontSize: "13px" }}>
+            <h2 className="card-title">Recent Reports</h2>
+            <p className="card-description">
               Showing the latest {query.limit} rows. Gain and fee values are raw underlying-asset units from the report event.
             </p>
           </div>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "980px" }}>
+        <TableWrap>
+          <table>
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-subtle)" }}>
-                <th style={{ padding: "12px 10px" }}>Time</th>
-                <th style={{ padding: "12px 10px" }}>Chain</th>
-                <th style={{ padding: "12px 10px" }}>Vault</th>
-                <th style={{ padding: "12px 10px" }}>Strategy</th>
-                <th style={{ padding: "12px 10px" }}>Gain</th>
-                <th style={{ padding: "12px 10px" }}>Fees</th>
+              <tr>
+                <th>Time</th>
+                <th>Chain</th>
+                <th>Vault</th>
+                <th>Strategy</th>
+                <th>Gain</th>
+                <th>Fees</th>
               </tr>
             </thead>
             <tbody>
@@ -425,42 +375,44 @@ function HarvestsPageContent() {
                 <TableSkeleton rows={6} columns={6} />
               ) : (data?.recent?.length ?? 0) === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: "28px 10px" }}>
-                    <div className="panel-empty muted">
-                      No harvest rows are available for this filter yet.
-                    </div>
+                  <td colSpan={6}>
+                    <EmptyState
+                      title="No harvest rows"
+                      description="No harvest reports match the current filter. Try clearing the vault filter or selecting a different chain."
+                      icon="data"
+                    />
                   </td>
                 </tr>
               ) : (
                 data?.recent?.map((row) => (
-                  <tr key={`${row.tx_hash}-${row.vault_address}`} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                    <td style={{ padding: "12px 10px", whiteSpace: "nowrap", color: "var(--text-secondary)" }}>
-                      <div style={{ display: "grid", gap: "4px" }}>
+                  <tr key={`${row.tx_hash}-${row.vault_address}`}>
+                    <td className="nowrap">
+                      <div className="cell-stack">
                         <span>{formatUtcDateTime(row.block_time)}</span>
                         {explorerTxUrl(row.chain_id, row.tx_hash) ? (
                           <a
                             href={explorerTxUrl(row.chain_id, row.tx_hash)!}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: "var(--accent)", textDecoration: "none", fontSize: "12px" }}
+                            className="external-link-inline text-xs"
                           >
                             {shortHash(row.tx_hash)}
                           </a>
                         ) : (
-                          <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>{shortHash(row.tx_hash)}</span>
+                          <span className="text-xs text-tertiary">{shortHash(row.tx_hash)}</span>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                    <td>
                       {row.chain_label || chainLabel(row.chain_id)}
                     </td>
-                    <td style={{ padding: "12px 10px" }}>
-                      <div style={{ display: "grid", gap: "4px" }}>
+                    <td>
+                      <div className="cell-stack">
                         <a
                           href={yearnVaultUrl(row.chain_id, row.vault_address)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
+                          className="external-link-inline font-semibold"
                         >
                           {row.vault_symbol || shortHash(row.vault_address)}
                         </a>
@@ -469,22 +421,22 @@ function HarvestsPageContent() {
                             href={explorerAddressUrl(row.chain_id, row.vault_address)!}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: "var(--accent)", fontSize: "12px", textDecoration: "none" }}
+                            className="external-link-inline text-xs"
                           >
                             {shortHash(row.vault_address)}
                           </a>
                         ) : (
-                          <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>{shortHash(row.vault_address)}</span>
+                          <span className="text-xs text-tertiary">{shortHash(row.vault_address)}</span>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)", fontFeatureSettings: "\"tnum\" 1" }}>
+                    <td>
                       {explorerAddressUrl(row.chain_id, row.strategy_address) ? (
                         <a
                           href={explorerAddressUrl(row.chain_id, row.strategy_address)!}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: "var(--text-secondary)", textDecoration: "none" }}
+                          className="external-link-inline"
                         >
                           {shortHash(row.strategy_address)}
                         </a>
@@ -492,10 +444,10 @@ function HarvestsPageContent() {
                         shortHash(row.strategy_address)
                       )}
                     </td>
-                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                    <td className="data-value">
                       {amountWithUnit(row.gain, row.token_symbol, row.token_decimals)}
                     </td>
-                    <td style={{ padding: "12px 10px", color: "var(--text-secondary)" }}>
+                    <td className="data-value">
                       {amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals)}
                     </td>
                   </tr>
@@ -503,7 +455,7 @@ function HarvestsPageContent() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
       </section>
     </div>
   );

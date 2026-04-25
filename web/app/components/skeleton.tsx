@@ -23,9 +23,6 @@ export function Skeleton({
   height,
 }: SkeletonProps) {
   const baseStyles: CSSProperties = {
-    background: "linear-gradient(90deg, #111111 25%, rgba(255,255,255,0.03) 50%, #111111 75%)",
-    backgroundSize: "200% 100%",
-    animation: "skeleton-shimmer 1.5s ease-in-out infinite",
     borderRadius: variant === "circle" ? "50%" : variant === "card" ? "12px" : "4px",
     ...style,
   };

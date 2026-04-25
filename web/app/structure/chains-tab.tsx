@@ -41,7 +41,7 @@ export function ChainsTab({
 }) {
   return (
     <>
-      <section className="section" style={{ marginBottom: "48px" }}>
+      <section className="section section-lg">
         {isLoading ? (
           <div className="kpi-grid kpi-grid-3">
             {Array(3).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
@@ -69,7 +69,7 @@ export function ChainsTab({
           <h2 className="card-title">Chain Comparison</h2>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "24px", marginBottom: "48px" }}>
+        <div className="cols-responsive-2 section-lg">
           <HeatGrid
             title="By Chain"
             items={rows.slice(0, 6).map((row) => ({
@@ -96,37 +96,37 @@ export function ChainsTab({
             <thead>
               <tr>
                 <th aria-sort={chainSort.key === "chain" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "chain"))}>
                     Chain {sortIndicator(chainSort, "chain")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "vaults" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={chainSort.key === "vaults" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "vaults"))}>
                     Vaults {sortIndicator(chainSort, "vaults")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "with_realized_apy" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "with_realized_apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={chainSort.key === "with_realized_apy" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "with_realized_apy"))}>
                     With Realized APY {sortIndicator(chainSort, "with_realized_apy")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "tvl" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={chainSort.key === "tvl" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "tvl"))}>
                     TVL {sortIndicator(chainSort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "apy" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "apy"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={chainSort.key === "apy" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "apy"))}>
                     Realized APY 30d {sortIndicator(chainSort, "apy")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "momentum" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "momentum"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={chainSort.key === "momentum" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "momentum"))}>
                     Avg Momentum {sortIndicator(chainSort, "momentum")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={chainSort.key === "consistency" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "consistency"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={chainSort.key === "consistency" ? (chainSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setChainSort(toggleSort(chainSort, "consistency"))}>
                     Avg Consistency {sortIndicator(chainSort, "consistency")}
                   </button>
                 </th>
@@ -143,12 +143,12 @@ export function ChainsTab({
                         {chainLabel(row.chain_id)}
                       </Link>
                     </td>
-                    <td style={{ textAlign: "right" }} className="data-value">{row.active_vaults}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{row.with_realized_apy}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.total_tvl_usd)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.weighted_realized_apy_30d)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.avg_momentum_7d_30d)}</td>
-                    <td style={{ textAlign: "right" }} className="data-value">{row.avg_consistency?.toFixed(2) ?? "n/a"}</td>
+                    <td className="data-value numeric">{row.active_vaults}</td>
+                    <td className="data-value numeric">{row.with_realized_apy}</td>
+                    <td className="data-value numeric">{formatUsd(row.total_tvl_usd)}</td>
+                    <td className="data-value numeric">{formatPct(row.weighted_realized_apy_30d)}</td>
+                    <td className="data-value numeric">{formatPct(row.avg_momentum_7d_30d)}</td>
+                    <td className="data-value numeric">{row.avg_consistency?.toFixed(2) ?? "n/a"}</td>
                   </tr>
                 ))
               )}

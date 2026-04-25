@@ -541,10 +541,10 @@ function MomentumPageContent() {
 
   if (changesError && !changesData) {
     return (
-      <div className="card" style={{ padding: "48px" }}>
+      <div className="card card-padded-lg">
         <h2>Changes data is temporarily unavailable</h2>
         <p>The change feed failed to load. Please try again later.</p>
-        <button onClick={() => refetchChanges()} className="button button-primary" style={{ marginTop: "16px" }}>
+        <button onClick={() => refetchChanges()} className="button button-primary section-sm">
           Retry
         </button>
       </div>
@@ -558,7 +558,7 @@ function MomentumPageContent() {
 
   return (
     <div>
-      <section className="page-header" style={{ borderBottom: "none" }}>
+      <section className="page-header page-header-no-border">
         <h1 className="page-title">
           Momentum
           <br />
@@ -644,7 +644,7 @@ function MomentumPageContent() {
       )}
 
       {activeTab === "regimes" && regimeError ? (
-        <div className="card" style={{ padding: "24px", marginTop: "24px" }}>{regimeError}</div>
+        <div className="card card-padded section-sm">{regimeError}</div>
       ) : null}
     </div>
   );
@@ -652,7 +652,7 @@ function MomentumPageContent() {
 
 export default function MomentumPage() {
   return (
-    <Suspense fallback={<div className="card" style={{ padding: "48px" }}>Loading...</div>}>
+    <Suspense fallback={<div className="card card-padded-lg">Loading...</div>}>
       <MomentumPageContent />
     </Suspense>
   );

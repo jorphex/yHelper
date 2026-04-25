@@ -11,7 +11,7 @@ type MiniLineChartProps = {
   data: DataPoint[];
   color?: string;
   height?: number;
-  width?: number;
+  width?: number | string;
   strokeWidth?: number;
 };
 
@@ -32,7 +32,8 @@ export function MiniLineChart({
 
   // Add padding
   const padding = { top: 4, right: 4, bottom: 4, left: 4 };
-  const chartWidth = width - padding.left - padding.right;
+  const numericWidth = typeof width === "string" ? 300 : width;
+  const chartWidth = numericWidth - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
   const getX = (index: number) =>
@@ -62,9 +63,9 @@ export function MiniLineChart({
     <svg
       width="100%"
       height={height}
-      viewBox={`0 0 ${width} ${height}`}
+      viewBox={`0 0 ${numericWidth} ${height}`}
       preserveAspectRatio="none"
-      style={{ display: "block", width: "100%", height: `${height}px` }}
+      style={{ display: "block", width: typeof width === "string" ? width : `${width}px`, height: `${height}px` }}
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

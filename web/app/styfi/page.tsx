@@ -6,6 +6,7 @@ import { explorerAddressUrl, explorerTxUrl, formatPct, formatUtcDateTime } from 
 import { BarList, TrendStrips } from "../components/visuals";
 import { TableWrap } from "../components/table-wrap";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
+import { DataLoadError } from "../components/error-state";
 import { useStYfiData } from "../hooks/use-styfi-data";
 
 type StYfiSnapshotPoint = {
@@ -231,27 +232,13 @@ function StYfiPageContent() {
 
   // Error state fallback - after all hooks
   if (error && !data) {
-    return (
-      <div className="card" style={{ padding: "48px", textAlign: "center" }}>
-        <h2 style={{ marginBottom: "16px" }}>Data temporarily unavailable</h2>
-        <p style={{ color: "var(--text-secondary)", marginBottom: "24px" }}>
-          The stYFI data feed failed to load. Please try again later.
-        </p>
-        <button 
-          onClick={() => void refetch()}
-          className="button button-primary"
-          style={{ padding: "12px 24px" }}
-        >
-          Retry
-        </button>
-      </div>
-    );
+    return <DataLoadError onRetry={() => refetch()} />;
   }
 
   return (
     <div>
       {/* Header */}
-      <section className="page-header page-header-hero" style={{ borderBottom: "none" }}>
+      <section className="page-header page-header-hero page-header-no-border">
         <div>
           <h1 className="page-title">
             stYFI
@@ -261,7 +248,7 @@ function StYfiPageContent() {
           <p className="page-description">
             Track Yearn staking balance, reward epochs, and protocol-level yield.
           </p>
-          <div style={{ marginTop: "24px" }}>
+          <div className="tab-bar-plain">
             <a
               href="https://styfi.yearn.fi"
               target="_blank"
@@ -272,7 +259,7 @@ function StYfiPageContent() {
             </a>
           </div>
         </div>
-        <div style={{ position: "relative", height: "320px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="hero-image">
           <Image
             src="/styfi-assets-blender/hero-styfi-blender-coin-tilt-left.png"
             alt="stYFI"
@@ -298,7 +285,7 @@ function StYfiPageContent() {
               <div key={item.label} className="kpi-card">
                 <div className="kpi-label">{item.label}</div>
                 <div className="kpi-value">{item.value}</div>
-                {item.hint && <div className="kpi-hint" style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "4px" }}>{item.hint}</div>}
+                {item.hint && <div className="kpi-hint text-tertiary text-xs">{item.hint}</div>}
               </div>
             ))}
           </div>
@@ -319,7 +306,7 @@ function StYfiPageContent() {
       <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Stake Trend</h2>
-          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>{snapshotSeries.length} snapshots across {historySpan}</p>
+          <p className="card-description">{snapshotSeries.length} snapshots across {historySpan}</p>
         </div>
         <TrendStrips
           title=""
@@ -334,7 +321,7 @@ function StYfiPageContent() {
       <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Recent Activity</h2>
-          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+          <p className="card-description">
             Latest 10 stYFI and stYFIx stake, unstake, withdraw, and claim actions.
           </p>
         </div>
@@ -343,12 +330,12 @@ function StYfiPageContent() {
           <table>
             <thead>
               <tr>
-                <th style={{ width: "22%" }}>Time</th>
-                <th style={{ width: "14%" }}>Product</th>
-                <th style={{ width: "14%" }}>Action</th>
-                <th style={{ width: "22%" }}>Amount</th>
-                <th style={{ width: "16%" }}>Account</th>
-                <th style={{ width: "12%" }}>Tx</th>
+                <th>Time</th>
+                <th>Product</th>
+                <th>Action</th>
+                <th>Amount</th>
+                <th>Account</th>
+                <th>Tx</th>
               </tr>
             </thead>
             <tbody>
@@ -356,7 +343,7 @@ function StYfiPageContent() {
                 <TableSkeleton rows={6} columns={6} />
               ) : recentActivity.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: "18px", color: "var(--text-secondary)" }}>
+                  <td colSpan={6} className="empty-state-row">
                     Recent activity is still warming up.
                   </td>
                 </tr>
@@ -365,39 +352,20 @@ function StYfiPageContent() {
                   const chainId = row.chain_id ?? 1;
                   const accountHref = row.user_account ? explorerAddressUrl(chainId, row.user_account) : null;
                   const txHref = row.tx_hash ? explorerTxUrl(chainId, row.tx_hash) : null;
-                  const actionTone =
+                  const badgeClass =
                     row.event_kind === "claim"
-                      ? "var(--accent)"
+                      ? "badge-claim"
                       : row.event_kind === "withdraw"
-                        ? "var(--text-secondary)"
+                        ? "badge-withdraw"
                         : row.event_kind === "unstake"
-                          ? "#9a5b23"
-                          : "var(--accent)";
-                  const actionBackground =
-                    row.event_kind === "claim"
-                      ? "rgba(6, 87, 233, 0.12)"
-                      : row.event_kind === "withdraw"
-                        ? "rgba(90, 84, 78, 0.10)"
-                        : row.event_kind === "unstake"
-                          ? "rgba(154, 91, 35, 0.12)"
-                          : "rgba(6, 87, 233, 0.12)";
+                          ? "badge-unstake"
+                          : "badge-stake";
                   return (
                     <tr key={`${row.tx_hash}-${row.product_type}-${row.event_kind}-${row.user_account}`}>
-                      <td style={{ whiteSpace: "nowrap" }}>{formatUtcDateTime(row.block_time ?? null)}</td>
+                      <td className="nowrap">{formatUtcDateTime(row.block_time ?? null)}</td>
                       <td>{row.product_label ?? "Unknown"}</td>
                       <td>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            padding: "4px 10px",
-                            borderRadius: "999px",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            background: actionBackground,
-                            color: actionTone,
-                          }}
-                        >
+                        <span className={`badge ${badgeClass}`}>
                           {row.action_label ?? "Activity"}
                         </span>
                       </td>
@@ -406,20 +374,20 @@ function StYfiPageContent() {
                       </td>
                       <td>
                         {accountHref ? (
-                          <a href={accountHref} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+                          <a href={accountHref} target="_blank" rel="noopener noreferrer" className="external-link-inline">
                             {shortHex(row.user_account)}
                           </a>
                         ) : (
                           shortHex(row.user_account)
                         )}
                       </td>
-                      <td style={{ whiteSpace: "nowrap" }}>
+                      <td className="nowrap">
                         {txHref ? (
                           <a
                             href={txHref}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: "var(--accent)", whiteSpace: "nowrap" }}
+                            className="external-link-inline"
                           >
                             {shortHex(row.tx_hash)}
                           </a>
@@ -440,7 +408,7 @@ function StYfiPageContent() {
       <section className="section">
         <div className="card-header">
           <h2 className="card-title">Epoch Detail</h2>
-          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+          <p className="card-description">
             Epochs start at 00:00:00 UTC. Component columns are protocol allocations (not user claim totals).
           </p>
         </div>
@@ -448,14 +416,14 @@ function StYfiPageContent() {
           <table>
             <thead>
               <tr>
-                <th style={{ width: "8%" }}>Epoch</th>
-                <th style={{ width: "10%" }}>Status</th>
-                <th style={{ width: "14%" }}>Start</th>
-                <th style={{ width: "16%", textAlign: "right" }}>Pot</th>
-                <th style={{ width: "16%", textAlign: "right" }}>stYFI</th>
-                <th style={{ width: "16%", textAlign: "right" }}>stYFIx</th>
-                <th style={{ width: "10%", textAlign: "right" }}>veYFI</th>
-                <th style={{ width: "10%", textAlign: "right" }}>Lockers</th>
+                <th>Epoch</th>
+                <th>Status</th>
+                <th>Start</th>
+                <th className="numeric">Pot</th>
+                <th className="numeric">stYFI</th>
+                <th className="numeric">stYFIx</th>
+                <th className="numeric">veYFI</th>
+                <th className="numeric">Lockers</th>
               </tr>
             </thead>
             <tbody>
@@ -468,22 +436,16 @@ function StYfiPageContent() {
                     <tr key={row.epoch ?? row.epoch_start ?? "epoch"}>
                       <td>{row.epoch ?? "n/a"}</td>
                       <td>
-                        <span style={{ 
-                          fontSize: "11px", 
-                          padding: "2px 8px", 
-                          borderRadius: "4px",
-                          background: isCurrent ? "var(--accent)" : "var(--bg-elevated)",
-                          color: isCurrent ? "white" : "var(--text-secondary)"
-                        }}>
+                        <span className={isCurrent ? "badge badge-primary" : "badge"}>
                           {isCurrent ? "Ongoing" : "Completed"}
                         </span>
                       </td>
                       <td>{formatUtcDate(row.epoch_start ?? null)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_total, rewardSymbol, 2)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_styfi, rewardSymbol, 2)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_styfix, rewardSymbol, 2)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_veyfi, rewardSymbol, 2)}</td>
-                      <td style={{ textAlign: "right" }} className="data-value">{formatToken(row.reward_liquid_lockers, rewardSymbol, 2)}</td>
+                      <td className="data-value numeric">{formatToken(row.reward_total, rewardSymbol, 2)}</td>
+                      <td className="data-value numeric">{formatToken(row.reward_styfi, rewardSymbol, 2)}</td>
+                      <td className="data-value numeric">{formatToken(row.reward_styfix, rewardSymbol, 2)}</td>
+                      <td className="data-value numeric">{formatToken(row.reward_veyfi, rewardSymbol, 2)}</td>
+                      <td className="data-value numeric">{formatToken(row.reward_liquid_lockers, rewardSymbol, 2)}</td>
                     </tr>
                   );
                 })
@@ -499,11 +461,8 @@ function StYfiPageContent() {
 export default function StYfiPage() {
   return (
     <Suspense fallback={
-      <div className="card" style={{ padding: "48px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div className="skeleton" style={{ height: "40px", width: "200px" }} />
-          <div className="skeleton" style={{ height: "20px", width: "60%" }} />
-        </div>
+      <div className="card card-padded-lg">
+        <KpiGridSkeleton count={2} />
       </div>
     }>
       <StYfiPageContent />

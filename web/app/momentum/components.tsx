@@ -43,7 +43,7 @@ export function MoverTable({
 
   return (
     <>
-      <div className="card-header" style={{ marginTop: "24px" }}>
+      <div className="card-header">
         <h2 className="card-title">{title}</h2>
       </div>
       <TableWrap>
@@ -51,37 +51,37 @@ export function MoverTable({
           <thead>
             <tr>
               <th aria-sort={sort.key === "vault" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "vault"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "vault"))}>
                   Vault {sortIndicator(sort, "vault")}
                 </button>
               </th>
               <th aria-sort={sort.key === "chain" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "chain"))}>
                   Chain {sortIndicator(sort, "chain")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }} aria-sort={sort.key === "tvl" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+              <th className="numeric" aria-sort={sort.key === "tvl" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "tvl"))}>
                   TVL {sortIndicator(sort, "tvl")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }} aria-sort={sort.key === "current" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "current"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+              <th className="numeric" aria-sort={sort.key === "current" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "current"))}>
                   Current Realized APY {sortIndicator(sort, "current")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }} aria-sort={sort.key === "previous" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "previous"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+              <th className="numeric" aria-sort={sort.key === "previous" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "previous"))}>
                   Previous Realized APY {sortIndicator(sort, "previous")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }} aria-sort={sort.key === "delta" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "delta"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+              <th className="numeric" aria-sort={sort.key === "delta" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "delta"))}>
                   Delta {sortIndicator(sort, "delta")}
                 </button>
               </th>
-              <th style={{ textAlign: "right" }} aria-sort={sort.key === "age" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                <button className="th-button" onClick={() => setSort(toggleSort(sort, "age"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+              <th className="numeric" aria-sort={sort.key === "age" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                <button className="th-button" onClick={() => setSort(toggleSort(sort, "age"))}>
                   Age {sortIndicator(sort, "age")}
                 </button>
               </th>
@@ -98,13 +98,13 @@ export function MoverTable({
                     {compactChainLabel(row.chain_id, compact)}
                   </Link>
                 </td>
-                <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_window)}</td>
-                <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_prev_window)}</td>
-                <td style={{ textAlign: "right" }} className={`data-value ${(row.delta_apy ?? 0) >= 0 ? "text-positive delta-positive" : "text-negative delta-negative"}`}>
+                <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
+                <td className="data-value numeric">{formatPct(row.realized_apy_window)}</td>
+                <td className="data-value numeric">{formatPct(row.realized_apy_prev_window)}</td>
+                <td className={`data-value numeric ${(row.delta_apy ?? 0) >= 0 ? "text-positive delta-positive" : "text-negative delta-negative"}`}>
                   {deltaArrow(row.delta_apy)} {formatPctSigned(row.delta_apy)}
                 </td>
-                <td style={{ textAlign: "right" }} className="data-value">{formatHours(row.age_seconds)}</td>
+                <td className="data-value numeric">{formatHours(row.age_seconds)}</td>
               </tr>
             ))}
           </tbody>
@@ -133,7 +133,7 @@ export function RegimeFlowSankey({
     return (
       <section className="regime-sankey-panel">
         {title ? <h3 className="panel-title">{title}</h3> : null}
-        <p style={{ color: "var(--text-secondary)" }}>No transition flows available.</p>
+        <p className="text-secondary">No transition flows available.</p>
       </section>
     );
   }
@@ -195,19 +195,19 @@ export function RegimeFlowSankey({
             return (
               <g key={`left-${regime}`}>
                 <rect x={8} y={y - 15} width={104} height={30} rx={6} fill={fill} stroke={stroke} />
-                <text x={14} y={y + 0.5} className="sankey-label" dominantBaseline="central" style={{ fontSize: "12px", fill: "var(--text-primary)" }}>{compactRegimeLabel(regime)}</text>
-                <text x={106} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central" style={{ fontSize: "11px", fill: "var(--text-secondary)" }}>{formatUsdCompact(outValue)}</text>
+                <text x={14} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
+                <text x={106} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(outValue)}</text>
                 <rect x={width - 112} y={y - 15} width={104} height={30} rx={6} fill={fill} stroke={stroke} />
-                <text x={width - 106} y={y + 0.5} className="sankey-label" dominantBaseline="central" style={{ fontSize: "12px", fill: "var(--text-primary)" }}>{compactRegimeLabel(regime)}</text>
-                <text x={width - 14} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central" style={{ fontSize: "11px", fill: "var(--text-secondary)" }}>{formatUsdCompact(inValue)}</text>
+                <text x={width - 106} y={y + 0.5} className="sankey-label" dominantBaseline="central">{compactRegimeLabel(regime)}</text>
+                <text x={width - 14} y={y + 0.5} className="sankey-value" textAnchor="end" dominantBaseline="central">{formatUsdCompact(inValue)}</text>
               </g>
             );
           })}
-          <text x={8} y={18} className="sankey-axis-label" style={{ fontSize: "11px", fill: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Previous Regime</text>
-          <text x={width - 8} y={18} className="sankey-axis-label" textAnchor="end" style={{ fontSize: "11px", fill: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Current Regime</text>
+          <text x={8} y={18} className="sankey-axis-label">Previous Regime</text>
+          <text x={width - 8} y={18} className="sankey-axis-label" textAnchor="end">Current Regime</text>
         </svg>
       </div>
-      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "12px" }}>Stroke width scales by transitioned TVL; labels show total outgoing vs incoming TVL per regime.</p>
+      <p className="text-sm text-secondary section-sm">Stroke width scales by transitioned TVL; labels show total outgoing vs incoming TVL per regime.</p>
     </section>
   );
 }

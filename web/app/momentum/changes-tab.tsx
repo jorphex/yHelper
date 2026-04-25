@@ -97,7 +97,7 @@ export function ChangesTab({
           <div className="filter-grid">
             <label>
               <span className="filter-label">Window</span>
-              <select value={query.window} onChange={(e) => updateQuery({ window: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
+              <select value={query.window} onChange={(e) => updateQuery({ window: e.target.value })} className="filter-control">
                 <option value="24h">24 hours</option>
                 <option value="7d">7 days</option>
                 <option value="30d">30 days</option>
@@ -105,7 +105,7 @@ export function ChangesTab({
             </label>
             <label>
               <span className="filter-label">Universe</span>
-              <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
+              <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value })} className="filter-control">
                 {UNIVERSE_VALUES.map((value) => (
                   <option key={value} value={value}>{universeLabel(value)}</option>
                 ))}
@@ -113,11 +113,11 @@ export function ChangesTab({
             </label>
             <label>
               <span className="filter-label">Min TVL</span>
-              <input type="number" value={query.minTvl} onChange={(e) => updateQuery({ min_tvl: Number(e.target.value) })} style={{ width: "100%", marginTop: "6px" }} />
+              <input type="number" value={query.minTvl} onChange={(e) => updateQuery({ min_tvl: Number(e.target.value) })} className="filter-control" />
             </label>
             <label>
               <span className="filter-label">Trend View</span>
-              <select value={query.trendGroup} onChange={(e) => updateQuery({ trend_group: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
+              <select value={query.trendGroup} onChange={(e) => updateQuery({ trend_group: e.target.value })} className="filter-control">
                 <option value="none">Global</option>
                 <option value="chain">By Chain</option>
                 <option value="category">By Category</option>
@@ -125,7 +125,7 @@ export function ChangesTab({
             </label>
             <label>
               <span className="filter-label">TVL View</span>
-              <select value={query.tvlView} onChange={(e) => updateQuery({ tvl_view: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
+              <select value={query.tvlView} onChange={(e) => updateQuery({ tvl_view: e.target.value })} className="filter-control">
                 <option value="filtered">Filtered Universe</option>
                 <option value="reference">Yearn Aligned</option>
               </select>
@@ -184,7 +184,7 @@ export function ChangesTab({
                 </div>
               </div>
             )}
-            <div className="kpi-grid kpi-grid-4" style={{ marginTop: "16px" }}>
+            <div className="kpi-grid kpi-grid-4 section-sm">
               <div className="kpi-card">
                 <div className="kpi-label">Avg Delta</div>
                 <div className={`kpi-value ${(summary?.avg_delta ?? 0) >= 0 ? "text-positive delta-positive" : "text-negative delta-negative"}`}>
@@ -243,7 +243,7 @@ export function ChangesTab({
       <section className="section section-lg">
         <div className="card-header">
           <h2 className="card-title">Grouped Momentum Snapshot (Latest Day)</h2>
-          <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginTop: "8px" }}>
+          <p className="card-description">
             TVL-weighted momentum by chain/category (realized 7d APY minus realized 30d APY). Positive values indicate short-term strengthening.
           </p>
         </div>
@@ -272,32 +272,32 @@ export function ChangesTab({
             <thead>
               <tr>
                 <th aria-sort={staleSort.key === "chain" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "chain"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "chain"))}>
                     Chain {sortIndicator(staleSort, "chain")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "vaults" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "vaults"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={staleSort.key === "vaults" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "vaults"))}>
                     Vaults {sortIndicator(staleSort, "vaults")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "stale" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "stale"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={staleSort.key === "stale" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "stale"))}>
                     Stale {sortIndicator(staleSort, "stale")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "ratio" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "ratio"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={staleSort.key === "ratio" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "ratio"))}>
                     Stale % {sortIndicator(staleSort, "ratio")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "tvl" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={staleSort.key === "tvl" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "tvl"))}>
                     TVL {sortIndicator(staleSort, "tvl")}
                   </button>
                 </th>
-                <th style={{ textAlign: "right" }} aria-sort={staleSort.key === "stale_tvl" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "stale_tvl"))} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", font: "inherit" }}>
+                <th className="numeric" aria-sort={staleSort.key === "stale_tvl" ? (staleSort.direction === "asc" ? "ascending" : "descending") : "none"}>
+                  <button className="th-button" onClick={() => setStaleSort(toggleSort(staleSort, "stale_tvl"))}>
                     Stale TVL {sortIndicator(staleSort, "stale_tvl")}
                   </button>
                 </th>
@@ -309,11 +309,11 @@ export function ChangesTab({
               ) : staleChainRows.map((row) => (
                 <tr key={`stale-chain-${row.chain_id}`}>
                   <td>{chainLabel(row.chain_id)}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{row.vaults}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{row.stale_vaults}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.stale_ratio)}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                  <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.stale_tvl_usd)}</td>
+                  <td className="data-value numeric">{row.vaults}</td>
+                  <td className="data-value numeric">{row.stale_vaults}</td>
+                  <td className="data-value numeric">{formatPct(row.stale_ratio)}</td>
+                  <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
+                  <td className="data-value numeric">{formatUsd(row.stale_tvl_usd)}</td>
                 </tr>
               ))}
             </tbody>
@@ -343,9 +343,9 @@ export function ChangesTab({
         <div className="card-header">
           <h2 className="card-title">Trend Analysis</h2>
         </div>
-        {trendError ? <div className="card" style={{ padding: "24px", marginBottom: "24px" }}>{trendError}</div> : null}
+        {trendError ? <div className="card card-padded section-sm">{trendError}</div> : null}
         {changesLoading ? (
-        <div style={{ display: "grid", gap: "24px" }}>
+        <div className="viz-stack">
           <div className="cols-2">
             <VizSkeleton variant="trend" />
             <VizSkeleton variant="trend" />
@@ -357,7 +357,7 @@ export function ChangesTab({
           </div>
         </div>
       ) : (
-        <div style={{ display: "grid", gap: "24px" }}>
+        <div className="viz-stack">
           <div className="cols-2">
             <TrendStrips
               title="Riser/Faller Drift (60 Days)"

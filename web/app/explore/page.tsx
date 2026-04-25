@@ -255,7 +255,7 @@ function ExplorePageContent() {
   return (
     <div>
       {/* Header */}
-      <section className="page-header" style={{ borderBottom: "none" }}>
+      <section className="page-header page-header-no-border">
         <h1 className="page-title">
           Explore
           <br />
@@ -287,7 +287,7 @@ function ExplorePageContent() {
       {/* Shared Filters */}
       <section className="section section-md">
         <div className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div className="card-header">
             <span className="card-title">Filters</span>
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -297,13 +297,13 @@ function ExplorePageContent() {
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: query.tab === "vaults" ? "repeat(4, 1fr)" : "repeat(5, 1fr)", gap: "16px" }}>
+          <div className="filter-grid-responsive">
             <label>
               <span className="filter-label">Universe</span>
               <select
                 value={query.universe}
                 onChange={(e) => updateQuery({ universe: e.target.value })}
-                style={{ width: "100%", marginTop: "6px" }}
+                className="filter-control"
               >
                 <option value="core">Core (high signal)</option>
                 <option value="extended">Extended (more vaults)</option>
@@ -317,7 +317,7 @@ function ExplorePageContent() {
                 type="number"
                 value={query.minTvl}
                 onChange={(e) => updateQuery({ min_tvl: Number(e.target.value) })}
-                style={{ width: "100%", marginTop: "6px" }}
+                className="filter-control"
               />
             </label>
 
@@ -327,7 +327,7 @@ function ExplorePageContent() {
                 type="number"
                 value={query.minPoints}
                 onChange={(e) => updateQuery({ min_points: Number(e.target.value) })}
-                style={{ width: "100%", marginTop: "6px" }}
+                className="filter-control"
               />
             </label>
 
@@ -337,7 +337,7 @@ function ExplorePageContent() {
                 <select
                   value={query.sort}
                   onChange={(e) => updateQuery({ api_sort: e.target.value })}
-                  style={{ width: "100%", marginTop: "6px" }}
+                  className="filter-control"
                 >
                   <option value="tvl">TVL</option>
                   <option value="quality">Quality</option>
@@ -354,7 +354,7 @@ function ExplorePageContent() {
                   <select
                     value={query.token || ""}
                     onChange={(e) => updateQuery({ token: e.target.value || null })}
-                    style={{ width: "100%", marginTop: "6px" }}
+                    className="filter-control"
                   >
                     {isLoadingAssets ? (
                       <option value="">Loading...</option>
@@ -370,7 +370,7 @@ function ExplorePageContent() {
                   <select
                     value={query.tokenScope}
                     onChange={(e) => updateQuery({ token_scope: e.target.value })}
-                    style={{ width: "100%", marginTop: "6px" }}
+                    className="filter-control"
                   >
                     <option value="featured">Featured</option>
                     <option value="canonical">Canonical</option>
@@ -382,13 +382,13 @@ function ExplorePageContent() {
           </div>
 
           {showFilters && (
-            <div className="filter-grid" style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)" }}>
+            <div className="filter-grid filter-advanced">
               <label>
-                <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Chain</span>
+                <span className="filter-label">Chain</span>
                 <select
                   value={query.chain || ""}
                   onChange={(e) => updateQuery({ chain: e.target.value || null })}
-                  style={{ width: "100%", marginTop: "6px" }}
+                  className="filter-control"
                 >
                   <option value="">All chains</option>
                   <option value="1">Ethereum</option>
@@ -400,11 +400,11 @@ function ExplorePageContent() {
               </label>
 
               <label>
-                <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Category</span>
+                <span className="filter-label">Category</span>
                 <select
                   value={query.category || ""}
                   onChange={(e) => updateQuery({ category: e.target.value || null })}
-                  style={{ width: "100%", marginTop: "6px" }}
+                  className="filter-control"
                 >
                   <option value="">All categories</option>
                   <option value="Stablecoin">Stablecoin</option>
@@ -415,11 +415,11 @@ function ExplorePageContent() {
               {query.tab === "vaults" && (
                 <>
                   <label>
-                    <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Rows</span>
+                    <span className="filter-label">Rows</span>
                     <select
                       value={query.limit}
                       onChange={(e) => updateQuery({ limit: Number(e.target.value) })}
-                      style={{ width: "100%", marginTop: "6px" }}
+                      className="filter-control"
                     >
                       <option value={30}>30</option>
                       <option value={60}>60</option>
@@ -427,13 +427,13 @@ function ExplorePageContent() {
                     </select>
                   </label>
 
-                  <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "20px" }}>
+                  <label className="checkbox-label">
                     <input
                       type="checkbox"
                       checked={query.dir === "asc"}
                       onChange={(e) => updateQuery({ api_dir: e.target.checked ? "asc" : "desc" })}
                     />
-                    <span style={{ fontSize: "13px" }}>Lowest first</span>
+                    <span className="text-sm">Lowest first</span>
                   </label>
                 </>
               )}
@@ -470,7 +470,7 @@ function ExplorePageContent() {
           <section className="section">
             <div className="card-header">
               <h2 className="card-title">Vault Universe</h2>
-              <span style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+              <span className="text-sm text-tertiary">
                 {isLoadingDiscover ? "Loading..." : `${discoverData?.pagination?.total ?? 0} vaults`}
               </span>
             </div>
@@ -483,15 +483,15 @@ function ExplorePageContent() {
                   <thead>
                     <tr>
                       <th>Vault</th>
-                      <th style={{ textAlign: "center" }}>Chain</th>
+                      <th className="text-center">Chain</th>
                       <th>Token</th>
-                      <th style={{ textAlign: "center" }}>Category</th>
-                      <th style={{ textAlign: "right" }}>TVL</th>
-                      <th style={{ textAlign: "right" }}>Est. APY</th>
-                      <th style={{ textAlign: "right" }}>Realized 30d</th>
-                      <th style={{ textAlign: "right" }}>Realized Momentum</th>
-                      <th style={{ textAlign: "center" }}>Risk</th>
-                      <th style={{ textAlign: "center" }}>Regime</th>
+                      <th className="text-center">Category</th>
+                      <th className="numeric">TVL</th>
+                      <th className="numeric">Est. APY</th>
+                      <th className="numeric">Realized 30d</th>
+                      <th className="numeric">Realized Momentum</th>
+                      <th className="text-center">Risk</th>
+                      <th className="text-center">Regime</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -507,8 +507,8 @@ function ExplorePageContent() {
                               symbol={row.symbol}
                             />
                           </td>
-                          <td style={{ textAlign: "center" }}>
-                            <Link href={`/structure?tab=chains&chain=${row.chain_id}`} style={{ color: "var(--text-secondary)" }}>
+                          <td className="text-center">
+                            <Link href={`/structure?tab=chains&chain=${row.chain_id}`} className="text-secondary">
                               {chainLabel(row.chain_id)}
                             </Link>
                           </td>
@@ -516,21 +516,21 @@ function ExplorePageContent() {
                             {row.token_symbol ? (
                               <button
                                 onClick={() => selectToken(row.token_symbol!)}
-                                style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit" }}
+                                className="button-reset text-accent"
                               >
                                 {row.token_symbol}
                               </button>
                             ) : "n/a"}
                           </td>
-                          <td style={{ textAlign: "center" }}>{row.category || "n/a"}</td>
-                          <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                          <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.est_apy)}</td>
-                          <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_30d)}</td>
-                          <td style={{ textAlign: "right" }} className={`data-value ${(row.momentum_7d_30d ?? 0) >= 0 ? "text-positive delta-positive" : "text-negative delta-negative"}`}>
+                          <td className="text-center">{row.category || "n/a"}</td>
+                          <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
+                          <td className="data-value numeric">{formatPct(row.est_apy)}</td>
+                          <td className="data-value numeric">{formatPct(row.realized_apy_30d)}</td>
+                          <td className={`data-value numeric ${(row.momentum_7d_30d ?? 0) >= 0 ? "text-positive delta-positive" : "text-negative delta-negative"}`}>
                             {formatPctSigned(row.momentum_7d_30d)}
                           </td>
-                          <td style={{ textAlign: "center" }}>{riskLabel(row.risk_level)}</td>
-                          <td style={{ textAlign: "center" }}>{regimeLabel(row.regime)}</td>
+                          <td className="text-center">{riskLabel(row.risk_level)}</td>
+                          <td className="text-center">{regimeLabel(row.regime)}</td>
                         </tr>
                       ))
                     )}
@@ -547,7 +547,7 @@ function ExplorePageContent() {
             </div>
 
             {isLoadingDiscover ? (
-              <div style={{ display: "grid", gap: "24px" }}>
+              <div className="viz-stack">
                 <VizSkeleton />
                 <VizSkeleton />
                 <div className="cols-2">
@@ -556,7 +556,7 @@ function ExplorePageContent() {
                 </div>
               </div>
             ) : (
-              <div style={{ display: "grid", gap: "24px" }}>
+              <div className="viz-stack">
               <ScatterPlot
                 title="Realized APY vs Momentum (Top 50 by TVL)"
                 xLabel="Realized Momentum (7d - 30d realized APY)"
@@ -641,12 +641,12 @@ function ExplorePageContent() {
                   <tr>
                     <th>Vault</th>
                     <th>Chain</th>
-                    <th style={{ textAlign: "center" }}>Category</th>
-                    <th style={{ textAlign: "right" }}>TVL</th>
-                    <th style={{ textAlign: "right" }}>Est. APY</th>
-                    <th style={{ textAlign: "right" }}>Realized 30d</th>
-                    <th style={{ textAlign: "right" }}>Realized Momentum</th>
-                    <th style={{ textAlign: "center" }}>Regime</th>
+                    <th className="text-center">Category</th>
+                    <th className="numeric">TVL</th>
+                    <th className="numeric">Est. APY</th>
+                    <th className="numeric">Realized 30d</th>
+                    <th className="numeric">Realized Momentum</th>
+                    <th className="text-center">Regime</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -657,12 +657,12 @@ function ExplorePageContent() {
                       <tr key={row.vault_address}>
                         <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
                         <td>{chainLabel(row.chain_id)}</td>
-                        <td style={{ textAlign: "center" }}>{row.category || "n/a"}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.est_apy)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_30d)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.momentum_7d_30d)}</td>
-                        <td style={{ textAlign: "center" }}>{regimeLabel(row.regime)}</td>
+                        <td className="text-center">{row.category || "n/a"}</td>
+                        <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
+                        <td className="data-value numeric">{formatPct(row.est_apy)}</td>
+                        <td className="data-value numeric">{formatPct(row.realized_apy_30d)}</td>
+                        <td className="data-value numeric">{formatPct(row.momentum_7d_30d)}</td>
+                        <td className="text-center">{regimeLabel(row.regime)}</td>
                       </tr>
                     ))
                   )}
@@ -675,12 +675,12 @@ function ExplorePageContent() {
           <section className="section">
             <div className="card-header">
               <h2 className="card-title">Token Universe</h2>
-              <span style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+              <span className="text-sm text-tertiary">
                 {isLoadingAssets ? "Loading..." : `${tokenRows.length} tokens`}
               </span>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px", marginBottom: "32px" }}>
+            <div className="cols-responsive-2 section-md">
               <div className="kpi-grid kpi-grid-2">
                 <div className="kpi-card">
                   <div className="kpi-label">Multi-Chain</div>
@@ -708,11 +708,11 @@ function ExplorePageContent() {
                 <thead>
                   <tr>
                     <th>Token</th>
-                    <th style={{ textAlign: "center" }}>Venues</th>
-                    <th style={{ textAlign: "center" }}>Chains</th>
-                    <th style={{ textAlign: "right" }}>TVL</th>
-                    <th style={{ textAlign: "right" }}>Best Est. APY</th>
-                    <th style={{ textAlign: "right" }}>Realized Spread 30d</th>
+                    <th className="text-center">Venues</th>
+                    <th className="text-center">Chains</th>
+                    <th className="numeric">TVL</th>
+                    <th className="numeric">Best Est. APY</th>
+                    <th className="numeric">Realized Spread 30d</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -728,12 +728,12 @@ function ExplorePageContent() {
                           backgroundColor: row.token_symbol === selectedSymbol ? "rgba(6, 87, 233, 0.08)" : undefined
                         }}
                       >
-                        <td style={{ fontWeight: 500 }}>{row.token_symbol}</td>
-                        <td style={{ textAlign: "center" }}>{row.venues}</td>
-                        <td style={{ textAlign: "center" }}>{row.chains}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.total_tvl_usd)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.best_est_apy)}</td>
-                        <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_spread_30d)}</td>
+                        <td className="font-semibold">{row.token_symbol}</td>
+                        <td className="text-center">{row.venues}</td>
+                        <td className="text-center">{row.chains}</td>
+                        <td className="data-value numeric">{formatUsd(row.total_tvl_usd)}</td>
+                        <td className="data-value numeric">{formatPct(row.best_est_apy)}</td>
+                        <td className="data-value numeric">{formatPct(row.realized_spread_30d)}</td>
                       </tr>
                     ))
                   )}
@@ -749,7 +749,7 @@ function ExplorePageContent() {
 
 export default function ExplorePage() {
   return (
-    <Suspense fallback={<div className="card" style={{ padding: "48px" }}>Loading...</div>}>
+    <Suspense fallback={<div className="card card-padded-lg">Loading...</div>}>
       <ExplorePageContent />
     </Suspense>
   );

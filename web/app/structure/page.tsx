@@ -144,7 +144,7 @@ function StructurePageContent() {
 
   return (
     <div>
-      <section className="page-header" style={{ borderBottom: "none" }}>
+      <section className="page-header page-header-no-border">
         <h1 className="page-title">
           Structure
           <br />
@@ -171,7 +171,7 @@ function StructurePageContent() {
           <div className="filter-grid">
             <label>
               <span className="filter-label">Universe</span>
-              <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null })} style={{ width: "100%", marginTop: "6px" }}>
+              <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null })} className="filter-control">
                 {UNIVERSE_VALUES.map((value) => (
                   <option key={value} value={value}>{universeLabel(value)}</option>
                 ))}
@@ -179,11 +179,11 @@ function StructurePageContent() {
             </label>
             <label>
               <span className="filter-label">Min TVL (USD)</span>
-              <input type="number" min={0} value={query.minTvl} onChange={(e) => updateQuery({ min_tvl: Number(e.target.value || 0) })} style={{ width: "100%", marginTop: "6px" }} />
+              <input type="number" min={0} value={query.minTvl} onChange={(e) => updateQuery({ min_tvl: Number(e.target.value || 0) })} className="filter-control" />
             </label>
             <label>
               <span className="filter-label">Top Groups</span>
-              <select value={query.topN} onChange={(e) => updateQuery({ top_n: Number(e.target.value) })} style={{ width: "100%", marginTop: "6px" }}>
+              <select value={query.topN} onChange={(e) => updateQuery({ top_n: Number(e.target.value) })} className="filter-control">
                 <option value={10}>10</option>
                 <option value={12}>12</option>
                 <option value={20}>20</option>
@@ -241,7 +241,7 @@ function StructurePageContent() {
 
 export default function StructurePage() {
   return (
-    <Suspense fallback={<div className="card" style={{ padding: "48px" }}>Loading...</div>}>
+    <Suspense fallback={<div className="card card-padded-lg">Loading...</div>}>
       <StructurePageContent />
     </Suspense>
   );
