@@ -36,7 +36,7 @@ export function BarList({
 
   return (
     <section ref={ref} className={`bar-panel ${isInView ? "is-in-view" : ""}`.trim()}>
-      <h3>{title}</h3>
+      <h3 className="panel-title">{title}</h3>
       {valid.length === 0 ? (
         <div className="panel-empty muted">{emptyText}</div>
       ) : (
@@ -88,7 +88,7 @@ export function HeatGrid({
 
   const content = (
     <>
-      {title ? <h3>{title}</h3> : null}
+      {title ? <h3 className="panel-title">{title}</h3> : null}
       {valid.length === 0 ? (
         <div className="panel-empty muted">{emptyText}</div>
       ) : (
@@ -159,7 +159,7 @@ export function ShareMeter({
 
   const content = (
     <>
-      {title ? <h3>{title}</h3> : null}
+      {title ? <h3 className="panel-title">{title}</h3> : null}
       {normalizedSegments.length === 0 || resolvedTotal <= 0 ? (
         <div className="panel-empty muted">{emptyText}</div>
       ) : (
@@ -228,7 +228,7 @@ export function TrendStrips({
       return (
         <div ref={ref} className={isInView ? "is-in-view" : undefined}>
           <div className="trend-strip-panel">
-            {title ? <h3>{title}</h3> : null}
+            {title ? <h3 className="panel-title">{title}</h3> : null}
             <div className="panel-empty muted">{emptyText}</div>
           </div>
         </div>
@@ -236,7 +236,7 @@ export function TrendStrips({
     }
     return (
       <section ref={ref} className={`viz-panel ${isInView ? "is-in-view" : ""}`.trim()}>
-        <h3>{title}</h3>
+        <h3 className="panel-title">{title}</h3>
         <div className="panel-empty muted">{emptyText}</div>
       </section>
     );
@@ -244,7 +244,7 @@ export function TrendStrips({
 
   const content = (
     <div className="trend-strip-panel">
-      {title ? <h3>{title}</h3> : null}
+      {title ? <h3 className="panel-title">{title}</h3> : null}
       <div className={`trend-strip-list trend-strip-cols-${Math.min(4, Math.max(1, columns))}`}>
         {validItems.map((item, index) => {
           const finite = finiteValues(item.points);

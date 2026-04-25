@@ -152,7 +152,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="kpi-card" style={{ padding: '16px' }}>
+            <div className="kpi-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>
                   <div className="kpi-label" style={{ marginBottom: '4px' }}>{dauHeadlineLabel}</div>

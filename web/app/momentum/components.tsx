@@ -130,7 +130,7 @@ export function RegimeFlowSankey({
   if (validRows.length === 0 || regimes.length === 0) {
     return (
       <section className="regime-sankey-panel">
-        {title ? <h3>{title}</h3> : null}
+        {title ? <h3 className="panel-title">{title}</h3> : null}
         <p style={{ color: "var(--text-secondary)" }}>No transition flows available.</p>
       </section>
     );
@@ -155,7 +155,7 @@ export function RegimeFlowSankey({
 
   return (
     <section ref={ref} className={`regime-sankey-panel ${isInView ? "is-in-view" : ""}`.trim()}>
-      {title ? <h3>{title}</h3> : null}
+      {title ? <h3 className="panel-title">{title}</h3> : null}
       <div className="scatter-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title} style={{ width: "100%", height: "auto" }}>
           {validRows.map((row) => {

@@ -247,7 +247,7 @@ function HarvestsPageContent() {
           <br />
           <em className="page-title-accent">Vault report flow</em>
         </h1>
-        <p style={{ maxWidth: "66ch", color: "var(--text-secondary)", marginTop: "14px" }}>
+        <p className="page-description">
           Track vault-level strategy reports across chains, then narrow the event stream down to a single vault when you want exact gain, loss, and fee rows.
         </p>
       </section>
