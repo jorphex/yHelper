@@ -335,7 +335,6 @@ export function ChangesTab({
             <MoverTable title="Top Risers" rows={moverRisers} universe={query.universe} minTvl={query.minTvl} minPoints={query.minPoints} compact={isCompactViewport} />
             <MoverTable title="Top Fallers" rows={moverFallers} universe={query.universe} minTvl={query.minTvl} minPoints={query.minPoints} compact={isCompactViewport} />
             <MoverTable title="Largest Absolute Changes" rows={moverLargestAbsDelta} universe={query.universe} minTvl={query.minTvl} minPoints={query.minPoints} compact={isCompactViewport} />
-            <MoverTable title="Stalest Series" rows={moverStale} universe={query.universe} minTvl={query.minTvl} minPoints={query.minPoints} compact={isCompactViewport} />
           </>
         )}
       </section>

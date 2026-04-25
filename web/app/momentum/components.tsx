@@ -42,8 +42,10 @@ export function MoverTable({
   });
 
   return (
-    <section className="card" style={{ marginBottom: "24px" }}>
-      <h2 className="card-title">{title}</h2>
+    <>
+      <div className="card-header" style={{ marginTop: "24px" }}>
+        <h2 className="card-title">{title}</h2>
+      </div>
       <TableWrap>
         <table>
           <thead>
@@ -107,8 +109,8 @@ export function MoverTable({
             ))}
           </tbody>
         </table>
-            </TableWrap>
-    </section>
+      </TableWrap>
+    </>
   );
 }
 
