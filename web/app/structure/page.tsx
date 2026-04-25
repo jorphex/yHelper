@@ -170,7 +170,7 @@ function StructurePageContent() {
         <div className="card">
           <div className="filter-grid">
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
+              <span className="filter-label">Universe</span>
               <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null })} style={{ width: "100%", marginTop: "6px" }}>
                 {UNIVERSE_VALUES.map((value) => (
                   <option key={value} value={value}>{universeLabel(value)}</option>
@@ -178,11 +178,11 @@ function StructurePageContent() {
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Min TVL (USD)</span>
+              <span className="filter-label">Min TVL (USD)</span>
               <input type="number" min={0} value={query.minTvl} onChange={(e) => updateQuery({ min_tvl: Number(e.target.value || 0) })} style={{ width: "100%", marginTop: "6px" }} />
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Top Groups</span>
+              <span className="filter-label">Top Groups</span>
               <select value={query.topN} onChange={(e) => updateQuery({ top_n: Number(e.target.value) })} style={{ width: "100%", marginTop: "6px" }}>
                 <option value={10}>10</option>
                 <option value={12}>12</option>

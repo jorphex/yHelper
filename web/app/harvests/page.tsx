@@ -264,7 +264,7 @@ function HarvestsPageContent() {
             }}
           >
             <label style={{ width: "160px", maxWidth: "100%" }}>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Chain</span>
+              <span className="filter-label">Chain</span>
               <select
                 value={query.chainId ?? ""}
                 onChange={(event) => updateQuery({ chain_id: event.target.value ? Number(event.target.value) : null })}
@@ -277,7 +277,7 @@ function HarvestsPageContent() {
               </select>
             </label>
             <label style={{ width: "420px", maxWidth: "100%" }}>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Vault Filter</span>
+              <span className="filter-label">Vault Filter</span>
               <div
                 style={{
                   display: "grid",

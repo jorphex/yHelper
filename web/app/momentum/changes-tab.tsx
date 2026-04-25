@@ -1,7 +1,9 @@
 "use client";
 
-import { chainLabel, formatHours, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
+import { chainLabel, formatHours, formatPct, formatPctSigned, formatUsd, yearnVaultUrl } from "../lib/format";
 import { HeatGrid, ShareMeter, ScatterPlot, TrendStrips, BarList } from "../components/visuals";
+import { TableWrap } from "../components/table-wrap";
+import { VizSkeleton } from "../components/viz-skeleton";
 import { sortIndicator, toggleSort, type SortState } from "../lib/sort";
 import { universeLabel, UNIVERSE_VALUES } from "../lib/universe";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
@@ -94,7 +96,7 @@ export function ChangesTab({
         <div className="card">
           <div className="filter-grid">
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Window</span>
+              <span className="filter-label">Window</span>
               <select value={query.window} onChange={(e) => updateQuery({ window: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
                 <option value="24h">24 hours</option>
                 <option value="7d">7 days</option>
@@ -102,7 +104,7 @@ export function ChangesTab({
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
+              <span className="filter-label">Universe</span>
               <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
                 {UNIVERSE_VALUES.map((value) => (
                   <option key={value} value={value}>{universeLabel(value)}</option>
@@ -110,11 +112,11 @@ export function ChangesTab({
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Min TVL</span>
+              <span className="filter-label">Min TVL</span>
               <input type="number" value={query.minTvl} onChange={(e) => updateQuery({ min_tvl: Number(e.target.value) })} style={{ width: "100%", marginTop: "6px" }} />
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Trend View</span>
+              <span className="filter-label">Trend View</span>
               <select value={query.trendGroup} onChange={(e) => updateQuery({ trend_group: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
                 <option value="none">Global</option>
                 <option value="chain">By Chain</option>
@@ -122,7 +124,7 @@ export function ChangesTab({
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>TVL View</span>
+              <span className="filter-label">TVL View</span>
               <select value={query.tvlView} onChange={(e) => updateQuery({ tvl_view: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
                 <option value="filtered">Filtered Universe</option>
                 <option value="reference">Yearn Aligned</option>
@@ -185,8 +187,8 @@ export function ChangesTab({
             <div className="kpi-grid kpi-grid-4" style={{ marginTop: "16px" }}>
               <div className="kpi-card">
                 <div className="kpi-label">Avg Delta</div>
-                <div className="kpi-value" style={{ color: (summary?.avg_delta ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }}>
-                  {formatPct(summary?.avg_delta)}
+                <div className={`kpi-value ${(summary?.avg_delta ?? 0) >= 0 ? "text-positive delta-positive" : "text-negative delta-negative"}`}>
+                  {formatPctSigned(summary?.avg_delta)}
                 </div>
               </div>
               <div className="kpi-card">
@@ -265,7 +267,7 @@ export function ChangesTab({
         <div className="card-header">
           <h2 className="card-title">Freshness by Chain</h2>
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -316,7 +318,7 @@ export function ChangesTab({
               ))}
             </tbody>
           </table>
-        </div>
+            </TableWrap>
       </section>
 
       <section className="section section-lg">
@@ -343,6 +345,19 @@ export function ChangesTab({
           <h2 className="card-title">Trend Analysis</h2>
         </div>
         {trendError ? <div className="card" style={{ padding: "24px", marginBottom: "24px" }}>{trendError}</div> : null}
+        {changesLoading ? (
+        <div style={{ display: "grid", gap: "24px" }}>
+          <div className="cols-2">
+            <VizSkeleton variant="trend" />
+            <VizSkeleton variant="trend" />
+          </div>
+          <VizSkeleton />
+          <div className="cols-2">
+            <VizSkeleton variant="bars" />
+            <VizSkeleton />
+          </div>
+        </div>
+      ) : (
         <div style={{ display: "grid", gap: "24px" }}>
           <div className="cols-2">
             <TrendStrips
@@ -380,6 +395,7 @@ export function ChangesTab({
             <HeatGrid title="Momentum by Category" items={categoryMomentumHeat} valueFormatter={(value) => formatPct(value, 1)} legend="Compare category momentum drift" />
           </div>
         </div>
+      )}
       </section>
     </>
   );

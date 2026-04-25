@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatPct, formatUsd } from "../lib/format";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
+import { TableWrap } from "../components/table-wrap";
 import { sortIndicator, toggleSort, type SortState } from "../lib/sort";
 import { TvlTreemap } from "./components";
 import type { BreakdownRow, CategorySortKey, StructureQuery, TokenSortKey } from "./types";
@@ -84,7 +85,7 @@ export function OverviewTab({
         <div className="card-header">
           <h2 className="card-title">Category Concentration</h2>
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -137,14 +138,14 @@ export function OverviewTab({
               )}
             </tbody>
           </table>
-        </div>
+            </TableWrap>
       </section>
 
       <section className="section">
         <div className="card-header">
           <h2 className="card-title">Top Tokens by TVL</h2>
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -197,7 +198,7 @@ export function OverviewTab({
               )}
             </tbody>
           </table>
-        </div>
+            </TableWrap>
       </section>
     </>
   );

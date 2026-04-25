@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Suspense, useMemo } from "react";
 import { explorerAddressUrl, explorerTxUrl, formatPct, formatUtcDateTime } from "../lib/format";
 import { BarList, TrendStrips } from "../components/visuals";
+import { TableWrap } from "../components/table-wrap";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { useStYfiData } from "../hooks/use-styfi-data";
 
@@ -337,7 +338,7 @@ function StYfiPageContent() {
           </p>
         </div>
 
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -431,7 +432,7 @@ function StYfiPageContent() {
               )}
             </tbody>
           </table>
-        </div>
+            </TableWrap>
       </section>
 
       {/* Epoch Detail Table */}
@@ -442,8 +443,7 @@ function StYfiPageContent() {
             Epochs start at 00:00:00 UTC. Component columns are protocol allocations (not user claim totals).
           </p>
         </div>
-        
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -489,7 +489,7 @@ function StYfiPageContent() {
               )}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
       </section>
     </div>
   );

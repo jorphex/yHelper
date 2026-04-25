@@ -60,6 +60,24 @@ export function formatPct(value: number | null | undefined, digits = 2, isLoadin
   return `${(value * 100).toFixed(digits)}%`;
 }
 
+export function formatPctSigned(value: number | null | undefined, digits = 2): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "n/a";
+  }
+  const pct = value * 100;
+  const prefix = pct > 0 ? "+" : "";
+  return `${prefix}${pct.toFixed(digits)}%`;
+}
+
+export function deltaArrow(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "";
+  }
+  if (value > 0) return "↑";
+  if (value < 0) return "↓";
+  return "→";
+}
+
 export function formatUsd(value: number | null | undefined, digits = 0, isLoading = false): string {
   if (isLoading) {
     return "—";

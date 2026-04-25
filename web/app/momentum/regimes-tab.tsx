@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { chainLabel, compactChainLabel, formatPct, formatUsd } from "../lib/format";
 import { BarList, HeatGrid, TrendStrips } from "../components/visuals";
+import { TableWrap } from "../components/table-wrap";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { sortIndicator, toggleSort, type SortState } from "../lib/sort";
 import { universeLabel, UNIVERSE_VALUES } from "../lib/universe";
@@ -81,7 +82,7 @@ export function RegimesTab({
         <div className="card">
           <div className="filter-grid">
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
+              <span className="filter-label">Universe</span>
               <select value={query.universe} onChange={(e) => updateQuery({ universe: e.target.value, min_tvl: null, min_points: null })} style={{ width: "100%", marginTop: "6px" }}>
                 {UNIVERSE_VALUES.map((value) => (
                   <option key={value} value={value}>{universeLabel(value)}</option>
@@ -89,7 +90,7 @@ export function RegimesTab({
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Chain</span>
+              <span className="filter-label">Chain</span>
               <select value={query.chain > 0 ? String(query.chain) : ""} onChange={(e) => updateQuery({ chain: e.target.value || null })} style={{ width: "100%", marginTop: "6px" }}>
                 <option value="">All</option>
                 {availableChains.map((chainId) => (
@@ -98,11 +99,11 @@ export function RegimesTab({
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Min TVL (USD)</span>
+              <span className="filter-label">Min TVL (USD)</span>
               <input type="number" min={0} value={query.minTvl} onChange={(e) => updateQuery({ min_tvl: Number(e.target.value || 0) })} style={{ width: "100%", marginTop: "6px" }} />
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Min Points</span>
+              <span className="filter-label">Min Points</span>
               <input type="number" min={0} max={365} value={query.minPoints} onChange={(e) => updateQuery({ min_points: Number(e.target.value || 0) })} style={{ width: "100%", marginTop: "6px" }} />
             </label>
           </div>
@@ -114,7 +115,7 @@ export function RegimesTab({
           <h3 style={{ fontSize: "14px", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)" }}>Transition Analysis</h3>
           <div className="filter-grid">
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Movers Limit</span>
+              <span className="filter-label">Movers Limit</span>
               <select value={query.limit} onChange={(e) => updateQuery({ limit: Number(e.target.value) })} style={{ width: "100%", marginTop: "6px" }}>
                 <option value={20}>20</option>
                 <option value={30}>30</option>
@@ -123,7 +124,7 @@ export function RegimesTab({
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Transition Split</span>
+              <span className="filter-label">Transition Split</span>
               <select value={query.transitionSplit} onChange={(e) => updateQuery({ transition_split: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
                 <option value="none">Global</option>
                 <option value="chain">By Chain</option>
@@ -131,7 +132,7 @@ export function RegimesTab({
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Transition Window</span>
+              <span className="filter-label">Transition Window</span>
               <select value={query.transitionDays} onChange={(e) => updateQuery({ transition_days: e.target.value })} style={{ width: "100%", marginTop: "6px" }}>
                 <option value="60">60d</option>
                 <option value="120">120d</option>
@@ -140,7 +141,7 @@ export function RegimesTab({
               </select>
             </label>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Min Cohort TVL (USD)</span>
+              <span className="filter-label">Min Cohort TVL (USD)</span>
               <input type="number" min={0} value={query.transitionMinCohortTvl} onChange={(e) => updateQuery({ transition_min_cohort_tvl: Number(e.target.value || 0) })} style={{ width: "100%", marginTop: "6px" }} />
             </label>
           </div>
@@ -203,7 +204,7 @@ export function RegimesTab({
           />
         </div>
 
-        <div className="table-wrap" style={{ marginBottom: "48px" }}>
+        <TableWrap style={{ marginBottom: "48px" }}>
           <table>
             <thead>
               <tr>
@@ -238,12 +239,12 @@ export function RegimesTab({
               ))}
             </tbody>
           </table>
-        </div>
+            </TableWrap>
 
         <div className="card-header">
           <h2 className="card-title">Current Regime Movers</h2>
         </div>
-        <div className="table-wrap" style={{ marginBottom: "48px" }}>
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -316,7 +317,7 @@ export function RegimesTab({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
 
         <div className="card-header">
           <h2 className="card-title">Transition Analysis</h2>
@@ -420,7 +421,7 @@ export function RegimesTab({
                 Sortable latest-day cohort metrics for quick comparison.
               </p>
             </div>
-            <div className="table-wrap" style={{ marginBottom: "48px" }}>
+            <TableWrap style={{ marginBottom: "48px" }}>
               <table>
                 <thead>
                   <tr>
@@ -463,7 +464,7 @@ export function RegimesTab({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           </>
         )}
       </section>

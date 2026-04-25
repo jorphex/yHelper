@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
 import { ScatterPlot } from "../components/visuals";
+import { TableWrap } from "../components/table-wrap";
 import { TableSkeleton } from "../components/skeleton";
 import { sortIndicator, toggleSort, type SortState } from "../lib/sort";
 import { VaultLink } from "../components/vault-link";
@@ -58,7 +59,7 @@ export function CrowdingTab({
         <div className="card-header">
           <h2 className="card-title">Most Crowded</h2>
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -133,14 +134,14 @@ export function CrowdingTab({
               )}
             </tbody>
           </table>
-        </div>
+            </TableWrap>
       </section>
 
       <section className="section">
         <div className="card-header">
           <h2 className="card-title">Least Crowded</h2>
         </div>
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -215,7 +216,7 @@ export function CrowdingTab({
               )}
             </tbody>
           </table>
-        </div>
+        </TableWrap>
       </section>
     </>
   );

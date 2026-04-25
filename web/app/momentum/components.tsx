@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { chainLabel, compactChainLabel, formatHours, formatPct, formatUsd } from "../lib/format";
+import { chainLabel, compactChainLabel, deltaArrow, formatHours, formatPct, formatPctSigned, formatUsd } from "../lib/format";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 import { useInViewOnce } from "../components/visuals";
+import { TableWrap } from "../components/table-wrap";
 import { VaultLink } from "../components/vault-link";
 import { compactRegimeLabel, formatUsdCompact, regimeColor, regimeOrder } from "./helpers";
 import type { ChangeRow, MoverSortKey, TransitionRow } from "./types";
@@ -43,7 +44,7 @@ export function MoverTable({
   return (
     <section className="card" style={{ marginBottom: "24px" }}>
       <h2 className="card-title">{title}</h2>
-      <div className="table-wrap">
+      <TableWrap>
         <table>
           <thead>
             <tr>
@@ -98,15 +99,15 @@ export function MoverTable({
                 <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
                 <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_window)}</td>
                 <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_prev_window)}</td>
-                <td style={{ textAlign: "right", color: (row.delta_apy ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }} className="data-value">
-                  {formatPct(row.delta_apy)}
+                <td style={{ textAlign: "right" }} className={`data-value ${(row.delta_apy ?? 0) >= 0 ? "text-positive delta-positive" : "text-negative delta-negative"}`}>
+                  {deltaArrow(row.delta_apy)} {formatPctSigned(row.delta_apy)}
                 </td>
                 <td style={{ textAlign: "right" }} className="data-value">{formatHours(row.age_seconds)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+            </TableWrap>
     </section>
   );
 }

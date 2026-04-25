@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { BarList, HeatGrid } from "../components/visuals";
+import { TableWrap } from "../components/table-wrap";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { sortIndicator, toggleSort, type SortState } from "../lib/sort";
 import type { ChainSortKey, StructureQuery } from "./types";
@@ -90,7 +91,7 @@ export function ChainsTab({
           />
         </div>
 
-        <div className="table-wrap">
+        <TableWrap>
           <table>
             <thead>
               <tr>
@@ -153,7 +154,7 @@ export function ChainsTab({
               )}
             </tbody>
           </table>
-        </div>
+            </TableWrap>
       </section>
     </>
   );

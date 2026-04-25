@@ -101,11 +101,11 @@ export default function HomePage() {
       <section className="page-header" style={{ borderBottom: 'none', display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '48px', alignItems: 'center' }}>
         <div>
           <h1 className="page-title">
-            Clear signals<br />
-            <em className="page-title-accent">Faster decisions</em>
+            Find the best<br />
+            <em className="page-title-accent">Yearn vaults</em>
           </h1>
           <p className="page-description">
-            Analytics for Yearn vault discovery, yield shifts, and strategic decisions.
+            Move from raw yield data to calm, defensible allocation decisions in minutes. Track shifts, compare venues, and time your moves.
           </p>
           <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
             <Link href="/explore" className="button button-primary">
@@ -140,7 +140,7 @@ export default function HomePage() {
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="kpi-card">
               <div className="kpi-label">Largest Shift</div>
-              <div className="kpi-value" style={{ color: (topMover?.delta_apy ?? 0) >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+              <div className={`kpi-value ${(topMover?.delta_apy ?? 0) >= 0 ? 'text-positive delta-positive' : 'text-negative delta-negative'}`}>
                 {liveShiftValue}
               </div>
               <div className="kpi-hint">

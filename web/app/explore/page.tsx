@@ -3,15 +3,17 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "../lib/format";
+import { chainLabel, formatPct, formatPctSigned, formatUsd, yearnVaultUrl } from "../lib/format";
 import { useDiscoverData } from "../hooks/use-discover-data";
 import { useAssetsData, useAssetVenues } from "../hooks/use-assets-data";
 import type { UniverseKind } from "../lib/universe";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
+import { TableWrap } from "../components/table-wrap";
 import { NoVaultsEmptyState } from "../components/empty-state";
 import { DataLoadError } from "../components/error-state";
 import { VaultLink } from "../components/vault-link";
 import { BarList, HeatGrid, ScatterPlot, Ridgeline } from "../components/visuals";
+import { VizSkeleton } from "../components/viz-skeleton";
 import { SortState, sortIndicator, sortRows, toggleSort } from "../lib/sort";
 
 type TabKey = "vaults" | "venues";
@@ -297,7 +299,7 @@ function ExplorePageContent() {
 
           <div style={{ display: "grid", gridTemplateColumns: query.tab === "vaults" ? "repeat(4, 1fr)" : "repeat(5, 1fr)", gap: "16px" }}>
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Universe</span>
+              <span className="filter-label">Universe</span>
               <select
                 value={query.universe}
                 onChange={(e) => updateQuery({ universe: e.target.value })}
@@ -310,7 +312,7 @@ function ExplorePageContent() {
             </label>
 
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Min TVL</span>
+              <span className="filter-label">Min TVL</span>
               <input
                 type="number"
                 value={query.minTvl}
@@ -320,7 +322,7 @@ function ExplorePageContent() {
             </label>
 
             <label>
-              <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Min Points</span>
+              <span className="filter-label">Min Points</span>
               <input
                 type="number"
                 value={query.minPoints}
@@ -331,7 +333,7 @@ function ExplorePageContent() {
 
             {query.tab === "vaults" ? (
               <label>
-                <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Sort</span>
+                <span className="filter-label">Sort</span>
                 <select
                   value={query.sort}
                   onChange={(e) => updateQuery({ api_sort: e.target.value })}
@@ -348,7 +350,7 @@ function ExplorePageContent() {
             ) : (
               <>
                 <label>
-                  <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Token</span>
+                  <span className="filter-label">Token</span>
                   <select
                     value={query.token || ""}
                     onChange={(e) => updateQuery({ token: e.target.value || null })}
@@ -364,7 +366,7 @@ function ExplorePageContent() {
                   </select>
                 </label>
                 <label>
-                  <span style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>List</span>
+                  <span className="filter-label">List</span>
                   <select
                     value={query.tokenScope}
                     onChange={(e) => updateQuery({ token_scope: e.target.value })}
@@ -476,7 +478,7 @@ function ExplorePageContent() {
             {!isLoadingDiscover && !discoverRows.length ? (
               <NoVaultsEmptyState onReset={() => updateQuery({ min_tvl: 0, min_points: 0, chain: null, category: null })} />
             ) : (
-              <div className="table-wrap">
+              <TableWrap>
                 <table>
                   <thead>
                     <tr>
@@ -524,8 +526,8 @@ function ExplorePageContent() {
                           <td style={{ textAlign: "right" }} className="data-value">{formatUsd(row.tvl_usd)}</td>
                           <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.est_apy)}</td>
                           <td style={{ textAlign: "right" }} className="data-value">{formatPct(row.realized_apy_30d)}</td>
-                          <td style={{ textAlign: "right", color: (row.momentum_7d_30d ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }} className="data-value">
-                            {formatPct(row.momentum_7d_30d)}
+                          <td style={{ textAlign: "right" }} className={`data-value ${(row.momentum_7d_30d ?? 0) >= 0 ? "text-positive delta-positive" : "text-negative delta-negative"}`}>
+                            {formatPctSigned(row.momentum_7d_30d)}
                           </td>
                           <td style={{ textAlign: "center" }}>{riskLabel(row.risk_level)}</td>
                           <td style={{ textAlign: "center" }}>{regimeLabel(row.regime)}</td>
@@ -534,7 +536,7 @@ function ExplorePageContent() {
                     )}
                   </tbody>
                 </table>
-              </div>
+            </TableWrap>
             )}
           </section>
 
@@ -544,7 +546,17 @@ function ExplorePageContent() {
               <h2 className="card-title">Yield Structure</h2>
             </div>
 
-            <div style={{ display: "grid", gap: "24px" }}>
+            {isLoadingDiscover ? (
+              <div style={{ display: "grid", gap: "24px" }}>
+                <VizSkeleton />
+                <VizSkeleton />
+                <div className="cols-2">
+                  <VizSkeleton variant="bars" />
+                  <VizSkeleton />
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: "24px" }}>
               <ScatterPlot
                 title="Realized APY vs Momentum (Top 50 by TVL)"
                 xLabel="Realized Momentum (7d - 30d realized APY)"
@@ -583,6 +595,7 @@ function ExplorePageContent() {
                 />
               </div>
             </div>
+          )}
           </section>
         </>
       )}
@@ -622,7 +635,7 @@ function ExplorePageContent() {
               </div>
             ) : null}
 
-            <div className="table-wrap">
+            <TableWrap>
               <table>
                 <thead>
                   <tr>
@@ -655,7 +668,7 @@ function ExplorePageContent() {
                   )}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           </section>
 
           {/* Token Universe */}
@@ -690,7 +703,7 @@ function ExplorePageContent() {
               />
             </div>
 
-            <div className="table-wrap">
+            <TableWrap>
               <table>
                 <thead>
                   <tr>
@@ -726,7 +739,7 @@ function ExplorePageContent() {
                   )}
                 </tbody>
               </table>
-            </div>
+            </TableWrap>
           </section>
         </>
       )}

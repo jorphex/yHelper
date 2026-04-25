@@ -517,11 +517,18 @@ h4 { font-size: var(--text-xl); }
 }
 
 .card-title {
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: var(--tracking-normal);
+}
+
+.section-title {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: var(--tracking-tight);
+  margin-bottom: var(--space-4);
 }
 
 /* --------------------------------------------------------------------------
@@ -532,6 +539,39 @@ h4 { font-size: var(--text-xl); }
   overflow-x: auto;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
+  position: relative;
+}
+
+/* Scroll shadows — only visible when overflow exists and not at edge */
+.table-wrap.table-wrap-overflow::before,
+.table-wrap.table-wrap-overflow::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.table-wrap.table-wrap-overflow::before {
+  left: 0;
+  background: linear-gradient(to right, var(--bg-card), transparent);
+}
+
+.table-wrap.table-wrap-overflow::after {
+  right: 0;
+  background: linear-gradient(to left, var(--bg-card), transparent);
+}
+
+.table-wrap.table-wrap-scroll-start::before {
+  opacity: 1;
+}
+
+.table-wrap.table-wrap-scroll-end::after {
+  opacity: 1;
 }
 
 /* Tables - Editorial */
@@ -717,30 +757,16 @@ td.numeric, th.numeric {
   border-top: 1px solid var(--border-subtle);
 }
 
-/* Hover card effect - Editorial */
+/* Hover card effect - visible feedback */
 .hover-card {
   transition: all var(--duration-base) var(--ease-out);
-  position: relative;
-  overflow: hidden;
-}
-
-.hover-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(6, 87, 233, 0.1) 0%, transparent 50%);
-  opacity: 0;
-  transition: opacity var(--duration-base) var(--ease-out);
-  pointer-events: none;
 }
 
 .hover-card:hover {
-  border-color: var(--border-soft);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.hover-card:hover::after {
-  opacity: 1;
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 4px 20px rgba(6, 87, 233, 0.08);
+  transform: translateY(-1px);
 }
 
 /* Common layout utilities — extracted from repetitive inline styles */
@@ -767,6 +793,22 @@ td.numeric, th.numeric {
 .section-sm { margin-bottom: var(--space-6); }
 .section-md { margin-bottom: var(--space-8); }
 .section-lg { margin-bottom: var(--space-12); }
+
+/* Standardized filter label */
+.filter-label {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+/* Delta color indicators — arrows rendered in JSX via deltaArrow() */
+.delta-positive { color: var(--positive); }
+.delta-negative { color: var(--negative); }
+.delta-neutral { color: var(--text-tertiary); }
 
 .kpi-grid-2 { grid-template-columns: repeat(2, 1fr); }
 .kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
