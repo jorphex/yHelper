@@ -626,10 +626,6 @@ th {
   color: var(--text-primary);
 }
 
-.th-button.is-active {
-  color: var(--accent);
-}
-
 .th-indicator {
   font-size: 10px;
   opacity: 0.6;
@@ -706,24 +702,6 @@ th {
   flex-wrap: wrap;
 }
 
-.footer-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.footer-logo {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: var(--text-base);
-  color: var(--text-primary);
-}
-
-.footer-tagline {
-  font-size: var(--text-sm);
-  color: var(--text-tertiary);
-}
-
 .footer-links {
   display: flex;
   align-items: center;
@@ -741,10 +719,7 @@ th {
   color: var(--text-primary);
 }
 
-.footer-meta {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
+
 
 /* --------------------------------------------------------------------------
    31. Scrollbar

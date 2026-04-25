@@ -46,61 +46,20 @@ export function EmptyState({
   };
 
   return (
-    <div
-      className="empty-state"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "var(--space-12)",
-        textAlign: "center",
-        color: "var(--text-secondary)",
-      }}
-    >
-      <div
-        style={{
-          color: "var(--text-tertiary)",
-          marginBottom: "var(--space-4)",
-        }}
-      >
+    <div className="empty-state">
+      <div className="empty-state-icon">
         {icons[icon]}
       </div>
-      <h3
-        style={{
-          fontSize: "var(--text-lg)",
-          fontWeight: 600,
-          color: "var(--text-primary)",
-          marginBottom: "var(--space-2)",
-        }}
-      >
+      <h3 className="empty-state-title">
         {title}
       </h3>
-      <p
-        style={{
-          fontSize: "var(--text-sm)",
-          color: "var(--text-secondary)",
-          maxWidth: "40ch",
-          marginBottom: actionLabel ? "var(--space-4)" : 0,
-        }}
-      >
+      <p className="empty-state-description" style={{ marginBottom: actionLabel ? "var(--space-4)" : 0 }}>
         {description}
       </p>
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="button button-secondary"
-          style={{
-            padding: "var(--space-2) var(--space-4)",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-soft)",
-            borderRadius: "var(--radius-md)",
-            color: "var(--text-primary)",
-            fontSize: "var(--text-sm)",
-            fontWeight: 500,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-          }}
+          className="button button-secondary empty-state-action"
         >
           {actionLabel}
         </button>

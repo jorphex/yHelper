@@ -253,7 +253,7 @@ export default function HomePage() {
         <div className="card-header">
           <h2 className="card-title">Explore</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+        <div className="card-grid">
           {[
             { href: "/explore", title: "Explore", desc: "Find vaults and compare token venues.", tag: "Best first stop" },
             { href: "/structure", title: "Structure", desc: "Check concentration and chain coverage.", tag: "Risk sizing" },
