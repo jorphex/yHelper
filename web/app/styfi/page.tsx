@@ -251,7 +251,7 @@ function StYfiPageContent() {
   return (
     <div>
       {/* Header */}
-      <section className="page-header" style={{ borderBottom: "none", display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "48px", alignItems: "center" }}>
+      <section className="page-header page-header-hero" style={{ borderBottom: "none" }}>
         <div>
           <h1 className="page-title">
             stYFI
@@ -261,17 +261,18 @@ function StYfiPageContent() {
           <p className="page-description">
             Track Yearn staking balance, reward epochs, and protocol-level yield.
           </p>
-          <a
-            href="https://styfi.yearn.fi"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="button button-primary"
-            style={{ marginTop: "24px" }}
-          >
-            Open stYFI App
-          </a>
+          <div style={{ marginTop: "24px" }}>
+            <a
+              href="https://styfi.yearn.fi"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="button button-primary"
+            >
+              Open stYFI App
+            </a>
+          </div>
         </div>
-        <div style={{ position: "relative", height: "280px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ position: "relative", height: "320px", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Image
             src="/styfi-assets-blender/hero-styfi-blender-coin-tilt-left.png"
             alt="stYFI"

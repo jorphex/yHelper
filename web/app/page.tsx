@@ -97,8 +97,8 @@ export default function HomePage() {
 
   return (
     <div className={`transition-opacity duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
-      {/* Hero Section with Yearn Logo */}
-      <section className="page-header" style={{ borderBottom: 'none', display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '48px', alignItems: 'center' }}>
+      {/* Hero Section */}
+      <section className="page-header page-header-hero" style={{ borderBottom: 'none' }}>
         <div>
           <h1 className="page-title">
             Find the best<br />
