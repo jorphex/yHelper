@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal, InvalidOperation
 from datetime import UTC, datetime
 
 import psycopg
@@ -72,6 +73,18 @@ def _format_amount(
     visible_fraction = trimmed_fraction[:max_fraction_digits]
     suffix = "…" if use_ellipsis and len(trimmed_fraction) > max_fraction_digits else ""
     return f"{whole_with_commas}.{visible_fraction}{suffix} {symbol}".strip()
+
+
+def _to_decimal_or_none(value: object) -> Decimal | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except InvalidOperation:
+        return None
 
 
 def _harvest_destination(chain_id: int) -> dict[str, object] | None:
@@ -339,6 +352,14 @@ def _build_harvest_discord_payload(
     strategy_url = _explorer_address_url(chain_id, strategy_address)
     vault_url = _yearn_vault_url(chain_id, vault_address)
     strategy_label = _strategy_display_label(chain_id, strategy_address)
+    gain_value = _to_decimal_or_none(row.get("gain"))
+    loss_value = _to_decimal_or_none(row.get("loss"))
+    fee_value = _to_decimal_or_none(row.get("fee_assets"))
+    refund_value = _to_decimal_or_none(row.get("refund_assets"))
+    is_profit_realization = any(
+        value is not None and value != 0
+        for value in (gain_value, loss_value, fee_value, refund_value)
+    )
     details_lines = [
         f"🏦 [{vault_symbol}]({vault_url}) ({f'[{_short_hex(vault_address)}]({vault_address_url})' if vault_address_url else _short_hex(vault_address)})",
         f"🧠 {strategy_label} ({f'[{_short_hex(strategy_address)}]({strategy_url})' if strategy_url else _short_hex(strategy_address)})",
@@ -347,7 +368,11 @@ def _build_harvest_discord_payload(
         f"💸 Fees: {fee_text}",
     ]
     embed = {
-        "title": f"{_chain_label(chain_id)} Harvest",
+        "title": (
+            f"{_chain_label(chain_id)} Profit Realized"
+            if is_profit_realization
+            else f"{_chain_label(chain_id)} Accounting Report"
+        ),
         "color": int(destination["color"]),
         "fields": [
             {"name": "\u200b", "value": "\n".join(details_lines), "inline": False},
