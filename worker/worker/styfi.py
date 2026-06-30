@@ -48,6 +48,22 @@ def _sum_raw_values(items: object, key: str) -> int:
     return total
 
 
+def _sum_liquid_locker_capacity(items: object) -> int:
+    if not isinstance(items, list):
+        return 0
+    total = 0
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        redemption = item.get("redemption")
+        if not isinstance(redemption, dict):
+            continue
+        parsed = _safe_int(redemption.get("capacity"))
+        if parsed is not None:
+            total += parsed
+    return total
+
+
 def _styfi_epoch_start(genesis: int, epoch: int) -> datetime:
     return datetime.fromtimestamp(genesis + epoch * STYFI_EPOCH_LENGTH_SEC, tz=UTC)
 
@@ -79,6 +95,7 @@ def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
     styfix = payload.get("styfix") if isinstance(payload.get("styfix"), dict) else {}
     global_state = payload.get("global") if isinstance(payload.get("global"), dict) else {}
     veyfi = global_state.get("veyfi") if isinstance(global_state.get("veyfi"), dict) else {}
+    veyfi_tokens = veyfi.get("tokens") if isinstance(veyfi.get("tokens"), list) else []
     llyfi = payload.get("llyfi") if isinstance(payload.get("llyfi"), list) else []
     styfi_current = styfi.get("current") if isinstance(styfi.get("current"), dict) else {}
     styfi_projected = styfi.get("projected") if isinstance(styfi.get("projected"), dict) else {}
@@ -118,6 +135,7 @@ def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
         },
         "liquid_lockers": {
             "staked_raw": _sum_raw_values(llyfi, "staked"),
+            "participating_raw": _sum_liquid_locker_capacity(veyfi_tokens),
             "symbols": [
                 str(item.get("symbol"))
                 for item in llyfi
@@ -142,13 +160,17 @@ def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, obje
     reward_state = _fetch_styfi_site_reward_state()
     liquid_lockers_state = reward_state.get("liquid_lockers") if isinstance(reward_state, dict) else {}
     migrations_state = reward_state.get("migrations") if isinstance(reward_state, dict) else {}
-    liquid_lockers_staked = _safe_int(
-        liquid_lockers_state.get("staked_raw") if isinstance(liquid_lockers_state, dict) else None
-    ) or 0
+    liquid_lockers_participating = _safe_int(
+        liquid_lockers_state.get("participating_raw") if isinstance(liquid_lockers_state, dict) else None
+    )
+    if liquid_lockers_participating is None:
+        liquid_lockers_participating = _safe_int(
+            liquid_lockers_state.get("staked_raw") if isinstance(liquid_lockers_state, dict) else None
+        ) or 0
     migrated_yfi = _safe_int(
         migrations_state.get("migrated_yfi_raw") if isinstance(migrations_state, dict) else None
     ) or 0
-    combined_staked = styfi_total_assets + styfix_total_assets + liquid_lockers_staked + migrated_yfi
+    combined_staked = styfi_total_assets + liquid_lockers_participating + migrated_yfi
 
     snapshot = {
         "chain_id": STYFI_CHAIN_ID,
@@ -159,7 +181,7 @@ def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, obje
         "styfi_total_supply_raw": styfi_total_supply,
         "styfix_total_assets_raw": styfix_total_assets,
         "styfix_total_supply_raw": styfix_total_supply,
-        "liquid_lockers_staked_raw": liquid_lockers_staked,
+        "liquid_lockers_staked_raw": liquid_lockers_participating,
         "migrated_yfi_raw": migrated_yfi,
         "combined_staked_raw": combined_staked,
     }

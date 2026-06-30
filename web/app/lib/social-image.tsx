@@ -154,7 +154,7 @@ export async function renderSocialImage() {
     {
       value: pct(rewardState.styfi_current_apr, 1),
       noteStrong: `Epoch ${Number.isFinite(styfiEpochValue) ? String(styfiEpochValue) : "n/a"}`,
-      noteTail: `${Number.isFinite(styfiSummary.combined_staked) ? (styfiSummary.combined_staked as number).toFixed(1) : "n/a"} staked`,
+      noteTail: `${Number.isFinite(styfiSummary.combined_staked) ? (styfiSummary.combined_staked as number).toFixed(1) : "n/a"} participating`,
       valueStyle: { fontSize: 62, lineHeight: 0.9, letterSpacing: "-0.05em" },
     },
   ];

@@ -84,6 +84,7 @@ type StYfiResponse = {
     styfix_projected_reward?: number | null;
     styfix_projected_apr?: number | null;
     liquid_lockers_staked?: number | null;
+    liquid_lockers_participating?: number | null;
     migrated_yfi?: number | null;
   } | null;
   series?: {

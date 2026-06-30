@@ -313,12 +313,14 @@ def _styfi_totals_summary(conn: psycopg.Connection) -> str | None:
     combined_text = _format_amount(
         combined_raw, STYFI_ASSET_DECIMALS, STYFI_ASSET_SYMBOL, max_fraction_digits=2, use_ellipsis=False
     )
-    styfi_text = _format_amount(styfi_raw, STYFI_ASSET_DECIMALS, "stYFI", max_fraction_digits=2, use_ellipsis=False)
+    styfi_text = _format_amount(
+        styfi_raw, STYFI_ASSET_DECIMALS, "stYFI incl. stYFIx", max_fraction_digits=2, use_ellipsis=False
+    )
     styfix_text = _format_amount(
         styfix_raw, STYFI_ASSET_DECIMALS, "stYFIx", max_fraction_digits=2, use_ellipsis=False
     )
     liquid_lockers_text = _format_amount(
-        liquid_lockers_raw, STYFI_ASSET_DECIMALS, "Liquid lockers", max_fraction_digits=2, use_ellipsis=False
+        liquid_lockers_raw, STYFI_ASSET_DECIMALS, "Liquid locker capacity", max_fraction_digits=2, use_ellipsis=False
     )
     migrated_text = _format_amount(
         migrated_raw, STYFI_ASSET_DECIMALS, "Migrated veYFI", max_fraction_digits=2, use_ellipsis=False

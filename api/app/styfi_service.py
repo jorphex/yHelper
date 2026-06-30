@@ -24,6 +24,7 @@ def _styfi_summary_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
         ),
         flow_24h AS (
             SELECT
+                combined_staked_raw,
                 styfi_total_assets_raw,
                 styfix_total_assets_raw,
                 liquid_lockers_staked_raw,
@@ -36,6 +37,7 @@ def _styfi_summary_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
         ),
         flow_7d AS (
             SELECT
+                combined_staked_raw,
                 styfi_total_assets_raw,
                 styfix_total_assets_raw,
                 liquid_lockers_staked_raw,
@@ -67,7 +69,6 @@ def _styfi_summary_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
             (
                 (
                     l.styfi_total_assets_raw
-                    + l.styfix_total_assets_raw
                     + COALESCE(l.liquid_lockers_staked_raw, 0)
                     + COALESCE(l.migrated_yfi_raw, 0)
                 )::numeric
@@ -78,7 +79,6 @@ def _styfi_summary_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
                 THEN (
                     (
                         l.styfi_total_assets_raw
-                        + l.styfix_total_assets_raw
                         + COALESCE(l.liquid_lockers_staked_raw, 0)
                         + COALESCE(l.migrated_yfi_raw, 0)
                     )::numeric / l.yfi_total_supply_raw::numeric
@@ -90,17 +90,20 @@ def _styfi_summary_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
                     f24.styfi_total_assets_raw IS NOT NULL
                     AND f24.liquid_lockers_staked_raw IS NOT NULL
                     AND f24.migrated_yfi_raw IS NOT NULL
+                    AND f24.combined_staked_raw = (
+                        f24.styfi_total_assets_raw
+                        + COALESCE(f24.liquid_lockers_staked_raw, 0)
+                        + COALESCE(f24.migrated_yfi_raw, 0)
+                    )
                 THEN (
                     (
                         (
                             l.styfi_total_assets_raw
-                            + l.styfix_total_assets_raw
                             + COALESCE(l.liquid_lockers_staked_raw, 0)
                             + COALESCE(l.migrated_yfi_raw, 0)
                         )
                         - (
                             f24.styfi_total_assets_raw
-                            + f24.styfix_total_assets_raw
                             + COALESCE(f24.liquid_lockers_staked_raw, 0)
                             + COALESCE(f24.migrated_yfi_raw, 0)
                         )
@@ -113,17 +116,20 @@ def _styfi_summary_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
                     f7d.styfi_total_assets_raw IS NOT NULL
                     AND f7d.liquid_lockers_staked_raw IS NOT NULL
                     AND f7d.migrated_yfi_raw IS NOT NULL
+                    AND f7d.combined_staked_raw = (
+                        f7d.styfi_total_assets_raw
+                        + COALESCE(f7d.liquid_lockers_staked_raw, 0)
+                        + COALESCE(f7d.migrated_yfi_raw, 0)
+                    )
                 THEN (
                     (
                         (
                             l.styfi_total_assets_raw
-                            + l.styfix_total_assets_raw
                             + COALESCE(l.liquid_lockers_staked_raw, 0)
                             + COALESCE(l.migrated_yfi_raw, 0)
                         )
                         - (
                             f7d.styfi_total_assets_raw
-                            + f7d.styfix_total_assets_raw
                             + COALESCE(f7d.liquid_lockers_staked_raw, 0)
                             + COALESCE(f7d.migrated_yfi_raw, 0)
                         )
@@ -248,6 +254,11 @@ def _styfi_current_reward_state(cur: psycopg.Cursor) -> dict[str, object] | None
             if liquid_lockers.get("staked_raw") is not None
             else None
         ),
+        "liquid_lockers_participating": _to_float_or_none(
+            (int(liquid_lockers.get("participating_raw")) / STYFI_SITE_REWARD_SCALE)
+            if liquid_lockers.get("participating_raw") is not None
+            else None
+        ),
         "migrated_yfi": _to_float_or_none(
             (int(migrations.get("migrated_yfi_raw")) / STYFI_SITE_REWARD_SCALE)
             if migrations.get("migrated_yfi_raw") is not None
@@ -269,7 +280,6 @@ def _styfi_snapshot_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, 
             (
                 (
                     styfi_total_assets_raw
-                    + styfix_total_assets_raw
                     + COALESCE(liquid_lockers_staked_raw, 0)
                     + COALESCE(migrated_yfi_raw, 0)
                 )::numeric
@@ -280,7 +290,6 @@ def _styfi_snapshot_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, 
                 THEN (
                     (
                         styfi_total_assets_raw
-                        + styfix_total_assets_raw
                         + COALESCE(liquid_lockers_staked_raw, 0)
                         + COALESCE(migrated_yfi_raw, 0)
                     )::numeric / yfi_total_supply_raw::numeric

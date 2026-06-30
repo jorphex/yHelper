@@ -236,13 +236,13 @@ export default function HomePage() {
             </div>
 
             <div className="kpi-card home-overview-summary-card">
-              <div className="kpi-label">Total Staked</div>
+              <div className="kpi-label">Total Participating</div>
               <div className="kpi-value kpi-value-md">
                 {Number.isFinite(styfi?.summary?.combined_staked ?? null)
                   ? `${Math.round((styfi?.summary?.combined_staked ?? 0)).toLocaleString()} YFI`
                   : "n/a"}
               </div>
-              <div className="kpi-hint">Combined stYFI + stYFIx</div>
+              <div className="kpi-hint">stYFI, liquid lockers, migrated veYFI</div>
             </div>
           </div>
         )}

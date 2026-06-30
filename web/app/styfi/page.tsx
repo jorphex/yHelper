@@ -68,6 +68,7 @@ type StYfiResponse = {
     styfi_current_reward?: number | null;
     styfix_current_reward?: number | null;
     liquid_lockers_staked?: number | null;
+    liquid_lockers_participating?: number | null;
     migrated_yfi?: number | null;
   } | null;
   series?: {
@@ -169,9 +170,9 @@ function StYfiPageContent() {
   const summaryItems = useMemo(() => {
     const items = [
       {
-        label: "Combined Staked",
+        label: "Total Participating",
         value: formatTokenCompact(summary?.combined_staked ?? null, "YFI"),
-        hint: "Total stYFI, stYFIx, liquid lockers, and migrated veYFI.",
+        hint: "stYFI underlying stake, liquid-locker capacity, and migrated veYFI.",
       },
       {
         label: "Share of Supply",
@@ -204,10 +205,10 @@ function StYfiPageContent() {
   }, [summary, data?.current_reward_state, hasNetFlow24h, hasNetFlow7d]);
 
   const stakeTrendItems = useMemo(() => [
-    { id: "combined", label: "Total", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest combined balance vs previous snapshot" },
+    { id: "combined", label: "Total", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest participating balance vs previous snapshot" },
     { id: "styfi", label: "stYFI", points: snapshotSeries.map((r) => r.styfi_staked), note: "Latest stYFI balance vs previous snapshot" },
-    { id: "styfix", label: "stYFIx", points: snapshotSeries.map((r) => r.styfix_staked), note: "Latest stYFIx balance vs previous snapshot" },
-    { id: "liquid-lockers", label: "Liquid lockers", points: snapshotSeries.map((r) => r.liquid_lockers_staked), note: "Latest liquid-locker balance from stYFI global state" },
+    { id: "styfix", label: "stYFIx", points: snapshotSeries.map((r) => r.styfix_staked), note: "Shown separately; included in stYFI underlying stake" },
+    { id: "liquid-lockers", label: "Liquid lockers", points: snapshotSeries.map((r) => r.liquid_lockers_staked), note: "Latest liquid-locker capacity from stYFI global state" },
     { id: "migrated-yfi", label: "Migrated veYFI", points: snapshotSeries.map((r) => r.migrated_yfi), note: "Latest migrated veYFI balance from stYFI global state" },
   ], [snapshotSeries]);
 
