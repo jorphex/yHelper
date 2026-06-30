@@ -1,5 +1,6 @@
-# yHelper-only virtual host.
-# Keep this in a separate include file and do not edit existing Nextcloud site blocks.
+# yHelper-only virtual host example.
+# The live public ingress is owned by the shared edge stack.
+# Keep this file only as a yHelper-specific routing snippet reference.
 
 yhelper.app {
     encode zstd gzip
