@@ -13,6 +13,16 @@ type OverviewResponse = {
     pps_vaults_total?: number | null;
   } | null;
   protocol_context?: {
+    protocol?: {
+      tvl_usd?: number | null;
+      observed_at?: string | null;
+    } | null;
+    catalog?: {
+      active_yearn?: {
+        vaults?: number | null;
+        gross_tvl_usd?: number | null;
+      } | null;
+    } | null;
     current_yearn?: {
       tvl_usd?: number | null;
       vaults?: number | null;

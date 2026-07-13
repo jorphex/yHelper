@@ -80,9 +80,13 @@ export default function HomePage() {
   const highestYieldName = compactTitle(highestYieldVault?.name ?? highestYieldVault?.symbol ?? null);
   const highestYieldApy = formatPct(highestYieldVault?.est_apy ?? null, 1);
 
-  const currentYearnVaultCount = Number.isFinite(overview?.protocol_context?.current_yearn?.vaults ?? null)
-    ? `${overview?.protocol_context?.current_yearn?.vaults}`
+  const currentYearnVaults = overview?.protocol_context?.catalog?.active_yearn?.vaults
+    ?? overview?.protocol_context?.current_yearn?.vaults;
+  const currentYearnVaultCount = Number.isFinite(currentYearnVaults ?? null)
+    ? `${currentYearnVaults}`
     : "n/a";
+  const protocolTvl = overview?.protocol_context?.protocol?.tvl_usd
+    ?? overview?.protocol_context?.current_yearn?.tvl_usd;
 
   // DAU data formatting
   const dauHeadline = dauData?.trailing_24h?.dau_total ?? null;
@@ -219,14 +223,14 @@ export default function HomePage() {
           <div className="kpi-grid home-overview-summary">
             <div className="kpi-card home-overview-summary-card">
               <div className="kpi-label">Current Yearn TVL</div>
-              <div className="kpi-value">{formatUsd(overview?.protocol_context?.current_yearn?.tvl_usd ?? null, 0, false)}</div>
-              <div className="kpi-hint">Active visible current-scope vaults</div>
+              <div className="kpi-value">{formatUsd(protocolTvl ?? null, 0, false)}</div>
+              <div className="kpi-hint">Yearn-reported protocol TVL</div>
             </div>
 
             <div className="kpi-card home-overview-summary-card">
               <div className="kpi-label">Current Vaults</div>
               <div className="kpi-value">{currentYearnVaultCount}</div>
-              <div className="kpi-hint">In deduped live Yearn universe</div>
+              <div className="kpi-hint">Active Yearn catalog vaults</div>
             </div>
 
             <div className="kpi-card home-overview-summary-card">

@@ -35,6 +35,14 @@ type SocialPreviewResponse = {
 
 type OverviewResponse = {
   protocol_context?: {
+    protocol?: {
+      tvl_usd?: number | null;
+    } | null;
+    catalog?: {
+      active_yearn?: {
+        vaults?: number | null;
+      } | null;
+    } | null;
     current_yearn?: {
       tvl_usd?: number | null;
       vaults?: number | null;
@@ -130,17 +138,21 @@ export async function renderSocialImage() {
   ]);
 
   const summary = social?.summary || {};
-  const protocol = overview?.protocol_context?.current_yearn || {};
+  const protocol = overview?.protocol_context?.protocol
+    ?? overview?.protocol_context?.current_yearn
+    ?? {};
   const highest = social?.highest_est_apy_vault || {};
   const styfiSummary = styfi?.summary || {};
   const rewardState = styfi?.current_reward_state || {};
 
-  const activeVaultCount = summary.active_vaults ?? protocol.vaults;
+  const activeVaultCount = overview?.protocol_context?.catalog?.active_yearn?.vaults
+    ?? overview?.protocol_context?.current_yearn?.vaults
+    ?? summary.active_vaults;
   const styfiEpochValue = rewardState.epoch ?? styfiSummary.reward_epoch;
 
   const cards = [
     {
-      value: usdCompact(summary.tracked_tvl_active_usd ?? protocol.tvl_usd),
+      value: usdCompact(protocol.tvl_usd ?? summary.tracked_tvl_active_usd),
       noteStrong: Number.isFinite(activeVaultCount) ? String(activeVaultCount) : "n/a",
       noteTail: "active vaults",
       valueStyle: { fontSize: 62, lineHeight: 0.9, letterSpacing: "-0.05em" },
