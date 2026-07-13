@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
-import { UniverseKind } from "../lib/universe";
+import { MarketKind, UniverseKind } from "../lib/universe";
 
 type BreakdownRow = {
   chain_id?: number;
@@ -12,19 +12,6 @@ type BreakdownRow = {
   tvl_usd: number | null;
   share_tvl?: number | null;
   weighted_realized_apy_30d?: number | null;
-};
-
-type CrowdingRow = {
-  vault_address: string;
-  chain_id: number;
-  symbol: string | null;
-  token_symbol: string | null;
-  category: string | null;
-  tvl_usd: number | null;
-  realized_apy_30d: number | null;
-  momentum_7d_30d: number | null;
-  consistency_score: number | null;
-  crowding_index: number | null;
 };
 
 type CompositionResponse = {
@@ -41,14 +28,11 @@ type CompositionResponse = {
   chains: BreakdownRow[];
   categories: BreakdownRow[];
   tokens: BreakdownRow[];
-  crowding: {
-    most_crowded: CrowdingRow[];
-    least_crowded: CrowdingRow[];
-  };
 };
 
 interface UseCompositionDataParams {
   universe: UniverseKind;
+  market: MarketKind;
   minTvl: number;
 }
 
@@ -56,6 +40,7 @@ export async function fetchCompositionData(params: UseCompositionDataParams): Pr
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
+    market: params.market,
   });
 
   const res = await fetch(apiUrl("/composition", searchParams), { cache: "no-store" });

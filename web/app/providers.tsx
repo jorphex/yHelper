@@ -7,11 +7,9 @@ import { fetchAssetsData } from "./hooks/use-assets-data";
 import { fetchChainsData } from "./hooks/use-chains-data";
 import { fetchChangesData, fetchTrendDailyData } from "./hooks/use-changes-data";
 import { fetchCompositionData } from "./hooks/use-composition-data";
-import { fetchDauData } from "./hooks/use-dau-data";
 import { fetchDiscoverData } from "./hooks/use-discover-data";
 import { fetchHarvestData } from "./hooks/use-harvest-data";
 import { fetchHomeData } from "./hooks/use-home-data";
-import { fetchRegimesData, fetchTransitionsDailyData, fetchTransitionsData } from "./hooks/use-regimes-data";
 import { fetchStYfiData } from "./hooks/use-styfi-data";
 import { queryClient } from "./lib/query-client";
 
@@ -43,10 +41,10 @@ function GlobalPrefetch() {
 
       const tasks = [
         () => client.prefetchQuery({ queryKey: ["home"], queryFn: fetchHomeData, staleTime: 30_000 }),
-        () => client.prefetchQuery({ queryKey: ["dau", 30], queryFn: () => fetchDauData(30), staleTime: 30_000 }),
         () => client.prefetchQuery({
           queryKey: ["discover", {
             universe: "core",
+            market: "all",
             minTvl: 1000000,
             minPoints: 45,
             limit: 30,
@@ -58,6 +56,7 @@ function GlobalPrefetch() {
           }],
           queryFn: () => fetchDiscoverData({
             universe: "core",
+            market: "all",
             minTvl: 1000000,
             minPoints: 45,
             limit: 30,
@@ -72,6 +71,7 @@ function GlobalPrefetch() {
         () => client.prefetchQuery({
           queryKey: ["assets", {
             universe: "core",
+            market: "all",
             minTvl: 1000000,
             minPoints: 45,
             limit: 120,
@@ -81,6 +81,7 @@ function GlobalPrefetch() {
           }],
           queryFn: () => fetchAssetsData({
             universe: "core",
+            market: "all",
             minTvl: 1000000,
             minPoints: 45,
             limit: 120,
@@ -91,8 +92,8 @@ function GlobalPrefetch() {
           staleTime: 30_000,
         }),
         () => client.prefetchQuery({
-          queryKey: ["composition", { universe: "core", minTvl: 1000000 }],
-          queryFn: () => fetchCompositionData({ universe: "core", minTvl: 1000000 }),
+          queryKey: ["composition", { universe: "core", market: "all", minTvl: 1000000 }],
+          queryFn: () => fetchCompositionData({ universe: "core", market: "all", minTvl: 1000000 }),
           staleTime: 30_000,
         }),
         () => client.prefetchQuery({
@@ -103,6 +104,7 @@ function GlobalPrefetch() {
         () => client.prefetchQuery({
           queryKey: ["changes", {
             universe: "core",
+            market: "all",
             minTvl: 1000000,
             minPoints: 45,
             window: "7d",
@@ -110,6 +112,7 @@ function GlobalPrefetch() {
           }],
           queryFn: () => fetchChangesData({
             universe: "core",
+            market: "all",
             minTvl: 1000000,
             minPoints: 45,
             window: "7d",
@@ -120,6 +123,7 @@ function GlobalPrefetch() {
         () => client.prefetchQuery({
           queryKey: ["trend-daily", {
             universe: "core",
+            market: "all",
             minTvl: 1000000,
             minPoints: 45,
             days: 90,
@@ -127,6 +131,7 @@ function GlobalPrefetch() {
           }],
           queryFn: () => fetchTrendDailyData({
             universe: "core",
+            market: "all",
             minTvl: 1000000,
             minPoints: 45,
             days: 90,
@@ -135,111 +140,8 @@ function GlobalPrefetch() {
           staleTime: 30_000,
         }),
         () => client.prefetchQuery({
-          queryKey: ["trend-daily", {
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            days: 90,
-            groupBy: "chain",
-            groupLimit: 10,
-            enabled: true,
-          }],
-          queryFn: () => fetchTrendDailyData({
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            days: 90,
-            groupBy: "chain",
-            groupLimit: 10,
-            enabled: true,
-          }),
-          staleTime: 30_000,
-        }),
-        () => client.prefetchQuery({
-          queryKey: ["trend-daily", {
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            days: 90,
-            groupBy: "category",
-            groupLimit: 10,
-            enabled: true,
-          }],
-          queryFn: () => fetchTrendDailyData({
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            days: 90,
-            groupBy: "category",
-            groupLimit: 10,
-            enabled: true,
-          }),
-          staleTime: 30_000,
-        }),
-        () => client.prefetchQuery({
-          queryKey: ["regimes", {
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            limit: 30,
-            chainId: null,
-            enabled: true,
-          }],
-          queryFn: () => fetchRegimesData({
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            limit: 30,
-            chainId: null,
-            enabled: true,
-          }),
-          staleTime: 30_000,
-        }),
-        () => client.prefetchQuery({
-          queryKey: ["transitions", {
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            limit: 30,
-            chainId: null,
-            enabled: true,
-          }],
-          queryFn: () => fetchTransitionsData({
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            limit: 30,
-            chainId: null,
-            enabled: true,
-          }),
-          staleTime: 30_000,
-        }),
-        () => client.prefetchQuery({
-          queryKey: ["transitions-daily", {
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            chainId: null,
-            days: 120,
-            groupBy: "none",
-            groupLimit: 8,
-            enabled: true,
-          }],
-          queryFn: () => fetchTransitionsDailyData({
-            universe: "core",
-            minTvl: 1000000,
-            minPoints: 45,
-            chainId: null,
-            days: 120,
-            groupBy: "none",
-            groupLimit: 8,
-            enabled: true,
-          }),
-          staleTime: 30_000,
-        }),
-        () => client.prefetchQuery({
-          queryKey: ["harvests", 90, null, null, 50],
-          queryFn: () => fetchHarvestData({ days: 90, chainId: null, vaultAddress: null, limit: 50 }),
+          queryKey: ["harvests", 90, null, null, 25, true],
+          queryFn: () => fetchHarvestData({ days: 90, chainId: null, vaultAddress: null, limit: 25, meaningfulOnly: true }),
           staleTime: 30_000,
         }),
         () => client.prefetchQuery({

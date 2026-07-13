@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
-import { UniverseKind } from "../lib/universe";
+import { MarketKind, UniverseKind } from "../lib/universe";
 
 type WindowKey = "24h" | "7d" | "30d";
 type StaleThresholdKey = "auto" | "24h" | "7d" | "30d";
@@ -17,6 +17,12 @@ type Summary = {
   avg_realized_apy_window: number | null;
   avg_realized_apy_prev_window: number | null;
   avg_delta: number | null;
+  tvl_weighted_delta?: number | null;
+  riser_vaults?: number;
+  faller_vaults?: number;
+  flat_vaults?: number;
+  riser_tvl_usd?: number | null;
+  faller_tvl_usd?: number | null;
 };
 
 type ChangeRow = {
@@ -56,17 +62,7 @@ type ChangesResponse = {
     stale_threshold_seconds?: number;
   };
   summary: Summary;
-  reference_tvl?: {
-    yearn_aligned_proxy?: {
-      vaults?: number;
-      tvl_usd?: number | null;
-      comparison_to_filtered_universe?: {
-        filtered_total_tvl_usd?: number | null;
-        gap_usd?: number | null;
-        ratio?: number | null;
-      };
-    };
-  };
+  protocol_context?: { protocol?: { tvl_usd?: number | null } };
   freshness?: {
     latest_pps_age_seconds?: number | null;
     pps_stale_ratio?: number | null;
@@ -115,6 +111,7 @@ export type TrendDailyResponse = {
 
 interface UseChangesDataParams {
   universe: UniverseKind;
+  market: MarketKind;
   minTvl: number;
   minPoints: number;
   window: WindowKey;
@@ -123,6 +120,7 @@ interface UseChangesDataParams {
 
 interface UseTrendDailyParams {
   universe: UniverseKind;
+  market: MarketKind;
   minTvl: number;
   minPoints: number;
   days: number;
@@ -139,6 +137,7 @@ export async function fetchChangesData(params: UseChangesDataParams): Promise<Ch
     min_tvl_usd: String(params.minTvl),
     min_points: String(params.minPoints),
     limit: "60",
+    market: params.market,
   });
 
   const res = await fetch(apiUrl("/changes", searchParams), { cache: "no-store" });
@@ -152,6 +151,7 @@ export async function fetchTrendDailyData(params: UseTrendDailyParams): Promise<
     min_tvl_usd: String(params.minTvl),
     min_points: String(params.minPoints),
     days: String(params.days),
+    market: params.market,
   });
   if (params.groupBy) searchParams.set("group_by", params.groupBy);
   if (params.groupLimit) searchParams.set("group_limit", String(params.groupLimit));

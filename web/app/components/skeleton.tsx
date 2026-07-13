@@ -46,9 +46,9 @@ export function KpiCardSkeleton() {
   return (
     <div
       style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: "var(--radius-lg)",
+        background: "transparent",
+        border: 0,
+        borderRadius: 0,
         padding: "var(--space-5)",
         minHeight: "100px",
       }}

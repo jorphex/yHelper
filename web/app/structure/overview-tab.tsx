@@ -1,204 +1,51 @@
 "use client";
 
 import Link from "next/link";
-import { formatPct, formatUsd } from "../lib/format";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { TableWrap } from "../components/table-wrap";
-import { sortIndicator, toggleSort, type SortState } from "../lib/sort";
+import { chainLabel, formatPct, formatUsd } from "../lib/format";
+import { marketLabel, type MarketKind, type UniverseKind } from "../lib/universe";
 import { TvlTreemap } from "./components";
-import type { BreakdownRow, CategorySortKey, StructureQuery, TokenSortKey } from "./types";
-
-type CompositionSummary = {
-  vaults?: number;
-  avg_realized_apy_30d?: number | null;
-};
-
-type ConcentrationSummary = {
-  chain_hhi?: number | null;
-  category_hhi?: number | null;
-  token_hhi?: number | null;
-};
+import type { BreakdownRow } from "./types";
 
 export function OverviewTab({
   isLoading,
-  query,
+  universe,
+  market,
   summary,
-  concentration,
   chainRows,
-  categoryRows,
+  marketRows,
   tokenRows,
-  categorySort,
-  setCategorySort,
-  tokenSort,
-  setTokenSort,
 }: {
   isLoading: boolean;
-  query: StructureQuery;
-  summary?: CompositionSummary;
-  concentration?: ConcentrationSummary;
+  universe: UniverseKind;
+  market: MarketKind;
+  summary?: { vaults?: number; total_tvl_usd?: number | null };
   chainRows: BreakdownRow[];
-  categoryRows: BreakdownRow[];
+  marketRows: BreakdownRow[];
   tokenRows: BreakdownRow[];
-  categorySort: SortState<CategorySortKey>;
-  setCategorySort: (value: SortState<CategorySortKey>) => void;
-  tokenSort: SortState<TokenSortKey>;
-  setTokenSort: (value: SortState<TokenSortKey>) => void;
 }) {
+  const topMarket = marketRows[0];
+  const topChain = chainRows[0];
+  const topToken = tokenRows[0];
   return (
     <>
       <section className="section section-lg">
-        {isLoading ? (
-          <div className="kpi-grid kpi-grid-5">
-            {Array(5).fill(null).map((_, i) => <KpiGridSkeleton key={i} count={1} />)}
-          </div>
-        ) : (
-          <div className="kpi-grid kpi-grid-5">
-            <div className="kpi-card">
-              <div className="kpi-label">Vaults</div>
-              <div className="kpi-value">{summary?.vaults ?? "n/a"}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Average Realized APY 30d</div>
-              <div className="kpi-value">{formatPct(summary?.avg_realized_apy_30d)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Chain HHI</div>
-              <div className="kpi-value">{concentration?.chain_hhi?.toFixed(3) ?? "n/a"}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Category HHI</div>
-              <div className="kpi-value">{concentration?.category_hhi?.toFixed(3) ?? "n/a"}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Token HHI</div>
-              <div className="kpi-value">{concentration?.token_hhi?.toFixed(3) ?? "n/a"}</div>
-            </div>
-          </div>
-        )}
+        {isLoading ? <KpiGridSkeleton count={4} /> : <div className="kpi-grid kpi-grid-4">
+          <div className="kpi-card"><div className="kpi-label">Comparable vaults</div><div className="kpi-value">{summary?.vaults ?? 0}</div></div>
+          <div className="kpi-card"><div className="kpi-label">Tracked TVL</div><div className="kpi-value">{formatUsd(summary?.total_tvl_usd)}</div></div>
+          {market === "all" ? <div className="kpi-card"><div className="kpi-label">Largest market share</div><div className="kpi-value">{formatPct(topMarket?.share_tvl)}</div><div className="kpi-hint">{topMarket?.category ? marketLabel(topMarket.category as MarketKind) : "n/a"}</div></div> : <div className="kpi-card"><div className="kpi-label">Largest chain share</div><div className="kpi-value">{formatPct(topChain?.share_tvl)}</div><div className="kpi-hint">{topChain?.chain_id ? chainLabel(topChain.chain_id) : "n/a"}</div></div>}
+          <div className="kpi-card"><div className="kpi-label">Largest asset share</div><div className="kpi-value">{formatPct(topToken?.share_tvl)}</div><div className="kpi-hint">{topToken?.token_symbol ?? "n/a"}</div></div>
+        </div>}
       </section>
-
       <section className="section section-lg">
-        <TvlTreemap title="TVL Treemap (Chain -> Category -> Token Lens)" chains={chainRows} categories={categoryRows} tokens={tokenRows} />
+        <TvlTreemap title={market === "all" ? "TVL composition" : `${marketLabel(market)} composition`} chains={chainRows} categories={market === "all" ? marketRows.map((row) => ({ ...row, category: row.category ? marketLabel(row.category as MarketKind) : "Other" })) : []} tokens={tokenRows} />
       </section>
-
       <section className="section">
-        <div className="card-header">
-          <h2 className="card-title">Category Concentration</h2>
-        </div>
-        <TableWrap>
-          <table>
-            <thead>
-              <tr>
-                <th aria-sort={categorySort.key === "category" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "category"))}>
-                    Category {sortIndicator(categorySort, "category")}
-                  </button>
-                </th>
-                <th className="numeric" aria-sort={categorySort.key === "vaults" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "vaults"))}>
-                    Vaults {sortIndicator(categorySort, "vaults")}
-                  </button>
-                </th>
-                <th className="numeric" aria-sort={categorySort.key === "tvl" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "tvl"))}>
-                    TVL {sortIndicator(categorySort, "tvl")}
-                  </button>
-                </th>
-                <th className="numeric" aria-sort={categorySort.key === "share" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "share"))}>
-                    Share {sortIndicator(categorySort, "share")}
-                  </button>
-                </th>
-                <th className="numeric" aria-sort={categorySort.key === "apy" ? (categorySort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setCategorySort(toggleSort(categorySort, "apy"))}>
-                    Realized APY 30d {sortIndicator(categorySort, "apy")}
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <TableSkeleton rows={5} columns={5} />
-              ) : (
-                categoryRows.map((row) => (
-                  <tr key={row.category}>
-                    <td>
-                      {row.category ? (
-                        <Link href={`/explore?category=${encodeURIComponent(row.category)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                          {row.category}
-                        </Link>
-                      ) : "Unknown"}
-                    </td>
-                    <td className="data-value numeric">{row.vaults}</td>
-                    <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
-                    <td className="data-value numeric">{formatPct(row.share_tvl)}</td>
-                    <td className="data-value numeric">{formatPct(row.weighted_realized_apy_30d)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-            </TableWrap>
-      </section>
-
-      <section className="section">
-        <div className="card-header">
-          <h2 className="card-title">Top Tokens by TVL</h2>
-        </div>
-        <TableWrap>
-          <table>
-            <thead>
-              <tr>
-                <th aria-sort={tokenSort.key === "token" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "token"))}>
-                    Token {sortIndicator(tokenSort, "token")}
-                  </button>
-                </th>
-                <th className="numeric" aria-sort={tokenSort.key === "vaults" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "vaults"))}>
-                    Vaults {sortIndicator(tokenSort, "vaults")}
-                  </button>
-                </th>
-                <th className="numeric" aria-sort={tokenSort.key === "tvl" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "tvl"))}>
-                    TVL {sortIndicator(tokenSort, "tvl")}
-                  </button>
-                </th>
-                <th className="numeric" aria-sort={tokenSort.key === "share" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "share"))}>
-                    Share {sortIndicator(tokenSort, "share")}
-                  </button>
-                </th>
-                <th className="numeric" aria-sort={tokenSort.key === "apy" ? (tokenSort.direction === "asc" ? "ascending" : "descending") : "none"}>
-                  <button className="th-button" onClick={() => setTokenSort(toggleSort(tokenSort, "apy"))}>
-                    Realized APY 30d {sortIndicator(tokenSort, "apy")}
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <TableSkeleton rows={5} columns={5} />
-              ) : (
-                tokenRows.slice(0, query.topN).map((row) => (
-                  <tr key={row.token_symbol}>
-                    <td>
-                      {row.token_symbol ? (
-                        <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${query.universe}&min_tvl=${query.minTvl}`}>
-                          {row.token_symbol}
-                        </Link>
-                      ) : "Unknown"}
-                    </td>
-                    <td className="data-value numeric">{row.vaults}</td>
-                    <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
-                    <td className="data-value numeric">{formatPct(row.share_tvl)}</td>
-                    <td className="data-value numeric">{formatPct(row.weighted_realized_apy_30d)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-            </TableWrap>
+        <div className="card-header"><div><h2 className="card-title">Underlying assets</h2><p className="card-description">Shares are relative to the selected tracked vault set, not total Yearn protocol TVL.</p></div></div>
+        <TableWrap><table><thead><tr><th>Asset</th><th className="numeric">Vaults</th><th className="numeric">TVL</th><th className="numeric">Share</th><th className="numeric">Weighted realized 30d</th></tr></thead><tbody>
+          {isLoading ? <TableSkeleton rows={7} columns={5} /> : tokenRows.map((row) => <tr key={row.token_symbol}><td>{row.token_symbol ? <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${universe}`}>{row.token_symbol}</Link> : "Unknown"}</td><td className="numeric">{row.vaults}</td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.share_tvl)}</td><td className="numeric">{formatPct(row.weighted_realized_apy_30d)}</td></tr>)}
+        </tbody></table></TableWrap>
       </section>
     </>
   );

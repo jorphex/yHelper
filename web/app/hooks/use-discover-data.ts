@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
-import { UniverseKind } from "../lib/universe";
+import { MarketKind, UniverseKind } from "../lib/universe";
 
 type DiscoverRow = {
   vault_address: string;
@@ -10,6 +10,7 @@ type DiscoverRow = {
   symbol: string | null;
   token_symbol: string | null;
   category: string | null;
+  market: MarketKind;
   tvl_usd: number | null;
   est_apy: number | null;
   realized_apy_30d: number | null;
@@ -65,6 +66,7 @@ type DiscoverResponse = {
 
 interface UseDiscoverDataParams {
   universe: UniverseKind;
+  market: MarketKind;
   minTvl: number;
   minPoints: number;
   limit: number;
@@ -83,6 +85,7 @@ export async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<
     limit: String(params.limit),
     sort_by: params.sort,
     direction: params.dir,
+    market: params.market,
   });
   if (params.chain) searchParams.set("chain_id", params.chain);
   if (params.category) searchParams.set("category", params.category);

@@ -107,7 +107,6 @@
 .kpi-card,
 .viz-panel,
 .trend-strip,
-.regime-sankey-panel,
 .distribution-card,
 .risk-card,
 .stat-card,
@@ -250,7 +249,6 @@ table tbody .external-link-inline::after {
 
 /* Visualization layout and data marks. */
 .viz-panel,
-.regime-sankey-panel,
 .trend-strip-panel {
   padding: var(--space-5) 0 !important;
   border: 0 !important;
@@ -262,28 +260,6 @@ table tbody .external-link-inline::after {
 .treemap-wrap { margin-top: var(--space-5); }
 
 .cols-responsive-2.section-lg > .bar-panel { padding-top: var(--space-5) !important; }
-
-.heat-cell {
-  background: transparent !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-
-.heat-cell.has-value { background: rgba(6, 87, 233, calc(.035 + var(--heat-alpha, 0) * .82)) !important; }
-
-.heat-cell:hover {
-  transform: none !important;
-  border: 0 !important;
-  background: rgba(6, 87, 233, calc(.075 + var(--heat-alpha, 0) * .95)) !important;
-}
-
-.heat-value,
-.heat-note {
-  font-family: var(--font-sans) !important;
-  font-variant-numeric: tabular-nums !important;
-  letter-spacing: .018em !important;
-}
 
 .meter-legend { gap: var(--space-4) !important; }
 .meter-legend-item { display: block !important; }
@@ -299,17 +275,6 @@ table tbody .external-link-inline::after {
   margin: var(--space-1) 0 0 calc(10px + var(--space-3)) !important;
   line-height: var(--leading-normal) !important;
 }
-
-.regime-sankey-panel .scatter-wrap {
-  width: 100% !important;
-  max-width: 920px !important;
-  margin: 0 auto !important;
-  padding: 0 !important;
-}
-
-.regime-sankey-panel svg { display: block !important; }
-.regime-sankey-panel svg rect { rx: 0 !important; stroke-width: 1 !important; }
-.regime-sankey-panel .sankey-flow path { stroke-linecap: butt !important; }
 
 /* Immediate custom details for treemap and scatter marks. */
 .viz-interactive-wrap { position: relative; }
@@ -422,7 +387,6 @@ table tbody .external-link-inline::after {
   .section,
   .viz-stack,
   .viz-panel,
-  .ridgeline-panel,
   .scatter-wrap {
     min-width: 0 !important;
     max-width: 100% !important;
@@ -473,7 +437,6 @@ table tbody .external-link-inline::after {
   .kpi-grid-4,
   .kpi-grid-5,
   .kpi-grid-6,
-  .heat-grid,
   .trend-strip-cols-2,
   .trend-strip-cols-3 { grid-template-columns: minmax(0, 1fr) !important; }
 
@@ -496,6 +459,5 @@ table tbody .external-link-inline::after {
   .card-grid { gap: var(--space-5) !important; }
 
   .viz-panel,
-  .regime-sankey-panel,
   .trend-strip-panel { padding: var(--space-4) 0 !important; }
 }

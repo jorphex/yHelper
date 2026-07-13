@@ -2,10 +2,9 @@
 
 import { useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { formatPct, formatUsd, formatUsdCompact } from "../../lib/format";
 import { useInViewOnce } from "./use-in-view-once";
 import { finiteValues, normalize } from "./utils";
-import type { RidgelineSeries, ScatterPoint } from "./types";
+import type { ScatterPoint } from "./types";
 
 export function ScatterPlot({
   title,
@@ -247,95 +246,6 @@ export function ScatterPlot({
             document.body,
           )
         : null}
-    </section>
-  );
-}
-
-export function Ridgeline({
-  title,
-  series,
-  emptyText = "Need more samples for distribution curves.",
-  valueLabel = "APY",
-}: {
-  title: string;
-  series: RidgelineSeries[];
-  emptyText?: string;
-  valueLabel?: string;
-}) {
-  const { ref, isInView } = useInViewOnce<HTMLElement>();
-  const ridgelinePalette = [
-    { stroke: "var(--viz-line-1)", fill: "rgba(6, 87, 233, 0.22)" },
-    { stroke: "var(--viz-line-3)", fill: "rgba(168, 85, 247, 0.2)" },
-    { stroke: "var(--viz-line-4)", fill: "rgba(245, 158, 11, 0.2)" },
-    { stroke: "var(--viz-line-2)", fill: "rgba(45, 212, 191, 0.2)" },
-  ];
-  const valid = series.filter((row) => row.values.length >= 4).slice(0, 6);
-  if (valid.length === 0) {
-    return (
-      <section className="viz-panel ridgeline-panel">
-        <h3>{title}</h3>
-        <p className="muted">{emptyText}</p>
-      </section>
-    );
-  }
-  const width = 920;
-  const rowH = valid.length >= 5 ? 28 : 32;
-  const maxLabelChars = valid.reduce((acc, row) => Math.max(acc, row.label.length), 0);
-  const maxNoteChars = valid.reduce((acc, row) => Math.max(acc, row.note.length), 0);
-  const chartLeft = Math.round(width * Math.max(0.102, Math.min(0.172, 0.036 + maxLabelChars * 0.0072)));
-  const chartRight = Math.round(width * Math.max(0.104, Math.min(0.188, 0.048 + maxNoteChars * 0.0068)));
-  const chartWidth = Math.max(220, width - chartLeft - chartRight);
-  const peakHeight = Math.max(8, Math.min(11, rowH * 0.38));
-  const height = 8 + valid.length * rowH + 16;
-  const bins = Math.max(14, Math.min(20, Math.round(chartWidth / 48)));
-  const allValues = valid.flatMap((row) => row.values);
-  const min = Math.min(...allValues);
-  const max = Math.max(...allValues);
-  const span = Math.max(0.0001, max - min);
-
-  return (
-    <section ref={ref} className={`viz-panel ridgeline-panel ${isInView ? "is-in-view" : ""}`.trim()}>
-      <h3>{title}</h3>
-      <div className="scatter-wrap">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
-          {valid.map((row, idx) => {
-            const tone = ridgelinePalette[idx % ridgelinePalette.length];
-            const yBase = 8 + idx * rowH + peakHeight + 3;
-            const counts = new Array<number>(bins).fill(0);
-            for (const value of row.values) {
-              const bucket = Math.max(0, Math.min(bins - 1, Math.floor(((value - min) / span) * bins)));
-              counts[bucket] += 1;
-            }
-            const maxCount = Math.max(1, ...counts);
-            const pathTop = counts
-              .map((count, bucketIndex) => {
-                const x = chartLeft + (bucketIndex / (bins - 1)) * chartWidth;
-                const y = yBase - (count / maxCount) * peakHeight;
-                return `${bucketIndex === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-              })
-              .join(" ");
-            const pathBottom = counts
-              .map((_, bucketIndex) => {
-                const reverseIndex = bins - 1 - bucketIndex;
-                const x = chartLeft + (reverseIndex / (bins - 1)) * chartWidth;
-                return `L${x.toFixed(2)},${yBase.toFixed(2)}`;
-              })
-              .join(" ");
-            return (
-              <g key={row.id}>
-                <title>{`${row.label}\n${row.note}\n${valueLabel} range ${formatPct(min, 1)} to ${formatPct(max, 1)}`}</title>
-                <path d={`${pathTop} ${pathBottom} Z`} fill={tone.fill} stroke={tone.stroke} strokeWidth={0.9} className="ridgeline-curve" />
-                <text x={8} y={yBase - 0.5} className="ridgeline-label" dominantBaseline="central">{row.label}</text>
-                <text x={width - 8} y={yBase - 0.5} className="ridgeline-note" textAnchor="end" dominantBaseline="central">{row.note}</text>
-              </g>
-            );
-          })}
-          <line x1={chartLeft} x2={width - chartRight} y1={height - 12} y2={height - 12} className="viz-axis" />
-          <text x={chartLeft} y={height - 2} className="ridgeline-axis">{formatPct(min, 1)}</text>
-          <text x={width - chartRight} y={height - 2} className="ridgeline-axis" textAnchor="end">{formatPct(max, 1)}</text>
-        </svg>
-      </div>
-      <p className="muted viz-legend">Ridgelines show {valueLabel.toLowerCase()} shape by chain. Taller peaks mean more vaults at that {valueLabel.toLowerCase()} zone.</p>
     </section>
   );
 }

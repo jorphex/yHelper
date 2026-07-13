@@ -3,276 +3,101 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { chainLabel, formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
 import { KpiCardSkeleton } from "./components/skeleton";
-import { useHomeData } from "./hooks/use-home-data";
-import { useDauData } from "./hooks/use-dau-data";
-import { MiniLineChart } from "./components/mini-line-chart";
+import { useHomeData, type HomeMover } from "./hooks/use-home-data";
+import { formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
 
-type ChangeMoverRow = {
-  vault_address?: string | null;
-  chain_id?: number | null;
-  symbol?: string | null;
-  token_symbol?: string | null;
-  delta_apy?: number | null;
-  realized_apy_30d?: number | null;
-};
-
-function pctDelta(value: number | null | undefined, digits = 2): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
-  const signed = value * 100;
-  const prefix = signed > 0 ? "+" : "";
-  return `${prefix}${signed.toFixed(digits)}%`;
+function signedPercent(value: number | null | undefined): string {
+  if (!Number.isFinite(value ?? null)) return "n/a";
+  const points = (value ?? 0) * 100;
+  return `${points > 0 ? "+" : ""}${points.toFixed(2)} pp`;
 }
 
-function moverTitle(row: ChangeMoverRow | undefined): string {
-  if (!row) return "n/a";
-  if (row.symbol?.trim()) return row.symbol.trim();
-  if (row.token_symbol?.trim()) return row.token_symbol.trim();
-  return "Vault";
+function moverName(row: HomeMover | undefined): string {
+  return row?.symbol?.trim() || row?.token_symbol?.trim() || "No comparable move";
 }
 
-function isMeaningfulMove(row: ChangeMoverRow | undefined): boolean {
-  return Number.isFinite(row?.delta_apy ?? null) && Math.abs(row?.delta_apy ?? 0) >= 0.0001;
-}
-
-function featuredMover(changes: { movers?: { largest_abs_delta?: ChangeMoverRow[]; risers?: ChangeMoverRow[]; fallers?: ChangeMoverRow[] } } | null): ChangeMoverRow | undefined {
-  const largest = changes?.movers?.largest_abs_delta?.[0];
-  if (isMeaningfulMove(largest)) return largest;
-  const riser = changes?.movers?.risers?.find((row) => isMeaningfulMove(row));
-  if (riser) return riser;
-  return changes?.movers?.fallers?.find((row) => isMeaningfulMove(row));
-}
-
-function compactTitle(value: string | null | undefined, max = 18): string {
-  if (!value?.trim()) return "Syncing";
-  const text = value.trim();
-  if (text.length <= max) return text;
-  return `${text.slice(0, Math.max(3, max - 1))}…`;
+function MoverLink({ row }: { row: HomeMover | undefined }) {
+  const url = row?.vault_address && row.chain_id != null ? yearnVaultUrl(row.chain_id, row.vault_address) : null;
+  return url ? <a className="external-link text-accent" href={url} target="_blank" rel="noreferrer">{moverName(row)}</a> : <>{moverName(row)}</>;
 }
 
 export default function HomePage() {
   const { data, isLoading } = useHomeData();
-  const { data: dauData, isLoading: isDauLoading } = useDauData(30);
   const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const overview = data?.overview ?? null;
-  const changes = data?.changes ?? null;
-  const styfi = data?.styfi ?? null;
-  const socialPreview = data?.socialPreview ?? null;
-
-  const topMover = featuredMover(changes);
-  const topMoverName = topMover ? moverTitle(topMover) : "Syncing";
-  const liveShiftHref = topMover?.vault_address && topMover?.chain_id != null
-    ? yearnVaultUrl(Number(topMover.chain_id), topMover.vault_address)
-    : null;
-  const liveShiftValue = Number.isFinite(topMover?.delta_apy ?? null) ? pctDelta(topMover?.delta_apy, 2) : "n/a";
-  const liveShiftApy = topMover ? formatPct(topMover?.realized_apy_30d ?? null, 2) : "n/a";
-
-  const highestYieldVault = socialPreview?.highest_est_apy_vault ?? null;
-  const highestYieldHref = highestYieldVault?.vault_address && highestYieldVault?.chain_id != null
-    ? yearnVaultUrl(Number(highestYieldVault.chain_id), highestYieldVault.vault_address)
-    : null;
-  const highestYieldName = compactTitle(highestYieldVault?.name ?? highestYieldVault?.symbol ?? null);
-  const highestYieldApy = formatPct(highestYieldVault?.est_apy ?? null, 1);
-
-  const currentYearnVaults = overview?.protocol_context?.catalog?.active_yearn?.vaults
-    ?? overview?.protocol_context?.current_yearn?.vaults;
-  const currentYearnVaultCount = Number.isFinite(currentYearnVaults ?? null)
-    ? `${currentYearnVaults}`
-    : "n/a";
-  const protocolTvl = overview?.protocol_context?.protocol?.tvl_usd
-    ?? overview?.protocol_context?.current_yearn?.tvl_usd;
-
-  // DAU data formatting
-  const dauHeadline = dauData?.trailing_24h?.dau_total ?? null;
-  const dauHeadlineLabel = dauData?.metric?.headline_label ?? "Active Accounts (24h)";
-  const dauChartLabel = dauData?.metric?.history_label ?? "Daily Active Accounts";
-  const dauWindowLabel = dauData?.metric?.history_window_label ?? "Last 30d";
-  const dauChartData = (dauData?.daily ?? [])
-    .filter((d): d is { day_utc: string; dau_total: number } => !!d && typeof d.dau_total === "number")
-    .map((d) => ({ x: d.day_utc, y: d.dau_total }));
-  const hasDauHistory = dauChartData.some((point) => point.y > 0);
-  const isDauBackfilling = dauData?.last_run?.status === "running" && !hasDauHistory;
+  const riser = data?.changes?.movers?.risers?.[0];
+  const faller = data?.changes?.movers?.fallers?.[0];
+  const opportunity = data?.assets?.rows?.find((row) => Number.isFinite(row.realized_spread_30d));
+  const protocolTvl = data?.overview?.protocol_context?.protocol?.tvl_usd;
+  const vaultCount = data?.overview?.protocol_context?.catalog?.active_yearn?.vaults;
+  const summary = data?.changes?.summary;
 
   return (
-    <div className={`transition-opacity duration-500 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
-      {/* Hero Section */}
+    <div className={`transition-opacity duration-500 ${mounted ? "opacity-100" : "opacity-0"}`}>
       <section className="page-header page-header-hero page-header-no-border">
         <div>
-          <h1 className="page-title">
-            Find the best<br />
-            <em className="page-title-accent">Yearn vaults</em>
-          </h1>
+          <h1 className="page-title">See where Yearn yield<br /><em className="page-title-accent">is moving</em></h1>
           <p className="page-description">
-            Move from raw yield data to calm, defensible allocation decisions in minutes. Track shifts, compare venues, and time your moves.
+            Compare like assets, follow realized-yield changes, and understand where Yearn&apos;s vault TVL is concentrated.
           </p>
           <div className="tab-bar-plain">
-            <Link href="/explore" className="button button-primary">
-              Start in Explore
-            </Link>
-            <Link href="/momentum" className="button button-secondary">
-              Check Momentum
-            </Link>
+            <Link href="/explore" className="button button-primary">Compare vaults</Link>
+            <Link href="/momentum" className="button button-secondary">Follow momentum</Link>
           </div>
         </div>
         <div className="hero-image">
-          <Image
-            src="/home-assets-yearn-blender/hero-yearn-blender-coins.png"
-            alt="Yearn Finance"
-            width={500}
-            height={320}
-            priority
-            style={{ objectFit: 'contain' }}
-          />
+          <Image src="/home-assets-yearn-blender/hero-yearn-blender-coins.png" alt="Yearn Finance" width={500} height={320} priority style={{ objectFit: "contain" }} />
         </div>
       </section>
 
-      {/* Quick Stats Row */}
       <section className="section section-lg">
-        {isLoading ? (
-          <div className="kpi-grid kpi-grid-3">
-            <KpiCardSkeleton />
-            <KpiCardSkeleton />
-            <KpiCardSkeleton />
-          </div>
-        ) : (
+        <div className="card-header"><div><h2 className="card-title">This week</h2><p className="card-subtitle">Realized APY, compared with the preceding seven-day window</p></div></div>
+        {isLoading ? <div className="kpi-grid kpi-grid-3"><KpiCardSkeleton /><KpiCardSkeleton /><KpiCardSkeleton /></div> : (
           <div className="kpi-grid kpi-grid-3">
             <div className="kpi-card">
-              <div className="kpi-label">Largest Shift</div>
-              <div className={`kpi-value ${(topMover?.delta_apy ?? 0) >= 0 ? 'text-positive delta-positive' : 'text-negative delta-negative'}`}>
-                {liveShiftValue}
-              </div>
-              <div className="kpi-hint">
-                {liveShiftHref ? (
-                  <a href={liveShiftHref} target="_blank" rel="noopener noreferrer" className="external-link text-accent">
-                    {topMoverName}
-                  </a>
-                ) : topMoverName} · Realized APY 30d now {liveShiftApy}
-              </div>
+              <div className="kpi-label">Strongest riser</div>
+              <div className="kpi-value kpi-value-md"><MoverLink row={riser} /></div>
+              <div className="kpi-hint">{signedPercent(riser?.delta_apy)} · now {formatPct(riser?.realized_apy_30d ?? null, 2)}</div>
             </div>
-
             <div className="kpi-card">
-              <div className="kpi-card-head">
-                <div>
-                  <div className="kpi-label">{dauHeadlineLabel}</div>
-                  <div className="kpi-value kpi-value-lg">
-                    {!isDauLoading && Number.isFinite(dauHeadline) ? (dauHeadline as number).toLocaleString() : "—"}
-                  </div>
-                </div>
-                <div className="kpi-meta">
-                  {dauWindowLabel}
-                </div>
-              </div>
-              <div className="kpi-chart-wrap">
-                {!isDauLoading && hasDauHistory && dauChartData.length >= 2 ? (
-                  <MiniLineChart
-                    data={dauChartData}
-                    color="var(--accent, #0657E9)"
-                    height={50}
-                    width="100%"
-                    strokeWidth={2}
-                  />
-                ) : (
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      height: '50px',
-                      borderRadius: '10px',
-                      background:
-                        'linear-gradient(90deg, rgba(6,87,233,0.08) 0%, rgba(6,87,233,0.16) 50%, rgba(6,87,233,0.08) 100%)',
-                    }}
-                  />
-                )}
-              </div>
-              <div className="kpi-hint kpi-hint-sm">
-                {isDauLoading || isDauBackfilling ? 'Backfilling daily history…' : dauChartLabel}
-              </div>
+              <div className="kpi-label">Largest faller</div>
+              <div className="kpi-value kpi-value-md"><MoverLink row={faller} /></div>
+              <div className="kpi-hint">{signedPercent(faller?.delta_apy)} · now {formatPct(faller?.realized_apy_30d ?? null, 2)}</div>
             </div>
-
             <div className="kpi-card">
-              <div className="kpi-label">Highest Est. APY</div>
-              <div className="kpi-value kpi-value-md">
-                {highestYieldHref ? (
-                  <a href={highestYieldHref} target="_blank" rel="noopener noreferrer" className="external-link text-accent">
-                    {highestYieldName}
-                  </a>
-                ) : highestYieldName}
-              </div>
-              <div className="kpi-hint">Est. APY {highestYieldApy} · {chainLabel(highestYieldVault?.chain_id ?? null)}</div>
+              <div className="kpi-label">Largest venue spread</div>
+              <div className="kpi-value kpi-value-md">{opportunity ? <Link className="text-accent" href={`/explore?tab=venues&token=${encodeURIComponent(opportunity.token_symbol)}`}>{opportunity.token_symbol}</Link> : "n/a"}</div>
+              <div className="kpi-hint">{formatPct(opportunity?.realized_spread_30d ?? null, 2)} across {opportunity?.venues ?? 0} exact-symbol venues</div>
             </div>
           </div>
         )}
       </section>
 
-      {/* Protocol Overview */}
       <section className="section">
-        <div className="card-header">
-          <h2 className="card-title">Protocol Overview</h2>
-        </div>
-        {isLoading ? (
-          <div className="kpi-grid">
-            <KpiCardSkeleton />
-            <KpiCardSkeleton />
-          </div>
-        ) : (
-          <div className="kpi-grid home-overview-summary">
-            <div className="kpi-card home-overview-summary-card">
-              <div className="kpi-label">Current Yearn TVL</div>
-              <div className="kpi-value">{formatUsd(protocolTvl ?? null, 0, false)}</div>
-              <div className="kpi-hint">Yearn-reported protocol TVL</div>
-            </div>
-
-            <div className="kpi-card home-overview-summary-card">
-              <div className="kpi-label">Current Vaults</div>
-              <div className="kpi-value">{currentYearnVaultCount}</div>
-              <div className="kpi-hint">Active Yearn catalog vaults</div>
-            </div>
-
-            <div className="kpi-card home-overview-summary-card">
-              <div className="kpi-label">stYFI APR</div>
-              <div className="kpi-value">{formatPct(styfi?.current_reward_state?.styfi_current_apr ?? null, 2)}</div>
-              <div className="kpi-hint">Current staking rewards rate</div>
-            </div>
-
-            <div className="kpi-card home-overview-summary-card">
-              <div className="kpi-label">Total Participating</div>
-              <div className="kpi-value kpi-value-md">
-                {Number.isFinite(styfi?.summary?.combined_staked ?? null)
-                  ? `${Math.round((styfi?.summary?.combined_staked ?? 0)).toLocaleString()} YFI`
-                  : "n/a"}
-              </div>
-              <div className="kpi-hint">stYFI, liquid lockers, migrated veYFI</div>
-            </div>
+        <div className="card-header"><div><h2 className="card-title">Market context</h2><p className="card-subtitle">Protocol size and the direction of comparable established vaults</p></div></div>
+        {isLoading ? <div className="kpi-grid kpi-grid-3"><KpiCardSkeleton /><KpiCardSkeleton /><KpiCardSkeleton /></div> : (
+          <div className="kpi-grid kpi-grid-3">
+            <div className="kpi-card"><div className="kpi-label">Yearn protocol TVL</div><div className="kpi-value">{formatUsd(protocolTvl ?? null, 0, false)}</div><div className="kpi-hint">Yearn-reported total · {vaultCount ?? "n/a"} active catalog vaults</div></div>
+            <div className="kpi-card"><div className="kpi-label">TVL-weighted change</div><div className="kpi-value">{signedPercent(summary?.tvl_weighted_delta)}</div><div className="kpi-hint">Across {summary?.vaults_with_change ?? 0} comparable vaults</div></div>
+            <div className="kpi-card"><div className="kpi-label">Direction</div><div className="kpi-value kpi-value-md">{summary?.riser_vaults ?? 0} rising · {summary?.faller_vaults ?? 0} falling</div><div className="kpi-hint">{formatUsd(summary?.riser_tvl_usd ?? null, 0, false)} rising TVL · {formatUsd(summary?.faller_tvl_usd ?? null, 0, false)} falling</div></div>
           </div>
         )}
       </section>
 
-      {/* Navigation Cards */}
       <section className="section">
-        <div className="card-header">
-          <h2 className="card-title">Explore</h2>
-        </div>
+        <div className="card-header"><h2 className="card-title">Go deeper</h2></div>
         <div className="card-grid">
           {[
-            { href: "/explore", title: "Explore", desc: "Find vaults and compare token venues.", tag: "Best first stop" },
-            { href: "/structure", title: "Structure", desc: "Check concentration and chain coverage.", tag: "Risk sizing" },
-            { href: "/momentum", title: "Momentum", desc: "Track realized APY changes and regime shifts.", tag: "Timing matters" },
-            { href: "/styfi", title: "stYFI", desc: "Track stake balances and reward epochs.", tag: "Governance" },
+            { href: "/explore", title: "Explore", desc: "Screen vaults or compare venues sharing an exact token symbol.", tag: "Choose" },
+            { href: "/momentum", title: "Momentum", desc: "See which realized yields are strengthening or weakening.", tag: "Time" },
+            { href: "/structure", title: "Structure", desc: "Understand concentration by market, chain, and asset.", tag: "Size" },
+            { href: "/harvests", title: "Reports", desc: "Inspect recent strategy gains, losses, fees, and debt updates.", tag: "Verify" },
+            { href: "/styfi", title: "stYFI", desc: "Track participation, reward allocation, and epochs.", tag: "Stake" },
           ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="hover-card card-grid-link"
-            >
-              <div className="card-grid-link-head">
-                <span className="card-grid-link-title">{item.title}</span>
-                <span className="card-grid-link-tag">{item.tag}</span>
-              </div>
+            <Link key={item.href} href={item.href} className="hover-card card-grid-link">
+              <div className="card-grid-link-head"><span className="card-grid-link-title">{item.title}</span><span className="card-grid-link-tag">{item.tag}</span></div>
               <p className="card-grid-link-desc">{item.desc}</p>
             </Link>
           ))}

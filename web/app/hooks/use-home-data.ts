@@ -6,119 +6,71 @@ import { apiUrl } from "../lib/api";
 const HOME_REFRESH_MS = 60_000;
 
 type OverviewResponse = {
-  freshness?: {
-    latest_pps_age_seconds?: number | null;
-    pps_stale_ratio?: number | null;
-    pps_vaults_stale?: number | null;
-    pps_vaults_total?: number | null;
-  } | null;
   protocol_context?: {
-    protocol?: {
-      tvl_usd?: number | null;
-      observed_at?: string | null;
-    } | null;
-    catalog?: {
-      active_yearn?: {
-        vaults?: number | null;
-        gross_tvl_usd?: number | null;
-      } | null;
-    } | null;
-    current_yearn?: {
-      tvl_usd?: number | null;
-      vaults?: number | null;
-    } | null;
-    total_yearn?: {
-      tvl_usd?: number | null;
-      vaults?: number | null;
-    } | null;
+    protocol?: { tvl_usd?: number | null; observed_at?: string | null } | null;
+    catalog?: { active_yearn?: { vaults?: number | null; gross_tvl_usd?: number | null } | null } | null;
   } | null;
 };
 
-type ChangeMoverRow = {
+export type HomeMover = {
   vault_address?: string | null;
   chain_id?: number | null;
   symbol?: string | null;
   token_symbol?: string | null;
   delta_apy?: number | null;
   realized_apy_30d?: number | null;
-  realized_apy_window?: number | null;
 };
 
 type ChangesResponse = {
   summary?: {
-    avg_delta?: number | null;
     vaults_with_change?: number | null;
-  };
-  freshness?: {
-    latest_pps_age_seconds?: number | null;
+    riser_vaults?: number | null;
+    faller_vaults?: number | null;
+    riser_tvl_usd?: number | null;
+    faller_tvl_usd?: number | null;
+    tvl_weighted_delta?: number | null;
   } | null;
-  movers?: {
-    risers?: ChangeMoverRow[];
-    fallers?: ChangeMoverRow[];
-    largest_abs_delta?: ChangeMoverRow[];
-  };
+  movers?: { risers?: HomeMover[]; fallers?: HomeMover[] } | null;
 };
 
-type StYfiHomeResponse = {
-  summary?: {
-    combined_staked?: number | null;
-  } | null;
-  current_reward_state?: {
-    styfi_current_apr?: number | null;
-  } | null;
+export type HomeAsset = {
+  token_symbol: string;
+  venues: number;
+  chains: number;
+  total_tvl_usd: number | null;
+  realized_spread_30d: number | null;
+  best_realized_apy_30d: number | null;
+  weighted_realized_apy_30d: number | null;
 };
 
-type SocialPreviewResponse = {
-  highest_est_apy_vault?: {
-    vault_address?: string | null;
-    name?: string | null;
-    symbol?: string | null;
-    chain_id?: number | null;
-    tvl_usd?: number | null;
-    est_apy?: number | null;
-  } | null;
-  highest_realized_apy_fallback_vault?: {
-    vault_address?: string | null;
-    name?: string | null;
-    symbol?: string | null;
-    chain_id?: number | null;
-    tvl_usd?: number | null;
-    realized_apy_30d?: number | null;
-  } | null;
-};
+type AssetsResponse = { rows?: HomeAsset[] };
 
 type HomeData = {
   overview: OverviewResponse | null;
   changes: ChangesResponse | null;
-  styfi: StYfiHomeResponse | null;
-  socialPreview: SocialPreviewResponse | null;
+  assets: AssetsResponse | null;
 };
 
 export async function fetchHomeData(): Promise<HomeData> {
-  const [overviewRes, changesRes, styfiRes, socialRes] = await Promise.allSettled([
+  const [overviewRes, changesRes, assetsRes] = await Promise.allSettled([
     fetch(apiUrl("/overview"), { cache: "no-store" }),
-    fetch(apiUrl("/changes", { window: "24h", universe: "core", limit: 1 }), { cache: "no-store" }),
-    fetch(apiUrl("/styfi", { days: "30", epoch_limit: "4" }), { cache: "no-store" }),
-    fetch(apiUrl("/meta/social-preview"), { cache: "no-store" }),
+    fetch(apiUrl("/changes", { window: "7d", universe: "core", limit: 3 }), { cache: "no-store" }),
+    fetch(apiUrl("/assets", {
+      universe: "core",
+      market: "all",
+      token_scope: "featured",
+      sort_by: "spread",
+      direction: "desc",
+      limit: 3,
+    }), { cache: "no-store" }),
   ]);
-
   const overview = overviewRes.status === "fulfilled" && overviewRes.value.ok
-    ? (await overviewRes.value.json()) as OverviewResponse
-    : null;
-
+    ? await overviewRes.value.json() as OverviewResponse : null;
   const changes = changesRes.status === "fulfilled" && changesRes.value.ok
-    ? (await changesRes.value.json()) as ChangesResponse
-    : null;
-
-  const styfi = styfiRes.status === "fulfilled" && styfiRes.value.ok
-    ? (await styfiRes.value.json()) as StYfiHomeResponse
-    : null;
-
-  const socialPreview = socialRes.status === "fulfilled" && socialRes.value.ok
-    ? (await socialRes.value.json()) as SocialPreviewResponse
-    : null;
-
-  return { overview, changes, styfi, socialPreview };
+    ? await changesRes.value.json() as ChangesResponse : null;
+  const assets = assetsRes.status === "fulfilled" && assetsRes.value.ok
+    ? await assetsRes.value.json() as AssetsResponse : null;
+  return { overview, changes, assets };
 }
 
 export function useHomeData() {

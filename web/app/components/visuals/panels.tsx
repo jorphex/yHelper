@@ -3,25 +3,7 @@
 import type { CSSProperties } from "react";
 import { useInViewOnce } from "./use-in-view-once";
 import { finiteValues, normalize, pickTrendStroke } from "./utils";
-import type { BarDatum, HeatCellDatum, Kpi, MeterSegmentDatum, TrendStripDatum } from "./types";
-
-function addNumericBreathingRoom(value: string): string {
-  return value.replace(/(?<=\d),(?=\d{3}\b)/g, ",\u202f");
-}
-
-export function KpiGrid({ items }: { items: Kpi[] }) {
-  return (
-    <div className="kpi-grid">
-      {items.map((item) => (
-        <article className="kpi-card" key={item.label}>
-          <p className="kpi-label">{item.label}</p>
-          <p className="kpi-value">{item.value}</p>
-          {item.hint ? <p className="kpi-hint">{item.hint}</p> : null}
-        </article>
-      ))}
-    </div>
-  );
-}
+import type { BarDatum, MeterSegmentDatum, TrendStripDatum } from "./types";
 
 export function BarList({
   title,
@@ -68,66 +50,6 @@ export function BarList({
       )}
     </section>
   );
-}
-
-export function HeatGrid({
-  title,
-  items,
-  valueFormatter,
-  legend,
-  embedded = false,
-  emptyText = "No data available.",
-}: {
-  title: string;
-  items: HeatCellDatum[];
-  valueFormatter: (value: number | null | undefined) => string;
-  legend?: string;
-  embedded?: boolean;
-  emptyText?: string;
-}) {
-  const { ref, isInView } = useInViewOnce<HTMLElement>();
-  const valid = items.filter((item) => item.value !== null && item.value !== undefined && Number.isFinite(item.value));
-  const min = valid.reduce((acc, item) => Math.min(acc, Number(item.value)), Number.POSITIVE_INFINITY);
-  const max = valid.reduce((acc, item) => Math.max(acc, Number(item.value)), Number.NEGATIVE_INFINITY);
-
-  const content = (
-    <>
-      {title ? <h3 className="panel-title">{title}</h3> : null}
-      {valid.length === 0 ? (
-        <div className="panel-empty muted">{emptyText}</div>
-      ) : (
-        <>
-          <div className="heat-grid">
-            {valid.map((item, index) => {
-              const value = Number(item.value);
-              const intensity = normalize(value, min, max);
-              return (
-                <article
-                  className={`heat-cell ${item.value ? "has-value" : ""}`}
-                  key={item.id}
-                  style={
-                    {
-                      "--heat-alpha": `${Math.pow(intensity, 0.7) * 0.35}`,
-                      "--heat-delay": `${Math.min(index, 10) * 0.012}s`,
-                    } as CSSProperties
-                  }
-                >
-                  <p className="heat-label">{item.label}</p>
-                  <p className="heat-value">{addNumericBreathingRoom(valueFormatter(item.value))}</p>
-                  {item.note ? <p className="heat-note muted">{addNumericBreathingRoom(item.note)}</p> : null}
-                </article>
-              );
-            })}
-          </div>
-          {legend ? <p className="muted viz-legend">{legend}</p> : null}
-        </>
-      )}
-    </>
-  );
-
-  if (embedded) return <div ref={ref} className={isInView ? "is-in-view" : undefined}>{content}</div>;
-
-  return <section ref={ref} className={`viz-panel ${isInView ? "is-in-view" : ""}`.trim()}>{content}</section>;
 }
 
 export function ShareMeter({
@@ -278,7 +200,7 @@ export function TrendStrips({
                 <p className="trend-strip-label">{item.label}</p>
                 <p className="trend-strip-value">
                   <span className="trend-strip-latest">{valueFormatter(latest)}</span>
-                  <span className={`trend-strip-delta ${toneClass}`.trim()}>{`Delta ${deltaFormatter(delta)}`}</span>
+                  <span className={`trend-strip-delta ${toneClass}`.trim()}>{`${item.deltaLabel ?? "Latest change"} ${deltaFormatter(delta)}`}</span>
                 </p>
               </div>
               <svg
@@ -290,6 +212,7 @@ export function TrendStrips({
                 <line x1={4} x2={width - 4} y1={zeroY} y2={zeroY} className="trend-strip-zero" />
                 <path d={path} className="trend-strip-line" pathLength={1} />
               </svg>
+              {item.startLabel || item.endLabel ? <div className="trend-strip-period muted"><span>{item.startLabel}</span><span>{item.endLabel}</span></div> : null}
               {item.note ? <p className="trend-strip-note muted">{item.note}</p> : null}
             </article>
           );

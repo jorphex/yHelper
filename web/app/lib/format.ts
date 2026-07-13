@@ -60,13 +60,11 @@ export function formatPct(value: number | null | undefined, digits = 2, isLoadin
   return `${(value * 100).toFixed(digits)}%`;
 }
 
-export function formatPctSigned(value: number | null | undefined, digits = 2): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) {
-    return "n/a";
-  }
-  const pct = value * 100;
-  const prefix = pct > 0 ? "+" : "";
-  return `${prefix}${pct.toFixed(digits)}%`;
+export function formatPercentagePoints(value: number | null | undefined, digits = 2): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
+  const points = value * 100;
+  const prefix = points > 0 ? "+" : points < 0 ? "−" : "";
+  return `${prefix}${Math.abs(points).toFixed(digits)} pp`;
 }
 
 export function deltaArrow(value: number | null | undefined): string {

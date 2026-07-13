@@ -20,12 +20,11 @@ export function TvlTreemap({
   const { ref, isInView } = useInViewOnce<HTMLElement>();
   const [hoveredSegment, setHoveredSegment] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
   const width = 820;
-  const height = 168;
   const topChains = [...chains]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
     .slice(0, 6);
-  const topCategories = [...categories]
+  const topMarkets = [...categories]
     .filter((row) => (row.tvl_usd ?? 0) > 0)
     .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
     .slice(0, 6);
@@ -35,10 +34,11 @@ export function TvlTreemap({
     .slice(0, 8);
   const groups = [
     { key: "chain", label: "Chain", color: "rgba(100, 150, 255, 0.78)", rows: topChains, text: (row: BreakdownRow) => chainLabel(row.chain_id) },
-    { key: "category", label: "Category", color: "rgba(100, 200, 180, 0.7)", rows: topCategories, text: (row: BreakdownRow) => row.category || "unknown" },
+    { key: "market", label: "Market", color: "rgba(100, 200, 180, 0.7)", rows: topMarkets, text: (row: BreakdownRow) => row.category || "unknown" },
     { key: "token", label: "Token", color: "rgba(180, 120, 220, 0.72)", rows: topTokens, text: (row: BreakdownRow) => row.token_symbol || "unknown" },
   ];
   const validGroups = groups.filter((group) => group.rows.length > 0);
+  const height = validGroups.length === 2 ? 118 : 168;
   if (validGroups.length === 0) {
     return (
       <section className="viz-panel">
@@ -133,9 +133,7 @@ export function TvlTreemap({
             document.body,
           )
         : null}
-      <p className="text-sm text-secondary section-sm">
-        Treemap lanes show top TVL contributors by chain, category, and token.
-      </p>
+      <p className="text-sm text-secondary section-sm">Bars show top TVL contributors by {validGroups.map((group) => group.label.toLowerCase()).join(", ")}.</p>
     </section>
   );
 }

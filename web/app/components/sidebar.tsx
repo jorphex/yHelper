@@ -8,7 +8,7 @@ import { apiUrl } from "../lib/api";
 const navItems = [
   { href: "/", label: "Overview" },
   { href: "/explore", label: "Explore" },
-  { href: "/harvests", label: "Harvests" },
+  { href: "/harvests", label: "Reports" },
   { href: "/structure", label: "Structure" },
   { href: "/momentum", label: "Momentum" },
   { href: "/styfi", label: "stYFI" },

@@ -16,6 +16,7 @@ export type HarvestResponse = {
     chain_label?: string | null;
     vault_address?: string | null;
     limit?: number | null;
+    meaningful_only?: boolean;
   } | null;
   trailing_24h?: {
     harvest_count?: number | null;
@@ -43,12 +44,15 @@ export type HarvestResponse = {
     chain_label?: string | null;
     block_time: string;
     tx_hash: string;
+    log_index: number;
     vault_address: string;
     vault_symbol?: string | null;
     token_symbol?: string | null;
     token_decimals?: number | null;
     vault_version?: string | null;
     strategy_address: string;
+    strategy_name?: string | null;
+    report_type?: "realized_result" | "accounting_update";
     gain?: string | null;
     loss?: string | null;
     debt_after?: string | null;
@@ -67,6 +71,7 @@ export type HarvestQuery = {
   chainId?: number | null;
   vaultAddress?: string | null;
   limit?: number;
+  meaningfulOnly?: boolean;
 };
 
 export async function fetchHarvestData(query: HarvestQuery): Promise<HarvestResponse> {
@@ -76,6 +81,7 @@ export async function fetchHarvestData(query: HarvestQuery): Promise<HarvestResp
       chain_id: query.chainId ?? undefined,
       vault_address: query.vaultAddress ?? undefined,
       limit: query.limit ?? 50,
+      meaningful_only: query.meaningfulOnly ?? false,
     }),
     { cache: "no-store" },
   );
@@ -87,7 +93,7 @@ export async function fetchHarvestData(query: HarvestQuery): Promise<HarvestResp
 
 export function useHarvestData(query: HarvestQuery) {
   return useQuery({
-    queryKey: ["harvests", query.days ?? 90, query.chainId ?? null, query.vaultAddress ?? null, query.limit ?? 50],
+    queryKey: ["harvests", query.days ?? 90, query.chainId ?? null, query.vaultAddress ?? null, query.limit ?? 50, query.meaningfulOnly ?? false],
     queryFn: () => fetchHarvestData(query),
     refetchInterval: HARVEST_REFRESH_MS,
     staleTime: 30_000,

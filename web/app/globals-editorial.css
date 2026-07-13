@@ -1434,23 +1434,3 @@ input[type="number"]::-webkit-outer-spin-button {
 .viz-panel {
   padding: var(--space-6);
 }
-
-/* --------------------------------------------------------------------------
-   29. Sankey SVG Labels
-   -------------------------------------------------------------------------- */
-.sankey-label {
-  font-size: 12px;
-  fill: var(--text-primary);
-}
-
-.sankey-value {
-  font-size: 11px;
-  fill: var(--text-secondary);
-}
-
-.sankey-axis-label {
-  font-size: 11px;
-  fill: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}

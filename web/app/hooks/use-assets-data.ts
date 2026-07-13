@@ -2,11 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
-import { UniverseKind } from "../lib/universe";
+import { MarketKind, UniverseKind } from "../lib/universe";
 
 type AssetRow = {
   token_symbol: string;
-  token_type?: "canonical" | "structured";
+  token_type?: "exact_symbol";
   venues: number;
   chains: number;
   total_tvl_usd: number | null;
@@ -84,6 +84,7 @@ type AssetVenuesResponse = {
 
 interface UseAssetsDataParams {
   universe: UniverseKind;
+  market: MarketKind;
   minTvl: number;
   minPoints: number;
   limit: number;
@@ -101,6 +102,7 @@ export async function fetchAssetsData(params: UseAssetsDataParams): Promise<Asse
     token_scope: params.tokenScope,
     sort_by: params.apiSort,
     direction: params.apiDir,
+    market: params.market,
   });
 
   const res = await fetch(apiUrl("/assets", searchParams), { cache: "no-store" });
