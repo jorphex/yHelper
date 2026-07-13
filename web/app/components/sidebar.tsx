@@ -18,13 +18,68 @@ const externalLinks = [
   { href: "https://powerglove.yearn.fi", label: "Powerglove" },
 ];
 
-type OverviewNoteResponse = {
-  summary?: string | null;
-  mentioned_vault?: {
-    symbol: string;
-    href: string;
-  } | null;
+type YieldPulse = {
+  trend: "improving" | "softening" | "steady";
+  data_state: "ready" | "limited" | "delayed";
+  latest_7d_apy: number;
+  change_7d: number;
+  directional_tvl_ratio: number | null;
+  coverage_ratio: number | null;
+  fresh_tvl_ratio: number | null;
+  freshness_window_hours: number;
+  eligible_vaults: number;
+  comparable_vaults: number;
+  latest_data_at: string | null;
 };
+
+type OverviewPulseResponse = {
+  pulse?: YieldPulse | null;
+};
+
+function formatPulsePercent(value: number): string {
+  return `${(value * 100).toFixed(2)}%`;
+}
+
+function formatPercentagePointChange(value: number): string {
+  const points = value * 100;
+  const sign = points > 0 ? "+" : points < 0 ? "−" : "";
+  return `${sign}${Math.abs(points).toFixed(2)} pp`;
+}
+
+function formatUpdatedAt(value: string | null): string | null {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  const ageHours = Math.max(0, (Date.now() - timestamp) / 3_600_000);
+  if (ageHours < 1) return "Updated less than 1h ago";
+  if (ageHours < 24) return `Updated ${Math.round(ageHours)}h ago`;
+  const ageDays = Math.max(1, Math.round(ageHours / 24));
+  return `Updated ${ageDays}d ago`;
+}
+
+function pulseHeadline(pulse: YieldPulse): string {
+  if (pulse.data_state === "limited") return "7d comparison is limited";
+  if (pulse.data_state === "delayed") return "7d yield data is delayed";
+  if (pulse.trend === "improving") return "7d realized yield improved";
+  if (pulse.trend === "softening") return "7d realized yield softened";
+  return "7d realized yield held steady";
+}
+
+function pulseBreadth(pulse: YieldPulse): string {
+  if (pulse.data_state === "limited") {
+    const coverage = pulse.coverage_ratio === null ? "An unknown share" : `${Math.round(pulse.coverage_ratio * 100)}%`;
+    return `${coverage} of core TVL has comparable windows.`;
+  }
+  if (pulse.data_state === "delayed") {
+    const fresh = pulse.fresh_tvl_ratio === null ? "An unknown share" : `${Math.round(pulse.fresh_tvl_ratio * 100)}%`;
+    return `${fresh} of comparable TVL updated within ${pulse.freshness_window_hours}h.`;
+  }
+  if (pulse.directional_tvl_ratio !== null && pulse.directional_tvl_ratio >= 0.6) {
+    const verb = pulse.trend === "improving" ? "improved" : pulse.trend === "softening" ? "softened" : "held steady";
+    return `${Math.round(pulse.directional_tvl_ratio * 100)}% of comparable TVL ${verb}.`;
+  }
+  return "Direction was mixed across comparable vaults.";
+}
 
 function ExternalLinkIcon() {
   return (
@@ -58,10 +113,10 @@ function MenuIcon({ open }: { open: boolean }) {
 export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [mentionedVault, setMentionedVault] = useState<OverviewNoteResponse["mentioned_vault"]>(null);
+  const [pulse, setPulse] = useState<YieldPulse | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const pulseUpdatedAt = pulse ? formatUpdatedAt(pulse.latest_data_at) : null;
 
   useEffect(() => {
     setIsOpen(false);
@@ -69,22 +124,21 @@ export function Sidebar() {
 
   useEffect(() => {
     let cancelled = false;
-    async function fetchOverviewNote() {
+    async function fetchOverviewPulse() {
       try {
-        const res = await fetch(apiUrl("/overview-note"), { cache: "no-store" });
+        const res = await fetch(apiUrl("/overview-pulse"), { cache: "no-store" });
         if (!res.ok) {
           return;
         }
-        const data: OverviewNoteResponse = await res.json();
+        const data: OverviewPulseResponse = await res.json();
         if (!cancelled) {
-          setSummary(data.summary || null);
-          setMentionedVault(data.mentioned_vault || null);
+          setPulse(data.pulse || null);
         }
       } catch {
         // Silently fail - box will be hidden
       }
     }
-    fetchOverviewNote();
+    fetchOverviewPulse();
     return () => { cancelled = true; };
   }, []);
 
@@ -169,29 +223,22 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {summary && (
-        <div className="sidebar-note">
-          <div className="sidebar-note-title">Summary</div>
-          <div className="sidebar-note-content">
-            {mentionedVault && summary.includes(mentionedVault.symbol) ? (
-              <>
-                {summary.slice(0, summary.indexOf(mentionedVault.symbol))}
-                <a
-                  href={mentionedVault.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="external-link text-accent"
-                >
-                  {mentionedVault.symbol}
-                  <ExternalLinkIcon />
-                </a>
-                {summary.slice(summary.indexOf(mentionedVault.symbol) + mentionedVault.symbol.length)}
-              </>
-            ) : (
-              summary
-            )}
+      {pulse && (
+        <section className="sidebar-note" aria-labelledby="yield-pulse-title">
+          <div className="sidebar-note-title" id="yield-pulse-title">Yield pulse</div>
+          <div className="sidebar-pulse-headline">{pulseHeadline(pulse)}</div>
+          <div className="sidebar-pulse-value">{formatPulsePercent(pulse.latest_7d_apy)}</div>
+          <div className="sidebar-pulse-label">TVL-weighted 7d realized APY</div>
+          <div className={`sidebar-pulse-change tone-${pulse.trend}`}>
+            {formatPercentagePointChange(pulse.change_7d)} vs preceding 7d
           </div>
-        </div>
+          <div className="sidebar-pulse-breadth">{pulseBreadth(pulse)}</div>
+          <div className="sidebar-pulse-meta">
+            {pulse.comparable_vaults}/{pulse.eligible_vaults} eligible vaults · {pulse.coverage_ratio === null ? "n/a" : `${Math.round(pulse.coverage_ratio * 100)}%`} TVL coverage
+          </div>
+          {pulseUpdatedAt ? <div className="sidebar-pulse-meta">{pulseUpdatedAt}</div> : null}
+          <Link href="/momentum" className="sidebar-pulse-link">Open Momentum</Link>
+        </section>
       )}
 
       <div className="sidebar-divider" />

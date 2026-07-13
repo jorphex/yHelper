@@ -30,6 +30,76 @@
   border-radius: 0 !important;
 }
 
+.sidebar-note-title {
+  font-size: 0.625rem !important;
+  margin-bottom: var(--space-2) !important;
+}
+
+.sidebar-pulse-headline {
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+
+.sidebar-pulse-value {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1;
+}
+
+.sidebar-pulse-label,
+.sidebar-pulse-meta {
+  color: var(--text-tertiary);
+  font-size: 0.6875rem;
+  line-height: var(--leading-normal);
+}
+
+.sidebar-pulse-label { margin-top: var(--space-1); }
+
+.sidebar-pulse-change {
+  margin-top: var(--space-2);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: var(--leading-normal);
+}
+
+.sidebar-pulse-change.tone-improving { color: var(--positive); }
+.sidebar-pulse-change.tone-softening { color: var(--negative); }
+.sidebar-pulse-change.tone-steady { color: var(--text-secondary); }
+
+.sidebar-pulse-breadth {
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: var(--leading-normal);
+}
+
+.sidebar-pulse-meta { margin-top: var(--space-2); }
+.sidebar-pulse-meta + .sidebar-pulse-meta { margin-top: var(--space-1); }
+
+.sidebar-pulse-link {
+  display: inline-block;
+  margin-top: var(--space-3);
+  color: var(--yearn-link);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sidebar-pulse-link:hover,
+.sidebar-pulse-link:focus-visible {
+  color: var(--yearn-link-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .freshness-dot { box-shadow: none !important; }
 
 /* A single cardless surface grammar. */
