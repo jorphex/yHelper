@@ -5,6 +5,10 @@ import { useInViewOnce } from "./use-in-view-once";
 import { finiteValues, normalize, pickTrendStroke } from "./utils";
 import type { BarDatum, HeatCellDatum, Kpi, MeterSegmentDatum, TrendStripDatum } from "./types";
 
+function addNumericBreathingRoom(value: string): string {
+  return value.replace(/(?<=\d),(?=\d{3}\b)/g, ",\u202f");
+}
+
 export function KpiGrid({ items }: { items: Kpi[] }) {
   return (
     <div className="kpi-grid">
@@ -109,8 +113,8 @@ export function HeatGrid({
                   }
                 >
                   <p className="heat-label">{item.label}</p>
-                  <p className="heat-value">{valueFormatter(item.value)}</p>
-                  {item.note ? <p className="heat-note muted">{item.note}</p> : null}
+                  <p className="heat-value">{addNumericBreathingRoom(valueFormatter(item.value))}</p>
+                  {item.note ? <p className="heat-note muted">{addNumericBreathingRoom(item.note)}</p> : null}
                 </article>
               );
             })}

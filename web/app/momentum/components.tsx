@@ -140,8 +140,8 @@ export function RegimeFlowSankey({
 
   const width = 720;
   const height = 268;
-  const xLeft = 112;
-  const xRight = width - 112;
+  const xLeft = 120;
+  const xRight = width - 120;
   const laneTop = 60;
   const laneBottom = height - 38;
   const laneHeight = laneBottom - laneTop;
