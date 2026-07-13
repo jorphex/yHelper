@@ -7,6 +7,8 @@ import psycopg
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
+from app.accounting_service import _protocol_context_snapshot
+
 from app.analytics_service import (
     _changes_base_cte,
     _composition_filtered_cte,
@@ -21,12 +23,13 @@ from app.common import (
     _alias_realized_apy_many,
     _alias_realized_coverage_fields,
     _apply_aliases_many,
-    _raw_hidden_sql,
     _raw_highlighted_sql,
     _raw_migration_available_sql,
     _raw_retired_sql,
     _raw_risk_level_sql,
     _raw_strategies_count_sql,
+    _market_filter_sql,
+    _market_group_sql,
     _rank_gate_filter_sql,
     _resolve_universe_gate,
     _to_float_or_none,
@@ -45,6 +48,7 @@ async def discover(
     chain_id: int | None = Query(default=None),
     category: str | None = Query(default=None),
     token_symbol: str | None = Query(default=None),
+    market: Literal["all", "stablecoins", "eth", "bitcoin", "other"] = "all",
     universe: Literal["core", "extended", "raw"] = "core",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     min_points: int | None = Query(default=None, ge=0),
@@ -81,12 +85,14 @@ async def discover(
     scope_filters = [
         _user_visible_filter_sql("d", include_retired=False),
         "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s",
+        _market_filter_sql("d"),
     ]
     params: dict[str, object] = {
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "limit": limit,
         "offset": offset,
+        "market": market,
     }
     if migration_only:
         scope_filters.append(f"{migration_sql} = TRUE")
@@ -250,6 +256,7 @@ async def discover(
                     d.name,
                     d.symbol,
                     d.category,
+                    {_market_group_sql("d")} AS market,
                     d.kind,
                     d.version,
                     d.token_symbol,
@@ -297,6 +304,7 @@ async def discover(
             "chain_id": chain_id,
             "category": category,
             "token_symbol": token_symbol,
+            "market": market,
             "min_tvl_usd": min_tvl_usd,
             "min_points": min_points,
             "max_vaults": max_vaults,
@@ -330,11 +338,11 @@ async def discover(
 @router.get("/api/composition")
 async def composition(
     universe: Literal["core", "extended", "raw"] = "core",
+    market: Literal["all", "stablecoins", "eth", "bitcoin", "other"] = "all",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     min_points: int | None = Query(default=None, ge=0),
     max_vaults: int | None = Query(default=None, ge=0),
     top_n: int = Query(default=12, ge=3, le=50),
-    crowding_limit: int = Query(default=20, ge=1, le=80),
 ) -> dict[str, object]:
     universe_gate = _resolve_universe_gate(
         universe, min_tvl_usd=min_tvl_usd, min_points=min_points, max_vaults=max_vaults
@@ -346,13 +354,13 @@ async def composition(
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "top_n": top_n,
-        "crowding_limit": crowding_limit,
         "apy_min": APY_MIN,
         "apy_max": APY_MAX,
+        "market": market,
     }
     if max_vaults is not None:
         params["max_vaults"] = max_vaults
-    filtered_cte = _composition_filtered_cte(max_vaults=max_vaults)
+    filtered_cte = _composition_filtered_cte(max_vaults=max_vaults, filter_market=True)
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
@@ -396,7 +404,7 @@ async def composition(
                 filtered_cte
                 + """
                 SELECT
-                    category,
+                    market AS category,
                     COUNT(*) AS vaults,
                     SUM(tvl_usd) AS tvl_usd,
                     CASE
@@ -406,7 +414,7 @@ async def composition(
                         ELSE NULL
                     END AS weighted_safe_apy_30d
                 FROM filtered
-                GROUP BY category
+                GROUP BY market
                 ORDER BY tvl_usd DESC
                 LIMIT %(top_n)s
                 """,
@@ -445,9 +453,9 @@ async def composition(
                     GROUP BY chain_id
                 )
                 , category_agg AS (
-                    SELECT category AS grp, SUM(tvl_usd) AS tvl
+                    SELECT market AS grp, SUM(tvl_usd) AS tvl
                     FROM filtered
-                    GROUP BY category
+                    GROUP BY market
                 )
                 , token_agg AS (
                     SELECT token_symbol AS grp, SUM(tvl_usd) AS tvl
@@ -463,43 +471,6 @@ async def composition(
             )
             concentration = cur.fetchone() or {"chain_hhi": None, "category_hhi": None, "token_hhi": None}
 
-            crowding_sql = (
-                filtered_cte
-                + """
-                , scored AS (
-                    SELECT
-                        f.*,
-                        LN(1 + f.tvl_usd) AS ln_tvl,
-                        AVG(LN(1 + f.tvl_usd)) OVER () AS mean_ln_tvl,
-                        STDDEV_SAMP(LN(1 + f.tvl_usd)) OVER () AS sd_ln_tvl,
-                        AVG(f.safe_apy_30d) OVER () AS mean_apy,
-                        STDDEV_SAMP(f.safe_apy_30d) OVER () AS sd_apy
-                    FROM filtered f
-                )
-                SELECT
-                    vault_address,
-                    chain_id,
-                    symbol,
-                    token_symbol,
-                    category,
-                    tvl_usd,
-                    safe_apy_30d,
-                    momentum_7d_30d,
-                    consistency_score,
-                    COALESCE((ln_tvl - mean_ln_tvl) / NULLIF(sd_ln_tvl, 0), 0) AS z_tvl,
-                    COALESCE((safe_apy_30d - mean_apy) / NULLIF(sd_apy, 0), 0) AS z_apy,
-                    COALESCE((ln_tvl - mean_ln_tvl) / NULLIF(sd_ln_tvl, 0), 0)
-                    - COALESCE((safe_apy_30d - mean_apy) / NULLIF(sd_apy, 0), 0) AS crowding_index
-                FROM scored
-                ORDER BY crowding_index {order_dir}, tvl_usd DESC
-                LIMIT %(crowding_limit)s
-                """
-            )
-            cur.execute(crowding_sql.format(order_dir="DESC"), params)
-            crowded = cur.fetchall()
-            cur.execute(crowding_sql.format(order_dir="ASC"), params)
-            uncrowded = cur.fetchall()
-
     def _share(rows: list[dict]) -> list[dict]:
         if total_tvl <= 0:
             return rows
@@ -511,17 +482,14 @@ async def composition(
     _apply_aliases_many(chains, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
     _apply_aliases_many(categories, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
     _apply_aliases_many(tokens, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
-    _alias_realized_apy_many(crowded)
-    _alias_realized_apy_many(uncrowded)
-
     return {
         "filters": {
             "universe": universe,
+            "market": market,
             "min_tvl_usd": min_tvl_usd,
             "min_points": min_points,
             "max_vaults": max_vaults,
             "top_n": top_n,
-            "crowding_limit": crowding_limit,
             "apy_bounds": {"min": APY_MIN, "max": APY_MAX},
         },
         "universe_gate": universe_gate,
@@ -530,7 +498,6 @@ async def composition(
         "chains": _share(chains),
         "categories": _share(categories),
         "tokens": _share(tokens),
-        "crowding": {"most_crowded": crowded, "least_crowded": uncrowded},
     }
 
 
@@ -540,6 +507,7 @@ async def changes(
     stale_threshold: Literal["auto", "24h", "7d", "30d"] = "auto",
     limit: int = Query(default=20, ge=1, le=80),
     universe: Literal["core", "extended", "raw"] = "core",
+    market: Literal["all", "stablecoins", "eth", "bitcoin", "other"] = "all",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     min_points: int | None = Query(default=None, ge=0),
     max_vaults: int | None = Query(default=None, ge=0),
@@ -564,10 +532,11 @@ async def changes(
         "apy_min": APY_MIN,
         "apy_max": APY_MAX,
         "now_epoch": int(datetime.now(UTC).timestamp()),
+        "market": market,
     }
     if max_vaults is not None:
         params["max_vaults"] = max_vaults
-    base_cte = _changes_base_cte(max_vaults=max_vaults)
+    base_cte = _changes_base_cte(max_vaults=max_vaults, filter_market=True)
     regime_sql = _regime_case_sql("n")
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
@@ -589,6 +558,37 @@ async def changes(
                     AVG(n.safe_apy_window) AS avg_safe_apy_window,
                     AVG(n.safe_apy_prev_window) AS avg_safe_apy_prev_window,
                     AVG(n.safe_apy_window - n.safe_apy_prev_window) AS avg_delta,
+                    COUNT(*) FILTER (
+                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                          AND n.safe_apy_window > n.safe_apy_prev_window
+                    ) AS riser_vaults,
+                    COUNT(*) FILTER (
+                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                          AND n.safe_apy_window < n.safe_apy_prev_window
+                    ) AS faller_vaults,
+                    COUNT(*) FILTER (
+                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                          AND n.safe_apy_window = n.safe_apy_prev_window
+                    ) AS flat_vaults,
+                    SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                          AND n.safe_apy_window > n.safe_apy_prev_window
+                    ) AS riser_tvl_usd,
+                    SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                          AND n.safe_apy_window < n.safe_apy_prev_window
+                    ) AS faller_tvl_usd,
+                    CASE
+                        WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                            WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                        ) > 0
+                        THEN SUM(COALESCE(n.tvl_usd, 0.0) * (n.safe_apy_window - n.safe_apy_prev_window)) FILTER (
+                            WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                        ) / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                            WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                        )
+                        ELSE NULL
+                    END AS tvl_weighted_delta,
                     SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                         WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
                     ) AS tracked_tvl_usd,
@@ -646,51 +646,13 @@ async def changes(
             )
             stale = cur.fetchall()
 
-            cur.execute(
-                f"""
-                SELECT
-                    COUNT(*) AS vaults,
-                    SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
-                FROM vault_dim d
-                WHERE
-                    d.active = TRUE
-                    AND COALESCE(d.chain_id, -1) NOT IN (250)
-                    AND COALESCE(d.kind, '') IN ('Multi Strategy', 'Single Strategy')
-                    AND {_raw_retired_sql('d')} = FALSE
-                    AND {_raw_hidden_sql('d')} = FALSE
-                """
-            )
-            yearn_scope = cur.fetchone() or {}
+            protocol_context = _protocol_context_snapshot(cur)
         freshness = _freshness_snapshot(
             conn,
             stale_threshold_seconds=stale_threshold_seconds,
             split_limit=8,
             min_tvl_usd=min_tvl_usd,
         )
-
-    filtered_total_tvl = float(summary.get("total_tvl_usd") or 0.0)
-    yearn_proxy_tvl = float(yearn_scope.get("tvl_usd") or 0.0)
-    reference_tvl = {
-        "yearn_aligned_proxy": {
-            "vaults": int(yearn_scope.get("vaults") or 0),
-            "tvl_usd": yearn_proxy_tvl if yearn_scope.get("tvl_usd") is not None else None,
-            "criteria": {
-                "active": True,
-                "exclude_hidden": True,
-                "exclude_retired": True,
-                "kinds": ["Multi Strategy", "Single Strategy"],
-            },
-            "comparison_to_filtered_universe": {
-                "filtered_total_tvl_usd": filtered_total_tvl if summary.get("total_tvl_usd") is not None else None,
-                "gap_usd": (filtered_total_tvl - yearn_proxy_tvl)
-                if summary.get("total_tvl_usd") is not None and yearn_scope.get("tvl_usd") is not None
-                else None,
-                "ratio": (filtered_total_tvl / yearn_proxy_tvl)
-                if summary.get("total_tvl_usd") is not None and yearn_proxy_tvl > 0
-                else None,
-            },
-        }
-    }
 
     if freshness is not None:
         tracked = int(summary.get("vaults_with_change") or 0)
@@ -707,6 +669,7 @@ async def changes(
     return {
         "filters": {
             "universe": universe,
+            "market": market,
             "window": window,
             "stale_threshold": stale_threshold,
             "limit": limit,
@@ -719,7 +682,7 @@ async def changes(
         },
         "universe_gate": universe_gate,
         "summary": summary,
-        "reference_tvl": reference_tvl,
+        "protocol_context": protocol_context,
         "freshness": freshness,
         "regime_counts": regime_counts,
         "movers": movers,

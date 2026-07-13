@@ -5,6 +5,8 @@ import psycopg
 from app.common import (
     _alias_realized_apy_fields,
     _alias_realized_apy_many,
+    _market_filter_sql,
+    _market_group_sql,
     _rank_gate_filter_sql,
     _user_visible_filter_sql,
 )
@@ -47,16 +49,18 @@ def _quality_score_sql() -> str:
     return f"({safe_apy} - 0.5 * COALESCE(m.vol_30d, 0.0))"
 
 
-def _composition_filtered_cte(*, max_vaults: int | None) -> str:
+def _composition_filtered_cte(*, max_vaults: int | None, filter_market: bool = False) -> str:
     safe_momentum_sql = _safe_momentum_sql("m")
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
+    market_clause = f"AND {_market_filter_sql('d')}" if filter_market else ""
     return f"""
     WITH filtered AS (
         SELECT
             d.vault_address,
             d.chain_id,
             COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
+            {_market_group_sql("d")} AS market,
             COALESCE(NULLIF(d.token_symbol, ''), 'unknown') AS token_symbol,
             COALESCE(NULLIF(d.symbol, ''), d.vault_address) AS symbol,
             COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
@@ -70,14 +74,16 @@ def _composition_filtered_cte(*, max_vaults: int | None) -> str:
             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             AND COALESCE(m.points_count, 0) >= %(min_points)s
             {rank_clause}
+            {market_clause}
     )
     """
 
 
-def _changes_base_cte(*, max_vaults: int | None) -> str:
+def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) -> str:
     safe_momentum_sql = _safe_momentum_sql("m")
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
+    market_clause = f"AND {_market_filter_sql('d')}" if filter_market else ""
     return f"""
     WITH eligible AS (
         SELECT
@@ -87,6 +93,7 @@ def _changes_base_cte(*, max_vaults: int | None) -> str:
             d.symbol,
             COALESCE(NULLIF(d.token_symbol, ''), 'unknown') AS token_symbol,
             COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
+            {_market_group_sql("d")} AS market,
             COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
             d.est_apy,
             {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d,
@@ -102,6 +109,7 @@ def _changes_base_cte(*, max_vaults: int | None) -> str:
             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             AND COALESCE(m.points_count, 0) >= %(min_points)s
             {rank_clause}
+            {market_clause}
     ),
     latest AS (
         SELECT p.chain_id, p.vault_address, MAX(p.ts) AS latest_ts
@@ -119,6 +127,7 @@ def _changes_base_cte(*, max_vaults: int | None) -> str:
             e.symbol,
             e.token_symbol,
             e.category,
+            e.market,
             e.tvl_usd,
             e.est_apy,
             e.safe_apy_30d,
@@ -211,6 +220,7 @@ def _fetch_change_movers(
             n.symbol,
             n.token_symbol,
             n.category,
+            n.market,
             n.tvl_usd,
             n.safe_apy_30d,
             n.points_count,
@@ -223,16 +233,36 @@ def _fetch_change_movers(
             n.vol_30d,
             n.age_seconds
         FROM normalized n
-        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+        WHERE n.apy_window_raw IS NOT NULL
+          AND n.apy_prev_window_raw IS NOT NULL
+          AND ({sign_filter})
         ORDER BY {order_expr}, n.tvl_usd DESC
         LIMIT %(limit)s
         """
     )
-    cur.execute(movers_sql.format(order_expr="delta_apy DESC"), movers_params)
+    cur.execute(
+        movers_sql.format(
+            order_expr="delta_apy DESC",
+            sign_filter="(n.safe_apy_window - n.safe_apy_prev_window) > 0",
+        ),
+        movers_params,
+    )
     risers = cur.fetchall()
-    cur.execute(movers_sql.format(order_expr="delta_apy ASC"), movers_params)
+    cur.execute(
+        movers_sql.format(
+            order_expr="delta_apy ASC",
+            sign_filter="(n.safe_apy_window - n.safe_apy_prev_window) < 0",
+        ),
+        movers_params,
+    )
     fallers = cur.fetchall()
-    cur.execute(movers_sql.format(order_expr="ABS((n.safe_apy_window - n.safe_apy_prev_window)) DESC"), movers_params)
+    cur.execute(
+        movers_sql.format(
+            order_expr="ABS((n.safe_apy_window - n.safe_apy_prev_window)) DESC",
+            sign_filter="(n.safe_apy_window - n.safe_apy_prev_window) <> 0",
+        ),
+        movers_params,
+    )
     largest = cur.fetchall()
     _alias_realized_apy_many(risers)
     _alias_realized_apy_many(fallers)

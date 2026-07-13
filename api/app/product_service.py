@@ -284,6 +284,19 @@ def _harvest_where_clause(*, chain_id: int | None, vault_address: str | None) ->
     return " AND " + " AND ".join(clauses), params
 
 
+def _harvest_meaningful_clause(meaningful_only: bool) -> str:
+    if not meaningful_only:
+        return ""
+    return """
+        AND (
+            COALESCE(h.gain, 0) <> 0
+            OR COALESCE(h.loss, 0) <> 0
+            OR COALESCE(h.fee_assets, 0) <> 0
+            OR COALESCE(h.refund_assets, 0) <> 0
+        )
+    """
+
+
 def _harvest_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
     cur.execute(
         """
@@ -311,8 +324,10 @@ def _harvest_trailing_24h(
     *,
     chain_id: int | None,
     vault_address: str | None,
+    meaningful_only: bool = False,
 ) -> dict[str, object]:
     where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
+    meaningful_sql = _harvest_meaningful_clause(meaningful_only)
     cur.execute(
         f"""
         SELECT
@@ -321,6 +336,7 @@ def _harvest_trailing_24h(
             COUNT(DISTINCT h.strategy_address) AS strategy_count
         FROM vault_harvests h
         WHERE h.block_time >= NOW() - INTERVAL '24 hours'
+        {meaningful_sql}
         {where_sql}
         """,
         params,
@@ -339,8 +355,10 @@ def _harvest_chain_rollups(
     days: int,
     chain_id: int | None,
     vault_address: str | None,
+    meaningful_only: bool = False,
 ) -> list[dict[str, object]]:
     where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
+    meaningful_sql = _harvest_meaningful_clause(meaningful_only)
     params["days"] = days
     cur.execute(
         f"""
@@ -352,6 +370,7 @@ def _harvest_chain_rollups(
             MAX(h.block_time) AS last_harvest_at
         FROM vault_harvests h
         WHERE h.block_time >= NOW() - (%(days)s * INTERVAL '1 day')
+        {meaningful_sql}
         {where_sql}
         GROUP BY h.chain_id
         ORDER BY harvest_count DESC, h.chain_id
@@ -378,9 +397,11 @@ def _harvest_daily_by_chain(
     days: int,
     chain_id: int | None,
     vault_address: str | None,
+    meaningful_only: bool = False,
 ) -> list[dict[str, object]]:
-    if vault_address:
+    if vault_address or meaningful_only:
         where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
+        meaningful_sql = _harvest_meaningful_clause(meaningful_only)
         params["days"] = days
         cur.execute(
             f"""
@@ -395,6 +416,7 @@ def _harvest_daily_by_chain(
                 SELECT DISTINCT h.chain_id
                 FROM vault_harvests h
                 WHERE TRUE
+                {meaningful_sql}
                 {where_sql}
             )
             SELECT
@@ -409,6 +431,7 @@ def _harvest_daily_by_chain(
               ON (h.block_time AT TIME ZONE 'UTC')::date = s.day_utc
              AND h.chain_id = c.chain_id
              AND h.block_time >= CURRENT_DATE - (%(days)s::int - 1)
+             {meaningful_sql}
              {where_sql}
             GROUP BY s.day_utc, c.chain_id
             ORDER BY s.day_utc, c.chain_id
@@ -471,16 +494,19 @@ def _harvest_recent(
     chain_id: int | None,
     vault_address: str | None,
     limit: int,
+    meaningful_only: bool = False,
 ) -> list[dict[str, object]]:
     where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
     params["days"] = days
     params["limit"] = limit
+    meaningful_sql = _harvest_meaningful_clause(meaningful_only)
     cur.execute(
         f"""
         SELECT
             h.chain_id,
             h.block_time,
             h.tx_hash,
+            h.log_index,
             h.vault_address,
             d.symbol AS vault_symbol,
             d.token_symbol,
@@ -509,6 +535,7 @@ def _harvest_recent(
             ) AS token_decimals,
             h.vault_version,
             h.strategy_address,
+            COALESCE(NULLIF(s.name, ''), NULLIF(s.symbol, '')) AS strategy_name,
             h.gain::text AS gain,
             h.loss::text AS loss,
             h.debt_after::text AS debt_after,
@@ -518,7 +545,11 @@ def _harvest_recent(
         LEFT JOIN vault_dim d
           ON d.chain_id = h.chain_id
          AND LOWER(d.vault_address) = LOWER(h.vault_address)
+        LEFT JOIN vault_dim s
+          ON s.chain_id = h.chain_id
+         AND LOWER(s.vault_address) = LOWER(h.strategy_address)
         WHERE h.block_time >= NOW() - (%(days)s * INTERVAL '1 day')
+          {meaningful_sql}
         {where_sql}
         ORDER BY h.block_time DESC, h.chain_id, h.log_index DESC
         LIMIT %(limit)s
@@ -532,17 +563,25 @@ def _harvest_recent(
             "chain_label": _chain_label(int(row["chain_id"])),
             "block_time": row["block_time"].isoformat() if row["block_time"] else None,
             "tx_hash": row["tx_hash"],
+            "log_index": int(row["log_index"]),
             "vault_address": row["vault_address"],
             "vault_symbol": row["vault_symbol"],
             "token_symbol": row["token_symbol"],
             "token_decimals": row["token_decimals"],
             "vault_version": row["vault_version"],
             "strategy_address": row["strategy_address"],
+            "strategy_name": row["strategy_name"],
             "gain": row["gain"],
             "loss": row["loss"],
             "debt_after": row["debt_after"],
             "fee_assets": row["fee_assets"],
             "refund_assets": row["refund_assets"],
+            "report_type": "realized_result"
+            if any(
+                row.get(field) not in (None, "0", 0)
+                for field in ("gain", "loss", "fee_assets", "refund_assets")
+            )
+            else "accounting_update",
         }
         for row in rows
     ]

@@ -18,6 +18,7 @@ from app.common import (
     _alias_realized_apy_many,
     _apply_aliases_many,
     _median,
+    _market_filter_sql,
     _rank_gate_filter_sql,
     _resolve_universe_gate,
     _to_float_or_none,
@@ -26,7 +27,6 @@ from app.common import (
 from app.config import (
     APY_MAX,
     APY_MIN,
-    ASSETS_FEATURED_MIN_CHAINS,
     ASSETS_FEATURED_MIN_TVL_USD,
     ASSETS_FEATURED_MIN_VENUES,
     DATABASE_URL,
@@ -38,6 +38,7 @@ router = APIRouter()
 @router.get("/api/assets")
 async def assets(
     universe: Literal["core", "extended", "raw"] = "core",
+    market: Literal["all", "stablecoins", "eth", "bitcoin", "other"] = "all",
     token_scope: Literal["featured", "canonical", "all"] = "featured",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     min_points: int | None = Query(default=None, ge=0),
@@ -64,17 +65,7 @@ async def assets(
     canonical_sort_by = "best_est_apy" if sort_by == "best_apy" else sort_by
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
-    token_type_sql = """
-        CASE
-            WHEN COALESCE(d.token_symbol, '') ~ '[-_/]' THEN 'structured'
-            WHEN LOWER(COALESCE(d.token_symbol, '')) LIKE '%%curve%%' THEN 'structured'
-            WHEN LOWER(COALESCE(d.token_symbol, '')) LIKE '%%pool%%' THEN 'structured'
-            WHEN LOWER(COALESCE(d.token_symbol, '')) LIKE 'lp%%' THEN 'structured'
-            WHEN LOWER(COALESCE(d.token_symbol, '')) LIKE '%%-lp%%' THEN 'structured'
-            WHEN LENGTH(COALESCE(d.token_symbol, '')) > 14 THEN 'structured'
-            ELSE 'canonical'
-        END
-    """
+    token_type_sql = "'exact_symbol'"
     tokens_cte = f"""
         WITH filtered AS (
             SELECT
@@ -92,6 +83,7 @@ async def assets(
                 AND COALESCE(d.token_symbol, '') <> ''
                 AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                 AND COALESCE(m.points_count, 0) >= %(min_points)s
+                AND {_market_filter_sql("d")}
                 {rank_clause}
         ),
         token_all AS (
@@ -105,7 +97,7 @@ async def assets(
         scoped_tokens AS (
             SELECT token_symbol_key, token_symbol, token_type
             FROM token_all
-            WHERE %(token_scope)s = 'all' OR token_type = 'canonical'
+            WHERE TRUE
         ),
         scoped AS (
             SELECT
@@ -153,15 +145,14 @@ async def assets(
             WHERE
                 %(token_scope)s <> 'featured'
                 OR (
-                    token_type = 'canonical'
-                    AND total_tvl_usd >= %(featured_min_tvl_usd)s
+                    total_tvl_usd >= %(featured_min_tvl_usd)s
                     AND venues >= %(featured_min_venues)s
-                    AND chains >= %(featured_min_chains)s
                 )
         )
     """
     sql_params = {
         "token_scope": token_scope,
+        "market": market,
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "limit": limit,
@@ -169,7 +160,6 @@ async def assets(
         "apy_max": APY_MAX,
         "featured_min_tvl_usd": ASSETS_FEATURED_MIN_TVL_USD,
         "featured_min_venues": ASSETS_FEATURED_MIN_VENUES,
-        "featured_min_chains": ASSETS_FEATURED_MIN_CHAINS,
     }
     if max_vaults is not None:
         sql_params["max_vaults"] = max_vaults
@@ -230,15 +220,12 @@ async def assets(
                         FROM final_tokens
                     ) AS top_token_tvl_share,
                     (SELECT COUNT(*) FROM token_all) AS tokens_available_all,
-                    (SELECT COUNT(*) FROM token_all WHERE token_type = 'canonical') AS tokens_available_canonical,
-                    (SELECT COUNT(*) FROM token_all WHERE token_type = 'structured') AS tokens_available_structured,
+                    (SELECT COUNT(*) FROM token_all) AS tokens_available_exact_symbol,
                     (
                         SELECT COUNT(*)
                         FROM token_agg
-                        WHERE token_type = 'canonical'
-                          AND total_tvl_usd >= %(featured_min_tvl_usd)s
+                        WHERE total_tvl_usd >= %(featured_min_tvl_usd)s
                           AND venues >= %(featured_min_venues)s
-                          AND chains >= %(featured_min_chains)s
                     ) AS tokens_available_featured
                 FROM final_tokens
                 """,
@@ -262,8 +249,10 @@ async def assets(
     _alias_realized_apy_fields(summary)
 
     return {
+        "identity": "exact_token_symbol",
         "filters": {
             "universe": universe,
+            "market": market,
             "token_scope": token_scope,
             "min_tvl_usd": min_tvl_usd,
             "min_points": min_points,
@@ -273,7 +262,6 @@ async def assets(
             "direction": direction,
             "featured_min_tvl_usd": ASSETS_FEATURED_MIN_TVL_USD,
             "featured_min_venues": ASSETS_FEATURED_MIN_VENUES,
-            "featured_min_chains": ASSETS_FEATURED_MIN_CHAINS,
             "apy_bounds": {"min": APY_MIN, "max": APY_MAX},
         },
         "universe_gate": universe_gate,
@@ -419,6 +407,7 @@ async def asset_venues(
 
     return {
         "token_symbol": token_symbol.upper(),
+        "identity": "exact_token_symbol",
         "filters": {
             "universe": universe,
             "min_tvl_usd": min_tvl_usd,

@@ -76,19 +76,27 @@ async def harvests(
     chain_id: int | None = Query(default=None, ge=1),
     vault_address: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
+    meaningful_only: bool = Query(default=False),
 ) -> dict[str, object]:
     normalized_vault = vault_address.lower() if vault_address else None
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
-            trailing_24h = _harvest_trailing_24h(cur, chain_id=chain_id, vault_address=normalized_vault)
-            chain_rollups = _harvest_chain_rollups(cur, days=days, chain_id=chain_id, vault_address=normalized_vault)
-            daily_by_chain = _harvest_daily_by_chain(cur, days=days, chain_id=chain_id, vault_address=normalized_vault)
+            trailing_24h = _harvest_trailing_24h(
+                cur, chain_id=chain_id, vault_address=normalized_vault, meaningful_only=meaningful_only
+            )
+            chain_rollups = _harvest_chain_rollups(
+                cur, days=days, chain_id=chain_id, vault_address=normalized_vault, meaningful_only=meaningful_only
+            )
+            daily_by_chain = _harvest_daily_by_chain(
+                cur, days=days, chain_id=chain_id, vault_address=normalized_vault, meaningful_only=meaningful_only
+            )
             recent = _harvest_recent(
                 cur,
                 days=days,
                 chain_id=chain_id,
                 vault_address=normalized_vault,
                 limit=limit,
+                meaningful_only=meaningful_only,
             )
             last_run = _harvest_last_run(cur)
     return {
@@ -115,6 +123,7 @@ async def harvests(
             "chain_label": _chain_label(chain_id),
             "vault_address": normalized_vault,
             "limit": limit,
+            "meaningful_only": meaningful_only,
         },
         "trailing_24h": trailing_24h,
         "chain_rollups": chain_rollups,

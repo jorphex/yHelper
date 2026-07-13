@@ -12,6 +12,8 @@ from app.common import (
     _apply_aliases_many,
     _delta_or_none,
     _median,
+    _market_filter_sql,
+    _market_group_sql,
     _rank_gate_filter_sql,
     _resolve_universe_gate,
     _user_visible_filter_sql,
@@ -148,6 +150,7 @@ async def chains_rollups(
 @router.get("/api/trends/daily")
 async def daily_trends(
     universe: Literal["core", "extended", "raw"] = "core",
+    market: Literal["all", "stablecoins", "eth", "bitcoin", "other"] = "all",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     min_points: int | None = Query(default=None, ge=0),
     max_vaults: int | None = Query(default=None, ge=0),
@@ -174,6 +177,7 @@ async def daily_trends(
         "apy_min": APY_MIN,
         "apy_max": APY_MAX,
         "group_limit": group_limit,
+        "market": market,
     }
     if chain_id is not None:
         params["chain_id"] = chain_id
@@ -186,6 +190,7 @@ async def daily_trends(
                 d.vault_address,
                 d.chain_id,
                 COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
+                {_market_group_sql("d")} AS market,
                 COALESCE(d.tvl_usd, 0.0) AS tvl_usd
             FROM vault_dim d
             JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
@@ -193,6 +198,7 @@ async def daily_trends(
                 {_user_visible_filter_sql("d", include_retired=False)}
                 AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
                 AND COALESCE(m.points_count, 0) >= %(min_points)s
+                AND {_market_filter_sql("d")}
                 {chain_clause}
                 {rank_clause}
         ),
@@ -449,6 +455,7 @@ async def daily_trends(
     return {
         "filters": {
             "universe": universe,
+            "market": market,
             "min_tvl_usd": min_tvl_usd,
             "min_points": min_points,
             "max_vaults": max_vaults,

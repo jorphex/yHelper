@@ -20,6 +20,92 @@ from app.config import (
 )
 
 
+MARKET_VALUES = ("all", "stablecoins", "eth", "bitcoin", "other")
+STABLE_MARKET_SYMBOLS = (
+    "usdc",
+    "vbusdc",
+    "usdt",
+    "vbusdt",
+    "dai",
+    "yvajnadai",
+    "sdai",
+    "usds",
+    "bold",
+    "crvusd",
+    "ausd",
+    "usde",
+    "susde",
+    "mkusd",
+    "usdaf",
+    "usnd",
+    "gho",
+    "lusd",
+    "dola",
+    "frxusd",
+)
+ETH_MARKET_SYMBOLS = (
+    "eth",
+    "weth",
+    "vbeth",
+    "steth",
+    "wsteth",
+    "reth",
+    "cbeth",
+    "frxeth",
+    "sfrxeth",
+    "ezeth",
+    "rseth",
+    "weeth",
+    "weeths",
+    "rsweth",
+    "pufeth",
+    "unieth",
+    "sweth",
+    "ageth",
+    "yvajnaweth",
+)
+BTC_MARKET_SYMBOLS = (
+    "btc",
+    "wbtc",
+    "vbbtc",
+    "tbtc",
+    "cbbtc",
+    "lbtc",
+    "ebtc",
+    "vbwbtc",
+)
+
+
+def _sql_text_list(values: tuple[str, ...]) -> str:
+    return ", ".join("'" + value.replace("'", "''") + "'" for value in values)
+
+
+def _market_group_sql(alias: str) -> str:
+    """Return the explicit user-facing asset cohort for a Kong vault row.
+
+    Kong's Stablecoin category is authoritative for stable assets. ETH and BTC
+    cohorts are intentionally small, reviewed symbol registries; everything
+    else remains Other rather than being guessed from substrings.
+    """
+    stable_symbols = _sql_text_list(STABLE_MARKET_SYMBOLS)
+    eth_symbols = _sql_text_list(ETH_MARKET_SYMBOLS)
+    btc_symbols = _sql_text_list(BTC_MARKET_SYMBOLS)
+    return f"""
+    CASE
+        WHEN LOWER(COALESCE({alias}.category, '')) = 'stablecoin'
+          OR LOWER(COALESCE({alias}.token_symbol, '')) IN ({stable_symbols}) THEN 'stablecoins'
+        WHEN LOWER(COALESCE({alias}.token_symbol, '')) IN ({eth_symbols}) THEN 'eth'
+        WHEN LOWER(COALESCE({alias}.token_symbol, '')) IN ({btc_symbols}) THEN 'bitcoin'
+        ELSE 'other'
+    END
+    """
+
+
+def _market_filter_sql(alias: str) -> str:
+    market_sql = _market_group_sql(alias)
+    return f"(%(market)s = 'all' OR ({market_sql}) = %(market)s)"
+
+
 def _seconds_since(ts: datetime | None, now: datetime) -> int | None:
     if ts is None:
         return None
