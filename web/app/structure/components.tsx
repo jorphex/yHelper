@@ -1,6 +1,7 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { useInViewOnce } from "../components/visuals";
 import type { BreakdownRow } from "./types";
@@ -17,6 +18,7 @@ export function TvlTreemap({
   tokens: BreakdownRow[];
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
+  const [hoveredSegment, setHoveredSegment] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
   const width = 820;
   const height = 168;
   const topChains = [...chains]
@@ -49,10 +51,16 @@ export function TvlTreemap({
   const laneHeight = (height - 12 - (validGroups.length - 1) * laneGap) / validGroups.length;
 
   return (
-    <section ref={ref} style={{ padding: "24px", opacity: isInView ? 1 : 0.9, transition: "opacity 0.3s" }}>
+    <section ref={ref} className="treemap-panel" style={{ opacity: isInView ? 1 : 0.9, transition: "opacity 0.3s" }}>
       <h3 className="card-title">{title}</h3>
-      <div style={{ overflowX: "auto" }}>
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title} style={{ width: "100%", minWidth: "600px", height: "auto" }}>
+      <div className="treemap-wrap viz-interactive-wrap" style={{ overflowX: "auto" }}>
+        <svg
+          className={hoveredSegment ? "has-active-segment" : undefined}
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={title}
+          style={{ width: "100%", minWidth: "600px", height: "auto" }}
+        >
           {validGroups.map((group, groupIndex) => {
             const y = 5 + groupIndex * (laneHeight + laneGap);
             const total = group.rows.reduce((acc, row) => acc + Number(row.tvl_usd ?? 0), 0);
@@ -76,8 +84,24 @@ export function TvlTreemap({
                   const name = group.text(row);
                   const maxChars = Math.max(0, Math.floor((widthPx - 10) / 5.8));
                   const compactName = maxChars > 0 ? (name.length > maxChars ? `${name.slice(0, Math.max(2, maxChars - 1))}…` : name) : "";
+                  const segmentId = `${group.key}-${name}`;
+                  const tooltip = `${group.label}: ${name}\nTVL: ${formatUsd(row.tvl_usd)}\nShare: ${formatPct(row.share_tvl, 1)}`;
                   return (
-                    <g key={`${group.key}-${name}`}>
+                    <g
+                      key={segmentId}
+                      className={`treemap-segment ${hoveredSegment?.id === segmentId ? "is-active" : ""}`.trim()}
+                      tabIndex={0}
+                      role="img"
+                      aria-label={tooltip.replaceAll("\n", ", ")}
+                      onPointerEnter={(event) => setHoveredSegment({ id: segmentId, text: tooltip, x: event.clientX, y: event.clientY })}
+                      onPointerMove={(event) => setHoveredSegment({ id: segmentId, text: tooltip, x: event.clientX, y: event.clientY })}
+                      onPointerLeave={() => setHoveredSegment(null)}
+                      onFocus={(event) => {
+                        const bounds = event.currentTarget.getBoundingClientRect();
+                        setHoveredSegment({ id: segmentId, text: tooltip, x: bounds.left + bounds.width / 2, y: bounds.top });
+                      }}
+                      onBlur={() => setHoveredSegment(null)}
+                    >
                       <rect
                         x={rectX}
                         y={y}
@@ -93,7 +117,6 @@ export function TvlTreemap({
                           {compactName}
                         </text>
                       ) : null}
-                      <title>{`${group.label}: ${name}\nTVL: ${formatUsd(row.tvl_usd)}\nShare: ${formatPct(row.share_tvl, 1)}`}</title>
                     </g>
                   );
                 })}
@@ -102,6 +125,14 @@ export function TvlTreemap({
           })}
         </svg>
       </div>
+      {hoveredSegment && typeof document !== "undefined"
+        ? createPortal(
+            <div className="viz-hover-tooltip" style={{ left: hoveredSegment.x, top: hoveredSegment.y }} role="status">
+              {hoveredSegment.text}
+            </div>,
+            document.body,
+          )
+        : null}
       <p className="text-sm text-secondary section-sm">
         Treemap lanes show top TVL contributors by chain, category, and token.
       </p>

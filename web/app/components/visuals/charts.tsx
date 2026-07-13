@@ -1,6 +1,7 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { formatPct, formatUsd, formatUsdCompact } from "../../lib/format";
 import { useInViewOnce } from "./use-in-view-once";
 import { finiteValues, normalize } from "./utils";
@@ -28,6 +29,10 @@ export function ScatterPlot({
   densityBackdrop?: boolean;
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
+  const [hoveredPoint, setHoveredPoint] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
+  const showPoint = (id: string, text: string, x: number, y: number) => {
+    setHoveredPoint({ id, text, x, y });
+  };
   const valid = points.filter((point) => {
     const x = point.x;
     const y = point.y;
@@ -81,7 +86,7 @@ export function ScatterPlot({
   return (
     <section ref={ref} className={`viz-panel ${className ?? ""} ${isInView ? "is-in-view" : ""}`.trim()}>
       <h3>{title}</h3>
-      <div className="scatter-wrap">
+      <div className="scatter-wrap viz-interactive-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
           <rect x={paddingLeft} y={paddingTop} width={innerWidth} height={innerHeight} className="viz-plot-bg" rx="6" ry="6" />
           {densityBackdrop && maxDensity > 0
@@ -152,26 +157,53 @@ export function ScatterPlot({
             const pointTitle = point.tooltip ?? `${xLabel}: ${xFormatter(x)}\n${yLabel}: ${yFormatter(y)}`;
             if (point.href) {
               return (
-                <a key={point.id} href={point.href} target="_blank">
-                  <title>{pointTitle}</title>
+                <a
+                  key={point.id}
+                  href={point.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={pointTitle.replaceAll("\n", ", ")}
+                  onPointerEnter={(event) => showPoint(point.id, pointTitle, event.clientX, event.clientY)}
+                  onPointerMove={(event) => showPoint(point.id, pointTitle, event.clientX, event.clientY)}
+                  onPointerLeave={() => setHoveredPoint(null)}
+                  onFocus={(event) => {
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    showPoint(point.id, pointTitle, bounds.left + bounds.width / 2, bounds.top);
+                  }}
+                  onBlur={() => setHoveredPoint(null)}
+                >
+                  <circle cx={cx} cy={cy} r={Math.max(12, radius + 6)} className="viz-point-hit" />
                   <circle
                     cx={cx}
                     cy={cy}
                     r={radius}
-                    className={`viz-point ${toneClass}`}
+                    className={`viz-point ${toneClass} ${hoveredPoint?.id === point.id ? "is-active" : ""}`.trim()}
                     style={{ "--point-delay": `${Math.min(index, 12) * 0.01}s` } as CSSProperties}
                   />
                 </a>
               );
             }
             return (
-              <g key={point.id}>
-                <title>{pointTitle}</title>
+              <g
+                key={point.id}
+                tabIndex={0}
+                role="img"
+                aria-label={pointTitle.replaceAll("\n", ", ")}
+                onPointerEnter={(event) => showPoint(point.id, pointTitle, event.clientX, event.clientY)}
+                onPointerMove={(event) => showPoint(point.id, pointTitle, event.clientX, event.clientY)}
+                onPointerLeave={() => setHoveredPoint(null)}
+                onFocus={(event) => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  showPoint(point.id, pointTitle, bounds.left + bounds.width / 2, bounds.top);
+                }}
+                onBlur={() => setHoveredPoint(null)}
+              >
+                <circle cx={cx} cy={cy} r={Math.max(12, radius + 6)} className="viz-point-hit" />
                 <circle
                   cx={cx}
                   cy={cy}
                   r={radius}
-                  className={`viz-point ${toneClass}`}
+                  className={`viz-point ${toneClass} ${hoveredPoint?.id === point.id ? "is-active" : ""}`.trim()}
                   style={{ "--point-delay": `${Math.min(index, 12) * 0.01}s` } as CSSProperties}
                 />
               </g>
@@ -203,6 +235,18 @@ export function ScatterPlot({
           </text>
         </svg>
       </div>
+      {hoveredPoint && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="viz-hover-tooltip"
+              style={{ left: hoveredPoint.x, top: hoveredPoint.y }}
+              role="status"
+            >
+              {hoveredPoint.text}
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   );
 }
