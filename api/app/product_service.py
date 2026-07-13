@@ -7,31 +7,36 @@ from fastapi.responses import JSONResponse
 from psycopg.rows import dict_row
 
 from app.analytics_service import _changes_base_cte
-from app.common import (
-    _alias_realized_apy_fields,
-    _chain_label,
-    _format_compact_usd,
-    _safe_int,
-    _to_float_or_none,
-    _user_visible_filter_sql,
-    _yearn_vault_url,
+from app.common import _chain_label, _to_float_or_none
+from app.config import (
+    APY_MAX,
+    APY_MIN,
+    DATABASE_URL,
+    UNIVERSE_CORE_MAX_VAULTS,
+    UNIVERSE_CORE_MIN_POINTS,
+    UNIVERSE_CORE_MIN_TVL_USD,
 )
-from app.config import APY_MAX, APY_MIN, DATABASE_URL
 
 
-def _overview_note_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
-    standout_min_tvl_usd = 100_000.0
+PULSE_DELTA_THRESHOLD = 0.0015
+PULSE_FRESHNESS_SECONDS = 48 * 3600
+PULSE_MIN_COVERAGE_RATIO = 0.5
+PULSE_MIN_FRESH_TVL_RATIO = 0.75
+
+
+def _overview_pulse_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     params: dict[str, object] = {
         "window_sec": 7 * 86400,
-        "min_tvl_usd": 1_000_000.0,
-        "min_points": 45,
+        "min_tvl_usd": UNIVERSE_CORE_MIN_TVL_USD,
+        "min_points": UNIVERSE_CORE_MIN_POINTS,
         "apy_min": APY_MIN,
         "apy_max": APY_MAX,
         "now_epoch": int(datetime.now(UTC).timestamp()),
-        "standout_min_tvl_usd": standout_min_tvl_usd,
-        "max_vaults": 250,
+        "delta_threshold": PULSE_DELTA_THRESHOLD,
+        "freshness_sec": PULSE_FRESHNESS_SECONDS,
+        "max_vaults": UNIVERSE_CORE_MAX_VAULTS,
     }
-    base_cte = _changes_base_cte(max_vaults=250)
+    base_cte = _changes_base_cte(max_vaults=UNIVERSE_CORE_MAX_VAULTS)
     cur.execute(
         base_cte
         + """
@@ -43,202 +48,146 @@ def _overview_note_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
             SUM(COALESCE(n.tvl_usd, 0.0)) AS total_tvl_usd,
             SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                 WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-            ) AS changed_tvl_usd,
-            AVG(n.safe_apy_window) AS avg_safe_apy_window,
-            AVG(n.safe_apy_prev_window) AS avg_safe_apy_prev_window,
-            AVG(n.safe_apy_window - n.safe_apy_prev_window) AS avg_delta,
-            AVG(n.safe_apy_30d) AS avg_safe_apy_30d,
-            AVG(n.est_apy) AS avg_est_apy,
+            ) AS comparable_tvl_usd,
+            SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                WHERE n.apy_window_raw IS NOT NULL
+                  AND n.apy_prev_window_raw IS NOT NULL
+                  AND (n.safe_apy_window - n.safe_apy_prev_window) >= %(delta_threshold)s
+            ) AS improving_tvl_usd,
+            SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                WHERE n.apy_window_raw IS NOT NULL
+                  AND n.apy_prev_window_raw IS NOT NULL
+                  AND (n.safe_apy_window - n.safe_apy_prev_window) <= -%(delta_threshold)s
+            ) AS softening_tvl_usd,
+            SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                WHERE n.apy_window_raw IS NOT NULL
+                  AND n.apy_prev_window_raw IS NOT NULL
+                  AND ABS(n.safe_apy_window - n.safe_apy_prev_window) < %(delta_threshold)s
+            ) AS steady_tvl_usd,
+            SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                WHERE n.apy_window_raw IS NOT NULL
+                  AND n.apy_prev_window_raw IS NOT NULL
+                  AND n.age_seconds <= %(freshness_sec)s
+            ) AS fresh_comparable_tvl_usd,
+            MAX(n.latest_ts) FILTER (
+                WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+            ) AS latest_data_epoch,
+            MIN(n.latest_ts) FILTER (
+                WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+            ) AS oldest_data_epoch,
             CASE
-                WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (WHERE n.safe_apy_window IS NOT NULL) > 0
-                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.safe_apy_window) FILTER (WHERE n.safe_apy_window IS NOT NULL)
-                     / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (WHERE n.safe_apy_window IS NOT NULL)
+                WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                    WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                ) > 0
+                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.safe_apy_window) FILTER (
+                    WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                ) / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                    WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                )
                 ELSE NULL
             END AS tvl_weighted_safe_apy_window,
             CASE
-                WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (WHERE n.safe_apy_prev_window IS NOT NULL) > 0
-                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.safe_apy_prev_window) FILTER (WHERE n.safe_apy_prev_window IS NOT NULL)
-                     / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (WHERE n.safe_apy_prev_window IS NOT NULL)
+                WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                    WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                ) > 0
+                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.safe_apy_prev_window) FILTER (
+                    WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                ) / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
+                    WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
+                )
                 ELSE NULL
             END AS tvl_weighted_safe_apy_prev_window,
-            CASE
-                WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (WHERE n.safe_apy_30d IS NOT NULL) > 0
-                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.safe_apy_30d) FILTER (WHERE n.safe_apy_30d IS NOT NULL)
-                     / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (WHERE n.safe_apy_30d IS NOT NULL)
-                ELSE NULL
-            END AS tvl_weighted_safe_apy_30d,
-            CASE
-                WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (WHERE n.est_apy IS NOT NULL) > 0
-                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.est_apy) FILTER (WHERE n.est_apy IS NOT NULL)
-                     / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (WHERE n.est_apy IS NOT NULL)
-                ELSE NULL
-            END AS tvl_weighted_est_apy
+            COUNT(*) FILTER (
+                WHERE n.apy_window_raw IS NOT NULL
+                  AND n.apy_prev_window_raw IS NOT NULL
+                  AND n.age_seconds <= %(freshness_sec)s
+            ) AS fresh_comparable_vaults
         FROM normalized n
         """,
         params,
     )
-    snapshot = cur.fetchone() or {}
-    cur.execute(
-        f"""
-        SELECT
-            d.symbol AS standout_est_symbol,
-            d.chain_id AS standout_est_chain_id,
-            d.vault_address AS standout_est_vault_address,
-            d.est_apy AS standout_est_apy,
-            COALESCE(d.tvl_usd, 0.0) AS standout_est_tvl_usd
-        FROM vault_dim d
-        WHERE
-            {_user_visible_filter_sql("d", include_retired=False)}
-            AND COALESCE(d.tvl_usd, 0.0) >= %(standout_min_tvl_usd)s
-            AND d.est_apy IS NOT NULL
-        ORDER BY d.est_apy DESC, COALESCE(d.tvl_usd, 0.0) DESC, d.vault_address
-        LIMIT 1
-        """,
-        params,
-    )
-    snapshot.update(cur.fetchone() or {})
-    _alias_realized_apy_fields(snapshot)
-    return snapshot
+    return cur.fetchone() or {}
 
 
-def _build_overview_note_summary(snapshot: dict[str, object]) -> dict[str, object]:
+def _ratio(numerator: float | None, denominator: float | None) -> float | None:
+    if numerator is None or denominator is None or denominator <= 0:
+        return None
+    return max(0.0, min(1.0, numerator / denominator))
+
+
+def _epoch_iso(value: object) -> str | None:
+    epoch = _to_float_or_none(value)
+    if epoch is None:
+        return None
+    return datetime.fromtimestamp(epoch, tz=UTC).isoformat()
+
+
+def _build_overview_pulse(snapshot: dict[str, object]) -> dict[str, object]:
     eligible = int(snapshot.get("vaults_eligible") or 0)
-    with_change = int(snapshot.get("vaults_with_change") or 0)
-    if eligible <= 0 or with_change <= 0:
-        return {"summary": None, "mentioned_vault": None}
-
-    weighted_realized_window = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_window"))
-    weighted_realized_prev = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_prev_window"))
-    weighted_realized_baseline = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_30d"))
-    avg_delta = _to_float_or_none(snapshot.get("avg_delta"))
-    realized_window = weighted_realized_window if weighted_realized_window is not None else _to_float_or_none(snapshot.get("avg_safe_apy_window"))
-    realized_prev = weighted_realized_prev if weighted_realized_prev is not None else _to_float_or_none(snapshot.get("avg_safe_apy_prev_window"))
-    realized_baseline = (
-        weighted_realized_baseline
-        if weighted_realized_baseline is not None
-        else _to_float_or_none(snapshot.get("avg_safe_apy_30d"))
-    )
-    weighted_est = _to_float_or_none(snapshot.get("tvl_weighted_est_apy"))
-    avg_est = _to_float_or_none(snapshot.get("avg_est_apy"))
+    comparable = int(snapshot.get("vaults_with_change") or 0)
     total_tvl = _to_float_or_none(snapshot.get("total_tvl_usd"))
-    changed_tvl = _to_float_or_none(snapshot.get("changed_tvl_usd"))
-    standout_est_symbol = (
-        snapshot.get("standout_est_symbol") if isinstance(snapshot.get("standout_est_symbol"), str) else None
-    )
-    standout_est_chain_id = _safe_int(snapshot.get("standout_est_chain_id"))
-    standout_est_vault_address = (
-        snapshot.get("standout_est_vault_address")
-        if isinstance(snapshot.get("standout_est_vault_address"), str)
-        else None
-    )
-    standout_est_apy = _to_float_or_none(snapshot.get("standout_est_apy"))
-    standout_est_tvl = _to_float_or_none(snapshot.get("standout_est_tvl_usd"))
-    est_reference = weighted_est if weighted_est is not None else avg_est
-    realized_delta = (realized_window - realized_prev) if realized_window is not None and realized_prev is not None else avg_delta
-    baseline_gap = (
-        realized_window - realized_baseline
-        if realized_window is not None and realized_baseline is not None
-        else None
-    )
-    est_gap = (est_reference - realized_window) if est_reference is not None and realized_window is not None else None
-    row_breadth_ratio = with_change / eligible
-    tvl_breadth_ratio = (changed_tvl / total_tvl) if total_tvl and total_tvl > 0 and changed_tvl is not None else None
-    delta_threshold = 0.0015
-    baseline_gap_threshold = 0.003
-    est_gap_threshold = 0.003
-    low_signal_delta_threshold = 0.001
-    low_signal_gap_threshold = 0.002
+    comparable_tvl = _to_float_or_none(snapshot.get("comparable_tvl_usd"))
+    fresh_tvl = _to_float_or_none(snapshot.get("fresh_comparable_tvl_usd"))
+    latest_apy = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_window"))
+    previous_apy = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_prev_window"))
+    if eligible <= 0 or comparable <= 0 or latest_apy is None or previous_apy is None:
+        return {"pulse": None}
 
-    if (
-        realized_delta is not None
-        and abs(realized_delta) < low_signal_delta_threshold
-        and (baseline_gap is None or abs(baseline_gap) < low_signal_gap_threshold)
-        and (est_gap is None or abs(est_gap) < low_signal_gap_threshold)
-    ):
-        return {"summary": None, "mentioned_vault": None}
-
-    breadth_ratio = tvl_breadth_ratio if tvl_breadth_ratio is not None else row_breadth_ratio
-    broad_move = breadth_ratio >= 0.75
-    if breadth_ratio >= 0.95:
-        breadth_label = "Nearly all tracked vault TVL"
-    elif breadth_ratio >= 0.75:
-        breadth_label = "Most tracked vault TVL"
-    elif breadth_ratio >= 0.4:
-        breadth_label = "A meaningful share of tracked vault TVL"
+    coverage_ratio = _ratio(comparable_tvl, total_tvl)
+    fresh_tvl_ratio = _ratio(fresh_tvl, comparable_tvl)
+    change = latest_apy - previous_apy
+    if change <= -PULSE_DELTA_THRESHOLD:
+        trend = "softening"
+        directional_tvl = _to_float_or_none(snapshot.get("softening_tvl_usd"))
+    elif change >= PULSE_DELTA_THRESHOLD:
+        trend = "improving"
+        directional_tvl = _to_float_or_none(snapshot.get("improving_tvl_usd"))
     else:
-        breadth_label = "A narrow slice of tracked vault TVL"
+        trend = "steady"
+        directional_tvl = _to_float_or_none(snapshot.get("steady_tvl_usd"))
 
-    standout_tvl_share = (
-        standout_est_tvl / total_tvl
-        if standout_est_tvl is not None and total_tvl and total_tvl > 0
-        else None
-    )
-    standout_not_representative = (
-        standout_est_apy is not None
-        and est_reference is not None
-        and standout_tvl_share is not None
-        and standout_tvl_share < 0.05
-        and (standout_est_apy - est_reference) >= 0.03
-    )
-    named_standout = None
-    if standout_est_symbol and not standout_est_symbol.startswith("0x"):
-        named_standout = standout_est_symbol.strip()
-    standout_tvl_text = _format_compact_usd(standout_est_tvl)
-    mention_named_vault = bool(standout_not_representative and named_standout and standout_tvl_text)
-    mentioned_vault: dict[str, str] | None = None
-
-    if baseline_gap is None or abs(baseline_gap) < baseline_gap_threshold:
-        if realized_delta is not None and realized_delta <= -delta_threshold:
-            first_sentence = f"{breadth_label} is still earning about what it was a month ago, but the last week softened."
-        elif realized_delta is not None and realized_delta >= delta_threshold:
-            first_sentence = f"{breadth_label} is still earning about what it was a month ago, but the last week improved."
-        else:
-            first_sentence = f"{breadth_label} is earning about what it was a month ago."
-    elif baseline_gap < 0:
-        first_sentence = f"{breadth_label} is earning less than it was a month ago."
+    if coverage_ratio is None or coverage_ratio < PULSE_MIN_COVERAGE_RATIO:
+        data_state = "limited"
+    elif fresh_tvl_ratio is None or fresh_tvl_ratio < PULSE_MIN_FRESH_TVL_RATIO:
+        data_state = "delayed"
     else:
-        first_sentence = f"{breadth_label} is earning more than it was a month ago."
+        data_state = "ready"
 
-    if standout_not_representative and mention_named_vault and named_standout and standout_tvl_text:
-        second_sentence = (
-            f"{named_standout} still shows the highest estimated APY, but its {standout_tvl_text} pool is too small to change the broader picture."
-        )
-        mentioned_vault_href = _yearn_vault_url(standout_est_chain_id, standout_est_vault_address)
-        if mentioned_vault_href:
-            mentioned_vault = {"symbol": named_standout, "href": mentioned_vault_href}
-    elif standout_not_representative:
-        second_sentence = "A few standout estimated APYs remain too isolated to represent where most TVL is earning."
-    elif realized_delta is None:
-        second_sentence = "The current mix is too patchy to say much more than that."
-    elif realized_delta <= -delta_threshold and broad_move:
-        if est_gap is not None and est_gap > est_gap_threshold:
-            second_sentence = "A few names still show stronger estimated APY, but not enough of the set is moving with them."
-        else:
-            second_sentence = "Estimated APY is softening with the set rather than offsetting it."
-    elif realized_delta <= -delta_threshold:
-        second_sentence = "The weaker yields are still concentrated rather than broad across the set."
-    elif realized_delta >= delta_threshold and broad_move:
-        if est_gap is not None and est_gap < -est_gap_threshold:
-            second_sentence = "Realized yields have improved across the set, even if estimated APY has not fully caught up yet."
-        else:
-            second_sentence = "Estimated APY is improving with the set rather than in just a few names."
-    elif realized_delta >= delta_threshold:
-        second_sentence = "The stronger yields are still concentrated rather than broad across the set."
-    elif broad_move:
-        second_sentence = "High estimated APYs are still concentrated rather than broadening the set."
-    else:
-        second_sentence = "The broader picture is steady, even if a few names still stand out."
-
-    return {"summary": f"{first_sentence} {second_sentence}", "mentioned_vault": mentioned_vault}
+    pulse = {
+        "trend": trend,
+        "data_state": data_state,
+        "latest_7d_apy": latest_apy,
+        "previous_7d_apy": previous_apy,
+        "change_7d": change,
+        "directional_tvl_ratio": _ratio(directional_tvl, comparable_tvl),
+        "coverage_ratio": coverage_ratio,
+        "fresh_tvl_ratio": fresh_tvl_ratio,
+        "eligible_vaults": eligible,
+        "comparable_vaults": comparable,
+        "fresh_comparable_vaults": int(snapshot.get("fresh_comparable_vaults") or 0),
+        "eligible_tvl_usd": total_tvl,
+        "comparable_tvl_usd": comparable_tvl,
+        "latest_data_at": _epoch_iso(snapshot.get("latest_data_epoch")),
+        "oldest_data_at": _epoch_iso(snapshot.get("oldest_data_epoch")),
+        "window_days": 7,
+        "freshness_window_hours": PULSE_FRESHNESS_SECONDS // 3600,
+        "scope": {
+            "name": "Core vault universe",
+            "min_tvl_usd": UNIVERSE_CORE_MIN_TVL_USD,
+            "min_points": UNIVERSE_CORE_MIN_POINTS,
+            "max_vaults": UNIVERSE_CORE_MAX_VAULTS,
+        },
+    }
+    return {"pulse": pulse}
 
 
-def _overview_note_response() -> JSONResponse:
+def _overview_pulse_response() -> JSONResponse:
     try:
         with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
-                payload = _build_overview_note_summary(_overview_note_snapshot(cur))
+                payload = _build_overview_pulse(_overview_pulse_snapshot(cur))
     except Exception as exc:
-        return JSONResponse(status_code=503, content={"summary": None, "mentioned_vault": None, "error": str(exc)})
+        return JSONResponse(status_code=503, content={"pulse": None, "error": str(exc)})
 
     return JSONResponse(status_code=200, content=payload)
 

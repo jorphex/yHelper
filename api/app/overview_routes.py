@@ -28,14 +28,14 @@ from app.meta_service import (
     _protocol_context_snapshot,
     _tracked_scope_snapshot,
 )
-from app.product_service import _dau_trailing_24h, _overview_note_response
+from app.product_service import _dau_trailing_24h, _overview_pulse_response
 
 router = APIRouter()
 
 
-@router.get("/api/overview-note")
-async def overview_note():
-    return _overview_note_response()
+@router.get("/api/overview-pulse")
+async def overview_pulse():
+    return _overview_pulse_response()
 
 
 @router.get("/api/overview")
