@@ -54,6 +54,14 @@ KONG_REST_VAULTS_URL = os.getenv(
     "KONG_REST_VAULTS_URL",
     "https://kong.yearn.fi/api/rest/list/vaults?origin=yearn",
 )
+DEFI_LLAMA_PARENT_TVL_URL = os.getenv(
+    "DEFI_LLAMA_PARENT_TVL_URL",
+    "https://api.llama.fi/tvl/yearn",
+).strip()
+DEFI_LLAMA_PROTOCOLS_URL = os.getenv(
+    "DEFI_LLAMA_PROTOCOLS_URL",
+    "https://api.llama.fi/protocols",
+).strip()
 SOCIAL_PREVIEW_LIVE_TTL_SEC = int(os.getenv("SOCIAL_PREVIEW_LIVE_TTL_SEC", "300"))
 STYFI_RETENTION_DAYS = int(os.getenv("STYFI_RETENTION_DAYS", str(PPS_RETENTION_DAYS)))
 STYFI_SNAPSHOT_RETENTION_DAYS = int(os.getenv("STYFI_SNAPSHOT_RETENTION_DAYS", "30"))
@@ -115,6 +123,36 @@ def _ensure_schema_columns() -> None:
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS token_decimals INTEGER")
+            cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS origin TEXT")
+            cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS inclusion JSONB NOT NULL DEFAULT '{}'::jsonb")
+            cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS catalog_is_yearn BOOLEAN")
+            cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN")
+            cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS is_retired BOOLEAN")
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_vault_dim_catalog_scope
+                    ON vault_dim(catalog_is_yearn, is_hidden, is_retired, chain_id);
+                CREATE TABLE IF NOT EXISTS protocol_tvl_snapshots (
+                    id BIGSERIAL PRIMARY KEY,
+                    observed_at TIMESTAMPTZ NOT NULL,
+                    parent_tvl_usd NUMERIC(38, 12) NOT NULL CHECK (parent_tvl_usd >= 0),
+                    components_tvl_usd NUMERIC(38, 12) NOT NULL CHECK (components_tvl_usd >= 0),
+                    reconciliation_residual_usd NUMERIC(38, 12) NOT NULL,
+                    parent_source_url TEXT NOT NULL,
+                    components_source_url TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_protocol_tvl_snapshots_observed
+                    ON protocol_tvl_snapshots(observed_at DESC, id DESC);
+                CREATE TABLE IF NOT EXISTS protocol_tvl_components (
+                    snapshot_id BIGINT NOT NULL REFERENCES protocol_tvl_snapshots(id) ON DELETE CASCADE,
+                    slug TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    tvl_usd NUMERIC(38, 12) NOT NULL CHECK (tvl_usd >= 0),
+                    chain_tvls JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    PRIMARY KEY (snapshot_id, slug)
+                );
+                """
+            )
             cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_raw NUMERIC(78, 0)")
             cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_decimals INTEGER")
             cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_symbol TEXT")

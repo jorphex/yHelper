@@ -5,7 +5,14 @@ import os
 import time
 from datetime import UTC, datetime
 
-from .config import HARVEST_WSS_ENABLED, KONG_GQL_URL, STYFI_SYNC_ENABLED, _validate_data_policy_config, configure_logging
+from .accounting import _run_protocol_tvl_ingestion
+from .config import (
+    HARVEST_WSS_ENABLED,
+    KONG_REST_VAULTS_URL,
+    STYFI_SYNC_ENABLED,
+    _validate_data_policy_config,
+    configure_logging,
+)
 from .db_state import _ensure_schema, _mark_boot_orphaned_runs, _mark_stale_running_runs
 from .eth import _connect
 from .harvests import HarvestWssManager, _run_vault_harvests, _select_harvest_contracts
@@ -15,16 +22,19 @@ from .product_activity import _backfill_styfi_activity_amounts, _run_product_dau
 from .styfi import _run_styfi_snapshot
 
 HARVEST_WSS_MANAGER: HarvestWssManager | None = None
+
+
 def run_once() -> None:
     global HARVEST_WSS_MANAGER
     logging.info("Tick at %s", datetime.now(UTC).isoformat())
-    logging.info("Fetching Kong vault snapshot: %s", KONG_GQL_URL)
+    logging.info("Fetching Kong vault snapshot: %s", KONG_REST_VAULTS_URL)
     with _connect() as conn:
         _ensure_schema(conn)
         abandoned = _mark_stale_running_runs(conn)
         if abandoned > 0:
             logging.warning("Marked %s stale running ingestion rows as abandoned", abandoned)
         _, stored = _run_kong_snapshot_ingestion(conn)
+        _run_protocol_tvl_ingestion(conn)
         if stored > 0:
             _run_kong_ingestion(conn)
         else:

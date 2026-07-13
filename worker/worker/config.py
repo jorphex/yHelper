@@ -4,12 +4,21 @@ import logging
 import os
 
 from eth_utils import keccak
+
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://yhelper:change_me@yhelper-postgres:5432/yhelper")
 KONG_GQL_URL = os.getenv("KONG_GQL_URL", "https://kong.yearn.fi/api/gql")
 KONG_REST_VAULTS_URL = os.getenv(
     "KONG_REST_VAULTS_URL",
     "https://kong.yearn.fi/api/rest/list/vaults?origin=yearn",
 )
+DEFI_LLAMA_PARENT_TVL_URL = os.getenv(
+    "DEFI_LLAMA_PARENT_TVL_URL",
+    "https://api.llama.fi/tvl/yearn",
+).strip()
+DEFI_LLAMA_PROTOCOLS_URL = os.getenv(
+    "DEFI_LLAMA_PROTOCOLS_URL",
+    "https://api.llama.fi/protocols",
+).strip()
 KONG_MAX_VAULTS = int(os.getenv("KONG_MAX_VAULTS", "120"))
 KONG_MIN_TVL_USD = float(os.getenv("KONG_MIN_TVL_USD", "100000"))
 # Keep PPS series length fixed to reduce operator-side tuning overhead.
@@ -65,6 +74,7 @@ HARVEST_WSS_CONNECT_TIMEOUT_SEC = int(os.getenv("HARVEST_WSS_CONNECT_TIMEOUT_SEC
 HARVEST_WSS_SUBSCRIPTION_CHUNK = int(os.getenv("HARVEST_WSS_SUBSCRIPTION_CHUNK", "100"))
 JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
+JOB_PROTOCOL_TVL = "protocol_tvl_snapshot"
 JOB_STYFI = "styfi_snapshot"
 JOB_PRODUCT_DAU = "product_dau"
 JOB_VAULT_HARVESTS = "vault_harvests"
@@ -254,75 +264,6 @@ query Query($label: String!, $chainId: Int, $address: String, $component: String
 }
 """
 
-KONG_VAULTS_SNAPSHOT_QUERY = """
-query SnapshotVaults($origin: String!) {
-  vaults(origin: $origin) {
-    address
-    chainId
-    name
-    symbol
-    apiVersion
-    category
-    v3
-    yearn
-    origin
-    erc4626
-    decimals
-    asset {
-      chainId
-      address
-      symbol
-      name
-      decimals
-    }
-    meta {
-      kind
-      category
-      isHidden
-      isRetired
-      isHighlighted
-      migration {
-        available
-        target
-      }
-      token {
-        symbol
-        decimals
-        displayName
-        displaySymbol
-        description
-        category
-      }
-    }
-    performance {
-      oracle {
-        apr
-        apy
-        netAPR
-      }
-      historical {
-        net
-        weeklyNet
-        monthlyNet
-        inceptionNet
-      }
-    }
-    risk {
-      riskLevel
-    }
-    tvl {
-      close
-    }
-    strategies
-    debts {
-      strategy
-      currentDebtUsd
-      totalDebtUsd
-    }
-  }
-}
-"""
-
 DDL = """
 CREATE TABLE IF NOT EXISTS vault_dim (
     chain_id INTEGER NOT NULL,
@@ -350,6 +291,34 @@ CREATE INDEX IF NOT EXISTS idx_vault_dim_active_tvl
 
 ALTER TABLE vault_dim
     ADD COLUMN IF NOT EXISTS token_decimals INTEGER;
+ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS origin TEXT;
+ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS inclusion JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS catalog_is_yearn BOOLEAN;
+ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN;
+ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS is_retired BOOLEAN;
+CREATE INDEX IF NOT EXISTS idx_vault_dim_catalog_scope
+    ON vault_dim(catalog_is_yearn, is_hidden, is_retired, chain_id);
+
+CREATE TABLE IF NOT EXISTS protocol_tvl_snapshots (
+    id BIGSERIAL PRIMARY KEY,
+    observed_at TIMESTAMPTZ NOT NULL,
+    parent_tvl_usd NUMERIC(38, 12) NOT NULL CHECK (parent_tvl_usd >= 0),
+    components_tvl_usd NUMERIC(38, 12) NOT NULL CHECK (components_tvl_usd >= 0),
+    reconciliation_residual_usd NUMERIC(38, 12) NOT NULL,
+    parent_source_url TEXT NOT NULL,
+    components_source_url TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_protocol_tvl_snapshots_observed
+    ON protocol_tvl_snapshots(observed_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS protocol_tvl_components (
+    snapshot_id BIGINT NOT NULL REFERENCES protocol_tvl_snapshots(id) ON DELETE CASCADE,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    tvl_usd NUMERIC(38, 12) NOT NULL CHECK (tvl_usd >= 0),
+    chain_tvls JSONB NOT NULL DEFAULT '{}'::jsonb,
+    PRIMARY KEY (snapshot_id, slug)
+);
 
 CREATE TABLE IF NOT EXISTS ingestion_runs (
     id BIGSERIAL PRIMARY KEY,
@@ -669,6 +638,11 @@ INSERT INTO vault_dim (
     token_decimals,
     tvl_usd,
     est_apy,
+    origin,
+    inclusion,
+    catalog_is_yearn,
+    is_hidden,
+    is_retired,
     active,
     last_seen_at,
     raw
@@ -686,6 +660,11 @@ INSERT INTO vault_dim (
     %(token_decimals)s,
     %(tvl_usd)s,
     %(est_apy)s,
+    %(origin)s,
+    %(inclusion)s,
+    %(catalog_is_yearn)s,
+    %(is_hidden)s,
+    %(is_retired)s,
     TRUE,
     NOW(),
     %(raw)s
@@ -702,6 +681,11 @@ ON CONFLICT (chain_id, vault_address) DO UPDATE SET
     token_decimals = EXCLUDED.token_decimals,
     tvl_usd = EXCLUDED.tvl_usd,
     est_apy = EXCLUDED.est_apy,
+    origin = EXCLUDED.origin,
+    inclusion = EXCLUDED.inclusion,
+    catalog_is_yearn = EXCLUDED.catalog_is_yearn,
+    is_hidden = EXCLUDED.is_hidden,
+    is_retired = EXCLUDED.is_retired,
     active = TRUE,
     last_seen_at = NOW(),
     raw = EXCLUDED.raw

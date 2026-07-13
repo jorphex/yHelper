@@ -24,9 +24,9 @@ from .config import (
     KONG_PPS_LIMIT,
     KONG_PPS_LOOKBACK_DAYS,
     KONG_PPS_QUERY,
+    KONG_REST_VAULTS_URL,
     KONG_SLEEP_BETWEEN_REQ_MS,
     KONG_TIMEOUT_SEC,
-    KONG_VAULTS_SNAPSHOT_QUERY,
     PPS_RETENTION_DAYS,
     PRODUCT_ACTIVITY_RETENTION_DAYS,
     STYFI_RETENTION_DAYS,
@@ -34,52 +34,72 @@ from .config import (
     UPSERT_SQL,
 )
 from .db_state import _assert_snapshot_size_guard, _complete_run, _insert_run
-from .eth import _first_present, _normalize_vault, _parse_chain_id, _post_kong_gql_json
+from .eth import _first_present, _normalize_vault, _parse_chain_id
 
 LAST_CLEANUP_AT: datetime | None = None
+
+
 def _fetch_kong_snapshot() -> list[dict]:
-    payload = _post_kong_gql_json(KONG_VAULTS_SNAPSHOT_QUERY, {"origin": "yearn"})
-    data = payload.get("data")
-    if not isinstance(data, dict):
-        raise ValueError("Kong snapshot GraphQL response missing data")
-    vaults = data.get("vaults")
-    if not isinstance(vaults, list):
-        raise ValueError("Kong snapshot GraphQL response missing vault list")
-    return [vault for vault in vaults if isinstance(vault, dict)]
+    response = requests.get(
+        KONG_REST_VAULTS_URL,
+        timeout=KONG_TIMEOUT_SEC,
+        headers={"Accept": "application/json", "User-Agent": "yHelper/0.1"},
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, list):
+        raise ValueError("Kong REST vault response is not a list")
+    vaults = [vault for vault in payload if isinstance(vault, dict)]
+    if len(vaults) != len(payload):
+        raise ValueError("Kong REST vault response contains non-object records")
+    return vaults
 
 
-def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
+def _normalize_kong_snapshot(vaults: list[dict]) -> list[dict]:
     rows_by_identity: dict[tuple[int, str], dict] = {}
     numeric_failures = {"tvl_usd": 0, "est_apy": 0}
-    skipped_missing_identity = 0
-    duplicate_identities = 0
     for vault in vaults:
         raw_address = _first_present(vault, ("address", "vaultAddress", "vault_address"))
         vault_address = str(raw_address or "").strip().lower()
         raw_chain_id = _first_present(vault, ("chainID", "chainId", "chain_id"))
         chain_id = _parse_chain_id(raw_chain_id)
         if not vault_address or chain_id is None:
-            skipped_missing_identity += 1
-            continue
+            raise ValueError("Kong REST record is missing a valid chain ID or vault address")
+        if str(vault.get("origin") or "") != "yearn":
+            raise ValueError(f"Kong REST record has unexpected origin for {chain_id}:{vault_address}")
+        if not isinstance(vault.get("isHidden"), bool) or not isinstance(vault.get("isRetired"), bool):
+            raise ValueError(f"Kong REST record is missing lifecycle flags for {chain_id}:{vault_address}")
+        inclusion = vault.get("inclusion")
+        if not isinstance(inclusion, dict):
+            raise ValueError(f"Kong REST record has invalid inclusion metadata for {chain_id}:{vault_address}")
+        if "isYearn" in inclusion and not isinstance(inclusion.get("isYearn"), bool):
+            raise ValueError(f"Kong REST record has invalid inclusion.isYearn for {chain_id}:{vault_address}")
         row, parse_failures = _normalize_vault(vault, vault_address=vault_address, chain_id=chain_id)
         for field in parse_failures:
             numeric_failures[field] += 1
         identity = (chain_id, vault_address)
         if identity in rows_by_identity:
-            duplicate_identities += 1
+            raise ValueError(f"Kong REST snapshot contains duplicate identity {chain_id}:{vault_address}")
         rows_by_identity[identity] = row
 
     rows = list(rows_by_identity.values())
-    if not rows:
+    if any(numeric_failures.values()):
         raise ValueError(
-            "Snapshot normalization produced 0 valid rows "
-            f"(payload={len(vaults)}, skipped_missing_identity={skipped_missing_identity})"
+            "Kong REST snapshot contains malformed numeric values "
+            f"(tvl_usd={numeric_failures['tvl_usd']}, est_apy={numeric_failures['est_apy']})"
         )
+    if not rows:
+        raise ValueError("Kong REST snapshot contains no vaults")
+    return rows
+
+
+def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
+    rows = _normalize_kong_snapshot(vaults)
     _assert_snapshot_size_guard(
         conn,
         normalized_count=len(rows),
         payload_count=len(vaults),
-        skipped_missing_identity=skipped_missing_identity,
+        skipped_missing_identity=0,
     )
 
     with conn.transaction():
@@ -87,18 +107,6 @@ def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
             cur.execute("UPDATE vault_dim SET active = FALSE WHERE active = TRUE")
             cur.executemany(UPSERT_SQL, rows)
 
-    if skipped_missing_identity or duplicate_identities:
-        logging.warning(
-            "Snapshot normalization anomalies: skipped_missing_identity=%s duplicate_identities=%s",
-            skipped_missing_identity,
-            duplicate_identities,
-        )
-    if any(numeric_failures.values()):
-        logging.warning(
-            "Snapshot numeric parse fallbacks: tvl_usd=%s est_apy=%s",
-            numeric_failures["tvl_usd"],
-            numeric_failures["est_apy"],
-        )
     return len(rows)
 
 
@@ -477,4 +485,3 @@ def _run_kong_ingestion(conn: psycopg.Connection) -> tuple[int, int, int]:
         _complete_run(conn, run_id, "failed", pps_rows_stored, json.dumps({"error": str(exc), "errors": errors}))
         logging.exception("Kong ingestion failed: %s", exc)
         return run_id, pps_rows_stored, metrics_rows
-

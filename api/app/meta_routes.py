@@ -7,15 +7,14 @@ import psycopg
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
+from app.accounting_service import _protocol_context_snapshot
 from app.analytics_service import _bounded_metric_sql, _changes_base_cte, _compact_mover_rows, _fetch_change_movers
 from app.common import _alias_realized_apy_fields, _alias_realized_coverage_fields, _user_visible_filter_sql
 from app.config import APY_MAX, APY_MIN, DATABASE_URL, DEFAULT_MIN_POINTS, DEFAULT_MIN_TVL_USD
 from app.meta_service import (
     _coverage_snapshot,
-    _deduped_yearn_scope_snapshot,
     _freshness_snapshot,
     _live_social_preview_highest_vault,
-    _protocol_context_snapshot,
     _tracked_scope_snapshot,
 )
 
@@ -60,22 +59,11 @@ async def meta_protocol_context() -> dict[str, object]:
     try:
         with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
-                current_yearn = _deduped_yearn_scope_snapshot(
-                    cur,
-                    include_hidden=False,
-                    include_retired=False,
-                    include_fantom=False,
-                )
-                total_yearn = _deduped_yearn_scope_snapshot(
-                    cur,
-                    include_hidden=True,
-                    include_retired=True,
-                    include_fantom=True,
-                )
-        return _protocol_context_snapshot(current_yearn=current_yearn, total_yearn=total_yearn)
+                return _protocol_context_snapshot(cur)
     except Exception as exc:
         return {
-            "source": "internal",
+            "schema_version": 2,
+            "source": "yearn_reported_defillama",
             "status": "unavailable",
             "as_of_utc": datetime.now(UTC).isoformat(),
             "error": str(exc),
@@ -202,7 +190,7 @@ async def meta_social_preview() -> dict[str, object]:
         "filters": {
             "total_vaults_scope": "all rows in vault_dim",
             "active_vaults_scope": "active + non-retired + non-hidden vaults in vault_dim",
-            "tracked_tvl_scope": "active + non-retired + non-hidden, debt-adjusted for single-strategy overlap",
+            "tracked_tvl_scope": "active + non-retired + non-hidden gross product TVL; not protocol TVL",
             "highest_est_apy_scope": "live Kong REST user-visible multi-strategy v3 scope",
             "fallback_highest_realized_apy_scope": "Postgres user-visible scored-vault fallback, realized APY 30d",
             "highest_apy_scope": "legacy alias for highest_est_apy_scope",

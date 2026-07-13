@@ -23,8 +23,11 @@ It is built to answer a few simple questions fast:
 
 ## Data
 The app combines:
-- Kong REST/GraphQL metadata, snapshots, and PPS history
-- Kong PPS history and derived yield metrics
+- Kong REST vault catalog snapshots
+- Kong GraphQL PPS history and derived yield metrics
+- Yearn-reported protocol TVL and component accounting from DefiLlama
+
+TVL is deliberately separated into three scopes: reported protocol TVL, Kong catalog product TVLs, and the existing analytics-page universe. Kong product TVLs can overlap, so their gross sums are exposed only as catalog or coverage context and are never substituted for protocol TVL.
 
 ## Stack
 - `web` is the Next.js frontend

@@ -137,23 +137,6 @@ def _raw_strategies_count_sql(alias: str) -> str:
     """
 
 
-def _raw_current_debt_usd_sum_sql(alias: str) -> str:
-    return f"""
-    SELECT
-        {alias}.chain_id,
-        LOWER({alias}.vault_address) AS vault_address,
-        SUM(
-            COALESCE(
-                NULLIF(d->>'currentDebtUsd', '')::numeric,
-                NULLIF(d->>'totalDebtUsd', '')::numeric,
-                0
-            )
-        ) AS debt_usd
-    FROM vault_dim {alias}
-    CROSS JOIN LATERAL jsonb_array_elements(COALESCE({alias}.raw->'debts', '[]'::jsonb)) d
-    """
-
-
 def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> str:
     excluded_ids_sql = ", ".join(str(chain_id) for chain_id in EXCLUDED_CHAIN_IDS)
     clauses = [

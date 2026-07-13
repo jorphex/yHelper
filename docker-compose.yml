@@ -31,7 +31,8 @@ services:
       API_LOG_LEVEL: ${API_LOG_LEVEL:-info}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3010}
       API_ASSETS_FEATURED_MIN_TVL_USD: ${API_ASSETS_FEATURED_MIN_TVL_USD:-1000000}
-      DEFI_LLAMA_PROTOCOL_URL: ${DEFI_LLAMA_PROTOCOL_URL:-https://api.llama.fi/protocol/yearn-finance}
+      DEFI_LLAMA_PARENT_TVL_URL: ${DEFI_LLAMA_PARENT_TVL_URL:-https://api.llama.fi/tvl/yearn}
+      DEFI_LLAMA_PROTOCOLS_URL: ${DEFI_LLAMA_PROTOCOLS_URL:-https://api.llama.fi/protocols}
       WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-900}
       PPS_RETENTION_DAYS: ${PPS_RETENTION_DAYS:-122}
       INGESTION_RUN_RETENTION_DAYS: ${INGESTION_RUN_RETENTION_DAYS:-14}
@@ -67,6 +68,8 @@ services:
       WORKER_INTERVAL_SEC: ${WORKER_INTERVAL_SEC:-900}
       KONG_GQL_URL: ${KONG_GQL_URL:-https://kong.yearn.fi/api/gql}
       KONG_REST_VAULTS_URL: ${KONG_REST_VAULTS_URL:-https://kong.yearn.fi/api/rest/list/vaults?origin=yearn}
+      DEFI_LLAMA_PARENT_TVL_URL: ${DEFI_LLAMA_PARENT_TVL_URL:-https://api.llama.fi/tvl/yearn}
+      DEFI_LLAMA_PROTOCOLS_URL: ${DEFI_LLAMA_PROTOCOLS_URL:-https://api.llama.fi/protocols}
       KONG_MAX_VAULTS: ${KONG_MAX_VAULTS:-120}
       KONG_MIN_TVL_USD: ${KONG_MIN_TVL_USD:-100000}
       KONG_PPS_LOOKBACK_DAYS: ${KONG_PPS_LOOKBACK_DAYS:-119}

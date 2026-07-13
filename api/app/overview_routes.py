@@ -6,9 +6,12 @@ import psycopg
 from fastapi import APIRouter
 from psycopg.rows import dict_row
 
+from app.accounting_service import _protocol_context_snapshot
 from app.config import (
     DATABASE_URL,
     DB_CLEANUP_MIN_INTERVAL_SEC,
+    DEFI_LLAMA_PARENT_TVL_URL,
+    DEFI_LLAMA_PROTOCOLS_URL,
     DEFAULT_MIN_POINTS,
     DEFAULT_MIN_TVL_USD,
     INGESTION_RUN_RETENTION_DAYS,
@@ -23,9 +26,7 @@ from app.config import (
 )
 from app.meta_service import (
     _coverage_snapshot,
-    _deduped_yearn_scope_snapshot,
     _freshness_snapshot,
-    _protocol_context_snapshot,
     _tracked_scope_snapshot,
 )
 from app.product_service import _dau_trailing_24h, _overview_pulse_response
@@ -52,6 +53,7 @@ async def overview() -> dict[str, object]:
     last_runs: dict[str, dict[str, object] | None] = {
         "kong_vault_snapshot": None,
         "kong_pps_metrics": None,
+        "protocol_tvl_snapshot": None,
         "styfi_snapshot": None,
         "product_dau": None,
     }
@@ -125,19 +127,7 @@ async def overview() -> dict[str, object]:
                 split_limit=6,
             )
             with conn.cursor() as cur:
-                current_yearn = _deduped_yearn_scope_snapshot(
-                    cur,
-                    include_hidden=False,
-                    include_retired=False,
-                    include_fantom=False,
-                )
-                total_yearn = _deduped_yearn_scope_snapshot(
-                    cur,
-                    include_hidden=True,
-                    include_retired=True,
-                    include_fantom=True,
-                )
-            protocol_context = _protocol_context_snapshot(current_yearn=current_yearn, total_yearn=total_yearn)
+                protocol_context = _protocol_context_snapshot(cur)
     except Exception:
         pass
 
@@ -148,6 +138,8 @@ async def overview() -> dict[str, object]:
         "sources": {
             "kong_rest": KONG_REST_VAULTS_URL,
             "kong_gql": KONG_GQL_URL,
+            "yearn_reported_tvl": DEFI_LLAMA_PARENT_TVL_URL,
+            "yearn_reported_components": DEFI_LLAMA_PROTOCOLS_URL,
         },
         "data_policy": {
             "worker_interval_sec": WORKER_INTERVAL_SEC,

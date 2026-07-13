@@ -9,9 +9,6 @@ import psycopg
 from psycopg.rows import dict_row
 
 from app.common import (
-    _raw_current_debt_usd_sum_sql,
-    _raw_hidden_sql,
-    _raw_retired_sql,
     _seconds_since,
     _to_float_or_none,
     _user_visible_filter_sql,
@@ -56,7 +53,7 @@ def _freshness_snapshot(
         "ingestion_jobs": {},
         "alerts": {},
     }
-    job_names = ("kong_vault_snapshot", "kong_pps_metrics")
+    job_names = ("kong_vault_snapshot", "kong_pps_metrics", "protocol_tvl_snapshot")
 
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
@@ -526,73 +523,32 @@ def _coverage_snapshot(
 
 def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
     cur.execute(
-        f"""
-        WITH all_vaults AS (
-            SELECT
-                d.chain_id,
-                d.vault_address,
-                d.active,
-                COALESCE(d.kind, '') AS kind,
-                COALESCE(d.tvl_usd, 0.0)::numeric AS tvl_usd,
-                {_raw_retired_sql('d')} AS is_retired,
-                {_raw_hidden_sql('d')} AS is_hidden
-            FROM vault_dim d
-        ),
-        active_visible AS (
-            SELECT *
-            FROM all_vaults
-            WHERE active = TRUE
-              AND is_retired = FALSE
-              AND is_hidden = FALSE
-        ),
-        strategy_debt_usd AS (
-            {_raw_current_debt_usd_sum_sql('m')}
-            WHERE m.active = TRUE
-              AND COALESCE(m.kind, '') = 'Multi Strategy'
-              AND {_raw_retired_sql('m')} = FALSE
-              AND {_raw_hidden_sql('m')} = FALSE
-            GROUP BY 1, 2
-        ),
-        single_independent AS (
-            SELECT
-                SUM(
-                    GREATEST(
-                        a.tvl_usd - COALESCE(sd.debt_usd, 0),
-                        0
-                    )
-                ) AS tvl_usd
-            FROM active_visible a
-            LEFT JOIN strategy_debt_usd sd
-              ON sd.chain_id = a.chain_id
-             AND sd.vault_address = a.vault_address
-            WHERE a.kind = 'Single Strategy'
-        ),
-        multi_visible AS (
-            SELECT SUM(a.tvl_usd) AS tvl_usd
-            FROM active_visible a
-            WHERE a.kind = 'Multi Strategy'
-        ),
-        other_visible AS (
-            SELECT SUM(a.tvl_usd) AS tvl_usd
-            FROM active_visible a
-            WHERE a.kind NOT IN ('Multi Strategy', 'Single Strategy')
-        )
+        """
         SELECT
-            (SELECT COUNT(*) FROM all_vaults) AS total_vaults,
-            (SELECT COUNT(*) FROM active_visible) AS active_vaults,
-            (
-                COALESCE((SELECT tvl_usd FROM multi_visible), 0)
-                + COALESCE((SELECT tvl_usd FROM single_independent), 0)
-                + COALESCE((SELECT tvl_usd FROM other_visible), 0)
+            COUNT(*) AS total_vaults,
+            COUNT(*) FILTER (
+                WHERE active = TRUE
+                  AND is_retired = FALSE
+                  AND is_hidden = FALSE
+            ) AS active_vaults,
+            SUM(tvl_usd) FILTER (
+                WHERE active = TRUE
+                  AND is_retired = FALSE
+                  AND is_hidden = FALSE
             )::double precision AS tracked_tvl_active_usd,
-            (
-                SELECT COUNT(DISTINCT (a.chain_id, a.vault_address))
-                FROM active_visible a
-                JOIN vault_metrics_latest m
-                  ON m.chain_id = a.chain_id
-                 AND m.vault_address = a.vault_address
-                WHERE m.apy_30d IS NOT NULL
+            COUNT(*) FILTER (
+                WHERE active = TRUE
+                  AND is_retired = FALSE
+                  AND is_hidden = FALSE
+                  AND EXISTS (
+                      SELECT 1
+                      FROM vault_metrics_latest m
+                      WHERE m.chain_id = vault_dim.chain_id
+                        AND m.vault_address = vault_dim.vault_address
+                        AND m.apy_30d IS NOT NULL
+                  )
             ) AS active_with_metrics
+        FROM vault_dim
         """
     )
     row = cur.fetchone() or {}
@@ -605,110 +561,7 @@ def _tracked_scope_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
             "active": True,
             "exclude_hidden": True,
             "exclude_retired": True,
-            "tracked_tvl_method": "debt_adjusted_single_strategy_overlap",
+            "tracked_tvl_method": "gross_non_additive_product_sum",
+            "warning": "Coverage context only; not protocol TVL.",
         },
-    }
-
-
-def _yearn_scope_filter_sql(alias: str, *, include_hidden: bool, include_retired: bool, include_fantom: bool) -> str:
-    clauses = [f"{alias}.active = TRUE"]
-    if not include_hidden:
-        clauses.append(f"{_raw_hidden_sql(alias)} = FALSE")
-    if not include_retired:
-        clauses.append(f"{_raw_retired_sql(alias)} = FALSE")
-    if not include_fantom:
-        clauses.append(f"COALESCE({alias}.chain_id, -1) <> 250")
-    return " AND ".join(clauses)
-
-
-def _deduped_yearn_scope_snapshot(
-    cur: psycopg.Cursor,
-    *,
-    include_hidden: bool,
-    include_retired: bool,
-    include_fantom: bool,
-) -> dict[str, object]:
-    scope_sql = _yearn_scope_filter_sql(
-        "d",
-        include_hidden=include_hidden,
-        include_retired=include_retired,
-        include_fantom=include_fantom,
-    )
-    parent_scope_sql = _yearn_scope_filter_sql(
-        "m",
-        include_hidden=include_hidden,
-        include_retired=include_retired,
-        include_fantom=include_fantom,
-    )
-    cur.execute(
-        f"""
-        WITH in_scope AS (
-            SELECT
-                d.chain_id,
-                LOWER(d.vault_address) AS vault_address,
-                COALESCE(d.kind, '') AS kind,
-                COALESCE(d.tvl_usd, 0.0)::numeric AS tvl_usd
-            FROM vault_dim d
-            WHERE {scope_sql}
-        ),
-        strategy_debt_usd AS (
-            {_raw_current_debt_usd_sum_sql('m')}
-            WHERE {parent_scope_sql}
-              AND COALESCE(m.kind, '') = 'Multi Strategy'
-            GROUP BY 1, 2
-        )
-        SELECT
-            COUNT(*) AS vaults,
-            COUNT(*) FILTER (WHERE kind = 'Multi Strategy') AS multi_vaults,
-            COUNT(*) FILTER (WHERE kind = 'Single Strategy') AS single_vaults,
-            COUNT(*) FILTER (WHERE kind NOT IN ('Multi Strategy', 'Single Strategy')) AS other_vaults,
-            SUM(tvl_usd) FILTER (WHERE kind = 'Multi Strategy') AS multi_tvl_usd,
-            SUM(tvl_usd) FILTER (WHERE kind = 'Single Strategy') AS single_raw_tvl_usd,
-            SUM(GREATEST(tvl_usd - COALESCE(sd.debt_usd, 0), 0)) FILTER (WHERE kind = 'Single Strategy') AS single_deduped_tvl_usd,
-            SUM(tvl_usd) FILTER (WHERE kind NOT IN ('Multi Strategy', 'Single Strategy')) AS other_tvl_usd
-        FROM in_scope s
-        LEFT JOIN strategy_debt_usd sd
-          ON sd.chain_id = s.chain_id
-         AND sd.vault_address = s.vault_address
-        """
-    )
-    row = cur.fetchone() or {}
-    multi_tvl_usd = _to_float_or_none(row.get("multi_tvl_usd")) or 0.0
-    single_raw_tvl_usd = _to_float_or_none(row.get("single_raw_tvl_usd")) or 0.0
-    single_deduped_tvl_usd = _to_float_or_none(row.get("single_deduped_tvl_usd")) or 0.0
-    other_tvl_usd = _to_float_or_none(row.get("other_tvl_usd")) or 0.0
-    return {
-        "vaults": int(row.get("vaults") or 0),
-        "tvl_usd": multi_tvl_usd + single_deduped_tvl_usd + other_tvl_usd,
-        "criteria": {
-            "active": True,
-            "include_hidden": include_hidden,
-            "include_retired": include_retired,
-            "include_fantom": include_fantom,
-            "tvl_method": "deduped_multi_single_overlap",
-        },
-        "components": {
-            "multi_vaults": int(row.get("multi_vaults") or 0),
-            "single_vaults": int(row.get("single_vaults") or 0),
-            "other_vaults": int(row.get("other_vaults") or 0),
-            "multi_tvl_usd": multi_tvl_usd,
-            "single_raw_tvl_usd": single_raw_tvl_usd,
-            "single_deduped_tvl_usd": single_deduped_tvl_usd,
-            "removed_overlap_usd": max(0.0, single_raw_tvl_usd - single_deduped_tvl_usd),
-            "other_tvl_usd": other_tvl_usd,
-        },
-    }
-
-
-def _protocol_context_snapshot(
-    *,
-    current_yearn: dict[str, object] | None,
-    total_yearn: dict[str, object] | None,
-) -> dict[str, object]:
-    return {
-        "source": "internal",
-        "status": "ok",
-        "as_of_utc": datetime.now(UTC).isoformat(),
-        "current_yearn": current_yearn if isinstance(current_yearn, dict) else {},
-        "total_yearn": total_yearn if isinstance(total_yearn, dict) else {},
     }

@@ -170,13 +170,19 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
     meta_obj = meta if isinstance(meta, dict) else {}
     meta_token = meta_obj.get("token")
     meta_token_obj = meta_token if isinstance(meta_token, dict) else {}
+    inclusion = vault.get("inclusion")
+    inclusion_obj = inclusion if isinstance(inclusion, dict) else {}
     tvl = vault.get("tvl")
     tvl_obj = tvl if isinstance(tvl, dict) else {}
     performance = vault.get("performance")
     performance_obj = performance if isinstance(performance, dict) else {}
     oracle = performance_obj.get("oracle")
     oracle_obj = oracle if isinstance(oracle, dict) else {}
-    raw_tvl = _first_present(tvl_obj, ("close", "tvl", "tvlUsd", "usd", "totalValueLockedUSD"))
+    raw_tvl = (
+        _first_present(tvl_obj, ("close", "tvl", "tvlUsd", "usd", "totalValueLockedUSD"))
+        if tvl_obj
+        else tvl
+    )
     raw_apr = _first_present(oracle_obj, ("apy", "netAPY", "netApy"))
     tvl_usd = _to_float(raw_tvl)
     est_apy = _to_float(raw_apr)
@@ -207,6 +213,13 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
         ),
         "tvl_usd": tvl_usd,
         "est_apy": est_apy,
+        "origin": str(vault.get("origin") or "").strip() or None,
+        "inclusion": Json(inclusion_obj),
+        "catalog_is_yearn": (
+            inclusion_obj.get("isYearn") if isinstance(inclusion_obj.get("isYearn"), bool) else None
+        ),
+        "is_hidden": vault.get("isHidden") if isinstance(vault.get("isHidden"), bool) else None,
+        "is_retired": vault.get("isRetired") if isinstance(vault.get("isRetired"), bool) else None,
         "raw": Json(vault),
     }
     return row, numeric_parse_failures
