@@ -431,7 +431,7 @@ function StYfiPageContent() {
               {isLoading ? (
                 <TableSkeleton rows={5} columns={8} />
               ) : (
-                [...epochSeries].reverse().map((row) => {
+                [...epochSeries].reverse().slice(0, 10).map((row) => {
                   const isCurrent = row.epoch === currentEpoch;
                   return (
                     <tr key={row.epoch ?? row.epoch_start ?? "epoch"}>
