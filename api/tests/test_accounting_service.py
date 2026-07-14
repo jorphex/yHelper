@@ -27,7 +27,8 @@ class ProtocolContextContractTests(unittest.TestCase):
             analytics=self.analytics,
             now=self.now,
         )
-        self.assertEqual(result["schema_version"], 2)
+        self.assertEqual(result["schema_version"], 3)
+        self.assertEqual(result["source"], "defillama_yearn_parent")
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["protocol"]["tvl_usd"], 208_000_000)
         self.assertEqual(result["current_yearn"]["tvl_usd"], 208_000_000)

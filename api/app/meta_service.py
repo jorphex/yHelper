@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import time
 from datetime import UTC, datetime
-from json import loads
-from urllib.request import Request, urlopen
 
 import psycopg
 from psycopg.rows import dict_row
@@ -17,17 +14,7 @@ from app.config import (
     APY_MAX,
     APY_MIN,
     DEFAULT_MIN_TVL_USD,
-    EXCLUDED_CHAIN_IDS,
-    KONG_REST_VAULTS_URL,
-    SOCIAL_PREVIEW_LIVE_TTL_SEC,
-    USER_VISIBLE_KIND,
-    USER_VISIBLE_VERSION_PREFIX,
 )
-
-_SOCIAL_PREVIEW_LIVE_CACHE: dict[str, float | dict[str, object] | None] = {
-    "fetched_at": 0.0,
-    "highest_est_apy_vault": None,
-}
 
 
 def _freshness_snapshot(
@@ -300,89 +287,28 @@ def _freshness_snapshot(
     return result
 
 
-def _fetch_kong_vaults() -> list[dict]:
-    request = Request(KONG_REST_VAULTS_URL, headers={"User-Agent": "yHelper/0.1"})
-    with urlopen(request, timeout=8.0) as response:
-        payload = loads(response.read().decode("utf-8"))
-    return payload if isinstance(payload, list) else []
-
-
-def _extract_kong_est_apy(vault: dict[str, object]) -> float | None:
-    performance = vault.get("performance")
-    performance_obj = performance if isinstance(performance, dict) else {}
-    oracle = performance_obj.get("oracle")
-    oracle_obj = oracle if isinstance(oracle, dict) else {}
-    for key in ("apy", "netAPY", "netApy"):
-        value = oracle_obj.get(key)
-        parsed = _to_float_or_none(value)
-        if parsed is not None:
-            return parsed
-    return None
-
-
-def _extract_kong_tvl_usd(vault: dict[str, object]) -> float | None:
-    tvl = vault.get("tvl")
-    if isinstance(tvl, dict):
-        return _to_float_or_none(tvl.get("close") if "close" in tvl else tvl.get("tvl"))
-    return _to_float_or_none(tvl)
-
-
-def _live_social_preview_highest_vault() -> dict[str, object]:
-    now_mono = time.monotonic()
-    cached_at = float(_SOCIAL_PREVIEW_LIVE_CACHE.get("fetched_at") or 0.0)
-    cached_value = _SOCIAL_PREVIEW_LIVE_CACHE.get("highest_est_apy_vault")
-    if cached_value is not None and now_mono - cached_at < SOCIAL_PREVIEW_LIVE_TTL_SEC:
-        return dict(cached_value)
-
-    best: dict[str, object] = {}
-    best_score = float("-inf")
-    best_tvl = float("-inf")
-    try:
-        for vault in _fetch_kong_vaults():
-            if not isinstance(vault, dict):
-                continue
-            if str(vault.get("kind") or "") != USER_VISIBLE_KIND:
-                continue
-            if not str(vault.get("apiVersion") or vault.get("version") or "").startswith(USER_VISIBLE_VERSION_PREFIX):
-                continue
-            raw_chain_id = vault.get("chainID") or vault.get("chainId") or vault.get("chain_id")
-            try:
-                chain_id = int(raw_chain_id) if raw_chain_id is not None else None
-            except (TypeError, ValueError):
-                chain_id = None
-            if chain_id is None or chain_id in EXCLUDED_CHAIN_IDS:
-                continue
-            if bool(vault.get("isHidden")) or bool(vault.get("isRetired")):
-                continue
-            est_apy = _extract_kong_est_apy(vault)
-            if est_apy is None:
-                continue
-            tvl_usd = _extract_kong_tvl_usd(vault)
-            candidate_tvl = float("-inf") if tvl_usd is None else tvl_usd
-            if est_apy < best_score or (est_apy == best_score and candidate_tvl <= best_tvl):
-                continue
-            best_score = est_apy
-            best_tvl = candidate_tvl
-            best = {
-                "vault_address": vault.get("address"),
-                "name": vault.get("name"),
-                "symbol": vault.get("symbol"),
-                "chain_id": chain_id,
-                "tvl_usd": tvl_usd,
-                "est_apy": est_apy,
-                "current_est_apy": est_apy,
-                "current_net_apy": est_apy,
-                "yield_kind": "estimated_apy",
-                "source": "kong_rest_live",
-            }
-    except Exception:
-        if isinstance(cached_value, dict):
-            return dict(cached_value)
-        return {}
-
-    _SOCIAL_PREVIEW_LIVE_CACHE["fetched_at"] = now_mono
-    _SOCIAL_PREVIEW_LIVE_CACHE["highest_est_apy_vault"] = dict(best) if best else None
-    return best
+def _social_preview_highest_vault(cur: psycopg.Cursor) -> dict[str, object]:
+    cur.execute(
+        f"""
+        SELECT
+            d.vault_address,
+            d.name,
+            d.symbol,
+            d.chain_id,
+            d.tvl_usd,
+            d.est_apy,
+            d.est_apy AS current_est_apy,
+            d.est_apy AS current_net_apy,
+            'estimated_apy' AS yield_kind,
+            'kong_rest_snapshot' AS source
+        FROM vault_dim d
+        WHERE {_user_visible_filter_sql("d", include_retired=False)}
+          AND d.est_apy IS NOT NULL
+        ORDER BY d.est_apy DESC, d.tvl_usd DESC NULLS LAST, d.chain_id, d.vault_address
+        LIMIT 1
+        """
+    )
+    return cur.fetchone() or {}
 
 
 def _coverage_snapshot(

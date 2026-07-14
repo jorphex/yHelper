@@ -173,67 +173,18 @@ def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None) -> str:
     """.format(alias=alias, scope_sql=_user_visible_filter_sql("r", include_retired=False))
 
 
-def _raw_hidden_sql(alias: str) -> str:
-    return (
-        f"COALESCE(({alias}.raw->'meta'->>'isHidden')::boolean, "
-        f"({alias}.raw->>'isHidden')::boolean, "
-        f"({alias}.raw->'info'->>'isHidden')::boolean, FALSE)"
-    )
-
-
-def _raw_retired_sql(alias: str) -> str:
-    return (
-        f"COALESCE(({alias}.raw->'meta'->>'isRetired')::boolean, "
-        f"({alias}.raw->>'isRetired')::boolean, "
-        f"({alias}.raw->'info'->>'isRetired')::boolean, FALSE)"
-    )
-
-
-def _raw_highlighted_sql(alias: str) -> str:
-    return (
-        f"COALESCE(({alias}.raw->'meta'->>'isHighlighted')::boolean, "
-        f"({alias}.raw->>'isHighlighted')::boolean, "
-        f"({alias}.raw->'info'->>'isHighlighted')::boolean, FALSE)"
-    )
-
-
-def _raw_migration_available_sql(alias: str) -> str:
-    return (
-        f"COALESCE(({alias}.raw->'meta'->'migration'->>'available')::boolean, "
-        f"({alias}.raw->'migration'->>'available')::boolean, FALSE)"
-    )
-
-
-def _raw_risk_level_sql(alias: str) -> str:
-    return (
-        f"COALESCE(NULLIF({alias}.raw->'risk'->>'riskLevel', ''), "
-        f"NULLIF({alias}.raw->>'riskLevel', ''), "
-        f"NULLIF({alias}.raw->'info'->>'riskLevel', ''), 'unknown')"
-    )
-
-
-def _raw_strategies_count_sql(alias: str) -> str:
-    return f"""
-    COALESCE(
-        NULLIF({alias}.raw->>'strategiesCount', '')::INT,
-        CASE WHEN jsonb_typeof({alias}.raw->'strategies') = 'array' THEN jsonb_array_length({alias}.raw->'strategies') END,
-        CASE WHEN jsonb_typeof({alias}.raw->'debts') = 'array' THEN jsonb_array_length({alias}.raw->'debts') END,
-        0
-    )
-    """
-
-
 def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> str:
     excluded_ids_sql = ", ".join(str(chain_id) for chain_id in EXCLUDED_CHAIN_IDS)
     clauses = [
         f"{alias}.active = TRUE",
+        f"{alias}.catalog_is_yearn = TRUE",
         f"COALESCE({alias}.kind, '') = '{USER_VISIBLE_KIND}'",
         f"COALESCE({alias}.version, '') LIKE '{USER_VISIBLE_VERSION_PREFIX}%%'",
         f"COALESCE({alias}.chain_id, -1) NOT IN ({excluded_ids_sql})",
-        f"{_raw_hidden_sql(alias)} = FALSE",
+        f"{alias}.is_hidden = FALSE",
     ]
     if not include_retired:
-        clauses.append(f"{_raw_retired_sql(alias)} = FALSE")
+        clauses.append(f"{alias}.is_retired = FALSE")
     return " AND ".join(clauses)
 
 
@@ -246,25 +197,6 @@ def _to_float_or_none(value: object) -> float | None:
         return None
 
 
-def _format_compact_usd(value: float | None) -> str | None:
-    if value is None:
-        return None
-    amount = abs(value)
-    if amount >= 1_000_000_000:
-        return f"${value / 1_000_000_000:.1f}B"
-    if amount >= 1_000_000:
-        return f"${value / 1_000_000:.1f}M"
-    if amount >= 1_000:
-        return f"${value / 1_000:.0f}k"
-    return f"${value:.0f}"
-
-
-def _yearn_vault_url(chain_id: int | None, vault_address: str | None) -> str | None:
-    if chain_id is None or not vault_address:
-        return None
-    return f"https://yearn.fi/vaults/{chain_id}/{vault_address}"
-
-
 def _safe_int(value: object) -> int | None:
     try:
         if value is None:
@@ -272,78 +204,3 @@ def _safe_int(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _median(values: list[float]) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    n = len(ordered)
-    mid = n // 2
-    if n % 2 == 1:
-        return ordered[mid]
-    return (ordered[mid - 1] + ordered[mid]) / 2.0
-
-
-def _delta_or_none(left: object, right: object) -> float | None:
-    left_value = _to_float_or_none(left)
-    right_value = _to_float_or_none(right)
-    if left_value is None or right_value is None:
-        return None
-    return left_value - right_value
-
-
-def _apply_aliases(row: dict[str, object], alias_map: dict[str, str]) -> dict[str, object]:
-    for alias_key, source_key in alias_map.items():
-        if alias_key not in row and source_key in row:
-            row[alias_key] = row.get(source_key)
-    return row
-
-
-def _apply_aliases_many(rows: list[dict[str, object]], alias_map: dict[str, str]) -> list[dict[str, object]]:
-    for row in rows:
-        _apply_aliases(row, alias_map)
-    return rows
-
-
-def _alias_realized_apy_fields(row: dict[str, object]) -> dict[str, object]:
-    return _apply_aliases(
-        row,
-        {
-            "realized_apy_30d": "safe_apy_30d",
-            "avg_realized_apy_30d": "avg_safe_apy_30d",
-            "median_realized_apy_30d": "median_safe_apy_30d",
-            "weighted_realized_apy_30d": "weighted_safe_apy_30d",
-            "tvl_weighted_realized_apy_30d": "tvl_weighted_safe_apy_30d",
-            "best_realized_apy_30d": "best_safe_apy_30d",
-            "worst_realized_apy_30d": "worst_safe_apy_30d",
-            "median_best_realized_apy_30d": "median_best_safe_apy_30d",
-            "realized_spread_30d": "spread_safe_apy_30d",
-            "median_realized_spread_30d": "median_spread_safe_apy_30d",
-            "realized_apy_window": "safe_apy_window",
-            "realized_apy_prev_window": "safe_apy_prev_window",
-            "avg_realized_apy_window": "avg_safe_apy_window",
-            "avg_realized_apy_prev_window": "avg_safe_apy_prev_window",
-        },
-    )
-
-
-def _alias_realized_apy_many(rows: list[dict[str, object]]) -> list[dict[str, object]]:
-    return _apply_aliases_many(
-        rows,
-        {
-            "realized_apy_30d": "safe_apy_30d",
-            "realized_apy_window": "safe_apy_window",
-            "realized_apy_prev_window": "safe_apy_prev_window",
-        },
-    )
-
-
-def _alias_realized_coverage_fields(row: dict[str, object]) -> dict[str, object]:
-    return _apply_aliases(
-        row,
-        {
-            "with_realized_apy": "with_metrics",
-            "with_realized_apy_tvl_usd": "with_metrics_tvl_usd",
-        },
-    )

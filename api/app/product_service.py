@@ -52,17 +52,17 @@ def _overview_pulse_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
             SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                 WHERE n.apy_window_raw IS NOT NULL
                   AND n.apy_prev_window_raw IS NOT NULL
-                  AND (n.safe_apy_window - n.safe_apy_prev_window) >= %(delta_threshold)s
+                  AND (n.realized_apy_window - n.realized_apy_prev_window) >= %(delta_threshold)s
             ) AS improving_tvl_usd,
             SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                 WHERE n.apy_window_raw IS NOT NULL
                   AND n.apy_prev_window_raw IS NOT NULL
-                  AND (n.safe_apy_window - n.safe_apy_prev_window) <= -%(delta_threshold)s
+                  AND (n.realized_apy_window - n.realized_apy_prev_window) <= -%(delta_threshold)s
             ) AS softening_tvl_usd,
             SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                 WHERE n.apy_window_raw IS NOT NULL
                   AND n.apy_prev_window_raw IS NOT NULL
-                  AND ABS(n.safe_apy_window - n.safe_apy_prev_window) < %(delta_threshold)s
+                  AND ABS(n.realized_apy_window - n.realized_apy_prev_window) < %(delta_threshold)s
             ) AS steady_tvl_usd,
             SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                 WHERE n.apy_window_raw IS NOT NULL
@@ -79,24 +79,24 @@ def _overview_pulse_snapshot(cur: psycopg.Cursor) -> dict[str, object]:
                 WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                     WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
                 ) > 0
-                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.safe_apy_window) FILTER (
+                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.realized_apy_window) FILTER (
                     WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
                 ) / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                     WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
                 )
                 ELSE NULL
-            END AS tvl_weighted_safe_apy_window,
+            END AS tvl_weighted_realized_apy_window,
             CASE
                 WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                     WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
                 ) > 0
-                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.safe_apy_prev_window) FILTER (
+                THEN SUM(COALESCE(n.tvl_usd, 0.0) * n.realized_apy_prev_window) FILTER (
                     WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
                 ) / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
                     WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
                 )
                 ELSE NULL
-            END AS tvl_weighted_safe_apy_prev_window,
+            END AS tvl_weighted_realized_apy_prev_window,
             COUNT(*) FILTER (
                 WHERE n.apy_window_raw IS NOT NULL
                   AND n.apy_prev_window_raw IS NOT NULL
@@ -128,8 +128,8 @@ def _build_overview_pulse(snapshot: dict[str, object]) -> dict[str, object]:
     total_tvl = _to_float_or_none(snapshot.get("total_tvl_usd"))
     comparable_tvl = _to_float_or_none(snapshot.get("comparable_tvl_usd"))
     fresh_tvl = _to_float_or_none(snapshot.get("fresh_comparable_tvl_usd"))
-    latest_apy = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_window"))
-    previous_apy = _to_float_or_none(snapshot.get("tvl_weighted_safe_apy_prev_window"))
+    latest_apy = _to_float_or_none(snapshot.get("tvl_weighted_realized_apy_window"))
+    previous_apy = _to_float_or_none(snapshot.get("tvl_weighted_realized_apy_prev_window"))
     if eligible <= 0 or comparable <= 0 or latest_apy is None or previous_apy is None:
         return {"pulse": None}
 
@@ -186,91 +186,13 @@ def _overview_pulse_response() -> JSONResponse:
         with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 payload = _build_overview_pulse(_overview_pulse_snapshot(cur))
-    except Exception as exc:
-        return JSONResponse(status_code=503, content={"pulse": None, "error": str(exc)})
+    except Exception:
+        return JSONResponse(status_code=503, content={"pulse": None, "status": "unavailable"})
 
     return JSONResponse(status_code=200, content=payload)
 
 
-def _dau_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
-    cur.execute(
-        """
-        SELECT status, started_at, ended_at, records, error_summary
-        FROM ingestion_runs
-        WHERE job_name = 'product_dau'
-        ORDER BY id DESC
-        LIMIT 1
-        """
-    )
-    row = cur.fetchone()
-    if not row:
-        return None
-    return {
-        "status": row["status"],
-        "started_at": row["started_at"].isoformat() if row["started_at"] else None,
-        "ended_at": row["ended_at"].isoformat() if row["ended_at"] else None,
-        "records": row["records"],
-        "error_summary": row["error_summary"],
-    }
-
-
-def _dau_trailing_24h(cur: psycopg.Cursor) -> dict[str, object]:
-    cur.execute(
-        """
-        SELECT
-            COUNT(DISTINCT user_account) AS dau_total,
-            COUNT(DISTINCT CASE WHEN product_type = 'vault' THEN user_account END) AS dau_vaults,
-            COUNT(DISTINCT CASE WHEN product_type = 'styfi' THEN user_account END) AS dau_styfi,
-            COUNT(DISTINCT CASE WHEN product_type = 'styfix' THEN user_account END) AS dau_styfix
-        FROM product_interactions
-        WHERE block_time >= NOW() - INTERVAL '24 hours'
-        """
-    )
-    row = cur.fetchone() or {}
-    return {
-        "dau_total": int(row.get("dau_total") or 0),
-        "dau_vaults": int(row.get("dau_vaults") or 0),
-        "dau_styfi": int(row.get("dau_styfi") or 0),
-        "dau_styfix": int(row.get("dau_styfix") or 0),
-    }
-
-
-def _dau_daily_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, object]]:
-    cur.execute(
-        """
-        WITH day_series AS (
-            SELECT generate_series(
-                (CURRENT_DATE - (%(days)s::int - 1)),
-                CURRENT_DATE,
-                INTERVAL '1 day'
-            )::date AS day_utc
-        )
-        SELECT
-            s.day_utc,
-            COALESCE(d.dau_total, 0) AS dau_total,
-            COALESCE(d.dau_vaults, 0) AS dau_vaults,
-            COALESCE(d.dau_styfi, 0) AS dau_styfi,
-            COALESCE(d.dau_styfix, 0) AS dau_styfix
-        FROM day_series s
-        LEFT JOIN product_dau_daily d ON d.day_utc = s.day_utc
-        ORDER BY s.day_utc
-        """,
-        {"days": days},
-    )
-    rows = cur.fetchall()
-    return [
-        {
-            "day_utc": row["day_utc"].isoformat() if row["day_utc"] else None,
-            "dau_total": int(row["dau_total"] or 0),
-            "dau_vaults": int(row["dau_vaults"] or 0),
-            "dau_styfi": int(row["dau_styfi"] or 0),
-            "dau_styfix": int(row["dau_styfix"] or 0),
-        }
-        for row in rows
-    ]
-
-
-def _harvest_where_clause(*, chain_id: int | None, vault_address: str | None) -> tuple[str, dict[str, object]]:
+def _report_where_clause(*, chain_id: int | None, vault_address: str | None) -> tuple[str, dict[str, object]]:
     clauses: list[str] = []
     params: dict[str, object] = {}
     if chain_id is not None:
@@ -284,7 +206,7 @@ def _harvest_where_clause(*, chain_id: int | None, vault_address: str | None) ->
     return " AND " + " AND ".join(clauses), params
 
 
-def _harvest_meaningful_clause(meaningful_only: bool) -> str:
+def _report_meaningful_clause(meaningful_only: bool) -> str:
     if not meaningful_only:
         return ""
     return """
@@ -297,41 +219,19 @@ def _harvest_meaningful_clause(meaningful_only: bool) -> str:
     """
 
 
-def _harvest_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
-    cur.execute(
-        """
-        SELECT status, started_at, ended_at, records, error_summary
-        FROM ingestion_runs
-        WHERE job_name = 'vault_harvests'
-        ORDER BY id DESC
-        LIMIT 1
-        """
-    )
-    row = cur.fetchone()
-    if not row:
-        return None
-    return {
-        "status": row["status"],
-        "started_at": row["started_at"].isoformat() if row["started_at"] else None,
-        "ended_at": row["ended_at"].isoformat() if row["ended_at"] else None,
-        "records": row["records"],
-        "error_summary": row["error_summary"],
-    }
-
-
-def _harvest_trailing_24h(
+def _report_trailing_24h(
     cur: psycopg.Cursor,
     *,
     chain_id: int | None,
     vault_address: str | None,
     meaningful_only: bool = False,
 ) -> dict[str, object]:
-    where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
-    meaningful_sql = _harvest_meaningful_clause(meaningful_only)
+    where_sql, params = _report_where_clause(chain_id=chain_id, vault_address=vault_address)
+    meaningful_sql = _report_meaningful_clause(meaningful_only)
     cur.execute(
         f"""
         SELECT
-            COUNT(*) AS harvest_count,
+            COUNT(*) AS report_count,
             COUNT(DISTINCT h.vault_address) AS vault_count,
             COUNT(DISTINCT h.strategy_address) AS strategy_count
         FROM vault_harvests h
@@ -343,37 +243,27 @@ def _harvest_trailing_24h(
     )
     row = cur.fetchone() or {}
     return {
-        "harvest_count": int(row.get("harvest_count") or 0),
+        "report_count": int(row.get("report_count") or 0),
         "vault_count": int(row.get("vault_count") or 0),
         "strategy_count": int(row.get("strategy_count") or 0),
     }
 
 
-def _harvest_chain_rollups(
+def _report_chain_facets(
     cur: psycopg.Cursor,
     *,
     days: int,
-    chain_id: int | None,
-    vault_address: str | None,
     meaningful_only: bool = False,
 ) -> list[dict[str, object]]:
-    where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
-    meaningful_sql = _harvest_meaningful_clause(meaningful_only)
-    params["days"] = days
+    params: dict[str, object] = {"days": days}
+    meaningful_sql = _report_meaningful_clause(meaningful_only)
     cur.execute(
         f"""
-        SELECT
-            h.chain_id,
-            COUNT(*) AS harvest_count,
-            COUNT(DISTINCT h.vault_address) AS vault_count,
-            COUNT(DISTINCT h.strategy_address) AS strategy_count,
-            MAX(h.block_time) AS last_harvest_at
+        SELECT DISTINCT h.chain_id
         FROM vault_harvests h
         WHERE h.block_time >= NOW() - (%(days)s * INTERVAL '1 day')
         {meaningful_sql}
-        {where_sql}
-        GROUP BY h.chain_id
-        ORDER BY harvest_count DESC, h.chain_id
+        ORDER BY h.chain_id
         """,
         params,
     )
@@ -382,112 +272,12 @@ def _harvest_chain_rollups(
         {
             "chain_id": int(row["chain_id"]),
             "chain_label": _chain_label(int(row["chain_id"])),
-            "harvest_count": int(row["harvest_count"] or 0),
-            "vault_count": int(row["vault_count"] or 0),
-            "strategy_count": int(row["strategy_count"] or 0),
-            "last_harvest_at": row["last_harvest_at"].isoformat() if row["last_harvest_at"] else None,
         }
         for row in rows
     ]
 
 
-def _harvest_daily_by_chain(
-    cur: psycopg.Cursor,
-    *,
-    days: int,
-    chain_id: int | None,
-    vault_address: str | None,
-    meaningful_only: bool = False,
-) -> list[dict[str, object]]:
-    if vault_address or meaningful_only:
-        where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
-        meaningful_sql = _harvest_meaningful_clause(meaningful_only)
-        params["days"] = days
-        cur.execute(
-            f"""
-            WITH day_series AS (
-                SELECT generate_series(
-                    (CURRENT_DATE - (%(days)s::int - 1)),
-                    CURRENT_DATE,
-                    INTERVAL '1 day'
-                )::date AS day_utc
-            ),
-            chain_series AS (
-                SELECT DISTINCT h.chain_id
-                FROM vault_harvests h
-                WHERE TRUE
-                {meaningful_sql}
-                {where_sql}
-            )
-            SELECT
-                s.day_utc,
-                c.chain_id,
-                COALESCE(COUNT(h.tx_hash), 0) AS harvest_count,
-                COALESCE(COUNT(DISTINCT h.vault_address), 0) AS vault_count,
-                COALESCE(COUNT(DISTINCT h.strategy_address), 0) AS strategy_count
-            FROM day_series s
-            CROSS JOIN chain_series c
-            LEFT JOIN vault_harvests h
-              ON (h.block_time AT TIME ZONE 'UTC')::date = s.day_utc
-             AND h.chain_id = c.chain_id
-             AND h.block_time >= CURRENT_DATE - (%(days)s::int - 1)
-             {meaningful_sql}
-             {where_sql}
-            GROUP BY s.day_utc, c.chain_id
-            ORDER BY s.day_utc, c.chain_id
-            """,
-            params,
-        )
-    else:
-        params = {"days": days}
-        where_sql = ""
-        if chain_id is not None:
-            where_sql = "WHERE d.chain_id = %(chain_id)s"
-            params["chain_id"] = chain_id
-        cur.execute(
-            f"""
-            WITH day_series AS (
-                SELECT generate_series(
-                    (CURRENT_DATE - (%(days)s::int - 1)),
-                    CURRENT_DATE,
-                    INTERVAL '1 day'
-                )::date AS day_utc
-            ),
-            chain_series AS (
-                SELECT DISTINCT chain_id
-                FROM vault_harvest_daily_chain d
-                {where_sql}
-            )
-            SELECT
-                s.day_utc,
-                c.chain_id,
-                COALESCE(d.harvest_count, 0) AS harvest_count,
-                COALESCE(d.vault_count, 0) AS vault_count,
-                COALESCE(d.strategy_count, 0) AS strategy_count
-            FROM day_series s
-            CROSS JOIN chain_series c
-            LEFT JOIN vault_harvest_daily_chain d
-              ON d.day_utc = s.day_utc
-             AND d.chain_id = c.chain_id
-            ORDER BY s.day_utc, c.chain_id
-            """,
-            params,
-        )
-    rows = cur.fetchall()
-    return [
-        {
-            "day_utc": row["day_utc"].isoformat() if row["day_utc"] else None,
-            "chain_id": int(row["chain_id"]),
-            "chain_label": _chain_label(int(row["chain_id"])),
-            "harvest_count": int(row["harvest_count"] or 0),
-            "vault_count": int(row["vault_count"] or 0),
-            "strategy_count": int(row["strategy_count"] or 0),
-        }
-        for row in rows
-    ]
-
-
-def _harvest_recent(
+def _recent_reports(
     cur: psycopg.Cursor,
     *,
     days: int,
@@ -496,10 +286,10 @@ def _harvest_recent(
     limit: int,
     meaningful_only: bool = False,
 ) -> list[dict[str, object]]:
-    where_sql, params = _harvest_where_clause(chain_id=chain_id, vault_address=vault_address)
+    where_sql, params = _report_where_clause(chain_id=chain_id, vault_address=vault_address)
     params["days"] = days
     params["limit"] = limit
-    meaningful_sql = _harvest_meaningful_clause(meaningful_only)
+    meaningful_sql = _report_meaningful_clause(meaningful_only)
     cur.execute(
         f"""
         SELECT

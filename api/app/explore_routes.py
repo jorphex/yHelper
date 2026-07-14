@@ -7,56 +7,37 @@ import psycopg
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
-from app.accounting_service import _protocol_context_snapshot
-
 from app.analytics_service import (
+    _bounded_momentum_sql,
+    _bounded_realized_apy_sql,
     _changes_base_cte,
     _composition_filtered_cte,
     _fetch_change_movers,
-    _quality_score_sql,
-    _regime_case_sql,
-    _safe_apy_sql,
-    _safe_momentum_sql,
 )
 from app.common import (
-    _alias_realized_apy_fields,
-    _alias_realized_apy_many,
-    _alias_realized_coverage_fields,
-    _apply_aliases_many,
-    _raw_highlighted_sql,
-    _raw_migration_available_sql,
-    _raw_retired_sql,
-    _raw_risk_level_sql,
-    _raw_strategies_count_sql,
     _market_filter_sql,
     _market_group_sql,
     _rank_gate_filter_sql,
     _resolve_universe_gate,
-    _to_float_or_none,
     _user_visible_filter_sql,
 )
 from app.config import APY_MAX, APY_MIN, DATABASE_URL
-from app.meta_service import _freshness_snapshot
+from app.models import ChangesResponse, CompositionResponse, DiscoverResponse
 
 router = APIRouter()
 
 
-@router.get("/api/discover")
-async def discover(
+@router.get("/api/discover", response_model=DiscoverResponse)
+def discover(
     limit: int = Query(default=50, ge=1, le=250),
     offset: int = Query(default=0, ge=0),
     chain_id: int | None = Query(default=None),
-    category: str | None = Query(default=None),
-    token_symbol: str | None = Query(default=None),
     market: Literal["all", "stablecoins", "eth", "bitcoin", "other"] = "all",
     universe: Literal["core", "extended", "raw"] = "core",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
     min_points: int | None = Query(default=None, ge=0),
     max_vaults: int | None = Query(default=None, ge=0),
-    include_retired: bool = Query(default=False),
-    migration_only: bool = Query(default=False),
-    highlighted_only: bool = Query(default=False),
-    sort_by: Literal["quality", "tvl", "est_apy", "apy_7d", "apy_30d", "momentum", "consistency"] = "tvl",
+    sort_by: Literal["tvl", "est_apy", "apy_30d", "momentum"] = "tvl",
     direction: Literal["asc", "desc"] = "desc",
 ) -> dict[str, object]:
     universe_gate = _resolve_universe_gate(
@@ -65,24 +46,15 @@ async def discover(
     min_tvl_usd = float(universe_gate["min_tvl_usd"])
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
-    safe_momentum_sql = _safe_momentum_sql()
-    retired_sql = _raw_retired_sql("d")
-    highlighted_sql = _raw_highlighted_sql("d")
-    migration_sql = _raw_migration_available_sql("d")
-    risk_level_sql = _raw_risk_level_sql("d")
-    strategies_count_sql = _raw_strategies_count_sql("d")
+    realized_apy_sql = _bounded_realized_apy_sql()
+    momentum_sql = _bounded_momentum_sql()
     order_map = {
-        "quality": _quality_score_sql(),
         "tvl": "COALESCE(d.tvl_usd, 0.0)",
         "est_apy": "COALESCE(d.est_apy, -999999.0)",
-        "apy_7d": "COALESCE(m.apy_7d, -999999.0)",
-        "apy_30d": "COALESCE(m.apy_30d, -999999.0)",
-        "momentum": f"COALESCE(({safe_momentum_sql}), -999999.0)",
-        "consistency": "COALESCE(m.consistency_score, -999999.0)",
+        "apy_30d": f"COALESCE({realized_apy_sql}, -999999.0)",
+        "momentum": f"COALESCE({momentum_sql}, -999999.0)",
     }
-    order_expr = order_map[sort_by]
-    order_dir = "ASC" if direction == "asc" else "DESC"
-    scope_filters = [
+    base_filters = [
         _user_visible_filter_sql("d", include_retired=False),
         "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s",
         _market_filter_sql("d"),
@@ -94,31 +66,16 @@ async def discover(
         "offset": offset,
         "market": market,
     }
-    if migration_only:
-        scope_filters.append(f"{migration_sql} = TRUE")
-    if highlighted_only:
-        scope_filters.append(f"{highlighted_sql} = TRUE")
-    if chain_id is not None:
-        scope_filters.append("d.chain_id = %(chain_id)s")
-        params["chain_id"] = chain_id
-    if category:
-        scope_filters.append("LOWER(COALESCE(d.category, '')) = LOWER(%(category)s)")
-        params["category"] = category
-    if token_symbol:
-        scope_filters.append("LOWER(COALESCE(d.token_symbol, '')) = LOWER(%(token_symbol)s)")
-        params["token_symbol"] = token_symbol
-    rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
-    if rank_filter_sql:
-        scope_filters.append(rank_filter_sql)
+    rank_filter = _rank_gate_filter_sql("d", max_vaults=max_vaults)
+    if rank_filter:
+        base_filters.append(rank_filter)
         params["max_vaults"] = max_vaults
-
-    filters = [*scope_filters, "COALESCE(m.points_count, 0) >= %(min_points)s"]
-    scope_where_sql = " AND ".join(scope_filters)
-    where_sql = " AND ".join(filters)
-    regime_sql = _regime_case_sql()
-    quality_sql = _quality_score_sql()
-    safe_apy_sql = _safe_apy_sql()
-    scoreable_apy_sql = "m.apy_30d IS NOT NULL"
+    base_where = " AND ".join(base_filters)
+    eligible_where = f"{base_where} AND COALESCE(m.points_count, 0) >= %(min_points)s"
+    selected_where = eligible_where
+    if chain_id is not None:
+        selected_where += " AND d.chain_id = %(chain_id)s"
+        params["chain_id"] = chain_id
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
@@ -127,216 +84,104 @@ async def discover(
                 SELECT
                     COUNT(*) AS visible_vaults,
                     COUNT(*) FILTER (
-                        WHERE {scoreable_apy_sql}
-                          AND COALESCE(m.points_count, 0) >= %(min_points)s
-                    ) AS with_metrics,
+                        WHERE m.apy_30d IS NOT NULL AND COALESCE(m.points_count, 0) >= %(min_points)s
+                    ) AS with_realized_apy,
                     COUNT(*) FILTER (
-                        WHERE m.vault_address IS NULL
-                           OR (
-                                COALESCE(m.points_count, 0) >= %(min_points)s
-                                AND NOT ({scoreable_apy_sql})
-                           )
-                    ) AS missing_metrics,
-                    COUNT(*) FILTER (
-                        WHERE m.vault_address IS NOT NULL
-                          AND COALESCE(m.points_count, 0) < %(min_points)s
-                    ) AS low_points,
-                    SUM(COALESCE(d.tvl_usd, 0.0)) AS visible_tvl_usd,
-                    SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (
-                        WHERE {scoreable_apy_sql}
-                          AND COALESCE(m.points_count, 0) >= %(min_points)s
-                    ) AS with_metrics_tvl_usd
+                        WHERE m.apy_30d IS NULL OR COALESCE(m.points_count, 0) < %(min_points)s
+                    ) AS without_realized_apy
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
-                WHERE {scope_where_sql}
+                LEFT JOIN vault_metrics_latest m
+                  ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
+                WHERE {base_where}
                 """,
                 params,
             )
             coverage = cur.fetchone() or {}
-
             cur.execute(
                 f"""
-                SELECT COUNT(*) AS total
+                SELECT d.chain_id, COUNT(*) AS vaults
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
-                WHERE {where_sql}
+                JOIN vault_metrics_latest m
+                  ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
+                WHERE {eligible_where}
+                GROUP BY d.chain_id
+                ORDER BY SUM(COALESCE(d.tvl_usd, 0.0)) DESC, d.chain_id
                 """,
                 params,
             )
-            total = cur.fetchone()["total"]
-
+            chains = cur.fetchall()
             cur.execute(
                 f"""
                 SELECT
                     COUNT(*) AS vaults,
-                    COUNT(DISTINCT d.chain_id) AS chains,
-                    COUNT(DISTINCT LOWER(COALESCE(d.token_symbol, ''))) FILTER (WHERE COALESCE(d.token_symbol, '') <> '') AS tokens,
-                    COUNT(DISTINCT LOWER(COALESCE(d.category, ''))) FILTER (WHERE COALESCE(d.category, '') <> '') AS categories,
                     SUM(COALESCE(d.tvl_usd, 0.0)) AS total_tvl_usd,
-                    AVG(d.est_apy) AS avg_est_apy,
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY d.est_apy) AS median_est_apy,
-                    AVG({safe_apy_sql}) AS avg_safe_apy_30d,
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {safe_apy_sql}) AS median_safe_apy_30d,
-                    AVG({safe_momentum_sql}) AS avg_momentum_7d_30d,
-                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {safe_momentum_sql}) AS median_momentum_7d_30d,
-                    AVG(m.consistency_score) AS avg_consistency_score,
-                    COUNT(*) FILTER (WHERE {retired_sql} = TRUE) AS retired_vaults,
-                    COUNT(*) FILTER (WHERE {highlighted_sql} = TRUE) AS highlighted_vaults,
-                    COUNT(*) FILTER (WHERE {migration_sql} = TRUE) AS migration_ready_vaults,
-                    AVG({strategies_count_sql})::DOUBLE PRECISION AS avg_strategies_per_vault,
                     CASE
-                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE d.est_apy IS NOT NULL) > 0
-                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * d.est_apy) FILTER (WHERE d.est_apy IS NOT NULL)
-                             / SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE d.est_apy IS NOT NULL)
+                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE m.apy_30d IS NOT NULL) > 0
+                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * {realized_apy_sql})
+                             FILTER (WHERE m.apy_30d IS NOT NULL)
+                             / SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE m.apy_30d IS NOT NULL)
                         ELSE NULL
-                    END AS tvl_weighted_est_apy,
-                    CASE
-                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE {safe_apy_sql} IS NOT NULL) > 0
-                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * {safe_apy_sql}) FILTER (WHERE {safe_apy_sql} IS NOT NULL)
-                             / SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE {safe_apy_sql} IS NOT NULL)
-                        ELSE NULL
-                    END AS tvl_weighted_safe_apy_30d,
-                    COUNT(*) FILTER (WHERE {safe_apy_sql} < 0.0) AS apy_negative_vaults,
-                    COUNT(*) FILTER (WHERE {safe_apy_sql} >= 0.0 AND {safe_apy_sql} < 0.05) AS apy_low_vaults,
-                    COUNT(*) FILTER (WHERE {safe_apy_sql} >= 0.05 AND {safe_apy_sql} < 0.15) AS apy_mid_vaults,
-                    COUNT(*) FILTER (WHERE {safe_apy_sql} >= 0.15) AS apy_high_vaults
+                    END AS tvl_weighted_realized_apy_30d
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
-                WHERE {where_sql}
+                JOIN vault_metrics_latest m
+                  ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
+                WHERE {selected_where}
                 """,
                 params,
             )
             summary = cur.fetchone() or {}
-
-            cur.execute(
-                f"""
-                SELECT
-                    {risk_level_sql} AS risk_level,
-                    COUNT(*) AS vaults,
-                    SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
-                FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
-                WHERE {where_sql}
-                GROUP BY risk_level
-                ORDER BY
-                    CASE
-                        WHEN {risk_level_sql} = '-1' THEN -1
-                        WHEN {risk_level_sql} ~ '^[0-9]+$' THEN {risk_level_sql}::INT
-                        ELSE 999
-                    END,
-                    tvl_usd DESC NULLS LAST
-                LIMIT 8
-                """,
-                params,
-            )
-            risk_mix = cur.fetchall()
-
-            cur.execute(
-                f"""
-                SELECT
-                    {regime_sql} AS regime,
-                    COUNT(*) AS vaults,
-                    SUM(COALESCE(d.tvl_usd, 0.0)) AS tvl_usd
-                FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
-                WHERE {where_sql}
-                GROUP BY regime
-                ORDER BY tvl_usd DESC NULLS LAST, vaults DESC
-                LIMIT 8
-                """,
-                params,
-            )
-            regime_mix = cur.fetchall()
-
+            total = int(summary.pop("vaults", 0) or 0)
             cur.execute(
                 f"""
                 SELECT
                     d.vault_address,
                     d.chain_id,
-                    d.name,
                     d.symbol,
-                    d.category,
                     {_market_group_sql("d")} AS market,
-                    d.kind,
-                    d.version,
-                    d.token_symbol,
                     d.tvl_usd,
-                    d.est_apy AS est_apy,
-                    m.points_count,
-                    m.last_point_time,
-                    {risk_level_sql} AS risk_level,
-                    {retired_sql} AS is_retired,
-                    {highlighted_sql} AS is_highlighted,
-                    {migration_sql} AS migration_available,
-                    {strategies_count_sql} AS strategies_count,
-                    m.apy_7d,
-                    m.apy_30d,
-                    m.apy_90d,
-                    {safe_apy_sql} AS safe_apy_30d,
-                    m.vol_30d,
-                    {safe_momentum_sql} AS momentum_7d_30d,
-                    m.consistency_score,
-                    {quality_sql} AS quality_score,
-                    {regime_sql} AS regime
+                    d.est_apy,
+                    {realized_apy_sql} AS realized_apy_30d,
+                    {momentum_sql} AS momentum_7d_30d
                 FROM vault_dim d
-                LEFT JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
-                WHERE {where_sql}
-                ORDER BY {order_expr} {order_dir}, d.tvl_usd DESC
+                JOIN vault_metrics_latest m
+                  ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
+                WHERE {selected_where}
+                ORDER BY {order_map[sort_by]} {"ASC" if direction == "asc" else "DESC"}, d.tvl_usd DESC
                 LIMIT %(limit)s OFFSET %(offset)s
                 """,
                 params,
             )
             rows = cur.fetchall()
 
-    visible_vaults = int(coverage.get("visible_vaults") or 0)
-    with_metrics = int(coverage.get("with_metrics") or 0)
-    low_points = int(coverage.get("low_points") or 0)
-    missing_metrics = int(coverage.get("missing_metrics") or 0)
-    coverage["missing_or_low_points"] = max(0, visible_vaults - with_metrics)
-    coverage["coverage_ratio"] = (with_metrics / visible_vaults) if visible_vaults > 0 else None
-    _alias_realized_apy_fields(summary)
-    _alias_realized_coverage_fields(coverage)
-    _alias_realized_apy_many(rows)
-
+    visible = int(coverage.get("visible_vaults") or 0)
+    covered = int(coverage.get("with_realized_apy") or 0)
     return {
         "filters": {
             "universe": universe,
-            "chain_id": chain_id,
-            "category": category,
-            "token_symbol": token_symbol,
             "market": market,
+            "chain_id": chain_id,
             "min_tvl_usd": min_tvl_usd,
             "min_points": min_points,
             "max_vaults": max_vaults,
-            "include_retired": include_retired,
-            "migration_only": migration_only,
-            "highlighted_only": highlighted_only,
             "sort_by": sort_by,
             "direction": direction,
         },
-        "universe_gate": universe_gate,
+        "realized_apy_policy": {"kind": "bounded", "min": APY_MIN, "max": APY_MAX},
         "pagination": {"limit": limit, "offset": offset, "total": total},
         "summary": summary,
         "coverage": {
-            "visible_vaults": visible_vaults,
-            "with_metrics": with_metrics,
-            "with_realized_apy": with_metrics,
-            "missing_metrics": missing_metrics,
-            "low_points": low_points,
-            "missing_or_low_points": coverage["missing_or_low_points"],
-            "coverage_ratio": coverage["coverage_ratio"],
-            "visible_tvl_usd": _to_float_or_none(coverage.get("visible_tvl_usd")),
-            "with_metrics_tvl_usd": _to_float_or_none(coverage.get("with_metrics_tvl_usd")),
-            "with_realized_apy_tvl_usd": _to_float_or_none(coverage.get("with_metrics_tvl_usd")),
+            "visible_vaults": visible,
+            "with_realized_apy": covered,
+            "coverage_ratio": covered / visible if visible else None,
+            "without_realized_apy": int(coverage.get("without_realized_apy") or 0),
         },
-        "risk_mix": risk_mix,
-        "regime_mix": regime_mix,
+        "facets": {"chains": chains},
         "rows": rows,
     }
 
 
-@router.get("/api/composition")
-async def composition(
+@router.get("/api/composition", response_model=CompositionResponse)
+def composition(
     universe: Literal["core", "extended", "raw"] = "core",
     market: Literal["all", "stablecoins", "eth", "bitcoin", "other"] = "all",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
@@ -350,138 +195,44 @@ async def composition(
     min_tvl_usd = float(universe_gate["min_tvl_usd"])
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
-    params = {
+    params: dict[str, object] = {
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "top_n": top_n,
-        "apy_min": APY_MIN,
-        "apy_max": APY_MAX,
         "market": market,
     }
     if max_vaults is not None:
         params["max_vaults"] = max_vaults
     filtered_cte = _composition_filtered_cte(max_vaults=max_vaults, filter_market=True)
 
+    def breakdown(cur: psycopg.Cursor, key_sql: str, key_alias: str) -> list[dict]:
+        cur.execute(
+            filtered_cte
+            + f"""
+            SELECT {key_sql} AS {key_alias}, COUNT(*) AS vaults, SUM(tvl_usd) AS tvl_usd
+            FROM filtered
+            GROUP BY {key_sql}
+            ORDER BY tvl_usd DESC
+            LIMIT %(top_n)s
+            """,
+            params,
+        )
+        return cur.fetchall()
+
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                filtered_cte
-                + """
-                SELECT
-                    COUNT(*) AS vaults,
-                    SUM(tvl_usd) AS total_tvl_usd,
-                    AVG(safe_apy_30d) AS avg_safe_apy_30d
-                FROM filtered
-                """,
+                filtered_cte + " SELECT COUNT(*) AS vaults, SUM(tvl_usd) AS total_tvl_usd FROM filtered",
                 params,
             )
-            summary = cur.fetchone() or {"vaults": 0, "total_tvl_usd": 0.0, "avg_safe_apy_30d": None}
-            total_tvl = float(summary.get("total_tvl_usd") or 0.0)
-
-            cur.execute(
-                filtered_cte
-                + """
-                SELECT
-                    chain_id,
-                    COUNT(*) AS vaults,
-                    SUM(tvl_usd) AS tvl_usd,
-                    CASE
-                        WHEN SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL) > 0
-                        THEN SUM(tvl_usd * safe_apy_30d) FILTER (WHERE safe_apy_30d IS NOT NULL)
-                             / SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL)
-                        ELSE NULL
-                    END AS weighted_safe_apy_30d
-                FROM filtered
-                GROUP BY chain_id
-                ORDER BY tvl_usd DESC
-                LIMIT %(top_n)s
-                """,
-                params,
-            )
-            chains = cur.fetchall()
-
-            cur.execute(
-                filtered_cte
-                + """
-                SELECT
-                    market AS category,
-                    COUNT(*) AS vaults,
-                    SUM(tvl_usd) AS tvl_usd,
-                    CASE
-                        WHEN SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL) > 0
-                        THEN SUM(tvl_usd * safe_apy_30d) FILTER (WHERE safe_apy_30d IS NOT NULL)
-                             / SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL)
-                        ELSE NULL
-                    END AS weighted_safe_apy_30d
-                FROM filtered
-                GROUP BY market
-                ORDER BY tvl_usd DESC
-                LIMIT %(top_n)s
-                """,
-                params,
-            )
-            categories = cur.fetchall()
-
-            cur.execute(
-                filtered_cte
-                + """
-                SELECT
-                    token_symbol,
-                    COUNT(*) AS vaults,
-                    SUM(tvl_usd) AS tvl_usd,
-                    CASE
-                        WHEN SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL) > 0
-                        THEN SUM(tvl_usd * safe_apy_30d) FILTER (WHERE safe_apy_30d IS NOT NULL)
-                             / SUM(tvl_usd) FILTER (WHERE safe_apy_30d IS NOT NULL)
-                        ELSE NULL
-                    END AS weighted_safe_apy_30d
-                FROM filtered
-                GROUP BY token_symbol
-                ORDER BY tvl_usd DESC
-                LIMIT %(top_n)s
-                """,
-                params,
-            )
-            tokens = cur.fetchall()
-
-            cur.execute(
-                filtered_cte
-                + """
-                , chain_agg AS (
-                    SELECT chain_id::TEXT AS grp, SUM(tvl_usd) AS tvl
-                    FROM filtered
-                    GROUP BY chain_id
-                )
-                , category_agg AS (
-                    SELECT market AS grp, SUM(tvl_usd) AS tvl
-                    FROM filtered
-                    GROUP BY market
-                )
-                , token_agg AS (
-                    SELECT token_symbol AS grp, SUM(tvl_usd) AS tvl
-                    FROM filtered
-                    GROUP BY token_symbol
-                )
-                SELECT
-                    (SELECT SUM(POWER(c.tvl / NULLIF((SELECT SUM(tvl) FROM chain_agg), 0), 2)) FROM chain_agg c) AS chain_hhi,
-                    (SELECT SUM(POWER(ca.tvl / NULLIF((SELECT SUM(tvl) FROM category_agg), 0), 2)) FROM category_agg ca) AS category_hhi,
-                    (SELECT SUM(POWER(t.tvl / NULLIF((SELECT SUM(tvl) FROM token_agg), 0), 2)) FROM token_agg t) AS token_hhi
-                """,
-                params,
-            )
-            concentration = cur.fetchone() or {"chain_hhi": None, "category_hhi": None, "token_hhi": None}
-
-    def _share(rows: list[dict]) -> list[dict]:
-        if total_tvl <= 0:
-            return rows
+            summary = cur.fetchone() or {"vaults": 0, "total_tvl_usd": 0.0}
+            chains = breakdown(cur, "chain_id", "chain_id")
+            categories = breakdown(cur, "market", "category")
+            tokens = breakdown(cur, "token_symbol", "token_symbol")
+    total_tvl = float(summary.get("total_tvl_usd") or 0.0)
+    for rows in (chains, categories, tokens):
         for row in rows:
-            row["share_tvl"] = float(row.get("tvl_usd") or 0.0) / total_tvl
-        return rows
-
-    _alias_realized_apy_fields(summary)
-    _apply_aliases_many(chains, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
-    _apply_aliases_many(categories, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
-    _apply_aliases_many(tokens, {"weighted_realized_apy_30d": "weighted_safe_apy_30d"})
+            row["share_tvl"] = float(row.get("tvl_usd") or 0.0) / total_tvl if total_tvl else None
     return {
         "filters": {
             "universe": universe,
@@ -489,20 +240,16 @@ async def composition(
             "min_tvl_usd": min_tvl_usd,
             "min_points": min_points,
             "max_vaults": max_vaults,
-            "top_n": top_n,
-            "apy_bounds": {"min": APY_MIN, "max": APY_MAX},
         },
-        "universe_gate": universe_gate,
         "summary": summary,
-        "concentration": concentration,
-        "chains": _share(chains),
-        "categories": _share(categories),
-        "tokens": _share(tokens),
+        "chains": chains,
+        "categories": categories,
+        "tokens": tokens,
     }
 
 
-@router.get("/api/changes")
-async def changes(
+@router.get("/api/changes", response_model=ChangesResponse)
+def changes(
     window: Literal["24h", "7d", "30d"] = "7d",
     stale_threshold: Literal["auto", "24h", "7d", "30d"] = "auto",
     limit: int = Query(default=20, ge=1, le=80),
@@ -519,14 +266,15 @@ async def changes(
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
     window_seconds = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}[window]
-    threshold_seconds_map = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
-    stale_threshold_seconds = (
-        2 * window_seconds if stale_threshold == "auto" else threshold_seconds_map[stale_threshold]
-    )
-    params = {
+    threshold_seconds = {
+        "auto": 2 * window_seconds,
+        "24h": 86400,
+        "7d": 7 * 86400,
+        "30d": 30 * 86400,
+    }[stale_threshold]
+    params: dict[str, object] = {
         "window_sec": window_seconds,
-        "stale_threshold_sec": stale_threshold_seconds,
-        "limit": limit,
+        "stale_threshold_sec": threshold_seconds,
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
         "apy_min": APY_MIN,
@@ -537,154 +285,45 @@ async def changes(
     if max_vaults is not None:
         params["max_vaults"] = max_vaults
     base_cte = _changes_base_cte(max_vaults=max_vaults, filter_market=True)
-    regime_sql = _regime_case_sql("n")
+    comparable = "n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL"
 
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 base_cte
-                + """
+                + f"""
                 SELECT
                     COUNT(*) AS vaults_eligible,
-                    COUNT(*) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                    ) AS vaults_with_change,
-                    COUNT(*) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL
-                        AND n.apy_prev_window_raw IS NOT NULL
-                        AND n.age_seconds > %(stale_threshold_sec)s
-                    ) AS stale_vaults,
-                    SUM(COALESCE(n.tvl_usd, 0.0)) AS total_tvl_usd,
-                    AVG(n.safe_apy_window) AS avg_safe_apy_window,
-                    AVG(n.safe_apy_prev_window) AS avg_safe_apy_prev_window,
-                    AVG(n.safe_apy_window - n.safe_apy_prev_window) AS avg_delta,
-                    COUNT(*) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                          AND n.safe_apy_window > n.safe_apy_prev_window
-                    ) AS riser_vaults,
-                    COUNT(*) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                          AND n.safe_apy_window < n.safe_apy_prev_window
-                    ) AS faller_vaults,
-                    COUNT(*) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                          AND n.safe_apy_window = n.safe_apy_prev_window
-                    ) AS flat_vaults,
-                    SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                          AND n.safe_apy_window > n.safe_apy_prev_window
-                    ) AS riser_tvl_usd,
-                    SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                          AND n.safe_apy_window < n.safe_apy_prev_window
-                    ) AS faller_tvl_usd,
-                    CASE
-                        WHEN SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
-                            WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                        ) > 0
-                        THEN SUM(COALESCE(n.tvl_usd, 0.0) * (n.safe_apy_window - n.safe_apy_prev_window)) FILTER (
-                            WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                        ) / SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
-                            WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                        )
-                        ELSE NULL
-                    END AS tvl_weighted_delta,
-                    SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL
-                    ) AS tracked_tvl_usd,
-                    SUM(COALESCE(n.tvl_usd, 0.0)) FILTER (
-                        WHERE n.apy_window_raw IS NOT NULL
-                          AND n.apy_prev_window_raw IS NOT NULL
-                          AND n.age_seconds > %(stale_threshold_sec)s
-                    ) AS stale_tracked_tvl_usd
+                    COUNT(*) FILTER (WHERE {comparable}) AS vaults_with_change,
+                    SUM(n.tvl_usd) FILTER (WHERE {comparable}) AS tracked_tvl_usd,
+                    COUNT(*) FILTER (WHERE {comparable} AND n.realized_apy_window > n.realized_apy_prev_window) AS riser_vaults,
+                    COUNT(*) FILTER (WHERE {comparable} AND n.realized_apy_window < n.realized_apy_prev_window) AS faller_vaults,
+                    COUNT(*) FILTER (WHERE {comparable} AND n.realized_apy_window = n.realized_apy_prev_window) AS flat_vaults,
+                    SUM(n.tvl_usd) FILTER (WHERE {comparable} AND n.realized_apy_window > n.realized_apy_prev_window) AS riser_tvl_usd,
+                    SUM(n.tvl_usd) FILTER (WHERE {comparable} AND n.realized_apy_window < n.realized_apy_prev_window) AS faller_tvl_usd,
+                    CASE WHEN SUM(n.tvl_usd) FILTER (WHERE {comparable}) > 0
+                         THEN SUM(n.tvl_usd * (n.realized_apy_window - n.realized_apy_prev_window)) FILTER (WHERE {comparable})
+                              / SUM(n.tvl_usd) FILTER (WHERE {comparable})
+                         ELSE NULL END AS tvl_weighted_delta,
+                    MIN(n.age_seconds) FILTER (WHERE {comparable}) AS newest_comparison_age_seconds,
+                    COUNT(*) FILTER (WHERE {comparable} AND n.age_seconds > %(stale_threshold_sec)s) AS stale_comparisons
                 FROM normalized n
                 """,
                 params,
             )
             summary = cur.fetchone() or {}
-
-            cur.execute(
-                base_cte
-                + f"""
-                SELECT
-                    {regime_sql} AS regime,
-                    COUNT(*) AS vaults,
-                    SUM(COALESCE(n.tvl_usd, 0.0)) AS tvl_usd
-                FROM normalized n
-                GROUP BY regime
-                ORDER BY tvl_usd DESC NULLS LAST
-                """,
-                params,
-            )
-            regime_counts = cur.fetchall()
-
             movers = _fetch_change_movers(cur, base_cte=base_cte, params=params, limit=limit)
-
-            cur.execute(
-                base_cte
-                + """
-                SELECT
-                    n.vault_address,
-                    n.chain_id,
-                    n.name,
-                    n.symbol,
-                    n.token_symbol,
-                    n.category,
-                    n.tvl_usd,
-                    n.points_count,
-                    n.last_point_time,
-                    n.safe_apy_window,
-                    n.safe_apy_prev_window,
-                    (n.safe_apy_window - n.safe_apy_prev_window) AS delta_apy,
-                    n.age_seconds
-                FROM normalized n
-                WHERE n.age_seconds > %(stale_threshold_sec)s
-                ORDER BY n.age_seconds DESC, n.tvl_usd DESC
-                LIMIT %(limit)s
-                """,
-                params,
-            )
-            stale = cur.fetchall()
-
-            protocol_context = _protocol_context_snapshot(cur)
-        freshness = _freshness_snapshot(
-            conn,
-            stale_threshold_seconds=stale_threshold_seconds,
-            split_limit=8,
-            min_tvl_usd=min_tvl_usd,
-        )
-
-    if freshness is not None:
-        tracked = int(summary.get("vaults_with_change") or 0)
-        stale_vaults = int(summary.get("stale_vaults") or 0)
-        freshness["window_stale_vaults"] = stale_vaults
-        freshness["window_tracked_vaults"] = tracked
-        freshness["window_stale_ratio"] = (stale_vaults / tracked) if tracked > 0 else None
-    _alias_realized_apy_fields(summary)
-    _alias_realized_apy_many(movers.get("risers", []))
-    _alias_realized_apy_many(movers.get("fallers", []))
-    _alias_realized_apy_many(movers.get("largest_abs_delta", []))
-    _alias_realized_apy_many(stale)
-
+    tracked = int(summary.get("vaults_with_change") or 0)
+    stale = int(summary.pop("stale_comparisons", 0) or 0)
+    newest_age = summary.pop("newest_comparison_age_seconds", None)
     return {
-        "filters": {
-            "universe": universe,
-            "market": market,
-            "window": window,
-            "stale_threshold": stale_threshold,
-            "limit": limit,
-            "min_tvl_usd": min_tvl_usd,
-            "min_points": min_points,
-            "max_vaults": max_vaults,
-            "window_seconds": window_seconds,
-            "stale_threshold_seconds": stale_threshold_seconds,
-            "apy_bounds": {"min": APY_MIN, "max": APY_MAX},
-        },
-        "universe_gate": universe_gate,
+        "window": {"name": window, "stale_after_seconds": threshold_seconds},
+        "realized_apy_policy": {"kind": "bounded", "min": APY_MIN, "max": APY_MAX},
         "summary": summary,
-        "protocol_context": protocol_context,
-        "freshness": freshness,
-        "regime_counts": regime_counts,
+        "freshness": {
+            "newest_comparison_age_seconds": newest_age,
+            "current_comparisons": max(0, tracked - stale),
+            "tracked_comparisons": tracked,
+        },
         "movers": movers,
-        "stale": stale,
     }

@@ -43,25 +43,21 @@ def check_with_retries(url: str, timeout: float, retries: int, retry_delay: floa
 
 
 def run_checks(base_url: str, timeout: float, retries: int, retry_delay: float, allow_status: set[int]) -> int:
-    routes = ["/", "/explore", "/momentum", "/structure", "/styfi"]
+    routes = ["/", "/explore", "/momentum", "/harvests", "/structure", "/styfi"]
     apis = [
-        "/api/overview",
+        "/api/meta/status",
         "/api/meta/freshness?threshold=24h",
         "/api/meta/coverage?min_tvl_usd=100000&min_points=30&split_limit=8",
         "/api/meta/protocol-context",
-        "/api/meta/movers?window=7d&limit=5&min_tvl_usd=100000&min_points=30",
         "/api/meta/social-preview",
         "/api/styfi",
         "/api/discover?limit=1",
-        "/api/regimes?limit=5",
-        "/api/regimes/transitions?limit=4",
-        "/api/regimes/transitions/daily?days=30&group_by=none",
-        "/api/chains/rollups",
-        "/api/trends/daily?days=30&group_by=none",
+        "/api/trends/daily?days=30",
         "/api/assets?limit=5",
-        "/api/assets/USDC/venues?limit=5",
-        "/api/composition?top_n=6&crowding_limit=10",
+        "/api/assets/USDC/vaults?limit=5",
+        "/api/composition?top_n=6",
         "/api/changes?window=7d&limit=5",
+        "/api/reports?days=30&limit=5",
     ]
 
     failures = 0

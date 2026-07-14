@@ -43,7 +43,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    overview_url = args.base_url.rstrip("/") + "/api/overview"
+    overview_url = args.base_url.rstrip("/") + "/api/meta/status"
     freshness_url = args.base_url.rstrip("/") + "/api/meta/freshness?threshold=24h"
 
     try:

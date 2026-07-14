@@ -3,8 +3,6 @@ from __future__ import annotations
 import psycopg
 
 from app.common import (
-    _alias_realized_apy_fields,
-    _alias_realized_apy_many,
     _market_filter_sql,
     _market_group_sql,
     _rank_gate_filter_sql,
@@ -13,44 +11,21 @@ from app.common import (
 from app.config import APY_MAX, APY_MIN, MOMENTUM_ABS_MAX
 
 
-def _regime_from_momentum_sql(momentum_sql: str, *, vol_sql: str = "m.vol_30d") -> str:
-    return """
-    CASE
-        WHEN {vol_sql} IS NULL OR {momentum_sql} IS NULL THEN 'unknown'
-        WHEN {vol_sql} >= 0.20 THEN 'choppy'
-        WHEN {momentum_sql} >= 0.010 THEN 'rising'
-        WHEN {momentum_sql} <= -0.010 THEN 'falling'
-        ELSE 'stable'
-    END
-    """.format(vol_sql=vol_sql, momentum_sql=momentum_sql)
-
-
 def _bounded_metric_sql(expr: str, lower: float | str, upper: float | str) -> str:
     return f"CASE WHEN {expr} IS NULL THEN NULL ELSE LEAST(GREATEST({expr}, {lower}), {upper}) END"
 
 
-def _safe_apy_sql() -> str:
+def _bounded_realized_apy_sql() -> str:
     return _bounded_metric_sql("m.apy_30d", APY_MIN, APY_MAX)
 
 
-def _safe_momentum_sql(alias: str = "m") -> str:
+def _bounded_momentum_sql(alias: str = "m") -> str:
     lower = -abs(MOMENTUM_ABS_MAX)
     upper = abs(MOMENTUM_ABS_MAX)
     return _bounded_metric_sql(f"{alias}.momentum_7d_30d", lower, upper)
 
 
-def _regime_case_sql(alias: str = "m") -> str:
-    safe_momentum = _safe_momentum_sql(alias)
-    return _regime_from_momentum_sql(safe_momentum, vol_sql=f"{alias}.vol_30d")
-
-
-def _quality_score_sql() -> str:
-    safe_apy = _safe_apy_sql()
-    return f"({safe_apy} - 0.5 * COALESCE(m.vol_30d, 0.0))"
-
-
 def _composition_filtered_cte(*, max_vaults: int | None, filter_market: bool = False) -> str:
-    safe_momentum_sql = _safe_momentum_sql("m")
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
     market_clause = f"AND {_market_filter_sql('d')}" if filter_market else ""
@@ -63,10 +38,7 @@ def _composition_filtered_cte(*, max_vaults: int | None, filter_market: bool = F
             {_market_group_sql("d")} AS market,
             COALESCE(NULLIF(d.token_symbol, ''), 'unknown') AS token_symbol,
             COALESCE(NULLIF(d.symbol, ''), d.vault_address) AS symbol,
-            COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
-            {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d,
-            {safe_momentum_sql} AS momentum_7d_30d,
-            m.consistency_score
+            COALESCE(d.tvl_usd, 0.0) AS tvl_usd
         FROM vault_dim d
         JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
         WHERE
@@ -80,7 +52,7 @@ def _composition_filtered_cte(*, max_vaults: int | None, filter_market: bool = F
 
 
 def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) -> str:
-    safe_momentum_sql = _safe_momentum_sql("m")
+    bounded_momentum_sql = _bounded_momentum_sql("m")
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
     market_clause = f"AND {_market_filter_sql('d')}" if filter_market else ""
@@ -96,12 +68,10 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
             {_market_group_sql("d")} AS market,
             COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
             d.est_apy,
-            {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_30d,
+            {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS realized_apy_30d,
             m.points_count,
             m.last_point_time,
-            {safe_momentum_sql} AS momentum_7d_30d,
-            m.consistency_score,
-            m.vol_30d
+            {bounded_momentum_sql} AS momentum_7d_30d
         FROM vault_dim d
         JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
         WHERE
@@ -130,12 +100,10 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
             e.market,
             e.tvl_usd,
             e.est_apy,
-            e.safe_apy_30d,
+            e.realized_apy_30d,
             e.points_count,
             e.last_point_time,
             e.momentum_7d_30d,
-            e.consistency_score,
-            e.vol_30d,
             l.latest_ts,
             latest_point.ts AS latest_point_ts,
             latest_point.pps_raw AS latest_pps,
@@ -198,8 +166,8 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
     normalized AS (
         SELECT
             s.*,
-            {_bounded_metric_sql("s.apy_window_raw", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_window,
-            {_bounded_metric_sql("s.apy_prev_window_raw", "%(apy_min)s", "%(apy_max)s")} AS safe_apy_prev_window
+            {_bounded_metric_sql("s.apy_window_raw", "%(apy_min)s", "%(apy_max)s")} AS realized_apy_window,
+            {_bounded_metric_sql("s.apy_prev_window_raw", "%(apy_min)s", "%(apy_max)s")} AS realized_apy_prev_window
         FROM scored s
     )
     """
@@ -216,21 +184,12 @@ def _fetch_change_movers(
         SELECT
             n.vault_address,
             n.chain_id,
-            n.name,
             n.symbol,
             n.token_symbol,
-            n.category,
-            n.market,
             n.tvl_usd,
-            n.safe_apy_30d,
-            n.points_count,
-            n.last_point_time,
-            n.safe_apy_window,
-            n.safe_apy_prev_window,
-            (n.safe_apy_window - n.safe_apy_prev_window) AS delta_apy,
-            n.momentum_7d_30d,
-            n.consistency_score,
-            n.vol_30d,
+            n.realized_apy_window,
+            n.realized_apy_prev_window,
+            (n.realized_apy_window - n.realized_apy_prev_window) AS delta_apy,
             n.age_seconds
         FROM normalized n
         WHERE n.apy_window_raw IS NOT NULL
@@ -243,7 +202,7 @@ def _fetch_change_movers(
     cur.execute(
         movers_sql.format(
             order_expr="delta_apy DESC",
-            sign_filter="(n.safe_apy_window - n.safe_apy_prev_window) > 0",
+            sign_filter="(n.realized_apy_window - n.realized_apy_prev_window) > 0",
         ),
         movers_params,
     )
@@ -251,41 +210,9 @@ def _fetch_change_movers(
     cur.execute(
         movers_sql.format(
             order_expr="delta_apy ASC",
-            sign_filter="(n.safe_apy_window - n.safe_apy_prev_window) < 0",
+            sign_filter="(n.realized_apy_window - n.realized_apy_prev_window) < 0",
         ),
         movers_params,
     )
     fallers = cur.fetchall()
-    cur.execute(
-        movers_sql.format(
-            order_expr="ABS((n.safe_apy_window - n.safe_apy_prev_window)) DESC",
-            sign_filter="(n.safe_apy_window - n.safe_apy_prev_window) <> 0",
-        ),
-        movers_params,
-    )
-    largest = cur.fetchall()
-    _alias_realized_apy_many(risers)
-    _alias_realized_apy_many(fallers)
-    _alias_realized_apy_many(largest)
-    return {"risers": risers, "fallers": fallers, "largest_abs_delta": largest}
-
-
-def _compact_mover_rows(rows: list[dict]) -> list[dict]:
-    out: list[dict] = []
-    for row in rows:
-        out.append(
-            _alias_realized_apy_fields({
-                "vault_address": row.get("vault_address"),
-                "chain_id": row.get("chain_id"),
-                "symbol": row.get("symbol"),
-                "token_symbol": row.get("token_symbol"),
-                "category": row.get("category"),
-                "tvl_usd": row.get("tvl_usd"),
-                "safe_apy_30d": row.get("safe_apy_30d"),
-                "safe_apy_window": row.get("safe_apy_window"),
-                "safe_apy_prev_window": row.get("safe_apy_prev_window"),
-                "delta_apy": row.get("delta_apy"),
-                "age_seconds": row.get("age_seconds"),
-            })
-        )
-    return out
+    return {"risers": risers, "fallers": fallers}

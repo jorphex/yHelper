@@ -166,12 +166,13 @@ def _latest_protocol_tvl_snapshot(
         }
         for component in cur.fetchall()
     ]
-    observed_at = row["observed_at"]
-    age_seconds = _seconds_since(observed_at, now or datetime.now(UTC))
+    fetched_at = row["observed_at"]
+    age_seconds = _seconds_since(fetched_at, now or datetime.now(UTC))
     stale_after_seconds = WORKER_INTERVAL_SEC * 2
     return {
         "tvl_usd": _to_float_or_none(row["parent_tvl_usd"]),
-        "observed_at": observed_at.isoformat(),
+        "fetched_at": fetched_at.isoformat(),
+        "observed_at": fetched_at.isoformat(),
         "age_seconds": age_seconds,
         "freshness_status": "stale" if age_seconds is None or age_seconds > stale_after_seconds else "fresh",
         "stale_after_seconds": stale_after_seconds,
@@ -182,7 +183,8 @@ def _latest_protocol_tvl_snapshot(
             "parent": row["parent_source_url"],
             "components": row["components_source_url"],
         },
-        "method": "yearn_reported_parent_tvl",
+        "method": "defillama_yearn_parent_snapshot",
+        "deprecated_fields": {"observed_at": "Use fetched_at; the upstream valuation time is not exposed."},
         "reconciliation_note": "Parent and component endpoints refresh independently; residual records cache skew.",
     }
 
@@ -219,8 +221,8 @@ def _build_protocol_context(
     if protocol:
         status = "stale" if protocol.get("freshness_status") == "stale" else "ok"
     return {
-        "schema_version": 2,
-        "source": "yearn_reported_defillama",
+        "schema_version": 3,
+        "source": "defillama_yearn_parent",
         "status": status,
         "as_of_utc": generated_at.isoformat(),
         "protocol": protocol,

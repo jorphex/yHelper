@@ -15,8 +15,8 @@ def _snapshot(**overrides: object) -> dict[str, object]:
         "softening_tvl_usd": 600.0,
         "steady_tvl_usd": 100.0,
         "fresh_comparable_tvl_usd": 760.0,
-        "tvl_weighted_safe_apy_window": 0.02,
-        "tvl_weighted_safe_apy_prev_window": 0.025,
+        "tvl_weighted_realized_apy_window": 0.02,
+        "tvl_weighted_realized_apy_prev_window": 0.025,
         "fresh_comparable_vaults": 7,
         "latest_data_epoch": 1_750_000_000,
         "oldest_data_epoch": 1_749_900_000,
@@ -42,15 +42,15 @@ class BuildOverviewPulseTests(unittest.TestCase):
     def test_improving_and_steady_pulses_select_matching_breadth(self) -> None:
         improving = _build_overview_pulse(
             _snapshot(
-                tvl_weighted_safe_apy_window=0.03,
-                tvl_weighted_safe_apy_prev_window=0.025,
+                tvl_weighted_realized_apy_window=0.03,
+                tvl_weighted_realized_apy_prev_window=0.025,
                 improving_tvl_usd=520.0,
             )
         )["pulse"]
         steady = _build_overview_pulse(
             _snapshot(
-                tvl_weighted_safe_apy_window=0.0255,
-                tvl_weighted_safe_apy_prev_window=0.025,
+                tvl_weighted_realized_apy_window=0.0255,
+                tvl_weighted_realized_apy_prev_window=0.025,
                 steady_tvl_usd=440.0,
             )
         )["pulse"]
@@ -83,8 +83,8 @@ class BuildOverviewPulseTests(unittest.TestCase):
     def test_missing_comparison_data_hides_pulse(self) -> None:
         cases = (
             _snapshot(vaults_with_change=0),
-            _snapshot(tvl_weighted_safe_apy_window=None),
-            _snapshot(tvl_weighted_safe_apy_prev_window=None),
+            _snapshot(tvl_weighted_realized_apy_window=None),
+            _snapshot(tvl_weighted_realized_apy_prev_window=None),
         )
 
         for snapshot in cases:

@@ -6,7 +6,6 @@ import psycopg
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
-from app.common import _chain_label
 from app.config import (
     DATABASE_URL,
     STYFI_CHAIN_ID,
@@ -14,15 +13,11 @@ from app.config import (
     STYFI_RETENTION_DAYS,
     STYFI_SNAPSHOT_RETENTION_DAYS,
 )
+from app.models import ReportsResponse
 from app.product_service import (
-    _dau_daily_series,
-    _dau_last_run,
-    _dau_trailing_24h,
-    _harvest_chain_rollups,
-    _harvest_daily_by_chain,
-    _harvest_last_run,
-    _harvest_recent,
-    _harvest_trailing_24h,
+    _recent_reports,
+    _report_chain_facets,
+    _report_trailing_24h,
 )
 from app.styfi_service import (
     _styfi_current_reward_state,
@@ -38,59 +33,23 @@ from app.styfi_service import (
 router = APIRouter()
 
 
-@router.get("/api/dau")
-async def dau(days: int = Query(default=30, ge=7, le=180)) -> dict[str, object]:
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
-        with conn.cursor() as cur:
-            trailing_24h = _dau_trailing_24h(cur)
-            daily = _dau_daily_series(cur, days=days)
-            last_run = _dau_last_run(cur)
-    return {
-        "generated_at_utc": datetime.now(UTC).isoformat(),
-        "metric": {
-            "name": "active_accounts",
-            "headline_label": "Active Accounts (24h)",
-            "history_label": "Daily Active Accounts",
-            "history_window_label": f"Last {days}d",
-            "series_label": "Daily Active Accounts",
-        },
-        "window": {
-            "headline": "24h",
-            "history_days": days,
-            "history_granularity": "day_utc",
-        },
-        "scope": {
-            "vaults": "supported-chain V3 vault Deposit/Withdraw events",
-            "styfi": "stYFI/stYFIx Deposit/Withdraw, burn Transfer unstake, plus tx-deduped mapped staking Claim events",
-            "attribution": "indexed account fields from product event logs",
-        },
-        "trailing_24h": trailing_24h,
-        "daily": daily,
-        "last_run": last_run,
-    }
-
-
-@router.get("/api/harvests")
-async def harvests(
-    days: int = Query(default=30, ge=7, le=365),
-    chain_id: int | None = Query(default=None, ge=1),
-    vault_address: str | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
-    meaningful_only: bool = Query(default=False),
+def _reports_response(
+    days: int,
+    chain_id: int | None,
+    vault_address: str | None,
+    limit: int,
+    meaningful_only: bool,
 ) -> dict[str, object]:
     normalized_vault = vault_address.lower() if vault_address else None
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
-            trailing_24h = _harvest_trailing_24h(
+            trailing_24h = _report_trailing_24h(
                 cur, chain_id=chain_id, vault_address=normalized_vault, meaningful_only=meaningful_only
             )
-            chain_rollups = _harvest_chain_rollups(
-                cur, days=days, chain_id=chain_id, vault_address=normalized_vault, meaningful_only=meaningful_only
+            available_chains = _report_chain_facets(
+                cur, days=days, meaningful_only=meaningful_only
             )
-            daily_by_chain = _harvest_daily_by_chain(
-                cur, days=days, chain_id=chain_id, vault_address=normalized_vault, meaningful_only=meaningful_only
-            )
-            recent = _harvest_recent(
+            recent = _recent_reports(
                 cur,
                 days=days,
                 chain_id=chain_id,
@@ -98,43 +57,31 @@ async def harvests(
                 limit=limit,
                 meaningful_only=meaningful_only,
             )
-            last_run = _harvest_last_run(cur)
+    chain_facets = [
+        {"chain_id": row["chain_id"], "chain_label": row.get("chain_label")}
+        for row in available_chains
+    ]
     return {
-        "generated_at_utc": datetime.now(UTC).isoformat(),
-        "metric": {
-            "name": "vault_harvests",
-            "headline_label": "Vault Harvests (24h)",
-            "history_label": "Daily Vault Harvests",
-            "history_window_label": f"Last {days}d",
-            "series_label": "Daily Vault Harvests",
-        },
-        "window": {
-            "headline": "24h",
-            "history_days": days,
-            "history_granularity": "day_utc",
-        },
-        "scope": {
-            "vaults": "supported-chain legacy/V3 vault StrategyReported events",
-            "level": "vault",
-            "attribution": "vault report logs only; strategy-level Reported events are excluded",
-        },
-        "filters": {
-            "chain_id": chain_id,
-            "chain_label": _chain_label(chain_id),
-            "vault_address": normalized_vault,
-            "limit": limit,
-            "meaningful_only": meaningful_only,
-        },
+        "event": {"name": "StrategyReported", "level": "vault"},
         "trailing_24h": trailing_24h,
-        "chain_rollups": chain_rollups,
-        "daily_by_chain": daily_by_chain,
+        "available_chains": chain_facets,
         "recent": recent,
-        "last_run": last_run,
     }
 
 
+@router.get("/api/reports", response_model=ReportsResponse)
+def reports(
+    days: int = Query(default=30, ge=7, le=365),
+    chain_id: int | None = Query(default=None, ge=1),
+    vault_address: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    meaningful_only: bool = Query(default=False),
+) -> dict[str, object]:
+    return _reports_response(days, chain_id, vault_address, limit, meaningful_only)
+
+
 @router.get("/api/styfi")
-async def styfi(
+def styfi(
     days: int = Query(default=30, ge=7, le=STYFI_RETENTION_DAYS if STYFI_RETENTION_DAYS > 0 else 365),
     epoch_limit: int = Query(default=STYFI_EPOCH_LOOKBACK, ge=3, le=max(STYFI_EPOCH_LOOKBACK, 24)),
 ) -> dict[str, object]:
