@@ -137,6 +137,7 @@ export function TrendStrips({
   deltaFormatter,
   columns = 1,
   embedded = false,
+  domain,
   emptyText = "No trend data available.",
 }: {
   title: string;
@@ -145,6 +146,7 @@ export function TrendStrips({
   deltaFormatter: (value: number) => string;
   columns?: number;
   embedded?: boolean;
+  domain?: readonly [number, number];
   emptyText?: string;
 }) {
   const { ref, isInView } = useInViewOnce<HTMLElement>();
@@ -177,8 +179,8 @@ export function TrendStrips({
           const latest = finite[finite.length - 1];
           const previous = finite.length >= 2 ? finite[finite.length - 2] : finite[0];
           const delta = latest - previous;
-          const min = Math.min(...finite);
-          const max = Math.max(...finite);
+          const min = domain ? domain[0] : Math.min(...finite);
+          const max = domain ? domain[1] : Math.max(...finite);
           const width = 480;
           const height = 38;
           const innerW = width - 8;

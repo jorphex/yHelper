@@ -6,6 +6,29 @@ import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { useInViewOnce } from "../components/visuals";
 import type { BreakdownRow } from "./types";
 
+type DisplayRow = BreakdownRow & { isRemainder?: boolean };
+
+function topWithRemainder(rows: BreakdownRow[], limit: number, remainder: Partial<BreakdownRow>): DisplayRow[] {
+  const ranked = [...rows]
+    .filter((row) => (row.tvl_usd ?? 0) > 0)
+    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY));
+  const top = ranked.slice(0, limit);
+  const allTvl = ranked.reduce((sum, row) => sum + Number(row.tvl_usd ?? 0), 0);
+  const shownTvl = top.reduce((sum, row) => sum + Number(row.tvl_usd ?? 0), 0);
+  const remainderTvl = Math.max(0, allTvl - shownTvl);
+  if (remainderTvl <= 0) return top;
+  return [
+    ...top,
+    {
+      ...remainder,
+      vaults: Math.max(0, ranked.reduce((sum, row) => sum + row.vaults, 0) - top.reduce((sum, row) => sum + row.vaults, 0)),
+      tvl_usd: remainderTvl,
+      share_tvl: allTvl > 0 ? remainderTvl / allTvl : null,
+      isRemainder: true,
+    },
+  ];
+}
+
 export function TvlTreemap({
   title,
   chains,
@@ -20,22 +43,13 @@ export function TvlTreemap({
   const { ref, isInView } = useInViewOnce<HTMLElement>();
   const [hoveredSegment, setHoveredSegment] = useState<{ id: string; text: string; x: number; y: number } | null>(null);
   const width = 820;
-  const topChains = [...chains]
-    .filter((row) => (row.tvl_usd ?? 0) > 0)
-    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
-    .slice(0, 6);
-  const topMarkets = [...categories]
-    .filter((row) => (row.tvl_usd ?? 0) > 0)
-    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
-    .slice(0, 6);
-  const topTokens = [...tokens]
-    .filter((row) => (row.tvl_usd ?? 0) > 0)
-    .sort((left, right) => (right.tvl_usd ?? Number.NEGATIVE_INFINITY) - (left.tvl_usd ?? Number.NEGATIVE_INFINITY))
-    .slice(0, 8);
+  const topChains = topWithRemainder(chains, 6, { category: "Other chains" });
+  const topMarkets = topWithRemainder(categories, 6, { category: "Other markets" });
+  const topTokens = topWithRemainder(tokens, 8, { token_symbol: "Other assets" });
   const groups = [
-    { key: "chain", label: "Chain", color: "rgba(100, 150, 255, 0.78)", rows: topChains, text: (row: BreakdownRow) => chainLabel(row.chain_id) },
-    { key: "market", label: "Market", color: "rgba(100, 200, 180, 0.7)", rows: topMarkets, text: (row: BreakdownRow) => row.category || "unknown" },
-    { key: "token", label: "Token", color: "rgba(180, 120, 220, 0.72)", rows: topTokens, text: (row: BreakdownRow) => row.token_symbol || "unknown" },
+    { key: "chain", label: "Chain", color: "rgba(100, 150, 255, 0.78)", rows: topChains, text: (row: DisplayRow) => row.isRemainder ? row.category || "Other chains" : chainLabel(row.chain_id) },
+    { key: "market", label: "Market", color: "rgba(100, 200, 180, 0.7)", rows: topMarkets, text: (row: DisplayRow) => row.category || "unknown" },
+    { key: "token", label: "Token", color: "rgba(180, 120, 220, 0.72)", rows: topTokens, text: (row: DisplayRow) => row.token_symbol || "unknown" },
   ];
   const validGroups = groups.filter((group) => group.rows.length > 0);
   const height = validGroups.length === 2 ? 118 : 168;
@@ -108,7 +122,7 @@ export function TvlTreemap({
                         width={widthPx}
                         height={laneHeight}
                         fill={group.color}
-                        opacity={0.85}
+                        opacity={row.isRemainder ? 0.38 : 0.85}
                         stroke="var(--border)"
                         style={{ transition: "all 0.2s" } as CSSProperties}
                       />
@@ -125,6 +139,7 @@ export function TvlTreemap({
           })}
         </svg>
       </div>
+      <p className="mobile-only text-sm text-secondary section-sm">Swipe horizontally to see the full composition.</p>
       {hoveredSegment && typeof document !== "undefined"
         ? createPortal(
             <div className="viz-hover-tooltip" style={{ left: hoveredSegment.x, top: hoveredSegment.y }} role="status">
@@ -133,7 +148,7 @@ export function TvlTreemap({
             document.body,
           )
         : null}
-      <p className="text-sm text-secondary section-sm">Bars show top TVL contributors by {validGroups.map((group) => group.label.toLowerCase()).join(", ")}.</p>
+      <p className="text-sm text-secondary section-sm">Bars show the full selected TVL, with smaller contributors grouped as Other.</p>
     </section>
   );
 }

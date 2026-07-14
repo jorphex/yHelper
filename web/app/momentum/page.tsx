@@ -89,8 +89,11 @@ function MomentumPageContent() {
   ];
   const breadthItems = [
     { id: "riser", label: "Strengthening share", points: recent.map((row) => row.riser_ratio), note: "Share with realized 7d APY above 30d", startLabel, endLabel, deltaLabel: "1d change" },
-    { id: "faller", label: "Weakening share", points: recent.map((row) => row.faller_ratio), note: "Share with realized 7d APY below 30d", startLabel, endLabel, deltaLabel: "1d change" },
   ];
+  const yieldValues = trendItems.flatMap((item) => item.points).filter((value): value is number => value != null && Number.isFinite(value));
+  const yieldDomain: readonly [number, number] | undefined = yieldValues.length > 0
+    ? [Math.min(...yieldValues), Math.max(...yieldValues)]
+    : undefined;
   const moverRows = [...(data?.movers?.risers ?? []), ...(data?.movers?.fallers ?? [])].filter((row, index, rows) => rows.findIndex((candidate) => candidate.chain_id === row.chain_id && candidate.vault_address === row.vault_address) === index);
 
   return (
@@ -122,7 +125,7 @@ function MomentumPageContent() {
         </>}
       </section>
 
-      <section className="section"><div className="card-header"><div><h2 className="card-title">Market history</h2><p className="card-description">Uses the currently selected vault set and current TVL weights across the historical window.</p></div></div><div className="viz-stack"><div className="cols-2"><TrendStrips title="Realized yield" items={trendItems} valueFormatter={(value) => formatPct(value, 2)} deltaFormatter={(value) => formatPercentagePoints(value, 2)} /><TrendStrips title="Breadth" items={breadthItems} valueFormatter={(value) => formatPct(value, 0)} deltaFormatter={(value) => formatPercentagePoints(value, 1)} /></div><div><ScatterPlot title="Current realized yield vs window change" xLabel="Window change" yLabel="Current realized APY" points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size represents tracked TVL. Select a point to open its Yearn vault page.</p></div></div></section>
+      <section className="section"><div className="card-header"><div><h2 className="card-title">60-day context</h2><p className="card-description">Fixed 7d and 30d history for the selected market and vault set. The window control above applies to the current comparison, mover tables, and scatter plot—not these context strips.</p></div></div><div className="viz-stack"><div className="cols-2"><TrendStrips title="Realized yield" items={trendItems} domain={yieldDomain} valueFormatter={(value) => formatPct(value, 2)} deltaFormatter={(value) => formatPercentagePoints(value, 2)} /><TrendStrips title="7d vs 30d breadth" items={breadthItems} domain={[0, 1]} valueFormatter={(value) => formatPct(value, 0)} deltaFormatter={(value) => formatPercentagePoints(value, 1)} /></div><div><ScatterPlot title="Current realized yield vs window change" xLabel="Window change" yLabel="Current realized APY" points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size represents tracked TVL. The zero line separates strengthening from weakening. Select a point to open its Yearn vault page.</p></div></div></section>
     </div>
   );
 }

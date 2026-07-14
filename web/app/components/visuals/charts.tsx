@@ -138,6 +138,24 @@ export function ScatterPlot({
             y2={height - paddingBottom}
             className="viz-axis viz-axis-grid"
           />
+          {xMin < 0 && xMax > 0 ? (
+            <>
+              <line
+                x1={paddingLeft + normalize(0, xMin, xMax) * innerWidth}
+                x2={paddingLeft + normalize(0, xMin, xMax) * innerWidth}
+                y1={paddingTop}
+                y2={height - paddingBottom}
+                className="viz-axis viz-axis-zero"
+              />
+              <text
+                x={paddingLeft + normalize(0, xMin, xMax) * innerWidth + 5}
+                y={paddingTop + 13}
+                className="viz-tick"
+              >
+                No change
+              </text>
+            </>
+          ) : null}
           <line x1={paddingLeft} x2={width - paddingRight} y1={height - paddingBottom} y2={height - paddingBottom} className="viz-axis" />
           <line x1={paddingLeft} x2={paddingLeft} y1={paddingTop} y2={height - paddingBottom} className="viz-axis" />
           {valid.map((point, index) => {
