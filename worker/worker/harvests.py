@@ -246,92 +246,6 @@ def _upsert_vault_harvests(conn: psycopg.Connection, rows: list[dict[str, object
     return inserted
 
 
-def _recompute_vault_harvest_daily_chain(conn: psycopg.Connection, *, from_day: datetime) -> int:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            DELETE FROM vault_harvest_daily_chain
-            WHERE day_utc >= %s::date
-            """,
-            (from_day.date(),),
-        )
-        cur.execute(
-            """
-            INSERT INTO vault_harvest_daily_chain (
-                day_utc,
-                chain_id,
-                harvest_count,
-                vault_count,
-                strategy_count,
-                computed_at
-            )
-            SELECT
-                (block_time AT TIME ZONE 'UTC')::date AS day_utc,
-                chain_id,
-                COUNT(*) AS harvest_count,
-                COUNT(DISTINCT vault_address) AS vault_count,
-                COUNT(DISTINCT strategy_address) AS strategy_count,
-                NOW()
-            FROM vault_harvests
-            WHERE block_time >= %s::date
-            GROUP BY 1, 2
-            ORDER BY 1, 2
-            """,
-            (from_day.date(),),
-        )
-        inserted = cur.rowcount
-    conn.commit()
-    return inserted
-
-
-def _refresh_vault_harvest_daily_chain_keys(
-    conn: psycopg.Connection,
-    *,
-    day_keys: set[tuple[datetime.date, int]],
-) -> int:
-    if not day_keys:
-        return 0
-    inserted = 0
-    with conn.cursor() as cur:
-        for day_utc, chain_id in sorted(day_keys):
-            cur.execute(
-                """
-                DELETE FROM vault_harvest_daily_chain
-                WHERE day_utc = %s AND chain_id = %s
-                """,
-                (day_utc, chain_id),
-            )
-            cur.execute(
-                """
-                INSERT INTO vault_harvest_daily_chain (
-                    day_utc,
-                    chain_id,
-                    harvest_count,
-                    vault_count,
-                    strategy_count,
-                    computed_at
-                )
-                SELECT
-                    %s::date AS day_utc,
-                    chain_id,
-                    COUNT(*) AS harvest_count,
-                    COUNT(DISTINCT vault_address) AS vault_count,
-                    COUNT(DISTINCT strategy_address) AS strategy_count,
-                    NOW()
-                FROM vault_harvests
-                WHERE
-                    chain_id = %s
-                    AND block_time >= %s::date
-                    AND block_time < (%s::date + INTERVAL '1 day')
-                GROUP BY chain_id
-                """,
-                (day_utc, chain_id, day_utc, day_utc),
-            )
-            inserted += cur.rowcount
-    conn.commit()
-    return inserted
-
-
 def _harvest_wss_is_healthy(payload: dict[str, object], _now: datetime) -> bool:
     if not HARVEST_WSS_ENABLED:
         return False
@@ -563,12 +477,7 @@ class HarvestWssListener(threading.Thread):
         if row is None:
             return
         inserted = _upsert_vault_harvests(conn, [row])
-        block_time = row["block_time"]
-        if inserted > 0 and isinstance(block_time, datetime):
-            _refresh_vault_harvest_daily_chain_keys(
-                conn,
-                day_keys={(block_time.date(), self.chain_id)},
-            )
+        if inserted > 0:
             _notify_harvest_rows(conn, [row])
         seen_at = datetime.now(UTC)
         _upsert_harvest_sync_state(
@@ -608,12 +517,10 @@ class HarvestWssManager:
             listener.stop()
 
 
-def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
+def _run_vault_harvests(conn: psycopg.Connection) -> int:
     started_at = datetime.now(UTC)
     run_id = _insert_run(conn, JOB_VAULT_HARVESTS, started_at)
     inserted_total = 0
-    recomputed_days = 0
-    earliest_seen: datetime | None = None
     errors: list[str] = []
     try:
         targets = _select_harvest_contracts(conn)
@@ -672,7 +579,6 @@ def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
                     wss_healthy,
                 )
                 chain_inserted = 0
-                chain_first_seen: datetime | None = None
                 block_span = _harvest_block_span_for_chain(chain_id)
                 max_block_span = block_span
                 current_block = start_block
@@ -702,11 +608,6 @@ def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
                                 )
                                 if row is None:
                                     continue
-                                block_time = row["block_time"]
-                                if isinstance(block_time, datetime) and (
-                                    chain_first_seen is None or block_time < chain_first_seen
-                                ):
-                                    chain_first_seen = block_time
                                 rows.append(row)
                             chain_inserted += _upsert_vault_harvests(conn, rows)
                             if cursor is not None and notifications_primed and rows:
@@ -748,8 +649,6 @@ def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
                     },
                 )
                 inserted_total += chain_inserted
-                if chain_first_seen is not None and (earliest_seen is None or chain_first_seen < earliest_seen):
-                    earliest_seen = chain_first_seen
             except Exception as chain_exc:
                 errors.append(f"{chain_id}:{chain_exc}")
                 _upsert_harvest_sync_state(
@@ -766,27 +665,22 @@ def _run_vault_harvests(conn: psycopg.Connection) -> tuple[int, int]:
                 )
                 logging.exception("Vault harvest chain failed: chain=%s error=%s", chain_id, chain_exc)
                 continue
-        if earliest_seen is None:
-            earliest_seen = datetime.now(UTC) - timedelta(days=1)
-        recomputed_days = _recompute_vault_harvest_daily_chain(conn, from_day=earliest_seen)
         status = "partial_success" if errors else "success"
         _complete_run(
             conn,
             run_id,
             status,
             inserted_total,
-            json.dumps({"inserted": inserted_total, "recomputed_days": recomputed_days, "errors": errors}),
+            json.dumps({"inserted": inserted_total, "errors": errors}),
         )
         logging.info(
-            "Vault harvest sync complete: status=%s inserted=%s recomputed_days=%s errors=%s",
+            "Vault harvest sync complete: status=%s inserted=%s errors=%s",
             status,
             inserted_total,
-            recomputed_days,
             len(errors),
         )
-        return inserted_total, recomputed_days
+        return inserted_total
     except Exception as exc:
         _complete_run(conn, run_id, "failed", inserted_total, json.dumps({"error": str(exc), "errors": errors}))
         logging.exception("Vault harvest sync failed: %s", exc)
-        return inserted_total, recomputed_days
-
+        return inserted_total

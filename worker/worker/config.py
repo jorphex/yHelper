@@ -76,7 +76,7 @@ JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
 JOB_PROTOCOL_TVL = "protocol_tvl_snapshot"
 JOB_STYFI = "styfi_snapshot"
-JOB_PRODUCT_DAU = "product_dau"
+JOB_PRODUCT_ACTIVITY = "product_activity"
 JOB_VAULT_HARVESTS = "vault_harvests"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "21600"))
@@ -350,9 +350,7 @@ CREATE TABLE IF NOT EXISTS vault_metrics_latest (
     apy_7d DOUBLE PRECISION,
     apy_30d DOUBLE PRECISION,
     apy_90d DOUBLE PRECISION,
-    vol_30d DOUBLE PRECISION,
     momentum_7d_30d DOUBLE PRECISION,
-    consistency_score DOUBLE PRECISION,
     PRIMARY KEY (chain_id, vault_address)
 );
 CREATE INDEX IF NOT EXISTS idx_vault_metrics_points ON vault_metrics_latest(points_count DESC, chain_id, vault_address);
@@ -462,15 +460,6 @@ CREATE INDEX IF NOT EXISTS idx_product_interactions_time
 CREATE INDEX IF NOT EXISTS idx_product_interactions_user
     ON product_interactions(user_account, block_time DESC);
 
-CREATE TABLE IF NOT EXISTS product_dau_daily (
-    day_utc DATE PRIMARY KEY,
-    dau_total INTEGER NOT NULL,
-    dau_vaults INTEGER NOT NULL,
-    dau_styfi INTEGER NOT NULL,
-    dau_styfix INTEGER NOT NULL,
-    computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS vault_harvest_sync_state (
     chain_id INTEGER PRIMARY KEY,
     cursor BIGINT,
@@ -505,15 +494,6 @@ CREATE INDEX IF NOT EXISTS idx_vault_harvests_vault
 CREATE INDEX IF NOT EXISTS idx_vault_harvests_strategy
     ON vault_harvests(strategy_address, block_time DESC);
 
-CREATE TABLE IF NOT EXISTS vault_harvest_daily_chain (
-    day_utc DATE NOT NULL,
-    chain_id INTEGER NOT NULL,
-    harvest_count INTEGER NOT NULL,
-    vault_count INTEGER NOT NULL,
-    strategy_count INTEGER NOT NULL,
-    computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (day_utc, chain_id)
-);
 """
 
 

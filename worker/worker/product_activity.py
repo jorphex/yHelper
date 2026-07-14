@@ -14,7 +14,7 @@ from .config import (
     EVENT_TOPIC_DEPOSIT,
     EVENT_TOPIC_TRANSFER,
     EVENT_TOPIC_WITHDRAW,
-    JOB_PRODUCT_DAU,
+    JOB_PRODUCT_ACTIVITY,
     PRODUCT_ACTIVITY_BACKFILL_DAYS,
     PRODUCT_ACTIVITY_BLOCK_SPAN,
     PRODUCT_ACTIVITY_BLOCK_SPAN_BY_CHAIN,
@@ -363,50 +363,10 @@ def _upsert_product_interactions(conn: psycopg.Connection, rows: list[dict[str, 
     return inserted
 
 
-def _recompute_product_dau_daily(conn: psycopg.Connection, *, from_day: datetime) -> int:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            DELETE FROM product_dau_daily
-            WHERE day_utc >= %s::date
-            """,
-            (from_day.date(),),
-        )
-        cur.execute(
-            """
-            INSERT INTO product_dau_daily (
-                day_utc,
-                dau_total,
-                dau_vaults,
-                dau_styfi,
-                dau_styfix,
-                computed_at
-            )
-            SELECT
-                (block_time AT TIME ZONE 'UTC')::date AS day_utc,
-                COUNT(DISTINCT user_account) AS dau_total,
-                COUNT(DISTINCT CASE WHEN product_type = 'vault' THEN user_account END) AS dau_vaults,
-                COUNT(DISTINCT CASE WHEN product_type = 'styfi' THEN user_account END) AS dau_styfi,
-                COUNT(DISTINCT CASE WHEN product_type = 'styfix' THEN user_account END) AS dau_styfix,
-                NOW()
-            FROM product_interactions
-            WHERE block_time >= %s::date
-            GROUP BY 1
-            ORDER BY 1
-            """,
-            (from_day.date(),),
-        )
-        inserted = cur.rowcount
-    conn.commit()
-    return inserted
-
-
-def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
+def _run_product_activity(conn: psycopg.Connection) -> tuple[int, int]:
     started_at = datetime.now(UTC)
-    run_id = _insert_run(conn, JOB_PRODUCT_DAU, started_at)
+    run_id = _insert_run(conn, JOB_PRODUCT_ACTIVITY, started_at)
     inserted_total = 0
-    recomputed_days = 0
-    earliest_seen: datetime | None = None
     errors: list[str] = []
     try:
         targets = _select_product_activity_contracts(conn)
@@ -434,14 +394,13 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                     )
                     continue
                 logging.info(
-                    "Product DAU sync: chain=%s contracts=%s from_block=%s to_block=%s",
+                    "Product activity sync: chain=%s contracts=%s from_block=%s to_block=%s",
                     chain_id,
                     len(contracts),
                     start_block,
                     latest_block,
                 )
                 chain_inserted = 0
-                chain_first_seen: datetime | None = None
                 vault_addresses = sorted(address for address, product_type in contracts.items() if product_type == "vault")
                 styfi_addresses = sorted(address for address in contracts if address in STYFI_EVENT_CONTRACTS)
                 styfi_claim_addresses = sorted(STYFI_CLAIM_SOURCES) if chain_id == STYFI_CHAIN_ID else []
@@ -518,8 +477,6 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                                     if block_timestamp is None:
                                         continue
                                     block_time = datetime.fromtimestamp(block_timestamp, tz=UTC)
-                                    if chain_first_seen is None or block_time < chain_first_seen:
-                                        chain_first_seen = block_time
                                     rows.append(
                                         {
                                             "chain_id": chain_id,
@@ -562,7 +519,7 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                             raise
                         next_block_span = max(1, block_span // 2)
                         logging.warning(
-                            "Product DAU log window retry: chain=%s from_block=%s to_block=%s span=%s next_span=%s error=%s",
+                            "Product activity log window retry: chain=%s from_block=%s to_block=%s span=%s next_span=%s error=%s",
                             chain_id,
                             current_block,
                             end_block,
@@ -589,13 +546,11 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                     },
                 )
                 logging.info(
-                    "Product DAU chain complete: chain=%s inserted=%s",
+                    "Product activity chain complete: chain=%s inserted=%s",
                     chain_id,
                     chain_inserted,
                 )
                 inserted_total += chain_inserted
-                if chain_first_seen is not None and (earliest_seen is None or chain_first_seen < earliest_seen):
-                    earliest_seen = chain_first_seen
             except Exception as chain_exc:
                 errors.append(f"{chain_id}:{chain_exc}")
                 _upsert_product_activity_sync_state(
@@ -605,24 +560,20 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
                     observed_at=datetime.now(UTC),
                     payload={"status": "failed", "contracts": len(contracts), "error": str(chain_exc)},
                 )
-                logging.exception("Product DAU chain failed: chain=%s error=%s", chain_id, chain_exc)
+                logging.exception("Product activity chain failed: chain=%s error=%s", chain_id, chain_exc)
                 continue
-        if earliest_seen is None:
-            earliest_seen = datetime.now(UTC) - timedelta(days=1)
-        recomputed_days = _recompute_product_dau_daily(conn, from_day=earliest_seen)
         status = "partial_success" if errors else "success"
         _complete_run(
             conn,
             run_id,
             status,
             inserted_total,
-            json.dumps({"inserted": inserted_total, "recomputed_days": recomputed_days, "errors": errors}),
+            json.dumps({"inserted": inserted_total, "errors": errors}),
         )
         logging.info(
-            "Product DAU sync complete: status=%s inserted=%s recomputed_days=%s errors=%s",
+            "Product activity sync complete: status=%s inserted=%s errors=%s",
             status,
             inserted_total,
-            recomputed_days,
             len(errors),
         )
         return run_id, inserted_total
@@ -632,9 +583,9 @@ def _run_product_dau(conn: psycopg.Connection) -> tuple[int, int]:
             run_id,
             "failed",
             inserted_total,
-            json.dumps({"error": str(exc), "inserted": inserted_total, "recomputed_days": recomputed_days, "errors": errors}),
+            json.dumps({"error": str(exc), "inserted": inserted_total, "errors": errors}),
         )
-        logging.exception("Product DAU sync failed: %s", exc)
+        logging.exception("Product activity sync failed: %s", exc)
         return run_id, inserted_total
 
 

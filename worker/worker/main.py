@@ -18,7 +18,7 @@ from .eth import _connect
 from .harvests import HarvestWssManager, _run_vault_harvests, _select_harvest_contracts
 from .kong import _maybe_cleanup_old_data, _run_kong_ingestion, _run_kong_snapshot_ingestion
 from .notifications import _evaluate_alerts, _retry_failed_discord_notifications
-from .product_activity import _backfill_styfi_activity_amounts, _run_product_dau
+from .product_activity import _backfill_styfi_activity_amounts, _run_product_activity
 from .styfi import _run_styfi_snapshot
 
 HARVEST_WSS_MANAGER: HarvestWssManager | None = None
@@ -43,7 +43,7 @@ def run_once() -> None:
             _run_styfi_snapshot(conn)
         else:
             logging.info("Skipping stYFI snapshot because STYFI_SYNC_ENABLED=0")
-        _run_product_dau(conn)
+        _run_product_activity(conn)
         _backfill_styfi_activity_amounts(conn)
         if HARVEST_WSS_MANAGER is not None:
             HARVEST_WSS_MANAGER.refresh(_select_harvest_contracts(conn))

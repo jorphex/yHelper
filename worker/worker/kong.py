@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
-import statistics
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -251,40 +249,12 @@ def _apy_for_window(points: list[tuple[int, float]], days: int) -> float | None:
     return ratio ** (365 / window_days) - 1
 
 
-def _vol_30d(points: list[tuple[int, float]]) -> tuple[float | None, float | None]:
-    if len(points) < 3:
-        return None, None
-    latest_t = points[-1][0]
-    floor_t = latest_t - 30 * 86400
-    recent = [p for p in points if p[0] >= floor_t]
-    if len(recent) < 3:
-        return None, None
-    log_returns: list[float] = []
-    positive_count = 0
-    for idx in range(1, len(recent)):
-        prev = recent[idx - 1][1]
-        curr = recent[idx][1]
-        if prev <= 0 or curr <= 0:
-            continue
-        ret = curr / prev - 1
-        if ret > 0:
-            positive_count += 1
-        log_returns.append(math.log(curr / prev))
-    if len(log_returns) < 2:
-        return None, None
-    vol = statistics.pstdev(log_returns) * math.sqrt(365)
-    positive_ratio = positive_count / len(log_returns)
-    consistency = max(0.0, min(1.0, positive_ratio * (1.0 / (1.0 + vol))))
-    return vol, consistency
-
-
 def _compute_metrics(chain_id: int, vault_address: str, points: list[tuple[int, float]]) -> dict | None:
     if not points:
         return None
     apy_7d = _apy_for_window(points, 7)
     apy_30d = _apy_for_window(points, 30)
     apy_90d = _apy_for_window(points, 90)
-    vol_30d, consistency = _vol_30d(points)
     momentum = None
     if apy_7d is not None and apy_30d is not None:
         momentum = apy_7d - apy_30d
@@ -297,9 +267,7 @@ def _compute_metrics(chain_id: int, vault_address: str, points: list[tuple[int, 
         "apy_7d": apy_7d,
         "apy_30d": apy_30d,
         "apy_90d": apy_90d,
-        "vol_30d": vol_30d,
         "momentum_7d_30d": momentum,
-        "consistency_score": consistency,
     }
 
 
@@ -318,9 +286,7 @@ def _upsert_metrics(conn: psycopg.Connection, rows: list[dict]) -> int:
                 apy_7d,
                 apy_30d,
                 apy_90d,
-                vol_30d,
-                momentum_7d_30d,
-                consistency_score
+                momentum_7d_30d
             ) VALUES (
                 %(vault_address)s,
                 %(chain_id)s,
@@ -330,9 +296,7 @@ def _upsert_metrics(conn: psycopg.Connection, rows: list[dict]) -> int:
                 %(apy_7d)s,
                 %(apy_30d)s,
                 %(apy_90d)s,
-                %(vol_30d)s,
-                %(momentum_7d_30d)s,
-                %(consistency_score)s
+                %(momentum_7d_30d)s
             )
             ON CONFLICT (chain_id, vault_address) DO UPDATE SET
                 as_of = EXCLUDED.as_of,
@@ -341,9 +305,7 @@ def _upsert_metrics(conn: psycopg.Connection, rows: list[dict]) -> int:
                 apy_7d = EXCLUDED.apy_7d,
                 apy_30d = EXCLUDED.apy_30d,
                 apy_90d = EXCLUDED.apy_90d,
-                vol_30d = EXCLUDED.vol_30d,
-                momentum_7d_30d = EXCLUDED.momentum_7d_30d,
-                consistency_score = EXCLUDED.consistency_score
+                momentum_7d_30d = EXCLUDED.momentum_7d_30d
             """,
             rows,
         )

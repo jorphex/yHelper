@@ -20,7 +20,7 @@ from .config import (
     HARVEST_DISCORD_DESTINATIONS,
     JOB_KONG_PPS,
     JOB_KONG_SNAPSHOT,
-    JOB_PRODUCT_DAU,
+    JOB_PRODUCT_ACTIVITY,
     JOB_PROTOCOL_TVL,
     STYFI_ASSET_DECIMALS,
     STYFI_ASSET_SYMBOL,
@@ -812,11 +812,11 @@ def _prune_obsolete_alert_state(conn: psycopg.Connection, *, active_job_names: t
 
 
 def _evaluate_alerts(conn: psycopg.Connection) -> None:
-    active_job_names = (JOB_KONG_SNAPSHOT, JOB_KONG_PPS, JOB_PROTOCOL_TVL, JOB_PRODUCT_DAU)
+    active_job_names = (JOB_KONG_SNAPSHOT, JOB_KONG_PPS, JOB_PROTOCOL_TVL, JOB_PRODUCT_ACTIVITY)
     _evaluate_job_stale_alert(conn, job_name=JOB_KONG_SNAPSHOT)
     _evaluate_job_stale_alert(conn, job_name=JOB_KONG_PPS)
     _evaluate_job_stale_alert(conn, job_name=JOB_PROTOCOL_TVL)
-    _evaluate_job_stale_alert(conn, job_name=JOB_PRODUCT_DAU)
+    _evaluate_job_stale_alert(conn, job_name=JOB_PRODUCT_ACTIVITY)
     deleted = _prune_obsolete_alert_state(conn, active_job_names=active_job_names)
     if deleted:
         logging.info("Pruned %s obsolete alert_state rows", deleted)
