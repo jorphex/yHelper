@@ -11,6 +11,7 @@ import { TableWrap } from "../components/table-wrap";
 import { VaultLink } from "../components/vault-link";
 import { useAssetsData, useAssetVenues } from "../hooks/use-assets-data";
 import { useChainsData } from "../hooks/use-chains-data";
+import { useCompositionData } from "../hooks/use-composition-data";
 import { useDiscoverData } from "../hooks/use-discover-data";
 import { chainLabel, formatPct, formatPercentagePoints, formatUsd } from "../lib/format";
 import {
@@ -23,12 +24,12 @@ import {
   type UniverseKind,
 } from "../lib/universe";
 import { queryChoice, queryInt, replaceQuery } from "../lib/url";
+import { OverviewTab } from "../structure/overview-tab";
 
-type TabKey = "vaults" | "venues";
+type TabKey = "vaults" | "venues" | "structure";
 
 function riskLabel(level: string | null): string {
-  const labels: Record<string, string> = { "1": "Low", "2": "Medium", "3": "High", "4": "Very high" };
-  return level ? labels[level] ?? (level === "-1" ? "Unrated" : level) : "n/a";
+  return level && level !== "-1" && level !== "unknown" ? `Level ${level}` : "Unrated";
 }
 
 function ExplorePageContent() {
@@ -41,7 +42,7 @@ function ExplorePageContent() {
     return {
       universe,
       market: queryChoice(searchParams, "market", MARKET_VALUES, "all"),
-      tab: queryChoice(searchParams, "tab", ["vaults", "venues"] as const, "vaults") as TabKey,
+      tab: queryChoice(searchParams, "tab", ["vaults", "venues", "structure"] as const, "vaults") as TabKey,
       chain: searchParams.get("chain"),
       token: searchParams.get("token"),
       limit: queryInt(searchParams, "limit", 30, { min: 10, max: 100 }),
@@ -68,6 +69,11 @@ function ExplorePageContent() {
     token: null,
   });
   const { data: chainsData } = useChainsData({ universe: query.universe, minTvl: query.minTvl });
+  const { data: composition, isLoading: compositionLoading } = useCompositionData({
+    universe: query.universe,
+    market: query.market,
+    minTvl: query.minTvl,
+  });
   const { data: assets, isLoading: assetsLoading } = useAssetsData({
     universe: query.universe,
     market: "all",
@@ -110,18 +116,19 @@ function ExplorePageContent() {
       <section className="page-header page-header-no-border">
         <h1 className="page-title">Explore<br /><em className="page-title-accent">Compare like with like</em></h1>
         <p className="page-description">
-          Start with the asset exposure you want, then compare current estimated yield with realized history and direction.
+          Understand where capital sits, choose the exposure you want, then compare vault yield and direction.
         </p>
         <div className="tab-bar">
-          <button className={`button ${query.tab === "vaults" ? "button-primary" : "button-ghost"}`} onClick={() => updateQuery({ tab: "vaults" })}>Vaults</button>
-          <button className={`button ${query.tab === "venues" ? "button-primary" : "button-ghost"}`} onClick={() => updateQuery({ tab: "venues", market: "all", token: null })}>Asset venues</button>
+          <button aria-pressed={query.tab === "vaults"} className={`button ${query.tab === "vaults" ? "button-primary" : "button-ghost"}`} onClick={() => updateQuery({ tab: "vaults" })}>Vaults</button>
+          <button aria-pressed={query.tab === "venues"} className={`button ${query.tab === "venues" ? "button-primary" : "button-ghost"}`} onClick={() => updateQuery({ tab: "venues", market: "all", token: null })}>Asset comparison</button>
+          <button aria-pressed={query.tab === "structure"} className={`button ${query.tab === "structure" ? "button-primary" : "button-ghost"}`} onClick={() => updateQuery({ tab: "structure", token: null })}>Market structure</button>
         </div>
       </section>
 
       <section className="section section-md">
         <div className="card">
           <div className="filter-grid">
-            {query.tab === "vaults" ? <MarketFilter market={query.market} universe={query.universe} minTvl={query.minTvl} onChange={(market) => updateQuery({ market, token: null })} /> : null}
+            {query.tab !== "venues" ? <MarketFilter market={query.market} universe={query.universe} minTvl={query.minTvl} onChange={(market) => updateQuery({ market, token: null })} /> : null}
             <label>
               <span className="filter-label">Vault set</span>
               <select className="filter-control" value={query.universe} onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null, token: null })}>
@@ -142,8 +149,8 @@ function ExplorePageContent() {
                   <select className="filter-control" value={query.sort} onChange={(event) => updateQuery({ sort: event.target.value })}>
                     <option value="tvl:desc">Largest TVL</option>
                     <option value="apy_30d:desc">Highest realized 30d</option>
-                    <option value="momentum:desc">Strengthening fastest</option>
-                    <option value="momentum:asc">Weakening fastest</option>
+                    <option value="momentum:desc">Highest 7d vs 30d</option>
+                    <option value="momentum:asc">Lowest 7d vs 30d</option>
                     <option value="est_apy:desc">Highest estimated APY</option>
                   </select>
                 </label>
@@ -156,50 +163,50 @@ function ExplorePageContent() {
       {query.tab === "vaults" ? (
         <>
           <section className="section section-lg">
-            {isLoading ? <KpiGridSkeleton count={4} /> : (
-              <div className="kpi-grid kpi-grid-4">
+            {isLoading ? <KpiGridSkeleton count={query.universe === "raw" ? 4 : 3} /> : (
+              <div className={`kpi-grid ${query.universe === "raw" ? "kpi-grid-4" : "kpi-grid-3"}`}>
                 <div className="kpi-card"><div className="kpi-label">Comparable vaults</div><div className="kpi-value">{data?.pagination.total ?? 0}</div></div>
                 <div className="kpi-card"><div className="kpi-label">Tracked TVL</div><div className="kpi-value">{formatUsd(summary?.total_tvl_usd)}</div></div>
                 <div className="kpi-card"><div className="kpi-label">TVL-weighted realized 30d</div><div className="kpi-value">{formatPct(summary?.tvl_weighted_realized_apy_30d)}</div></div>
-                <div className="kpi-card"><div className="kpi-label">History coverage</div><div className="kpi-value">{formatPct(coverage, 0)}</div><div className="kpi-hint">Automatic history-quality gate</div></div>
+                {query.universe === "raw" ? <div className="kpi-card"><div className="kpi-label">History coverage</div><div className="kpi-value">{formatPct(coverage, 0)}</div><div className="kpi-hint">Vaults with usable realized history</div></div> : null}
               </div>
             )}
           </section>
 
           <section className="section">
-            <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">Momentum is realized 7d APY minus realized 30d APY. Positive means recent yield strengthened.</p></div></div>
+            <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">7d vs 30d is the short-window realized APY minus the longer 30d baseline. Catalog risk preserves the source rating level and is not a safety guarantee.</p></div></div>
             {!isLoading && !(data?.rows.length ?? 0) ? <NoVaultsEmptyState onReset={() => updateQuery({ market: "all", chain: null, universe: "core" })} /> : (
-              <TableWrap><table>
-                <thead><tr><th>Vault</th><th>Market</th><th>Chain</th><th className="numeric">TVL</th><th className="numeric">Est. APY</th><th className="numeric">Realized 30d</th><th className="numeric">Momentum</th><th>Risk</th></tr></thead>
+              <TableWrap><table className="decision-table">
+                <thead><tr><th>Vault</th><th className="mobile-secondary-column">Market</th><th className="mobile-secondary-column">Chain</th><th className="numeric">TVL</th><th className="numeric mobile-secondary-column">Est. APY</th><th className="numeric" data-mobile-label="30d APY">Realized 30d</th><th className="numeric" data-mobile-label="7d−30d">7d vs 30d</th><th className="mobile-secondary-column">Catalog risk</th></tr></thead>
                 <tbody>{isLoading ? <TableSkeleton rows={7} columns={8} /> : data?.rows.map((row) => (
                   <tr key={`${row.chain_id}:${row.vault_address}`}>
-                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td>
-                    <td>{marketLabel(row.market as MarketKind)}</td>
-                    <td><Link href={`/explore?market=${query.market}&universe=${query.universe}&chain=${row.chain_id}`}>{chainLabel(row.chain_id)}</Link></td>
+                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
+                    <td className="mobile-secondary-column">{marketLabel(row.market as MarketKind)}</td>
+                    <td className="mobile-secondary-column"><Link href={`/explore?market=${query.market}&universe=${query.universe}&chain=${row.chain_id}`}>{chainLabel(row.chain_id)}</Link></td>
                     <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
-                    <td className="data-value numeric">{formatPct(row.est_apy)}</td>
+                    <td className="data-value numeric mobile-secondary-column">{formatPct(row.est_apy)}</td>
                     <td className="data-value numeric">{formatPct(row.realized_apy_30d)}</td>
                     <td className={`data-value numeric ${(row.momentum_7d_30d ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>{formatPercentagePoints(row.momentum_7d_30d)}</td>
-                    <td>{riskLabel(row.risk_level)}</td>
+                    <td className="mobile-secondary-column">{riskLabel(row.risk_level)}</td>
                   </tr>
                 ))}</tbody>
               </table></TableWrap>
             )}
           </section>
         </>
-      ) : (
+      ) : query.tab === "venues" ? (
         <>
           <section className="section section-lg">
-            <div className="card-header"><div><h2 className="card-title">Comparable assets</h2><p className="card-description">Choose an exact symbol with at least two tracked venues and meaningful TVL. Wrapped or differently named assets are not silently merged.</p></div></div>
-            <TableWrap><table><thead><tr><th>Asset</th><th className="numeric">Venues</th><th className="numeric">TVL</th><th className="numeric">Best realized 30d</th><th className="numeric">Realized range</th></tr></thead><tbody>
-              {assetsLoading ? <TableSkeleton rows={3} columns={5} /> : assetRows.length === 0 ? <tr><td colSpan={5} className="muted">No exact-symbol venue comparisons are available for this market and vault set.</td></tr> : assetRows.map((row) => <tr key={row.token_symbol}><td><button aria-pressed={query.token === row.token_symbol} className={`button-reset ${query.token === row.token_symbol ? "text-accent" : ""}`.trim()} onClick={() => updateQuery({ token: row.token_symbol })}>{row.token_symbol}{query.token === row.token_symbol ? <span className="muted"> · selected</span> : null}</button></td><td className="numeric">{row.venues}</td><td className="numeric">{formatUsd(row.total_tvl_usd)}</td><td className="numeric">{formatPct(row.best_realized_apy_30d)}</td><td className="numeric">{formatPct(row.realized_spread_30d)}</td></tr>)}
+            <div className="card-header"><div><h2 className="card-title">Comparable assets</h2><p className="card-description">Choose an exact symbol with at least two tracked Yearn vaults and meaningful TVL. Wrapped or differently named assets are not silently merged.</p></div></div>
+            <TableWrap><table className="decision-table"><thead><tr><th>Asset</th><th className="numeric mobile-secondary-column">Vaults</th><th className="numeric">TVL</th><th className="numeric" data-mobile-label="Best 30d">Best realized 30d</th><th className="numeric" data-mobile-label="Range">Realized range</th></tr></thead><tbody>
+              {assetsLoading ? <TableSkeleton rows={3} columns={5} /> : assetRows.length === 0 ? <tr><td colSpan={5} className="muted">No exact-symbol vault comparisons are available for this vault set.</td></tr> : assetRows.map((row) => <tr key={row.token_symbol}><td><button aria-pressed={query.token === row.token_symbol} className={`button-reset ${query.token === row.token_symbol ? "text-accent" : ""}`.trim()} onClick={() => updateQuery({ token: row.token_symbol })}>{row.token_symbol}{query.token === row.token_symbol ? <span className="muted"> · selected</span> : null}</button></td><td className="numeric mobile-secondary-column">{row.venues}</td><td className="numeric">{formatUsd(row.total_tvl_usd)}</td><td className="numeric">{formatPct(row.best_realized_apy_30d)}</td><td className="numeric">{formatPct(row.realized_spread_30d)}</td></tr>)}
             </tbody></table></TableWrap>
           </section>
           {assetRows.length > 0 ? <>
           <section className="section section-lg">
             {assetsLoading || venuesLoading ? <KpiGridSkeleton count={4} /> : (
               <div className="kpi-grid kpi-grid-4">
-                <div className="kpi-card"><div className="kpi-label">Comparable venues</div><div className="kpi-value">{venues?.summary.venues ?? 0}</div></div>
+                <div className="kpi-card"><div className="kpi-label">Comparable vaults</div><div className="kpi-value">{venues?.summary.venues ?? 0}</div></div>
                 <div className="kpi-card"><div className="kpi-label">Realized range</div><div className="kpi-value">{formatPct(venues?.summary.realized_spread_30d)}</div><div className="kpi-hint">Best minus lowest 30d result</div></div>
                 <div className="kpi-card"><div className="kpi-label">Best realized 30d</div><div className="kpi-value">{formatPct(venues?.summary.best_realized_apy_30d)}</div></div>
                 <div className="kpi-card"><div className="kpi-label">Weighted realized 30d</div><div className="kpi-value">{formatPct(venues?.summary.weighted_realized_apy_30d)}</div></div>
@@ -207,16 +214,27 @@ function ExplorePageContent() {
             )}
           </section>
           <section className="section">
-            <div className="card-header"><div><h2 className="card-title">{query.token || "Asset"} venues</h2><p className="card-description">Exact token-symbol matches only; wrapped or differently named assets are not silently merged.</p></div></div>
-            <TableWrap><table>
-              <thead><tr><th>Vault</th><th>Chain</th><th className="numeric">TVL</th><th className="numeric">Est. APY</th><th className="numeric">Realized 30d</th><th className="numeric">Momentum</th></tr></thead>
+            <div className="card-header"><div><h2 className="card-title">{query.token || "Asset"} vaults</h2><p className="card-description">Exact token-symbol matches only; wrapped or differently named assets are not silently merged.</p></div></div>
+            <TableWrap><table className="decision-table">
+              <thead><tr><th>Vault</th><th className="mobile-secondary-column">Chain</th><th className="numeric">TVL</th><th className="numeric mobile-secondary-column">Est. APY</th><th className="numeric" data-mobile-label="30d APY">Realized 30d</th><th className="numeric" data-mobile-label="7d−30d">7d vs 30d</th></tr></thead>
               <tbody>{venuesLoading ? <TableSkeleton rows={6} columns={6} /> : venues?.rows.map((row) => (
-                <tr key={`${row.chain_id}:${row.vault_address}`}><td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /></td><td>{chainLabel(row.chain_id)}</td><td className="data-value numeric">{formatUsd(row.tvl_usd)}</td><td className="data-value numeric">{formatPct(row.est_apy)}</td><td className="data-value numeric">{formatPct(row.realized_apy_30d)}</td><td className={`data-value numeric ${(row.momentum_7d_30d ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>{formatPercentagePoints(row.momentum_7d_30d)}</td></tr>
+                <tr key={`${row.chain_id}:${row.vault_address}`}><td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><div className="mobile-only muted">{chainLabel(row.chain_id)}</div></td><td className="mobile-secondary-column">{chainLabel(row.chain_id)}</td><td className="data-value numeric">{formatUsd(row.tvl_usd)}</td><td className="data-value numeric mobile-secondary-column">{formatPct(row.est_apy)}</td><td className="data-value numeric">{formatPct(row.realized_apy_30d)}</td><td className={`data-value numeric ${(row.momentum_7d_30d ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>{formatPercentagePoints(row.momentum_7d_30d)}</td></tr>
               ))}</tbody>
             </table></TableWrap>
           </section>
           </> : null}
         </>
+      ) : (
+        <OverviewTab
+          isLoading={compositionLoading}
+          universe={query.universe}
+          market={query.market}
+          summary={composition?.summary}
+          chainRows={composition?.chains ?? []}
+          marketRows={composition?.categories ?? []}
+          tokenRows={composition?.tokens ?? []}
+          comparableTokenSymbols={assetRows.map((row) => row.token_symbol)}
+        />
       )}
     </div>
   );

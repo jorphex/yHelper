@@ -16,6 +16,7 @@ export function OverviewTab({
   chainRows,
   marketRows,
   tokenRows,
+  comparableTokenSymbols,
 }: {
   isLoading: boolean;
   universe: UniverseKind;
@@ -24,6 +25,7 @@ export function OverviewTab({
   chainRows: BreakdownRow[];
   marketRows: BreakdownRow[];
   tokenRows: BreakdownRow[];
+  comparableTokenSymbols: string[];
 }) {
   const topMarket = marketRows[0];
   const topChain = chainRows[0];
@@ -43,8 +45,8 @@ export function OverviewTab({
       </section>
       <section className="section">
         <div className="card-header"><div><h2 className="card-title">Underlying assets</h2><p className="card-description">Shares are relative to the selected tracked vault set, not total Yearn protocol TVL.</p></div></div>
-        <TableWrap><table><thead><tr><th>Asset</th><th className="numeric">Vaults</th><th className="numeric">TVL</th><th className="numeric">Share</th><th className="numeric">Weighted realized 30d</th></tr></thead><tbody>
-          {isLoading ? <TableSkeleton rows={7} columns={5} /> : tokenRows.map((row) => <tr key={row.token_symbol}><td>{row.token_symbol ? <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${universe}`}>{row.token_symbol}</Link> : "Unknown"}</td><td className="numeric">{row.vaults}</td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.share_tvl)}</td><td className="numeric">{formatPct(row.weighted_realized_apy_30d)}</td></tr>)}
+        <TableWrap><table className="decision-table"><thead><tr><th>Asset</th><th className="numeric mobile-secondary-column">Vaults</th><th className="numeric">TVL</th><th className="numeric">Share</th><th className="numeric mobile-secondary-column">Weighted realized 30d</th></tr></thead><tbody>
+          {isLoading ? <TableSkeleton rows={7} columns={5} /> : tokenRows.map((row) => <tr key={row.token_symbol}><td>{row.token_symbol && comparableTokenSymbols.includes(row.token_symbol) ? <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${universe}`}>{row.token_symbol}</Link> : row.token_symbol || "Unknown"}</td><td className="numeric mobile-secondary-column">{row.vaults}</td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.share_tvl)}</td><td className="numeric mobile-secondary-column">{formatPct(row.weighted_realized_apy_30d)}</td></tr>)}
         </tbody></table></TableWrap>
       </section>
     </>

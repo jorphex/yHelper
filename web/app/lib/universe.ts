@@ -13,7 +13,7 @@ export function universeDefaults(universe: UniverseKind): { minTvl: number; minP
 export function universeLabel(universe: UniverseKind): string {
   if (universe === "core") return "Established ($1m+ TVL)";
   if (universe === "extended") return "Broader ($250k+ TVL)";
-  return "All comparable vaults";
+  return "All tracked vaults";
 }
 
 export function marketLabel(market: MarketKind): string {

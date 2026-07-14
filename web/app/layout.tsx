@@ -17,7 +17,10 @@ const TWITTER_IMAGE_URL = `${siteUrl}/twitter-image?v=${SOCIAL_IMAGE_VERSION}`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "yHelper",
+  title: {
+    default: "yHelper",
+    template: "%s · yHelper",
+  },
   description: "Yearn vault discovery, yield shifts, and strategic decisions.",
   icons: {
     icon: [
