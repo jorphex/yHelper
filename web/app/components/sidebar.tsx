@@ -8,9 +8,8 @@ import { apiUrl } from "../lib/api";
 const navItems = [
   { href: "/", label: "Overview" },
   { href: "/explore", label: "Explore" },
-  { href: "/harvests", label: "Reports" },
-  { href: "/structure", label: "Structure" },
   { href: "/momentum", label: "Momentum" },
+  { href: "/harvests", label: "Reports" },
   { href: "/styfi", label: "stYFI" },
 ];
 
@@ -149,11 +148,14 @@ export function Sidebar() {
     if (!sidebar) return;
 
     const focusableSelectors = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
-    const focusables = Array.from(sidebar.querySelectorAll<HTMLElement>(focusableSelectors));
+    const focusables = [
+      toggleRef.current,
+      ...Array.from(sidebar.querySelectorAll<HTMLElement>(focusableSelectors)),
+    ].filter((item): item is HTMLElement => item !== null);
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
 
-    // Focus first element when opening
+    // Keep the visible close control inside the focus loop.
     first?.focus();
 
     function handleKeyDown(e: KeyboardEvent) {
@@ -211,11 +213,12 @@ export function Sidebar() {
         </Link>
       </div>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" aria-label="Primary">
         {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
+            aria-current={pathname === item.href ? "page" : undefined}
             className={`sidebar-link ${pathname === item.href ? "is-active" : ""}`}
           >
             {item.label}
@@ -243,7 +246,7 @@ export function Sidebar() {
 
       <div className="sidebar-divider" />
 
-      <nav className="sidebar-nav sidebar-external">
+      <nav className="sidebar-nav sidebar-external" aria-label="Related">
         {externalLinks.map((item) => (
           <a
             key={item.href}

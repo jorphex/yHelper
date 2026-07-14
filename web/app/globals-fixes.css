@@ -24,6 +24,8 @@
 .sidebar-link.is-active { font-weight: 600 !important; }
 .sidebar-link.is-active::before { display: none !important; content: none !important; }
 
+.mobile-only { display: none; }
+
 .sidebar-note {
   background: transparent !important;
   border: 1px solid var(--preview-rule) !important;
@@ -228,6 +230,16 @@ table tbody a:focus-visible {
   outline-color: var(--yearn-link) !important;
 }
 
+.table-filter-action {
+  color: var(--yearn-link) !important;
+  font: inherit !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+
+.table-filter-action:hover,
+.table-filter-action:focus-visible { color: var(--yearn-link-hover) !important; }
+
 .table-wrap tbody a[target="_blank"] > svg,
 table tbody a[target="_blank"] > svg { display: none !important; }
 
@@ -288,6 +300,12 @@ table tbody .external-link-inline::after {
 }
 
 .scatter-wrap:has(.viz-point.is-active) .viz-point:not(.is-active) { opacity: .24 !important; }
+
+.viz-axis-zero {
+  stroke: rgba(255, 255, 255, .42) !important;
+  stroke-dasharray: 4 4;
+  stroke-width: 1.25px !important;
+}
 
 .treemap-segment { transition: opacity 80ms linear; }
 .treemap-segment rect { transition: opacity 80ms linear, stroke 80ms linear, filter 80ms linear !important; }
@@ -401,6 +419,9 @@ table tbody .external-link-inline::after {
   .sidebar {
     transform: translateX(-100%) !important;
     transition: transform var(--duration-base) var(--ease-out) !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    padding-top: calc(var(--space-16) + var(--space-3)) !important;
   }
 
   .sidebar.is-open { transform: translateX(0) !important; }
@@ -441,6 +462,8 @@ table tbody .external-link-inline::after {
   .trend-strip-cols-3 { grid-template-columns: minmax(0, 1fr) !important; }
 
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .kpi-card { padding: var(--space-4) 0 !important; }
+  .kpi-value { overflow: visible !important; }
   .scatter-wrap { max-width: 100% !important; overflow-x: auto !important; }
   .page-title { font-size: clamp(40px, 13vw, 56px) !important; }
 
@@ -460,4 +483,73 @@ table tbody .external-link-inline::after {
 
   .viz-panel,
   .trend-strip-panel { padding: var(--space-4) 0 !important; }
+
+  .tab-bar { flex-wrap: wrap !important; }
+  .mobile-only {
+    display: block !important;
+    margin-top: var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    line-height: var(--leading-normal);
+    white-space: normal;
+  }
+
+  .decision-table .mobile-secondary-column { display: none !important; }
+  .decision-table th,
+  .decision-table td { padding: 10px 8px !important; }
+  .decision-table th[data-mobile-label] { font-size: 0 !important; }
+  .decision-table th[data-mobile-label] .th-button { display: none !important; }
+  .decision-table th[data-mobile-label]::after {
+    content: attr(data-mobile-label);
+    font-size: 0.625rem;
+  }
+  .decision-table th:first-child,
+  .decision-table td:first-child { padding-left: 12px !important; }
+  .decision-table th:last-child,
+  .decision-table td:last-child { padding-right: 12px !important; }
+
+  .reports-table-wrap {
+    border-left: 0 !important;
+    border-right: 0 !important;
+    overflow: visible !important;
+  }
+
+  .reports-table,
+  .reports-table tbody { display: block; }
+  .reports-table thead { display: none; }
+  .reports-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-5);
+    padding: var(--space-4) 0;
+    border-bottom: 1px solid var(--preview-rule);
+  }
+  .reports-table tr:last-child { border-bottom: 0; }
+  .reports-table td {
+    display: block;
+    min-width: 0;
+    padding: var(--space-2) 0 !important;
+    border: 0 !important;
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+  .reports-table td[data-label="Time"],
+  .reports-table td[data-label="Vault"],
+  .reports-table td[data-label="Strategy"],
+  .reports-table td[data-label="Debt after"] { grid-column: 1 / -1; }
+  .reports-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: var(--space-1);
+    color: var(--text-tertiary);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }

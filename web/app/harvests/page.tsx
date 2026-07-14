@@ -67,6 +67,21 @@ function hasAmount(value: string | null | undefined): boolean {
   return Boolean(value?.trim() && !/^0+$/.test(value.trim()));
 }
 
+function signedResult(
+  gain: string | null | undefined,
+  loss: string | null | undefined,
+  unit: string | null | undefined,
+  decimals: number | null | undefined,
+): string {
+  try {
+    const net = BigInt(gain?.trim() || "0") - BigInt(loss?.trim() || "0");
+    const formatted = amountWithUnit(net.toString(), unit, decimals);
+    return net > 0n ? `+${formatted}` : formatted;
+  } catch {
+    return "n/a";
+  }
+}
+
 function ReportsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -85,14 +100,31 @@ function ReportsPageContent() {
     limit: query.limit,
     meaningfulOnly: query.meaningfulOnly,
   });
+  const { data: chainData } = useHarvestData({
+    days: HISTORY_DAYS,
+    limit: 1,
+    meaningfulOnly: query.meaningfulOnly,
+  });
   const [vaultDraft, setVaultDraft] = useState(query.vaultAddress);
+  const [compact, setCompact] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
   useEffect(() => setVaultDraft(query.vaultAddress), [query.vaultAddress]);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 768px)");
+    const update = () => setCompact(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  useEffect(() => setMobileExpanded(false), [query.chainId, query.meaningfulOnly, query.vaultAddress]);
 
-  const chainOptions = useMemo(() => (data?.chain_rollups ?? [])
+  const chainOptions = useMemo(() => (chainData?.chain_rollups ?? [])
     .map((row) => ({ id: row.chain_id, label: row.chain_label || chainLabel(row.chain_id) }))
-    .sort((left, right) => left.label.localeCompare(right.label)), [data?.chain_rollups]);
+    .sort((left, right) => left.label.localeCompare(right.label)), [chainData?.chain_rollups]);
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
+  const recentRows = data?.recent ?? [];
+  const visibleRecentRows = compact && !mobileExpanded ? recentRows.slice(0, 10) : recentRows;
 
   if (error && !data) return <DataLoadError onRetry={() => refetch()} />;
 
@@ -161,41 +193,45 @@ function ReportsPageContent() {
             <p className="card-subtitle">Newest first · last {HISTORY_DAYS} days</p>
           </div>
         </div>
-        {isLoading && !data ? <TableSkeleton rows={8} columns={8} /> : (data?.recent?.length ?? 0) === 0 ? (
+        {!isLoading && (data?.recent?.length ?? 0) === 0 ? (
           <EmptyState title="No matching reports" description="Try another chain, vault, or include all accounting updates." />
         ) : (
-          <TableWrap>
-            <table>
+          <TableWrap className="reports-table-wrap">
+            <table className="reports-table">
               <thead><tr>
-                <th>Time</th><th>Vault</th><th>Strategy</th><th>Type</th>
-                <th className="numeric">Gain</th><th className="numeric">Loss</th><th className="numeric">Fees / refund</th><th className="numeric">Debt after</th>
+                <th>Time</th><th>Vault</th><th>Strategy</th>{query.meaningfulOnly ? null : <th>Type</th>}
+                <th className="numeric">Result</th><th className="numeric">Fees / refund</th><th className="numeric">Debt after</th>
               </tr></thead>
-              <tbody>{(data?.recent ?? []).map((row) => {
+              <tbody>{isLoading && !data ? <TableSkeleton rows={8} columns={query.meaningfulOnly ? 6 : 7} /> : visibleRecentRows.map((row) => {
                 const vaultUrl = yearnVaultUrl(row.chain_id, row.vault_address);
                 const strategyUrl = explorerAddressUrl(row.chain_id, row.strategy_address);
                 const txUrl = explorerTxUrl(row.chain_id, row.tx_hash);
                 return (
                   <tr key={`${row.chain_id}-${row.tx_hash}-${row.log_index}`}>
-                    <td>{txUrl ? <a className="external-link" href={txUrl} target="_blank" rel="noreferrer">{formatUtcDateTime(row.block_time)}</a> : formatUtcDateTime(row.block_time)}</td>
-                    <td>
+                    <td data-label="Time">{txUrl ? <a className="external-link" href={txUrl} target="_blank" rel="noreferrer">{formatUtcDateTime(row.block_time)}</a> : formatUtcDateTime(row.block_time)}</td>
+                    <td data-label="Vault">
                       <a className="external-link" href={vaultUrl} target="_blank" rel="noreferrer">{row.vault_symbol || shortAddress(row.vault_address)}</a>
-                      <div className="muted">{chainLabel(row.chain_id)} · {row.token_symbol || "asset"}</div>
+                      <div className="muted">{chainLabel(row.chain_id)} · {row.token_symbol || "asset"} · <button className="button-reset table-filter-action" aria-label={`Filter reports to ${row.vault_symbol || row.vault_address}`} onClick={() => updateQuery({ vault_address: row.vault_address })}>Filter</button></div>
                     </td>
-                    <td>
+                    <td data-label="Strategy">
                       {strategyUrl ? <a className="external-link" href={strategyUrl} target="_blank" rel="noreferrer">{row.strategy_name || shortAddress(row.strategy_address)}</a> : row.strategy_name || shortAddress(row.strategy_address)}
                     </td>
-                    <td>{row.report_type === "realized_result" ? "Realized result" : "Accounting update"}</td>
-                    <td className="numeric">{amountWithUnit(row.gain, row.token_symbol, row.token_decimals)}</td>
-                    <td className="numeric">{amountWithUnit(row.loss, row.token_symbol, row.token_decimals)}</td>
-                    <td className="numeric"><div>{amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals)} fee</div>{hasAmount(row.refund_assets) ? <div className="muted">{amountWithUnit(row.refund_assets, row.token_symbol, row.token_decimals)} refund</div> : null}</td>
-                    <td className="numeric">{amountWithUnit(row.debt_after, row.token_symbol, row.token_decimals)}</td>
+                    {query.meaningfulOnly ? null : <td data-label="Type">{row.report_type === "realized_result" ? "Realized result" : "Accounting update"}</td>}
+                    <td data-label="Result" className={`numeric ${hasAmount(row.loss) ? "text-negative" : hasAmount(row.gain) ? "text-positive" : ""}`.trim()}>{signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals)}</td>
+                    <td data-label="Fees / refund" className="numeric">
+                      {hasAmount(row.fee_assets) ? <div>{amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals)} fee</div> : null}
+                      {hasAmount(row.refund_assets) ? <div className="muted">{amountWithUnit(row.refund_assets, row.token_symbol, row.token_decimals)} refund</div> : null}
+                      {!hasAmount(row.fee_assets) && !hasAmount(row.refund_assets) ? "—" : null}
+                    </td>
+                    <td data-label="Debt after" className="numeric">{amountWithUnit(row.debt_after, row.token_symbol, row.token_decimals)}</td>
                   </tr>
                 );
               })}</tbody>
             </table>
           </TableWrap>
         )}
-        {!isLoading && ((data?.recent?.length ?? 0) >= 25 || query.limit > 25) ? <button className="button button-ghost section-sm" onClick={() => updateQuery({ limit: query.limit > 25 ? 25 : 50 })}>{query.limit > 25 ? "Show fewer" : "Show 50 recent reports"}</button> : null}
+        {!isLoading && compact && recentRows.length > 10 ? <button className="button button-ghost section-sm" onClick={() => setMobileExpanded((value) => !value)}>{mobileExpanded ? "Show 10 recent reports" : `Show all ${recentRows.length} loaded reports`}</button> : null}
+        {!isLoading && !compact && (recentRows.length >= 25 || query.limit > 25) ? <button className="button button-ghost section-sm" onClick={() => updateQuery({ limit: query.limit > 25 ? 25 : 50 })}>{query.limit > 25 ? "Show fewer" : "Show 50 recent reports"}</button> : null}
       </section>
     </>
   );
