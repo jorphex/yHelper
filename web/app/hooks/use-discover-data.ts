@@ -16,7 +16,6 @@ type DiscoverRow = {
   realized_apy_30d: number | null;
   momentum_7d_30d: number | null;
   consistency_score: number | null;
-  risk_level: string | null;
   is_retired: boolean;
   is_highlighted: boolean;
   migration_available: boolean;
@@ -60,7 +59,6 @@ type DiscoverResponse = {
     visible_tvl_usd?: number | null;
     with_realized_apy_tvl_usd?: number | null;
   };
-  risk_mix?: Array<{ risk_level: string; vaults: number; tvl_usd: number | null }>;
   rows: DiscoverRow[];
 };
 

@@ -28,10 +28,6 @@ import { OverviewTab } from "../structure/overview-tab";
 
 type TabKey = "vaults" | "venues" | "structure";
 
-function riskLabel(level: string | null): string {
-  return level && level !== "-1" && level !== "unknown" ? `Level ${level}` : "Unrated";
-}
-
 function ExplorePageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -174,11 +170,11 @@ function ExplorePageContent() {
           </section>
 
           <section className="section">
-            <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">7d vs 30d is the short-window realized APY minus the longer 30d baseline. Catalog risk preserves the source rating level and is not a safety guarantee.</p></div></div>
+            <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">7d vs 30d is the short-window realized APY minus the longer 30d baseline. Open a vault for its contract, strategies, and complete risk profile.</p></div></div>
             {!isLoading && !(data?.rows.length ?? 0) ? <NoVaultsEmptyState onReset={() => updateQuery({ market: "all", chain: null, universe: "core" })} /> : (
               <TableWrap><table className="decision-table">
-                <thead><tr><th>Vault</th><th className="mobile-secondary-column">Market</th><th className="mobile-secondary-column">Chain</th><th className="numeric">TVL</th><th className="numeric mobile-secondary-column">Est. APY</th><th className="numeric" data-mobile-label="30d APY">Realized 30d</th><th className="numeric" data-mobile-label="7d−30d">7d vs 30d</th><th className="mobile-secondary-column">Catalog risk</th></tr></thead>
-                <tbody>{isLoading ? <TableSkeleton rows={7} columns={8} /> : data?.rows.map((row) => (
+                <thead><tr><th>Vault</th><th className="mobile-secondary-column">Market</th><th className="mobile-secondary-column">Chain</th><th className="numeric">TVL</th><th className="numeric mobile-secondary-column">Est. APY</th><th className="numeric" data-mobile-label="30d APY">Realized 30d</th><th className="numeric" data-mobile-label="7d−30d">7d vs 30d</th></tr></thead>
+                <tbody>{isLoading ? <TableSkeleton rows={7} columns={7} /> : data?.rows.map((row) => (
                   <tr key={`${row.chain_id}:${row.vault_address}`}>
                     <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
                     <td className="mobile-secondary-column">{marketLabel(row.market as MarketKind)}</td>
@@ -187,7 +183,6 @@ function ExplorePageContent() {
                     <td className="data-value numeric mobile-secondary-column">{formatPct(row.est_apy)}</td>
                     <td className="data-value numeric">{formatPct(row.realized_apy_30d)}</td>
                     <td className={`data-value numeric ${(row.momentum_7d_30d ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>{formatPercentagePoints(row.momentum_7d_30d)}</td>
-                    <td className="mobile-secondary-column">{riskLabel(row.risk_level)}</td>
                   </tr>
                 ))}</tbody>
               </table></TableWrap>
@@ -197,7 +192,7 @@ function ExplorePageContent() {
       ) : query.tab === "venues" ? (
         <>
           <section className="section section-lg">
-            <div className="card-header"><div><h2 className="card-title">Comparable assets</h2><p className="card-description">Choose an exact symbol with at least two tracked Yearn vaults and meaningful TVL. Wrapped or differently named assets are not silently merged.</p></div></div>
+            <div className="card-header"><div><h2 className="card-title">Exact-symbol comparisons</h2><p className="card-description">Choose a symbol shared by at least two tracked Yearn vaults. Ranges are descriptive, not risk-adjusted; wrapped or differently named assets are not silently merged.</p></div></div>
             <TableWrap><table className="decision-table"><thead><tr><th>Asset</th><th className="numeric mobile-secondary-column">Vaults</th><th className="numeric">TVL</th><th className="numeric" data-mobile-label="Best 30d">Best realized 30d</th><th className="numeric" data-mobile-label="Range">Realized range</th></tr></thead><tbody>
               {assetsLoading ? <TableSkeleton rows={3} columns={5} /> : assetRows.length === 0 ? <tr><td colSpan={5} className="muted">No exact-symbol vault comparisons are available for this vault set.</td></tr> : assetRows.map((row) => <tr key={row.token_symbol}><td><button aria-pressed={query.token === row.token_symbol} className={`button-reset ${query.token === row.token_symbol ? "text-accent" : ""}`.trim()} onClick={() => updateQuery({ token: row.token_symbol })}>{row.token_symbol}{query.token === row.token_symbol ? <span className="muted"> · selected</span> : null}</button></td><td className="numeric mobile-secondary-column">{row.venues}</td><td className="numeric">{formatUsd(row.total_tvl_usd)}</td><td className="numeric">{formatPct(row.best_realized_apy_30d)}</td><td className="numeric">{formatPct(row.realized_spread_30d)}</td></tr>)}
             </tbody></table></TableWrap>
@@ -207,7 +202,7 @@ function ExplorePageContent() {
             {assetsLoading || venuesLoading ? <KpiGridSkeleton count={4} /> : (
               <div className="kpi-grid kpi-grid-4">
                 <div className="kpi-card"><div className="kpi-label">Comparable vaults</div><div className="kpi-value">{venues?.summary.venues ?? 0}</div></div>
-                <div className="kpi-card"><div className="kpi-label">Realized range</div><div className="kpi-value">{formatPct(venues?.summary.realized_spread_30d)}</div><div className="kpi-hint">Best minus lowest 30d result</div></div>
+                <div className="kpi-card"><div className="kpi-label">30d realized range</div><div className="kpi-value">{formatPct(venues?.summary.realized_spread_30d)}</div><div className="kpi-hint">Observed best minus lowest · not risk-adjusted</div></div>
                 <div className="kpi-card"><div className="kpi-label">Best realized 30d</div><div className="kpi-value">{formatPct(venues?.summary.best_realized_apy_30d)}</div></div>
                 <div className="kpi-card"><div className="kpi-label">Weighted realized 30d</div><div className="kpi-value">{formatPct(venues?.summary.weighted_realized_apy_30d)}</div></div>
               </div>

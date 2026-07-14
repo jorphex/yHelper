@@ -104,6 +104,28 @@
 
 .freshness-dot { box-shadow: none !important; }
 
+.analysis-scope {
+  border-top: 1px solid var(--preview-rule);
+  padding-top: var(--space-6);
+}
+
+.analysis-scope-fixed {
+  margin-top: var(--space-12) !important;
+}
+
+.scope-label {
+  margin-bottom: var(--space-2);
+  color: var(--yearn-link);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.active-filter-note {
+  margin-top: var(--space-4);
+}
+
 /* A single cardless surface grammar. */
 .card,
 .kpi-card,

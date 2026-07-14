@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { KpiCardSkeleton } from "./components/skeleton";
 import { useHomeData, type HomeMover } from "./hooks/use-home-data";
-import { formatPct, formatUsd, yearnVaultUrl } from "./lib/format";
+import { formatPct, formatUsd, formatUtcDateTime, yearnVaultUrl } from "./lib/format";
 
 function signedPercent(value: number | null | undefined): string {
   if (!Number.isFinite(value ?? null)) return "n/a";
@@ -31,6 +31,7 @@ export default function HomePage() {
   const faller = data?.changes?.movers?.fallers?.[0];
   const opportunity = data?.assets?.rows?.find((row) => Number.isFinite(row.realized_spread_30d));
   const protocolTvl = data?.overview?.protocol_context?.protocol?.tvl_usd;
+  const protocolFetchedAt = data?.overview?.protocol_context?.protocol?.observed_at;
   const summary = data?.changes?.summary;
 
   return (
@@ -66,9 +67,9 @@ export default function HomePage() {
               <div className="kpi-hint">{signedPercent(faller?.delta_apy)} · now {formatPct(faller?.realized_apy_30d ?? null, 2)}</div>
             </div>
             <div className="kpi-card">
-              <div className="kpi-label">Largest vault spread</div>
+              <div className="kpi-label">Widest exact-symbol range</div>
               <div className="kpi-value kpi-value-md">{opportunity ? <Link className="text-accent" href={`/explore?tab=venues&token=${encodeURIComponent(opportunity.token_symbol)}`}>{opportunity.token_symbol}</Link> : "n/a"}</div>
-              <div className="kpi-hint">{formatPct(opportunity?.realized_spread_30d ?? null, 2)} across {opportunity?.venues ?? 0} exact-symbol vaults</div>
+              <div className="kpi-hint">{formatPct(opportunity?.realized_spread_30d ?? null, 2)} across {opportunity?.venues ?? 0} exact-symbol vaults · compare differences</div>
             </div>
           </div>
         )}
@@ -78,7 +79,7 @@ export default function HomePage() {
         <div className="card-header"><div><h2 className="card-title">Market context</h2><p className="card-subtitle">Protocol size and the direction of comparable established vaults</p></div></div>
         {isLoading ? <div className="kpi-grid kpi-grid-3"><KpiCardSkeleton /><KpiCardSkeleton /><KpiCardSkeleton /></div> : (
           <div className="kpi-grid kpi-grid-3">
-            <div className="kpi-card"><div className="kpi-label">Yearn protocol TVL</div><div className="kpi-value">{formatUsd(protocolTvl ?? null, 0, false)}</div><div className="kpi-hint">Yearn-reported protocol aggregate</div></div>
+            <div className="kpi-card"><div className="kpi-label">Yearn website TVL</div><div className="kpi-value">{formatUsd(protocolTvl ?? null, 0, false)}</div><div className="kpi-hint">DefiLlama-sourced{protocolFetchedAt ? ` · fetched ${formatUtcDateTime(protocolFetchedAt)}` : ""}</div></div>
             <div className="kpi-card"><div className="kpi-label">TVL-weighted change</div><div className="kpi-value">{signedPercent(summary?.tvl_weighted_delta)}</div><div className="kpi-hint">Across {summary?.vaults_with_change ?? 0} comparable vaults</div></div>
             <div className="kpi-card"><div className="kpi-label">Direction</div><div className="kpi-value kpi-value-md">{summary?.riser_vaults ?? 0} rising · {summary?.faller_vaults ?? 0} falling</div><div className="kpi-hint">{formatUsd(summary?.riser_tvl_usd ?? null, 0, false)} rising TVL · {formatUsd(summary?.faller_tvl_usd ?? null, 0, false)} falling</div></div>
           </div>

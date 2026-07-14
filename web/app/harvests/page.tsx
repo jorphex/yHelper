@@ -175,6 +175,7 @@ function ReportsPageContent() {
           />
         </label>
         </div></div>
+        {query.vaultAddress ? <p className="section-note active-filter-note">Showing one vault: <span className="data-value">{data?.recent?.[0]?.vault_symbol || shortAddress(query.vaultAddress)}</span> <button className="button-reset table-filter-action" onClick={() => updateQuery({ vault_address: null })}>Clear vault filter</button></p> : null}
       </section>
 
       {isLoading && !data ? <p className="section section-md muted">Loading report scope…</p> : (
@@ -211,7 +212,7 @@ function ReportsPageContent() {
                     <td data-label="Time">{txUrl ? <a className="external-link" href={txUrl} target="_blank" rel="noreferrer">{formatUtcDateTime(row.block_time)}</a> : formatUtcDateTime(row.block_time)}</td>
                     <td data-label="Vault">
                       <a className="external-link" href={vaultUrl} target="_blank" rel="noreferrer">{row.vault_symbol || shortAddress(row.vault_address)}</a>
-                      <div className="muted">{chainLabel(row.chain_id)} · {row.token_symbol || "asset"} · <button className="button-reset table-filter-action" aria-label={`Filter reports to ${row.vault_symbol || row.vault_address}`} onClick={() => updateQuery({ vault_address: row.vault_address })}>Filter</button></div>
+                      <div className="muted">{chainLabel(row.chain_id)} · {row.token_symbol || "asset"} · <button className="button-reset table-filter-action" aria-label={`Show only reports for ${row.vault_symbol || row.vault_address}`} onClick={() => updateQuery({ vault_address: row.vault_address })}>Only this vault</button></div>
                     </td>
                     <td data-label="Strategy">
                       {strategyUrl ? <a className="external-link" href={strategyUrl} target="_blank" rel="noreferrer">{row.strategy_name || shortAddress(row.strategy_address)}</a> : row.strategy_name || shortAddress(row.strategy_address)}

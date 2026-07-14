@@ -18,6 +18,20 @@ function shortDate(value: string | undefined): string | undefined {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" }).format(date);
 }
 
+function comparisonLabel(window: "24h" | "7d" | "30d"): string {
+  if (window === "24h") return "24 hours vs preceding 24 hours";
+  if (window === "30d") return "30 days vs preceding 30 days";
+  return "7 days vs preceding 7 days";
+}
+
+function ageLabel(seconds: number | null | undefined): string | null {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return null;
+  if (seconds < 60) return "less than a minute ago";
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m ago`;
+  if (seconds < 86_400) return `${Math.max(1, Math.round(seconds / 3600))}h ago`;
+  return `${Math.max(1, Math.round(seconds / 86_400))}d ago`;
+}
+
 function MomentumPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -95,6 +109,15 @@ function MomentumPageContent() {
     ? [Math.min(...yieldValues), Math.max(...yieldValues)]
     : undefined;
   const moverRows = [...(data?.movers?.risers ?? []), ...(data?.movers?.fallers ?? [])].filter((row, index, rows) => rows.findIndex((candidate) => candidate.chain_id === row.chain_id && candidate.vault_address === row.vault_address) === index);
+  const newestMetricAge = ageLabel(data?.freshness?.metrics_newest_age_seconds);
+  const staleComparisons = data?.freshness?.window_stale_vaults;
+  const trackedComparisons = data?.freshness?.window_tracked_vaults;
+  const currentScopeNote = [
+    newestMetricAge ? `Newest source metric ${newestMetricAge}` : null,
+    staleComparisons != null && trackedComparisons != null
+      ? `${Math.max(0, trackedComparisons - staleComparisons)} of ${trackedComparisons} comparisons within the selected freshness threshold`
+      : null,
+  ].filter(Boolean).join(" · ");
 
   return (
     <div>
@@ -108,7 +131,8 @@ function MomentumPageContent() {
         <label><span className="filter-label">Vault set</span><select className="filter-control" value={query.universe} onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}>{UNIVERSE_VALUES.map((universe) => <option key={universe} value={universe}>{universeLabel(universe)}</option>)}</select></label>
       </div></div></section>
 
-      <section className="section section-lg">
+      <section className="section section-lg analysis-scope" aria-labelledby="current-comparison-title">
+        <div className="card-header"><div><div className="scope-label">Selected comparison</div><h2 className="card-title" id="current-comparison-title">{comparisonLabel(query.window)}</h2>{currentScopeNote ? <p className="card-description">{currentScopeNote}</p> : null}</div></div>
         {isLoading ? <KpiGridSkeleton count={3} /> : <div className="kpi-grid kpi-grid-3">
           <div className="kpi-card"><div className="kpi-label">Comparable vaults</div><div className="kpi-value">{compared}</div><div className="kpi-hint">{summary?.vaults_eligible ?? 0} eligible</div></div>
           <div className="kpi-card"><div className="kpi-label">Compared TVL</div><div className="kpi-value">{formatUsd(totalTvl)}</div></div>
@@ -125,7 +149,9 @@ function MomentumPageContent() {
         </>}
       </section>
 
-      <section className="section"><div className="card-header"><div><h2 className="card-title">60-day context</h2><p className="card-description">Fixed 7d and 30d history for the selected market and vault set. The window control above applies to the current comparison, mover tables, and scatter plot—not these context strips.</p></div></div><div className="viz-stack"><div className="cols-2"><TrendStrips title="Realized yield" items={trendItems} domain={yieldDomain} valueFormatter={(value) => formatPct(value, 2)} deltaFormatter={(value) => formatPercentagePoints(value, 2)} /><TrendStrips title="7d vs 30d breadth" items={breadthItems} domain={[0, 1]} valueFormatter={(value) => formatPct(value, 0)} deltaFormatter={(value) => formatPercentagePoints(value, 1)} /></div><div><ScatterPlot title="Current realized yield vs window change" xLabel="Window change" yLabel="Current realized APY" points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size represents tracked TVL. The zero line separates strengthening from weakening. Select a point to open its Yearn vault page.</p></div></div></section>
+      <section className="section section-lg"><ScatterPlot title={`Current yield vs ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size represents tracked TVL. The zero line separates strengthening from weakening. Select a point to open its Yearn vault page.</p></section>
+
+      <section className="section analysis-scope analysis-scope-fixed" aria-labelledby="historical-context-title"><div className="card-header"><div><div className="scope-label">Fixed historical context</div><h2 className="card-title" id="historical-context-title">60 days of 7d and 30d observations</h2><p className="card-description">These strips always use 7d and 30d observations for the selected market and vault set; changing the comparison window above does not alter them.</p></div></div><div className="cols-2"><TrendStrips title="Realized yield" items={trendItems} domain={yieldDomain} valueFormatter={(value) => formatPct(value, 2)} deltaFormatter={(value) => formatPercentagePoints(value, 2)} /><TrendStrips title="7d vs 30d breadth" items={breadthItems} domain={[0, 1]} valueFormatter={(value) => formatPct(value, 0)} deltaFormatter={(value) => formatPercentagePoints(value, 1)} /></div></section>
     </div>
   );
 }
