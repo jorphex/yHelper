@@ -79,8 +79,8 @@ export default function HomePage() {
         <div className="card-header"><div><h2 className="card-title">Market context</h2><p className="card-subtitle">Protocol size and the direction of comparable established vaults</p></div></div>
         {isLoading ? <div className="kpi-grid kpi-grid-3"><KpiCardSkeleton /><KpiCardSkeleton /><KpiCardSkeleton /></div> : (
           <div className="kpi-grid kpi-grid-3">
-            <div className="kpi-card"><div className="kpi-label">Yearn website TVL</div><div className="kpi-value">{formatUsd(protocolTvl ?? null, 0, false)}</div><div className="kpi-hint">DefiLlama-sourced{protocolFetchedAt ? ` · fetched ${formatUtcDateTime(protocolFetchedAt)}` : ""}</div></div>
-            <div className="kpi-card"><div className="kpi-label">TVL-weighted change</div><div className="kpi-value">{signedPercent(summary?.tvl_weighted_delta)}</div><div className="kpi-hint">Across {summary?.vaults_with_change ?? 0} comparable vaults</div></div>
+            <div className="kpi-card"><div className="kpi-label">Yearn website TVL</div><div className="kpi-value kpi-value-md">{formatUsd(protocolTvl ?? null, 0, false)}</div><div className="kpi-hint">DefiLlama-sourced{protocolFetchedAt ? ` · fetched ${formatUtcDateTime(protocolFetchedAt)}` : ""}</div></div>
+            <div className="kpi-card"><div className="kpi-label">TVL-weighted change</div><div className="kpi-value kpi-value-md">{signedPercent(summary?.tvl_weighted_delta)}</div><div className="kpi-hint">Across {summary?.vaults_with_change ?? 0} comparable vaults</div></div>
             <div className="kpi-card"><div className="kpi-label">Direction</div><div className="kpi-value kpi-value-md">{summary?.riser_vaults ?? 0} rising · {summary?.faller_vaults ?? 0} falling</div><div className="kpi-hint">{formatUsd(summary?.riser_tvl_usd ?? null, 0, false)} rising TVL · {formatUsd(summary?.faller_tvl_usd ?? null, 0, false)} falling</div></div>
           </div>
         )}
