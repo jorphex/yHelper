@@ -46,7 +46,7 @@ export function OverviewTab({
       <section className="section">
         <div className="card-header"><div><h2 className="card-title">Underlying assets</h2><p className="card-description">Select linked assets to compare their vaults; unlinked assets have no valid multi-vault comparison.</p></div></div>
         <TableWrap><table className="decision-table"><thead><tr><th>Asset</th><th className="numeric mobile-secondary-column">Vaults</th><th className="numeric">TVL</th><th className="numeric">Share</th></tr></thead><tbody>
-          {isLoading ? <TableSkeleton rows={7} columns={4} /> : tokenRows.map((row) => <tr key={row.token_symbol}><td>{row.token_symbol && comparableTokenSymbols.includes(row.token_symbol) ? <Link href={`/explore?tab=venues&token=${encodeURIComponent(row.token_symbol)}&universe=${universe}`}>{row.token_symbol}</Link> : row.token_symbol || "Unknown"}</td><td className="numeric mobile-secondary-column">{row.vaults}</td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.share_tvl)}</td></tr>)}
+          {isLoading ? <TableSkeleton rows={7} columns={4} /> : tokenRows.map((row) => <tr key={row.token_symbol}><td>{row.token_symbol && comparableTokenSymbols.includes(row.token_symbol) ? <Link href={`/explore?tab=compare&token=${encodeURIComponent(row.token_symbol)}&universe=${universe}`}>{row.token_symbol}</Link> : row.token_symbol || "Unknown"}</td><td className="numeric mobile-secondary-column">{row.vaults}</td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.share_tvl)}</td></tr>)}
         </tbody></table></TableWrap>
       </section>
     </>

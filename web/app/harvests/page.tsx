@@ -6,7 +6,7 @@ import { DataLoadError } from "../components/error-state";
 import { EmptyState } from "../components/empty-state";
 import { TableSkeleton } from "../components/skeleton";
 import { TableWrap } from "../components/table-wrap";
-import { useHarvestData } from "../hooks/use-harvest-data";
+import { useReportData } from "../hooks/use-report-data";
 import {
   chainLabel,
   explorerAddressUrl,
@@ -93,16 +93,11 @@ function ReportsPageContent() {
     meaningfulOnly: searchParams.get("all") !== "1",
   }), [searchParams]);
 
-  const { data, isLoading, error, refetch } = useHarvestData({
+  const { data, isLoading, error, refetch } = useReportData({
     days: HISTORY_DAYS,
     chainId: query.chainId,
     vaultAddress: query.vaultAddress || null,
     limit: query.limit,
-    meaningfulOnly: query.meaningfulOnly,
-  });
-  const { data: chainData } = useHarvestData({
-    days: HISTORY_DAYS,
-    limit: 1,
     meaningfulOnly: query.meaningfulOnly,
   });
   const [vaultDraft, setVaultDraft] = useState(query.vaultAddress);
@@ -118,9 +113,9 @@ function ReportsPageContent() {
   }, []);
   useEffect(() => setMobileExpanded(false), [query.chainId, query.meaningfulOnly, query.vaultAddress]);
 
-  const chainOptions = useMemo(() => (chainData?.chain_rollups ?? [])
+  const chainOptions = useMemo(() => (data?.available_chains ?? [])
     .map((row) => ({ id: row.chain_id, label: row.chain_label || chainLabel(row.chain_id) }))
-    .sort((left, right) => left.label.localeCompare(right.label)), [chainData?.chain_rollups]);
+    .sort((left, right) => left.label.localeCompare(right.label)), [data?.available_chains]);
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
   const recentRows = data?.recent ?? [];
@@ -180,7 +175,7 @@ function ReportsPageContent() {
 
       {isLoading && !data ? <p className="section section-md muted">Loading report scope…</p> : (
         <section className="section section-md"><p className="section-note">
-          Last 24 hours: <strong>{data?.trailing_24h?.harvest_count ?? 0}</strong> reports from{" "}
+          Last 24 hours: <strong>{data?.trailing_24h?.report_count ?? 0}</strong> reports from{" "}
           <strong>{data?.trailing_24h?.vault_count ?? 0}</strong> vaults and{" "}
           <strong>{data?.trailing_24h?.strategy_count ?? 0}</strong> strategies. Amounts use each vault&apos;s
           underlying asset and are not USD-normalized.

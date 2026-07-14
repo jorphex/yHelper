@@ -6,10 +6,7 @@ import { apiUrl } from "../lib/api";
 const HOME_REFRESH_MS = 60_000;
 
 type OverviewResponse = {
-  protocol_context?: {
-    protocol?: { tvl_usd?: number | null; observed_at?: string | null } | null;
-    catalog?: { active_yearn?: { vaults?: number | null; gross_tvl_usd?: number | null } | null } | null;
-  } | null;
+  protocol?: { tvl_usd?: number | null; fetched_at?: string | null } | null;
 };
 
 export type HomeMover = {
@@ -18,7 +15,7 @@ export type HomeMover = {
   symbol?: string | null;
   token_symbol?: string | null;
   delta_apy?: number | null;
-  realized_apy_30d?: number | null;
+  realized_apy_window?: number | null;
 };
 
 type ChangesResponse = {
@@ -35,7 +32,7 @@ type ChangesResponse = {
 
 export type HomeAsset = {
   token_symbol: string;
-  venues: number;
+  vaults: number;
   chains: number;
   total_tvl_usd: number | null;
   realized_spread_30d: number | null;
@@ -53,7 +50,7 @@ type HomeData = {
 
 export async function fetchHomeData(): Promise<HomeData> {
   const [overviewRes, changesRes, assetsRes] = await Promise.allSettled([
-    fetch(apiUrl("/overview"), { cache: "no-store" }),
+    fetch(apiUrl("/meta/protocol-context"), { cache: "no-store" }),
     fetch(apiUrl("/changes", { window: "7d", universe: "core", limit: 3 }), { cache: "no-store" }),
     fetch(apiUrl("/assets", {
       universe: "core",

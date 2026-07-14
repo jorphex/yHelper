@@ -4,11 +4,10 @@ import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { fetchAssetsData } from "./hooks/use-assets-data";
-import { fetchChainsData } from "./hooks/use-chains-data";
 import { fetchChangesData, fetchTrendDailyData } from "./hooks/use-changes-data";
 import { fetchCompositionData } from "./hooks/use-composition-data";
 import { fetchDiscoverData } from "./hooks/use-discover-data";
-import { fetchHarvestData } from "./hooks/use-harvest-data";
+import { fetchReportData } from "./hooks/use-report-data";
 import { fetchHomeData } from "./hooks/use-home-data";
 import { fetchStYfiData } from "./hooks/use-styfi-data";
 import { queryClient } from "./lib/query-client";
@@ -51,8 +50,6 @@ function GlobalPrefetch() {
             sort: "tvl",
             dir: "desc",
             chain: null,
-            category: null,
-            token: null,
           }],
           queryFn: () => fetchDiscoverData({
             universe: "core",
@@ -63,8 +60,6 @@ function GlobalPrefetch() {
             sort: "tvl",
             dir: "desc",
             chain: null,
-            category: null,
-            token: null,
           }),
           staleTime: 30_000,
         }),
@@ -97,11 +92,6 @@ function GlobalPrefetch() {
           staleTime: 30_000,
         }),
         () => client.prefetchQuery({
-          queryKey: ["chains", { universe: "core", minTvl: 1000000 }],
-          queryFn: () => fetchChainsData({ universe: "core", minTvl: 1000000 }),
-          staleTime: 30_000,
-        }),
-        () => client.prefetchQuery({
           queryKey: ["changes", {
             universe: "core",
             market: "all",
@@ -126,7 +116,7 @@ function GlobalPrefetch() {
             market: "all",
             minTvl: 1000000,
             minPoints: 45,
-            days: 90,
+            days: 60,
             enabled: true,
           }],
           queryFn: () => fetchTrendDailyData({
@@ -134,14 +124,14 @@ function GlobalPrefetch() {
             market: "all",
             minTvl: 1000000,
             minPoints: 45,
-            days: 90,
+            days: 60,
             enabled: true,
           }),
           staleTime: 30_000,
         }),
         () => client.prefetchQuery({
-          queryKey: ["harvests", 90, null, null, 25, true],
-          queryFn: () => fetchHarvestData({ days: 90, chainId: null, vaultAddress: null, limit: 25, meaningfulOnly: true }),
+          queryKey: ["reports", 90, null, null, 25, true],
+          queryFn: () => fetchReportData({ days: 90, chainId: null, vaultAddress: null, limit: 25, meaningfulOnly: true }),
           staleTime: 30_000,
         }),
         () => client.prefetchQuery({

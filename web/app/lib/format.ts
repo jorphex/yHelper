@@ -171,16 +171,6 @@ export function explorerTxUrl(chainId: number, txHash: string): string | null {
   return `${base}/tx/${encodeURIComponent(txHash)}`;
 }
 
-export function regimeLabel(value: string | null | undefined): string {
-  if (!value) return "Unknown";
-  const key = value.toLowerCase();
-  if (key === "rising") return "Rising (recent yield improving)";
-  if (key === "falling") return "Falling (recent yield weakening)";
-  if (key === "stable") return "Stable (small trend, lower volatility)";
-  if (key === "choppy") return "Choppy (high volatility)";
-  return value;
-}
-
 export function compactCategoryLabel(value: string | null | undefined, compact = false): string {
   if (!value || value.trim().length === 0) return "unknown";
   const label = value.trim();

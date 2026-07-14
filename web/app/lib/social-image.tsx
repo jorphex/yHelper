@@ -34,19 +34,9 @@ type SocialPreviewResponse = {
 };
 
 type OverviewResponse = {
-  protocol_context?: {
-    protocol?: {
-      tvl_usd?: number | null;
-    } | null;
-    catalog?: {
-      active_yearn?: {
-        vaults?: number | null;
-      } | null;
-    } | null;
-    current_yearn?: {
-      tvl_usd?: number | null;
-      vaults?: number | null;
-    } | null;
+  protocol?: { tvl_usd?: number | null } | null;
+  catalog?: {
+    active_yearn?: { vaults?: number | null } | null;
   } | null;
 };
 
@@ -130,7 +120,7 @@ function chainLabel(chainId: number | null | undefined): string {
 export async function renderSocialImage() {
   const [social, overview, styfi, regularFontData, boldFontData, previewBaseImageSrc] = await Promise.all([
     fetchJson<SocialPreviewResponse>("/meta/social-preview"),
-    fetchJson<OverviewResponse>("/overview"),
+    fetchJson<OverviewResponse>("/meta/protocol-context"),
     fetchJson<StyfiResponse>("/styfi"),
     regularFontPromise,
     boldFontPromise,
@@ -138,16 +128,12 @@ export async function renderSocialImage() {
   ]);
 
   const summary = social?.summary || {};
-  const protocol = overview?.protocol_context?.protocol
-    ?? overview?.protocol_context?.current_yearn
-    ?? {};
+  const protocol = overview?.protocol ?? {};
   const highest = social?.highest_est_apy_vault || {};
   const styfiSummary = styfi?.summary || {};
   const rewardState = styfi?.current_reward_state || {};
 
-  const activeVaultCount = overview?.protocol_context?.catalog?.active_yearn?.vaults
-    ?? overview?.protocol_context?.current_yearn?.vaults
-    ?? summary.active_vaults;
+  const activeVaultCount = overview?.catalog?.active_yearn?.vaults ?? summary.active_vaults;
   const styfiEpochValue = rewardState.epoch ?? styfiSummary.reward_epoch;
 
   const cards = [

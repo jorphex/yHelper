@@ -11,19 +11,12 @@ type BreakdownRow = {
   vaults: number;
   tvl_usd: number | null;
   share_tvl?: number | null;
-  weighted_realized_apy_30d?: number | null;
 };
 
 type CompositionResponse = {
   summary: {
     vaults: number;
     total_tvl_usd: number | null;
-    avg_realized_apy_30d: number | null;
-  };
-  concentration: {
-    chain_hhi: number | null;
-    category_hhi: number | null;
-    token_hhi: number | null;
   };
   chains: BreakdownRow[];
   categories: BreakdownRow[];

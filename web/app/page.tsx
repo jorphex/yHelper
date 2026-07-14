@@ -30,8 +30,8 @@ export default function HomePage() {
   const riser = data?.changes?.movers?.risers?.[0];
   const faller = data?.changes?.movers?.fallers?.[0];
   const opportunity = data?.assets?.rows?.find((row) => Number.isFinite(row.realized_spread_30d));
-  const protocolTvl = data?.overview?.protocol_context?.protocol?.tvl_usd;
-  const protocolFetchedAt = data?.overview?.protocol_context?.protocol?.observed_at;
+  const protocolTvl = data?.overview?.protocol?.tvl_usd;
+  const protocolFetchedAt = data?.overview?.protocol?.fetched_at;
   const summary = data?.changes?.summary;
 
   return (
@@ -59,17 +59,17 @@ export default function HomePage() {
             <div className="kpi-card">
               <div className="kpi-label">Strongest riser</div>
               <div className="kpi-value kpi-value-md"><MoverLink row={riser} /></div>
-              <div className="kpi-hint">{signedPercent(riser?.delta_apy)} · now {formatPct(riser?.realized_apy_30d ?? null, 2)}</div>
+              <div className="kpi-hint">{signedPercent(riser?.delta_apy)} · current 7d {formatPct(riser?.realized_apy_window ?? null, 2)}</div>
             </div>
             <div className="kpi-card">
               <div className="kpi-label">Largest faller</div>
               <div className="kpi-value kpi-value-md"><MoverLink row={faller} /></div>
-              <div className="kpi-hint">{signedPercent(faller?.delta_apy)} · now {formatPct(faller?.realized_apy_30d ?? null, 2)}</div>
+              <div className="kpi-hint">{signedPercent(faller?.delta_apy)} · current 7d {formatPct(faller?.realized_apy_window ?? null, 2)}</div>
             </div>
             <div className="kpi-card">
               <div className="kpi-label">Widest exact-symbol range</div>
-              <div className="kpi-value kpi-value-md">{opportunity ? <Link className="text-accent" href={`/explore?tab=venues&token=${encodeURIComponent(opportunity.token_symbol)}`}>{opportunity.token_symbol}</Link> : "n/a"}</div>
-              <div className="kpi-hint">{formatPct(opportunity?.realized_spread_30d ?? null, 2)} across {opportunity?.venues ?? 0} exact-symbol vaults · compare differences</div>
+              <div className="kpi-value kpi-value-md">{opportunity ? <Link className="text-accent" href={`/explore?tab=compare&token=${encodeURIComponent(opportunity.token_symbol)}`}>{opportunity.token_symbol}</Link> : "n/a"}</div>
+              <div className="kpi-hint">{formatPct(opportunity?.realized_spread_30d ?? null, 2)} across {opportunity?.vaults ?? 0} exact-symbol vaults · compare differences</div>
             </div>
           </div>
         )}
