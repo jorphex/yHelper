@@ -4,7 +4,6 @@ import unittest
 
 from app.analytics_service import _fetch_change_movers
 from app.common import _market_filter_sql, _market_group_sql, _user_visible_filter_sql
-from app.meta_service import _social_preview_highest_vault
 from app.models import ChangesResponse
 from app.product_service import _recent_reports
 
@@ -76,17 +75,6 @@ class ProductSemanticsTests(unittest.TestCase):
         self.assertIn("d.catalog_is_yearn = TRUE", sql)
         self.assertIn("d.is_hidden = FALSE", sql)
         self.assertIn("d.is_retired = FALSE", sql)
-
-    def test_social_preview_uses_the_stored_normalized_snapshot(self) -> None:
-        cursor = RecordingCursor()
-
-        self.assertEqual(_social_preview_highest_vault(cursor), {})  # type: ignore[arg-type]
-
-        sql, params = cursor.calls[0]
-        self.assertEqual(params, {})
-        self.assertIn("FROM vault_dim d", sql)
-        self.assertIn("d.catalog_is_yearn = TRUE", sql)
-        self.assertIn("'kong_rest_snapshot' AS source", sql)
 
     def test_changes_contract_rejects_unknown_fields(self) -> None:
         payload = {

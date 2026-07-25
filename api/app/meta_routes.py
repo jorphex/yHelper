@@ -12,8 +12,6 @@ from app.config import DATABASE_URL, DEFAULT_MIN_POINTS, DEFAULT_MIN_TVL_USD
 from app.meta_service import (
     _coverage_snapshot,
     _freshness_snapshot,
-    _social_preview_highest_vault,
-    _tracked_scope_snapshot,
 )
 
 router = APIRouter()
@@ -65,20 +63,3 @@ def meta_protocol_context() -> dict[str, object]:
             "status": "unavailable",
             "as_of_utc": datetime.now(UTC).isoformat(),
         }
-
-
-@router.get("/api/meta/social-preview")
-def meta_social_preview() -> dict[str, object]:
-    tracked_scope: dict[str, object] = {}
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
-        with conn.cursor() as cur:
-            tracked_scope = _tracked_scope_snapshot(cur)
-            highest_est_row = _social_preview_highest_vault(cur)
-    return {
-        "generated_at_utc": datetime.now(UTC).isoformat(),
-        "summary": {
-            "active_vaults": tracked_scope.get("active_vaults"),
-            "tracked_tvl_active_usd": tracked_scope.get("tracked_tvl_active_usd"),
-        },
-        "highest_est_apy_vault": highest_est_row or None,
-    }

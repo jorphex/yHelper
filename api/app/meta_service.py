@@ -287,30 +287,6 @@ def _freshness_snapshot(
     return result
 
 
-def _social_preview_highest_vault(cur: psycopg.Cursor) -> dict[str, object]:
-    cur.execute(
-        f"""
-        SELECT
-            d.vault_address,
-            d.name,
-            d.symbol,
-            d.chain_id,
-            d.tvl_usd,
-            d.est_apy,
-            d.est_apy AS current_est_apy,
-            d.est_apy AS current_net_apy,
-            'estimated_apy' AS yield_kind,
-            'kong_rest_snapshot' AS source
-        FROM vault_dim d
-        WHERE {_user_visible_filter_sql("d", include_retired=False)}
-          AND d.est_apy IS NOT NULL
-        ORDER BY d.est_apy DESC, d.tvl_usd DESC NULLS LAST, d.chain_id, d.vault_address
-        LIMIT 1
-        """
-    )
-    return cur.fetchone() or {}
-
-
 def _coverage_snapshot(
     conn: psycopg.Connection, *, min_tvl_usd: float, min_points: int, split_limit: int = 8
 ) -> dict[str, object]:

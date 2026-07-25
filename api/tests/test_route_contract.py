@@ -33,6 +33,7 @@ class RouteContractTests(unittest.TestCase):
         paths = {route.path for route in app.routes}
         self.assertNotIn("/api/overview", paths)
         self.assertNotIn("/api/harvests", paths)
+        self.assertNotIn("/api/meta/social-preview", paths)
         self.assertNotIn("/api/assets/{token_symbol:path}/venues", paths)
 
     def test_canonical_product_routes_publish_typed_responses(self) -> None:
