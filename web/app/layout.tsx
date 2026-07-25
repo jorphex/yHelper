@@ -41,7 +41,7 @@ export const metadata: Metadata = {
         url: OPEN_GRAPH_IMAGE_URL,
         width: 1200,
         height: 630,
-        alt: `yHelper dashboard preview`,
+        alt: "yHelper live Yearn market preview",
       },
     ],
   },

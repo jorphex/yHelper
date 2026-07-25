@@ -23,6 +23,7 @@ scripts/generate_og_image.py
 web/public/home-assets-yearn-blender-tests/
 web/public/social/yhelper-preview-*.png
 !web/public/social/yhelper-preview-base.png
+!web/public/social/yhelper-preview-bg-v2.png
 
 # Python
 __pycache__/
