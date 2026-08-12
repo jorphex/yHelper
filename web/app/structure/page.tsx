@@ -11,6 +11,6 @@ export default function StructureRedirect({
     if (Array.isArray(value)) value.forEach((item) => params.append(key, item));
     else params.set(key, value);
   }
-  params.set("tab", "structure");
-  redirect(`/explore?${params.toString()}`);
+  params.set("view", "structure");
+  redirect(`/markets?${params.toString()}`);
 }

@@ -7,7 +7,7 @@ import { DataLoadError } from "../components/error-state";
 import { MarketFilter } from "../components/market-filter";
 import { MarketModeNav } from "../components/market-mode-nav";
 import { NoVaultsEmptyState } from "../components/empty-state";
-import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
+import { TableSkeleton } from "../components/skeleton";
 import { TableWrap } from "../components/table-wrap";
 import { VaultLink } from "../components/vault-link";
 import { useAssetsData, useAssetVaults } from "../hooks/use-assets-data";
@@ -38,7 +38,9 @@ function ExplorePageContent() {
     return {
       universe,
       market: queryChoice(searchParams, "market", MARKET_VALUES, "all"),
-      tab: (searchParams.get("tab") === "venues"
+      tab: (searchParams.get("view") === "vaults" || searchParams.get("view") === "compare" || searchParams.get("view") === "structure"
+        ? searchParams.get("view")
+        : searchParams.get("tab") === "venues"
         ? "compare"
         : queryChoice(searchParams, "tab", ["vaults", "compare", "structure"] as const, "vaults")) as TabKey,
       chain: searchParams.get("chain"),
@@ -110,19 +112,31 @@ function ExplorePageContent() {
 
   const coverage = data?.coverage?.coverage_ratio;
   const summary = data?.summary;
+  const pageCopy = query.tab === "vaults"
+    ? {
+        accent: "Compare like with like",
+        description: "Screen established Yearn vaults by market, chain, size, and realized yield—then open the vault for its full evidence.",
+      }
+    : query.tab === "compare"
+      ? {
+          accent: "Same asset, different vault",
+          description: "Compare vaults with the exact same token symbol without silently merging wrapped or differently named assets.",
+        }
+      : {
+          accent: "Where tracked capital sits",
+          description: "Understand the composition of the selected vault set by market, chain, and underlying asset.",
+        };
 
   return (
-    <div>
+    <div className="markets-surface">
       <section className="page-header page-header-no-border">
-        <h1 className="page-title">Markets<br /><em className="page-title-accent">Compare like with like</em></h1>
-        <p className="page-description">
-          Screen established vaults, compare identical token symbols, or inspect where tracked capital is concentrated.
-        </p>
+        <h1 className="page-title">Markets<br /><em className="page-title-accent">{pageCopy.accent}</em></h1>
+        <p className="page-description">{pageCopy.description}</p>
         <MarketModeNav active={query.tab} />
       </section>
 
       <section className="section section-md">
-        <div className="card">
+        <div className="card market-filter-panel">
           <div className="filter-grid">
             {query.tab !== "compare" ? <MarketFilter market={query.market} universe={query.universe} minTvl={query.minTvl} onChange={(market) => updateQuery({ market, token: null })} /> : null}
             <label>
@@ -158,18 +172,16 @@ function ExplorePageContent() {
 
       {query.tab === "vaults" ? (
         <>
-          <section className="section section-lg">
-            {isLoading ? <KpiGridSkeleton count={query.universe === "raw" ? 4 : 3} /> : (
-              <div className={`kpi-grid ${query.universe === "raw" ? "kpi-grid-4" : "kpi-grid-3"}`}>
-                <div className="kpi-card"><div className="kpi-label">Comparable vaults</div><div className="kpi-value">{data?.pagination.total ?? 0}</div></div>
-                <div className="kpi-card"><div className="kpi-label">Tracked TVL</div><div className="kpi-value">{formatUsd(summary?.total_tvl_usd)}</div></div>
-                <div className="kpi-card"><div className="kpi-label">TVL-weighted realized 30d</div><div className="kpi-value">{formatPct(summary?.tvl_weighted_realized_apy_30d)}</div></div>
-                {query.universe === "raw" ? <div className="kpi-card"><div className="kpi-label">History coverage</div><div className="kpi-value">{formatPct(coverage, 0)}</div><div className="kpi-hint">Vaults with usable realized history</div></div> : null}
-              </div>
-            )}
+          <section className="section market-scope-summary" aria-label="Selected vault scope">
+            {isLoading ? <span className="muted">Loading selected vault scope…</span> : <>
+              <span><strong>{data?.pagination.total ?? 0}</strong> comparable vaults</span>
+              <span><strong>{formatUsd(summary?.total_tvl_usd)}</strong> tracked TVL</span>
+              <span><strong>{formatPct(summary?.tvl_weighted_realized_apy_30d)}</strong> TVL-weighted realized 30d</span>
+              {query.universe === "raw" ? <span><strong>{formatPct(coverage, 0)}</strong> history coverage</span> : null}
+            </>}
           </section>
 
-          <section className="section">
+          <section className="section section-lg">
             <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">7d vs 30d is the short-window realized APY minus the longer 30d baseline. Open a vault for its contract, strategies, and complete risk profile.</p></div></div>
             {!isLoading && !(data?.rows.length ?? 0) ? <NoVaultsEmptyState onReset={() => updateQuery({ market: "all", chain: null, universe: "core" })} /> : (
               <TableWrap><table className="decision-table">
@@ -178,7 +190,7 @@ function ExplorePageContent() {
                   <tr key={`${row.chain_id}:${row.vault_address}`}>
                     <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
                     <td className="mobile-secondary-column">{marketLabel(row.market as MarketKind)}</td>
-                    <td className="mobile-secondary-column"><Link href={`/explore?market=${query.market}&universe=${query.universe}&chain=${row.chain_id}`}>{chainLabel(row.chain_id)}</Link></td>
+                    <td className="mobile-secondary-column"><Link className="market-link-secondary" href={`/markets?view=vaults&market=${query.market}&universe=${query.universe}&chain=${row.chain_id}`}>{chainLabel(row.chain_id)}</Link></td>
                     <td className="data-value numeric">{formatUsd(row.tvl_usd)}</td>
                     <td className="data-value numeric mobile-secondary-column">{formatPct(row.est_apy)}</td>
                     <td className="data-value numeric">{formatPct(row.realized_apy_30d)}</td>
@@ -193,23 +205,13 @@ function ExplorePageContent() {
         <>
           <section className="section section-lg">
             <div className="card-header"><div><h2 className="card-title">Exact-symbol comparisons</h2><p className="card-description">Choose a symbol shared by at least two tracked Yearn vaults. Ranges are descriptive, not risk-adjusted; wrapped or differently named assets are not silently merged.</p></div></div>
-            <TableWrap><table className="decision-table"><thead><tr><th>Asset</th><th className="numeric mobile-secondary-column">Vaults</th><th className="numeric">TVL</th><th className="numeric" data-mobile-label="Best 30d">Best realized 30d</th><th className="numeric" data-mobile-label="Range">Realized range</th></tr></thead><tbody>
-              {assetsLoading ? <TableSkeleton rows={3} columns={5} /> : assetRows.length === 0 ? <tr><td colSpan={5} className="muted">No exact-symbol vault comparisons are available for this vault set.</td></tr> : assetRows.map((row) => <tr key={row.token_symbol}><td><button aria-pressed={query.token === row.token_symbol} className={`button-reset ${query.token === row.token_symbol ? "text-accent" : ""}`.trim()} onClick={() => updateQuery({ token: row.token_symbol })}>{row.token_symbol}{query.token === row.token_symbol ? <span className="muted"> · selected</span> : null}</button></td><td className="numeric mobile-secondary-column">{row.vaults}</td><td className="numeric">{formatUsd(row.total_tvl_usd)}</td><td className="numeric">{formatPct(row.best_realized_apy_30d)}</td><td className="numeric">{formatPct(row.realized_spread_30d)}</td></tr>)}
+            <TableWrap><table className="decision-table market-asset-selector"><thead><tr><th>Asset</th><th className="numeric mobile-secondary-column">Vaults</th><th className="numeric">TVL</th><th className="numeric mobile-secondary-column">Weighted realized 30d</th><th className="numeric" data-mobile-label="Best 30d">Best realized 30d</th><th className="numeric" data-mobile-label="Range">Realized range</th></tr></thead><tbody>
+              {assetsLoading ? <TableSkeleton rows={3} columns={6} /> : assetRows.length === 0 ? <tr><td colSpan={6} className="muted">No exact-symbol vault comparisons are available for this vault set.</td></tr> : assetRows.map((row) => <tr key={row.token_symbol} className={query.token === row.token_symbol ? "is-selected" : undefined}><td><button aria-pressed={query.token === row.token_symbol} className={`button-reset market-asset-choice ${query.token === row.token_symbol ? "is-selected" : ""}`.trim()} onClick={() => updateQuery({ token: row.token_symbol })}>{row.token_symbol}{query.token === row.token_symbol ? <span className="muted"> · selected</span> : null}</button></td><td className="numeric mobile-secondary-column">{row.vaults}</td><td className="numeric">{formatUsd(row.total_tvl_usd)}</td><td className="numeric mobile-secondary-column">{formatPct(row.weighted_realized_apy_30d)}</td><td className="numeric">{formatPct(row.best_realized_apy_30d)}</td><td className="numeric">{formatPct(row.realized_spread_30d)}</td></tr>)}
             </tbody></table></TableWrap>
           </section>
           {assetRows.length > 0 ? <>
           <section className="section section-lg">
-            {assetsLoading || assetVaultsLoading ? <KpiGridSkeleton count={4} /> : (
-              <div className="kpi-grid kpi-grid-4">
-                <div className="kpi-card"><div className="kpi-label">Comparable vaults</div><div className="kpi-value">{assetVaults?.summary.vaults ?? 0}</div></div>
-                <div className="kpi-card"><div className="kpi-label">30d realized range</div><div className="kpi-value">{formatPct(assetVaults?.summary.realized_spread_30d)}</div><div className="kpi-hint">Observed best minus lowest · not risk-adjusted</div></div>
-                <div className="kpi-card"><div className="kpi-label">Best realized 30d</div><div className="kpi-value">{formatPct(assetVaults?.summary.best_realized_apy_30d)}</div></div>
-                <div className="kpi-card"><div className="kpi-label">Weighted realized 30d</div><div className="kpi-value">{formatPct(assetVaults?.summary.weighted_realized_apy_30d)}</div></div>
-              </div>
-            )}
-          </section>
-          <section className="section">
-            <div className="card-header"><div><h2 className="card-title">{query.token || "Asset"} vaults</h2><p className="card-description">Exact token-symbol matches only; wrapped or differently named assets are not silently merged.</p></div></div>
+            <div className="card-header"><div><h2 className="card-title">{query.token || "Asset"} vaults{!assetVaultsLoading && assetVaults ? ` · ${assetVaults.summary.vaults} comparable` : ""}</h2><p className="card-description">Exact token-symbol matches only. The aggregate comparison above is descriptive, not risk-adjusted.</p></div></div>
             <TableWrap><table className="decision-table">
               <thead><tr><th>Vault</th><th className="mobile-secondary-column">Chain</th><th className="numeric">TVL</th><th className="numeric mobile-secondary-column">Est. APY</th><th className="numeric" data-mobile-label="30d APY">Realized 30d</th><th className="numeric" data-mobile-label="7d−30d">7d vs 30d</th></tr></thead>
               <tbody>{assetVaultsLoading ? <TableSkeleton rows={6} columns={6} /> : assetVaults?.rows.map((row) => (

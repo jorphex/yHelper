@@ -5,19 +5,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { MarketFilter } from "../components/market-filter";
 import { MarketModeNav } from "../components/market-mode-nav";
-import { ScatterPlot, ShareMeter, TrendStrips } from "../components/visuals";
-import { useChangesData, useTrendDailyData } from "../hooks/use-changes-data";
+import { ScatterPlot, ShareMeter } from "../components/visuals";
+import { useChangesData } from "../hooks/use-changes-data";
 import { formatPct, formatPercentagePoints, formatUsd, yearnVaultUrl } from "../lib/format";
 import { MARKET_VALUES, UNIVERSE_VALUES, universeDefaults, universeLabel } from "../lib/universe";
 import { queryChoice, replaceQuery } from "../lib/url";
 import { MoverTable } from "./components";
-import type { ChangeRow, DailyTrendRow } from "./types";
-
-function shortDate(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const date = new Date(`${value}T00:00:00Z`);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" }).format(date);
-}
+import type { ChangeRow } from "./types";
 
 function comparisonLabel(window: "24h" | "7d" | "30d"): string {
   if (window === "24h") return "24 hours vs preceding 24 hours";
@@ -65,14 +59,6 @@ function MomentumPageContent() {
     window: query.window,
     staleThreshold: "auto",
   });
-  const { data: trends } = useTrendDailyData({
-    universe: query.universe,
-    market: query.market,
-    minTvl: query.minTvl,
-    minPoints: query.minPoints,
-    days: 60,
-  });
-
   if (error && !data) {
     return <div className="error-state"><h2>Markets are temporarily unavailable</h2><button className="button button-primary section-sm" onClick={() => refetch()}>Retry</button></div>;
   }
@@ -94,21 +80,6 @@ function MomentumPageContent() {
     { id: "flat-tvl", label: "Unchanged TVL", value: neutralTvl, note: "No measured window change", tone: "muted" as const },
   ];
 
-  const daily = (trends?.rows ?? []) as DailyTrendRow[];
-  const recent = daily.slice(-60);
-  const startLabel = shortDate(recent[0]?.day);
-  const endLabel = shortDate(recent.at(-1)?.day);
-  const trendItems = [
-    { id: "7d", label: "Realized APY 7d", points: recent.map((row) => row.weighted_apy_7d), note: "TVL-weighted short window", startLabel, endLabel, deltaLabel: "1d change" },
-    { id: "30d", label: "Realized APY 30d", points: recent.map((row) => row.weighted_apy_30d), note: "TVL-weighted baseline", startLabel, endLabel, deltaLabel: "1d change" },
-  ];
-  const breadthItems = [
-    { id: "riser", label: "Strengthening share", points: recent.map((row) => row.riser_ratio), note: "Share with realized 7d APY above 30d", startLabel, endLabel, deltaLabel: "1d change" },
-  ];
-  const yieldValues = trendItems.flatMap((item) => item.points).filter((value): value is number => value != null && Number.isFinite(value));
-  const yieldDomain: readonly [number, number] | undefined = yieldValues.length > 0
-    ? [Math.min(...yieldValues), Math.max(...yieldValues)]
-    : undefined;
   const moverRows = [...(data?.movers?.risers ?? []), ...(data?.movers?.fallers ?? [])].filter((row, index, rows) => rows.findIndex((candidate) => candidate.chain_id === row.chain_id && candidate.vault_address === row.vault_address) === index);
   const newestMetricAge = ageLabel(data?.freshness?.newest_comparison_age_seconds);
   const currentComparisons = data?.freshness?.current_comparisons;
@@ -121,13 +92,13 @@ function MomentumPageContent() {
   ].filter(Boolean).join(" · ");
 
   return (
-    <div>
+    <div className="markets-surface">
       <section className="page-header page-header-no-border">
         <h1 className="page-title">Markets<br /><em className="page-title-accent">What changed enough to inspect</em></h1>
         <p className="page-description">Find material realized-yield changes, check how broad they are, then open the vault or compare its underlying asset. Movement is evidence to investigate, not a recommendation.</p>
         <MarketModeNav active="changes" />
       </section>
-      <section className="section section-md"><div className="card"><div className="filter-grid">
+      <section className="section section-md"><div className="card market-filter-panel"><div className="filter-grid">
         <label><span className="filter-label">Window</span><select className="filter-control" value={query.window} onChange={(event) => updateQuery({ window: event.target.value })}><option value="24h">24 hours vs prior 24 hours</option><option value="7d">7 days vs prior 7 days</option><option value="30d">30 days vs prior 30 days</option></select></label>
         <MarketFilter market={query.market} universe={query.universe} minTvl={query.minTvl} onChange={(market) => updateQuery({ market })} />
         <label><span className="filter-label">Vault set</span><select className="filter-control" value={query.universe} onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}>{UNIVERSE_VALUES.map((universe) => <option key={universe} value={universe}>{universeLabel(universe)}</option>)}</select></label>
@@ -144,6 +115,8 @@ function MomentumPageContent() {
 
       <section className="section section-lg"><div className="card-header"><div><h2 className="card-title">Is the move broad or isolated?</h2><p className="card-description">Breadth shows whether the selected window moved across many comparable vaults or only a concentrated share of TVL.</p></div></div><div className="cols-2"><ShareMeter title="By vaults" segments={breadthByVault} total={compared} valueFormatter={(value) => String(value ?? 0)} /><ShareMeter title="By TVL" segments={breadthByTvl} total={totalTvl} valueFormatter={formatUsd} /></div></section>
 
+      <section className="section section-lg market-scatter"><div className="card-header"><div><h2 className="card-title">Which moves combine scale and current yield?</h2><p className="card-description">Separate large-TVL changes from small outliers before opening the underlying vault evidence.</p></div></div><ScatterPlot title={`Current yield against ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size is tracked TVL. The zero line separates strengthening from weakening. Select a point to inspect the Yearn vault.</p></section>
+
       <section className="section section-lg">
         {isLoading ? <><TableSkeleton rows={4} columns={7} /><TableSkeleton rows={4} columns={7} /></> : <>
           <MoverTable title="Changes to inspect: strengthening" direction="strengthening" rows={(data?.movers?.risers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
@@ -151,9 +124,6 @@ function MomentumPageContent() {
         </>}
       </section>
 
-      <section className="section section-lg"><div className="card-header"><div><h2 className="card-title">Which moves combine scale and current yield?</h2><p className="card-description">Use this view to separate large-TVL changes from small outliers before opening the underlying vault evidence.</p></div></div><ScatterPlot title={`Current yield against ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size is tracked TVL. The zero line separates strengthening from weakening. Select a point to inspect the Yearn vault.</p></section>
-
-      <section className="section analysis-scope analysis-scope-fixed" aria-labelledby="historical-context-title"><div className="card-header"><div><div className="scope-label">Current-set retrospective</div><h2 className="card-title" id="historical-context-title">60 days of 7d and 30d observations</h2><p className="card-description">Historical yield for the vaults in today&apos;s selected set, weighted by their current TVL. These are not historical TVL weights; changing the comparison window above does not alter them.</p></div></div><div className="cols-2"><TrendStrips title="Realized yield" items={trendItems} domain={yieldDomain} valueFormatter={(value) => formatPct(value, 2)} deltaFormatter={(value) => formatPercentagePoints(value, 2)} /><TrendStrips title="7d vs 30d breadth" items={breadthItems} domain={[0, 1]} valueFormatter={(value) => formatPct(value, 0)} deltaFormatter={(value) => formatPercentagePoints(value, 1)} /></div></section>
     </div>
   );
 }

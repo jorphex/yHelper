@@ -9,6 +9,13 @@ import { sortIndicator, sortRows, toggleSort, type SortState } from "../lib/sort
 import type { MarketKind, UniverseKind } from "../lib/universe";
 import type { ChangeRow, MoverSortKey, WindowKey } from "./types";
 
+function compactAge(seconds: number | null): string | null {
+  if (seconds === null || !Number.isFinite(seconds)) return null;
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m old`;
+  if (seconds < 86_400) return `${Math.max(1, Math.round(seconds / 3600))}h old`;
+  return `${Math.max(1, Math.round(seconds / 86_400))}d old`;
+}
+
 export function MoverTable({ title, rows, universe, market, window, compact, direction }: { title: string; rows: ChangeRow[]; universe: UniverseKind; market: MarketKind; window: WindowKey; compact: boolean; direction: "strengthening" | "weakening" }) {
   const [sort, setSort] = useState<SortState<MoverSortKey>>({ key: "delta", direction: direction === "weakening" ? "asc" : "desc" });
   const [expanded, setExpanded] = useState(false);
@@ -33,7 +40,10 @@ export function MoverTable({ title, rows, universe, market, window, compact, dir
         <th className="numeric mobile-secondary-column" aria-sort={sort.key === "previous" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}><button className="th-button" onClick={() => setSort(toggleSort(sort, "previous"))}>Prior {windowLabel} APY {sortIndicator(sort, "previous")}</button></th>
         <th className="numeric" data-mobile-label="Change" aria-sort={sort.key === "delta" ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}><button className="th-button" onClick={() => setSort(toggleSort(sort, "delta"))}>Change {sortIndicator(sort, "delta")}</button></th>
       </tr></thead><tbody>
-        {sortedRows.length === 0 ? <tr><td colSpan={6} className="muted">No {title.toLowerCase()} in this window.</td></tr> : visibleRows.map((row) => <tr key={`${title}:${row.chain_id}:${row.vault_address}`}><td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} />{row.token_symbol ? <div className="table-row-action"><Link href={`/explore?tab=compare&token=${encodeURIComponent(row.token_symbol)}`}>Compare {row.token_symbol}</Link></div> : null}<div className="mobile-only muted">{compactChainLabel(row.chain_id, compact)}</div></td><td className="mobile-secondary-column"><Link href={`/explore?chain=${row.chain_id}&universe=${universe}&market=${market}`}>{compactChainLabel(row.chain_id, compact)}</Link></td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.realized_apy_window)}</td><td className="numeric mobile-secondary-column">{formatPct(row.realized_apy_prev_window)}</td><td className={`numeric ${(row.delta_apy ?? 0) > 0 ? "text-positive" : "text-negative"}`}>{deltaArrow(row.delta_apy)} {formatPercentagePoints(row.delta_apy)}</td></tr>)}
+        {sortedRows.length === 0 ? <tr><td colSpan={6} className="muted">No {title.toLowerCase()} in this window.</td></tr> : visibleRows.map((row) => {
+          const metricAge = compactAge(row.age_seconds);
+          return <tr key={`${title}:${row.chain_id}:${row.vault_address}`}><td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><div className="market-row-meta">{row.token_symbol ? <Link className="market-link-secondary" href={`/markets?view=compare&token=${encodeURIComponent(row.token_symbol)}&universe=${universe}`}>Compare {row.token_symbol}</Link> : null}{metricAge ? <span>{row.token_symbol ? " · " : ""}PPS {metricAge}</span> : null}</div><div className="mobile-only muted">{compactChainLabel(row.chain_id, compact)}</div></td><td className="mobile-secondary-column"><Link className="market-link-secondary" href={`/markets?view=vaults&chain=${row.chain_id}&universe=${universe}&market=${market}`}>{compactChainLabel(row.chain_id, compact)}</Link></td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.realized_apy_window)}</td><td className="numeric mobile-secondary-column">{formatPct(row.realized_apy_prev_window)}</td><td className={`numeric ${(row.delta_apy ?? 0) > 0 ? "text-positive" : "text-negative"}`}>{deltaArrow(row.delta_apy)} {formatPercentagePoints(row.delta_apy)}</td></tr>;
+        })}
       </tbody></table></TableWrap>
       {sortedRows.length > 5 ? <button className="button button-ghost section-sm" onClick={() => setExpanded((value) => !value)}>{expanded ? "Show fewer" : `Show all ${sortedRows.length}`}</button> : null}
     </>

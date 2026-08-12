@@ -12,10 +12,3 @@ export type ChangeRow = {
   delta_apy: number | null;
   age_seconds: number | null;
 };
-
-export type DailyTrendRow = {
-  day: string;
-  weighted_apy_7d?: number | null;
-  weighted_apy_30d?: number | null;
-  riser_ratio?: number | null;
-};
