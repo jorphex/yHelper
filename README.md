@@ -1,76 +1,104 @@
 # yHelper
 
-yHelper is a public Yearn analytics dashboard.
+yHelper is a public Yearn analytics dashboard for inspecting yield changes, vault coverage, accounting reports, and stYFI participation. It does not provide recommendations.
 
-It is built to answer a few simple questions fast:
-- where yield is moving
-- where Yearn vault TVL is concentrated
-- how vaults sharing an exact token symbol compare
+## Product
 
-## Navigation
-- `Overview` is the landing page with Yearn website TVL, weekly realized-yield movers, market direction, and direct links into the main workflows.
-- `Explore` is the scanning surface.
-  - `Vaults` ranks the selected vault set with market, chain, and sort controls.
-  - `Asset comparison` compares exact-symbol assets across tracked Yearn vaults without silently merging wrapped or aliased assets.
-  - `Market structure` shows tracked TVL by chain, market cohort, and token.
-- `Momentum` is the change-detection surface.
-  - `Changes` compares realized APY over `24h`, `7d`, or `30d` with the immediately preceding equal-length window, then shows breadth, movers, and fixed 60-day context.
-- `Reports` is the vault-accounting surface for recent `StrategyReported` gains, losses, fees, refunds, and debt updates.
-- `stYFI` is the governance staking page with combined stake balances, supply share, snapshot freshness, reward split, and epoch history.
+- **Overview** (`/`): a freshness-aware Yearn brief.
+- **Markets** (`/markets`): yield changes, vault discovery, and market structure.
+- **Reports** (`/reports`): Yearn `StrategyReported` events, with meaningful accounting results shown by default.
+- **stYFI** (`/styfi`): participation, rewards, flows, snapshots, and recent activity.
 
-## Data
-The app combines:
-- Kong REST vault catalog snapshots
-- Kong GraphQL PPS history and derived yield metrics
-- DefiLlama parent and component snapshots used for Yearn website TVL parity
+`/momentum` redirects to `/markets`, and `/harvests` redirects to `/reports`. Legacy `/explore` and `/structure` entry points remain for compatibility; `/structure` redirects to Markets.
 
-TVL is deliberately separated into three scopes: reported protocol TVL, Kong catalog product TVLs, and the existing analytics-page universe. Kong product TVLs can overlap, so their gross sums are exposed only as catalog or coverage context and are never substituted for protocol TVL.
+## Data and scope
 
-## Stack
-- `web` is the Next.js frontend
-- `api` serves dashboard endpoints
-- `worker` ingests and refreshes data
-- `postgres` stores snapshots, PPS history, and derived metrics
+The worker refreshes a PostgreSQL store from:
+
+- Yearn Kong REST catalog snapshots and GraphQL PPS history
+- DefiLlama Yearn parent and component TVL snapshots
+- configured chain RPC or WebSocket sources for activity, reports, and optional stYFI synchronization
+
+TVL has distinct meanings in the product. DefiLlama parent TVL is used for Yearn website parity; Kong vault TVL is product-catalog context and may overlap; filtered analytics TVL describes only the selected vault set. These figures are not interchangeable.
+
+Vault analytics use a maintained Yearn-focused universe.
+
+## Architecture
+
+Docker Compose runs four services:
+
+| Service | Responsibility |
+| --- | --- |
+| `yhelper-postgres` | Persistent application data |
+| `yhelper-api` | FastAPI read API and health endpoint |
+| `yhelper-worker` | Ingestion, derived metrics, retention, and optional notifications |
+| `yhelper-web` | Next.js dashboard and same-origin API proxy |
+
+The web service defaults to port `3010` and proxies `/api/*` and `/health` to the API when `NEXT_PUBLIC_API_BASE_URL=/api`. PostgreSQL and the API bind to loopback; the worker uses host networking for local chain endpoints.
+
+Public ingress is managed outside this Compose project: a shared edge serves the web app, and Tailscale exposes the private API.
 
 ## Run locally
-1. Copy `.env.example` to `.env`
-2. Start the stack:
 
-```bash
-docker compose up --build
-```
+1. Create local configuration:
 
-3. Open `http://localhost:3010`
+   ```bash
+   cp .env.example .env
+   ```
 
-## Useful commands
-Lint the frontend:
+2. Review `.env` and add only the source or alert settings needed for your environment. Keep secrets in `.env`.
+
+3. Build and start the stack:
+
+   ```bash
+   docker compose up --build
+   ```
+
+4. Open http://localhost:3010. The API health endpoint is http://127.0.0.1:8000/health.
+
+stYFI synchronization is disabled in the example configuration.
+
+## API
+
+The web app consumes the API under `/api`. The key endpoints are:
+
+- `GET /health`
+- `GET /api/overview-pulse`
+- `GET /api/changes`, `GET /api/discover`, `GET /api/composition`, and `GET /api/trends/daily`
+- `GET /api/reports` and `GET /api/styfi`
+- `GET /api/meta/status`, `GET /api/meta/freshness`, `GET /api/meta/coverage`, and `GET /api/meta/protocol-context`
+
+For complete contracts, inspect `/openapi.json` on a directly exposed API instance.
+
+## Development and verification
+
+Frontend checks:
 
 ```bash
 npm --prefix web run lint
+npm --prefix web run build
 ```
 
-Rebuild the web app only:
+Python tests, with service dependencies installed:
 
 ```bash
-docker compose up -d --build yhelper-web
+pytest api/tests worker/tests
 ```
 
-Run the smoke check:
+Smoke-test a running web deployment:
 
 ```bash
 python3 scripts/post_deploy_smoke.py --base-url http://127.0.0.1:3010
 ```
 
-Render the landing-page Blender assets:
+Rebuild only the web service:
 
 ```bash
-blender --background --python scripts/generate_yearn_blender_assets.py -- \
-  --output-dir web/public/home-assets-yearn-blender \
-  --scenes hero,purpose,divider
+docker compose up -d --build yhelper-web
 ```
 
-## Scope
-- public dashboard only
-- no wallet tracking
-- no connect flow
-- no exports unless explicitly added
+## Non-goals
+
+- Wallet tracking or wallet connection
+- Portfolio exports
+- Investment advice or automated allocation
