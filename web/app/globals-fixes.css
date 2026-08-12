@@ -165,8 +165,42 @@
 
 .brief-item {
   min-height: 126px;
-  padding: var(--space-6) 0;
+  padding: var(--space-8) 0;
   border-bottom: 1px solid var(--preview-rule);
+}
+
+.brief-item-lead {
+  min-height: 180px;
+  padding-top: var(--space-10);
+  padding-bottom: var(--space-10);
+}
+
+.brief-item-lead .brief-title {
+  max-width: 820px;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+}
+
+.brief-item-lead .brief-description { max-width: 820px; }
+
+.brief-secondary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.brief-secondary > .brief-item {
+  min-width: 0;
+  padding-right: var(--space-8);
+}
+
+.brief-secondary > .brief-item + .brief-item {
+  padding-right: 0;
+  padding-left: var(--space-8);
+  border-left: 1px solid var(--preview-rule);
+}
+
+.brief-secondary > .brief-item:only-child {
+  grid-column: 1 / -1;
+  padding-right: 0;
 }
 
 .brief-kicker {
@@ -179,10 +213,7 @@
 }
 
 .brief-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
-  align-items: start;
-  gap: var(--space-8);
+  display: block;
 }
 
 .brief-title {
@@ -202,18 +233,33 @@
 
 .brief-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
-  gap: var(--space-2);
-  padding-top: var(--space-1);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
   font-size: var(--text-sm);
   font-weight: 600;
-  white-space: nowrap;
 }
 
-.brief-actions a,
+.evidence-link-primary,
+.evidence-link-primary:visited { color: var(--yearn-link); }
+.evidence-link-primary:hover { color: var(--yearn-link-hover); }
+
+.evidence-link-secondary,
+.evidence-link-secondary:visited {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-decoration-color: rgba(160, 160, 160, .45);
+  text-underline-offset: 3px;
+}
+
+.evidence-link-secondary:hover {
+  color: var(--text-primary);
+  text-decoration-color: currentColor;
+}
+
 .table-row-action a { color: var(--yearn-link); }
-.brief-actions a:hover,
 .table-row-action a:hover { color: var(--yearn-link-hover); }
 
 .table-row-action {
@@ -357,6 +403,59 @@ table tbody a:focus-visible {
 
 .table-filter-action:hover,
 .table-filter-action:focus-visible { color: var(--yearn-link-hover) !important; }
+
+/* Reports is a ledger: data leads, links reveal themselves on intent. */
+.reports-table .report-link,
+.reports-table .report-link:visited {
+  text-decoration: none !important;
+  transition: color var(--duration-fast) var(--ease-out) !important;
+}
+
+.reports-table .report-link-utility,
+.reports-table .report-link-utility:visited {
+  color: var(--text-tertiary) !important;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.reports-table .report-link-utility:hover,
+.reports-table .report-link-utility:focus-visible { color: var(--text-primary) !important; }
+
+.reports-table .report-link-vault,
+.reports-table .report-link-vault:visited {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+.reports-table .report-link-strategy,
+.reports-table .report-link-strategy:visited { color: var(--text-secondary) !important; }
+
+.reports-table .report-link-address { font-family: var(--font-data); }
+
+.reports-table .report-link-entity:hover,
+.reports-table .report-link-entity:focus-visible { color: var(--yearn-link) !important; }
+
+.reports-table .report-link::after { opacity: .48 !important; }
+.reports-table .report-link:hover::after,
+.reports-table .report-link:focus-visible::after { opacity: 1 !important; }
+
+.reports-table .report-filter-action,
+.reports-table .report-filter-action:visited {
+  color: var(--text-secondary) !important;
+  text-decoration-color: rgba(160, 160, 160, .55) !important;
+}
+
+.reports-table .report-filter-action:hover,
+.reports-table .report-filter-action:focus-visible {
+  color: var(--text-primary) !important;
+  text-decoration-color: currentColor !important;
+}
+
+.reports-table .report-result {
+  font-family: var(--font-data);
+  font-weight: 700;
+}
 
 .table-wrap tbody a[target="_blank"] > svg,
 table tbody a[target="_blank"] > svg { display: none !important; }
@@ -603,8 +702,13 @@ table tbody .external-link-inline::after {
   .trend-strip-panel { padding: var(--space-4) 0 !important; }
 
   .tab-bar { flex-wrap: wrap !important; }
-  .brief-content { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
-  .brief-actions { flex-direction: row; flex-wrap: wrap; white-space: normal; }
+  .brief-secondary { grid-template-columns: minmax(0, 1fr); }
+  .brief-secondary > .brief-item,
+  .brief-secondary > .brief-item + .brief-item {
+    padding-right: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
   .mobile-only {
     display: block !important;
     margin-top: var(--space-1);

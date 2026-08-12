@@ -63,6 +63,19 @@ function shortAddress(value: string | null | undefined): string {
   return `${value.slice(0, 8)}…${value.slice(-5)}`;
 }
 
+function compactTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(date).replace(",", " ·") + " UTC";
+}
+
 function hasAmount(value: string | null | undefined): boolean {
   return Boolean(value?.trim() && !/^0+$/.test(value.trim()));
 }
@@ -204,16 +217,16 @@ function ReportsPageContent() {
                 const txUrl = explorerTxUrl(row.chain_id, row.tx_hash);
                 return (
                   <tr key={`${row.chain_id}-${row.tx_hash}-${row.log_index}`}>
-                    <td data-label="Time">{txUrl ? <a className="external-link" href={txUrl} target="_blank" rel="noreferrer">{formatUtcDateTime(row.block_time)}</a> : formatUtcDateTime(row.block_time)}</td>
+                    <td data-label="Time">{txUrl ? <a className="external-link report-link report-link-utility" href={txUrl} target="_blank" rel="noreferrer" title={formatUtcDateTime(row.block_time)}>{compactTimestamp(row.block_time)}</a> : compactTimestamp(row.block_time)}</td>
                     <td data-label="Vault">
-                      <a className="external-link" href={vaultUrl} target="_blank" rel="noreferrer">{row.vault_symbol || shortAddress(row.vault_address)}</a>
-                      <div className="muted">{chainLabel(row.chain_id)} · {row.token_symbol || "asset"} · <button className="button-reset table-filter-action" aria-label={`Show only reports for ${row.vault_symbol || row.vault_address}`} onClick={() => updateQuery({ vault_address: row.vault_address })}>Only this vault</button></div>
+                      <a className="external-link report-link report-link-entity report-link-vault" href={vaultUrl} target="_blank" rel="noreferrer">{row.vault_symbol || shortAddress(row.vault_address)}</a>
+                      <div className="muted">{chainLabel(row.chain_id)} · {row.token_symbol || "asset"} · <button className="button-reset table-filter-action report-filter-action" aria-label={`Show only reports for ${row.vault_symbol || row.vault_address}`} onClick={() => updateQuery({ vault_address: row.vault_address })}>Only this vault</button></div>
                     </td>
                     <td data-label="Strategy">
-                      {strategyUrl ? <a className="external-link" href={strategyUrl} target="_blank" rel="noreferrer">{row.strategy_name || shortAddress(row.strategy_address)}</a> : row.strategy_name || shortAddress(row.strategy_address)}
+                      {strategyUrl ? <a className={`external-link report-link report-link-entity report-link-strategy ${row.strategy_name ? "" : "report-link-address"}`.trim()} href={strategyUrl} target="_blank" rel="noreferrer">{row.strategy_name || shortAddress(row.strategy_address)}</a> : row.strategy_name || shortAddress(row.strategy_address)}
                     </td>
                     {query.meaningfulOnly ? null : <td data-label="Type">{row.report_type === "realized_result" ? "Realized result" : "Accounting update"}</td>}
-                    <td data-label="Result" className={`numeric ${hasAmount(row.loss) ? "text-negative" : hasAmount(row.gain) ? "text-positive" : ""}`.trim()}>{signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals)}</td>
+                    <td data-label="Result" className={`numeric report-result ${hasAmount(row.loss) ? "text-negative" : hasAmount(row.gain) ? "text-positive" : ""}`.trim()}>{signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals)}</td>
                     <td data-label="Fees / refund" className="numeric">
                       {hasAmount(row.fee_assets) ? <div>{amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals)} fee</div> : null}
                       {hasAmount(row.refund_assets) ? <div className="muted">{amountWithUnit(row.refund_assets, row.token_symbol, row.token_decimals)} refund</div> : null}
