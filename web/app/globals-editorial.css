@@ -331,7 +331,7 @@ h4 { font-size: var(--text-xl); }
   color: var(--text-secondary);
   border-radius: var(--radius-md);
   text-decoration: none;
-  transition: all var(--duration-base) var(--ease-out);
+  transition: color var(--duration-base) var(--ease-out), background-color var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
   position: relative;
   margin-left: calc(-1 * var(--space-2));
   padding-left: var(--space-4);
@@ -385,7 +385,7 @@ h4 { font-size: var(--text-xl); }
   align-items: center;
   justify-content: center;
   color: var(--text-tertiary);
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
 }
 
 .sidebar-link-external:hover .external-arrow {
@@ -473,7 +473,7 @@ h4 { font-size: var(--text-xl); }
   border-radius: var(--radius-md);
   color: var(--text-primary);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
 
 .sidebar-toggle:hover {
@@ -667,7 +667,7 @@ th:last-child {
 }
 
 tbody tr {
-  transition: all var(--duration-base) var(--ease-out);
+  transition: background-color var(--duration-base) var(--ease-out);
   cursor: default;
 }
 
@@ -713,7 +713,7 @@ td.text-center, th.text-center {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
-  transition: all var(--duration-base) var(--ease-out);
+  transition: background-color var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
   cursor: default;
   position: relative;
   overflow: hidden;
@@ -799,7 +799,7 @@ td.text-center, th.text-center {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
 }
 
 .button-primary {
@@ -839,7 +839,7 @@ td.text-center, th.text-center {
 .text-positive { color: var(--positive); }
 .text-negative { color: var(--negative); }
 .text-muted { color: var(--text-tertiary); }
-.text-accent { color: var(--accent); }
+.text-accent { color: var(--accent-soft); }
 .text-secondary { color: var(--text-secondary); }
 .text-tertiary { color: var(--text-tertiary); }
 .text-xs { font-size: var(--text-xs); }
@@ -884,7 +884,7 @@ td.text-center, th.text-center {
 
 /* Hover card effect - visible feedback */
 .hover-card {
-  transition: all var(--duration-base) var(--ease-out);
+  transition: background-color var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
 }
 
 .hover-card:hover {
@@ -1270,7 +1270,7 @@ select, input[type="number"], input[type="text"] {
   font-size: var(--text-sm);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
   width: 100%;
 }
 
@@ -1344,12 +1344,12 @@ input[type="number"]::-webkit-outer-spin-button {
    -------------------------------------------------------------------------- */
 .badge-claim {
   background: rgba(6, 87, 233, 0.12);
-  color: var(--accent);
+  color: var(--accent-soft);
 }
 
 .badge-stake {
   background: rgba(6, 87, 233, 0.12);
-  color: var(--accent);
+  color: var(--accent-soft);
 }
 
 .badge-withdraw {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 export type MarketMode = "changes" | "vaults" | "compare" | "structure";
@@ -15,7 +15,9 @@ const modes: Array<{ id: MarketMode; label: string }> = [
 
 export function MarketModeNav({ active }: { active: MarketMode }) {
   const searchParams = useSearchParams();
+  const navRef = useRef<HTMLElement>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
+  const [overflow, setOverflow] = useState({ start: false, end: false });
   const hrefs = useMemo(() => {
     const shared = new URLSearchParams();
     const universe = searchParams.get("universe");
@@ -42,12 +44,51 @@ export function MarketModeNav({ active }: { active: MarketMode }) {
     }));
   }, [searchParams]);
 
+  const updateOverflow = useCallback(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const lastLink = nav.querySelector<HTMLAnchorElement>("a:last-of-type");
+    const contentRight = lastLink ? lastLink.offsetLeft + lastLink.offsetWidth : nav.scrollWidth;
+    setOverflow({
+      start: nav.scrollLeft > 1,
+      end: contentRight - nav.scrollLeft - nav.clientWidth > 1,
+    });
+  }, []);
+
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [active]);
+    const nav = navRef.current;
+    const activeLink = activeRef.current;
+    if (!nav || !activeLink) return;
+
+    // Keep the selected view fully visible on first load and when switching views.
+    // An explicit auto behavior avoids inheriting a global smooth-scroll setting.
+    activeLink.scrollIntoView({ behavior: "auto", block: "nearest", inline: "start" });
+    updateOverflow();
+  }, [active, updateOverflow]);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+
+    updateOverflow();
+    nav.addEventListener("scroll", updateOverflow, { passive: true });
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(nav);
+    return () => {
+      nav.removeEventListener("scroll", updateOverflow);
+      observer.disconnect();
+    };
+  }, [updateOverflow]);
 
   return (
-    <nav className="market-mode-nav" aria-label="Market views">
+    <nav
+      ref={navRef}
+      className="market-mode-nav"
+      aria-label="Market views"
+      data-scrollable={overflow.start || overflow.end ? "true" : "false"}
+      data-overflow-start={overflow.start ? "true" : "false"}
+      data-overflow-end={overflow.end ? "true" : "false"}
+    >
       {modes.map((mode) => (
         <Link
           key={mode.id}

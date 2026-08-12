@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { useInViewOnce } from "../components/visuals";
@@ -65,7 +65,7 @@ export function TvlTreemap({
   const laneHeight = (height - 12 - (validGroups.length - 1) * laneGap) / validGroups.length;
 
   return (
-    <section ref={ref} className="treemap-panel" style={{ opacity: isInView ? 1 : 0.9, transition: "opacity 0.3s" }}>
+    <section ref={ref} className={`treemap-panel ${isInView ? "is-in-view" : ""}`.trim()} style={{ opacity: isInView ? 1 : 0.9 }}>
       <h3 className="card-title">{title}</h3>
       <div className="treemap-wrap viz-interactive-wrap" style={{ overflowX: "auto" }}>
         <svg
@@ -104,17 +104,9 @@ export function TvlTreemap({
                     <g
                       key={segmentId}
                       className={`treemap-segment ${hoveredSegment?.id === segmentId ? "is-active" : ""}`.trim()}
-                      tabIndex={0}
-                      role="img"
-                      aria-label={tooltip.replaceAll("\n", ", ")}
                       onPointerEnter={(event) => setHoveredSegment({ id: segmentId, text: tooltip, x: event.clientX, y: event.clientY })}
                       onPointerMove={(event) => setHoveredSegment({ id: segmentId, text: tooltip, x: event.clientX, y: event.clientY })}
                       onPointerLeave={() => setHoveredSegment(null)}
-                      onFocus={(event) => {
-                        const bounds = event.currentTarget.getBoundingClientRect();
-                        setHoveredSegment({ id: segmentId, text: tooltip, x: bounds.left + bounds.width / 2, y: bounds.top });
-                      }}
-                      onBlur={() => setHoveredSegment(null)}
                     >
                       <rect
                         x={rectX}
@@ -124,7 +116,6 @@ export function TvlTreemap({
                         fill={group.color}
                         opacity={row.isRemainder ? 0.38 : 0.85}
                         stroke="var(--border)"
-                        style={{ transition: "all 0.2s" } as CSSProperties}
                       />
                       {widthPx >= 54 && compactName ? (
                         <text x={rectX + 5} y={y + Math.min(18, laneHeight - 6)} className="svg-label-small">
@@ -139,7 +130,7 @@ export function TvlTreemap({
           })}
         </svg>
       </div>
-      <p className="mobile-only text-sm text-secondary section-sm">Swipe horizontally to see the full composition.</p>
+      <p className="mobile-only text-sm text-secondary section-sm">Scroll horizontally to see the full composition.</p>
       {hoveredSegment && typeof document !== "undefined"
         ? createPortal(
             <div className="viz-hover-tooltip" style={{ left: hoveredSegment.x, top: hoveredSegment.y }} role="status">

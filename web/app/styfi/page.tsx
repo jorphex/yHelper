@@ -104,8 +104,8 @@ function formatSignedToken(value: number | null | undefined, symbol: string, dig
 }
 
 function percentShare(value: number | null | undefined, total: number | null | undefined): string {
-  if (value === null || value === undefined || total === null || total === undefined) return "Share syncing";
-  if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return "Share syncing";
+  if (value === null || value === undefined || total === null || total === undefined) return "Share not available yet";
+  if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return "Share not available yet";
   return `${formatPct(value / total, 0)} of total`;
 }
 
@@ -170,7 +170,7 @@ function StYfiPageContent() {
   const summaryItems = useMemo(() => {
     const items = [
       {
-        label: "Total Participating",
+        label: "Tracked participation",
         value: formatTokenCompact(summary?.combined_staked ?? null, "YFI"),
         hint: "stYFI underlying stake, liquid-locker capacity, and migrated veYFI.",
       },
@@ -184,21 +184,21 @@ function StYfiPageContent() {
         value: formatPct(data?.current_reward_state?.styfi_current_apr ?? null, 2),
         hint: Number.isFinite(data?.current_reward_state?.styfix_current_apr ?? null)
           ? `stYFIx ${formatPct(data?.current_reward_state?.styfix_current_apr ?? null, 2)} APR`
-          : "Current staking rewards rate",
+          : "Current reward rate",
       },
       {
         label: "Net Flow 24h",
-        value: hasNetFlow24h ? formatSignedToken(summary?.net_flow_24h ?? null, "YFI") : "Syncing",
-        hint: hasNetFlow24h
-          ? "Snapshot derived, not gross stake/unstake"
-          : "Waiting for a corrected 24h comparison snapshot after the total-count fix",
+        value: hasNetFlow24h ? formatSignedToken(summary?.net_flow_24h ?? null, "YFI") : "Not available yet",
+          hint: hasNetFlow24h
+          ? "Change between snapshots, not total stakes and unstakes"
+          : "Waiting for the next 24h comparison snapshot",
       },
       {
         label: "Net Flow 7d",
-        value: hasNetFlow7d ? formatSignedToken(summary?.net_flow_7d ?? null, "YFI") : "Syncing",
-        hint: hasNetFlow7d
-          ? "Compared with snapshot seven days back"
-          : "Waiting for a corrected 7d comparison snapshot after the total-count fix",
+        value: hasNetFlow7d ? formatSignedToken(summary?.net_flow_7d ?? null, "YFI") : "Not available yet",
+          hint: hasNetFlow7d
+          ? "Compared with the snapshot seven days earlier"
+          : "Waiting for the next 7d comparison snapshot",
       },
     ];
     return items;
@@ -247,7 +247,7 @@ function StYfiPageContent() {
             <em className="page-title-accent">Governance staking</em>
           </h1>
           <p className="page-description">
-            Track Yearn staking balance, reward epochs, and protocol-level yield.
+            Track stYFI participation, rewards, and epochs.
           </p>
           <div className="tab-bar-plain">
             <a
@@ -256,7 +256,7 @@ function StYfiPageContent() {
               rel="noopener noreferrer"
               className="button button-primary"
             >
-              Open stYFI App
+              Open stYFI
             </a>
           </div>
         </div>
@@ -296,17 +296,17 @@ function StYfiPageContent() {
       {/* Reward Split */}
       <section className="section section-lg">
         <BarList
-          title={`Current Reward Split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
+          title={`Current reward split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
           items={rewardBars}
           valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
-          emptyText="Current reward split syncing."
+          emptyText="Reward split is not available yet."
         />
       </section>
 
       {/* Stake Trend */}
       <section className="section section-lg">
         <div className="card-header">
-          <h2 className="card-title">Stake Trend</h2>
+          <h2 className="card-title">Participation trend</h2>
           <p className="card-description">{snapshotSeries.length} snapshots across {historySpan}</p>
         </div>
         <TrendStrips
@@ -315,20 +315,22 @@ function StYfiPageContent() {
           valueFormatter={(value) => formatTokenCompact(value, "YFI")}
           deltaFormatter={(value) => formatSignedToken(value, "YFI", 2)}
           columns={3}
-          emptyText="Snapshot history is still warming up."
+          emptyText="Snapshot history is not available yet."
         />
       </section>
 
       <section className="section section-lg">
         <div className="card-header">
-          <h2 className="card-title">Recent Activity</h2>
-          <p className="card-description">
-            Latest 10 stYFI and stYFIx stake, unstake, withdraw, and claim actions.
-          </p>
+          <div>
+            <h2 className="card-title">Recent Activity</h2>
+            <p className="card-description">
+              The latest 10 stYFI and stYFIx stake, unstake, withdrawal, and claim actions.
+            </p>
+          </div>
         </div>
 
-        <TableWrap>
-          <table>
+        <TableWrap className="styfi-evidence-table-wrap">
+          <table className="styfi-evidence-table">
             <thead>
               <tr>
                 <th>Time</th>
@@ -345,7 +347,7 @@ function StYfiPageContent() {
               ) : recentActivity.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="empty-state-row">
-                    Recent activity is still warming up.
+                    Recent activity is not available yet.
                   </td>
                 </tr>
               ) : (
@@ -363,17 +365,17 @@ function StYfiPageContent() {
                           : "badge-stake";
                   return (
                     <tr key={`${row.tx_hash}-${row.product_type}-${row.event_kind}-${row.user_account}`}>
-                      <td className="nowrap">{formatUtcDateTime(row.block_time ?? null)}</td>
-                      <td>{row.product_label ?? "Unknown"}</td>
-                      <td>
+                      <td data-label="Time" className="nowrap">{formatUtcDateTime(row.block_time ?? null)}</td>
+                      <td data-label="Product">{row.product_label ?? "Unknown"}</td>
+                      <td data-label="Action">
                         <span className={`badge ${badgeClass}`}>
                           {row.action_label ?? "Activity"}
                         </span>
                       </td>
-                      <td className="data-value">
+                      <td data-label="Amount" className="data-value">
                         {formatRawAmount(row.amount_raw, row.amount_decimals, row.amount_symbol)}
                       </td>
-                      <td>
+                      <td data-label="Account">
                         {accountHref ? (
                           <a href={accountHref} target="_blank" rel="noopener noreferrer" className="external-link-inline">
                             {shortHex(row.user_account)}
@@ -382,7 +384,7 @@ function StYfiPageContent() {
                           shortHex(row.user_account)
                         )}
                       </td>
-                      <td className="nowrap">
+                      <td data-label="Tx" className="nowrap">
                         {txHref ? (
                           <a
                             href={txHref}
@@ -408,23 +410,25 @@ function StYfiPageContent() {
       {/* Epoch Detail Table */}
       <section className="section">
         <div className="card-header">
-          <h2 className="card-title">Epoch Detail</h2>
-          <p className="card-description">
-            Epochs start at 00:00:00 UTC. Component columns are protocol allocations (not user claim totals).
-          </p>
+          <div>
+            <h2 className="card-title">Epoch Detail</h2>
+            <p className="card-description">
+              Epochs start at 00:00 UTC. Columns show protocol allocations, not individual claim totals.
+            </p>
+          </div>
         </div>
-        <TableWrap>
-          <table>
+        <TableWrap className="styfi-evidence-table-wrap">
+          <table className="styfi-evidence-table">
             <thead>
               <tr>
                 <th>Epoch</th>
                 <th>Status</th>
                 <th>Start</th>
-                <th className="numeric">Pot</th>
+                <th className="numeric">Reward pot</th>
                 <th className="numeric">stYFI</th>
                 <th className="numeric">stYFIx</th>
                 <th className="numeric">veYFI</th>
-                <th className="numeric">Lockers</th>
+                <th className="numeric">Liquid lockers</th>
               </tr>
             </thead>
             <tbody>
@@ -435,18 +439,18 @@ function StYfiPageContent() {
                   const isCurrent = row.epoch === currentEpoch;
                   return (
                     <tr key={row.epoch ?? row.epoch_start ?? "epoch"}>
-                      <td>{row.epoch ?? "n/a"}</td>
-                      <td>
+                      <td data-label="Epoch">{row.epoch ?? "n/a"}</td>
+                      <td data-label="Status">
                         <span className={isCurrent ? "badge badge-primary" : "badge"}>
                           {isCurrent ? "Ongoing" : "Completed"}
                         </span>
                       </td>
-                      <td>{formatUtcDate(row.epoch_start ?? null)}</td>
-                      <td className="data-value numeric">{formatToken(row.reward_total, rewardSymbol, 2)}</td>
-                      <td className="data-value numeric">{formatToken(row.reward_styfi, rewardSymbol, 2)}</td>
-                      <td className="data-value numeric">{formatToken(row.reward_styfix, rewardSymbol, 2)}</td>
-                      <td className="data-value numeric">{formatToken(row.reward_veyfi, rewardSymbol, 2)}</td>
-                      <td className="data-value numeric">{formatToken(row.reward_liquid_lockers, rewardSymbol, 2)}</td>
+                      <td data-label="Start">{formatUtcDate(row.epoch_start ?? null)}</td>
+                      <td data-label="Reward pot" className="data-value numeric">{formatToken(row.reward_total, rewardSymbol, 2)}</td>
+                      <td data-label="stYFI" className="data-value numeric">{formatToken(row.reward_styfi, rewardSymbol, 2)}</td>
+                      <td data-label="stYFIx" className="data-value numeric">{formatToken(row.reward_styfix, rewardSymbol, 2)}</td>
+                      <td data-label="veYFI" className="data-value numeric">{formatToken(row.reward_veyfi, rewardSymbol, 2)}</td>
+                      <td data-label="Liquid lockers" className="data-value numeric">{formatToken(row.reward_liquid_lockers, rewardSymbol, 2)}</td>
                     </tr>
                   );
                 })

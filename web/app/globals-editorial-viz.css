@@ -534,6 +534,14 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+
+  .skeleton,
+  .viz-skeleton-header,
+  .viz-skeleton-body,
+  .viz-skeleton-bar {
+    animation: none !important;
+    background-position: 0 0 !important;
+  }
 }
 
 /* --------------------------------------------------------------------------

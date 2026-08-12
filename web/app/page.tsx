@@ -55,17 +55,17 @@ export default function HomePage() {
       ? "The core comparison has limited coverage"
       : pulse?.data_state === "delayed"
         ? "Core yield data is delayed"
-        : "Current market direction is syncing";
+        : "Current market direction is not available yet";
   const hasSecondaryEvidence = Boolean(report || styfiReward || styfiSummary);
 
   return (
     <div>
-      <section className="page-header page-header-hero page-header-no-border">
-        <div>
+      <section className="page-header page-header-hero page-header-no-border overview-hero">
+        <div className="overview-hero-copy">
           <div className="scope-label">Current Yearn brief</div>
           <h1 className="page-title">What changed<br /><em className="page-title-accent">and where to look</em></h1>
           <p className="page-description">
-            A concise route into meaningful vault movements, strategy reports, and stYFI activity—with the evidence and freshness needed to inspect them.
+            A clear view of material vault moves, strategy reports, and stYFI activity, with the evidence and freshness to inspect each one.
           </p>
           <div className="tab-bar-plain">
             <Link href="/markets" className="button button-primary">Inspect markets</Link>
@@ -75,8 +75,8 @@ export default function HomePage() {
             <p className="hero-context">Yearn website TVL {formatUsd(protocol.tvl_usd, 0, false)}{protocol.fetched_at ? ` · source fetched ${formatUtcDateTime(protocol.fetched_at)}` : ""}</p>
           ) : null}
         </div>
-        <div className="hero-image">
-          <Image src="/home-assets-yearn-blender/hero-yearn-blender-coins.png" alt="Yearn Finance" width={500} height={320} priority style={{ objectFit: "contain" }} />
+        <div className="hero-image overview-hero-image">
+          <Image src="/home-assets-yearn-blender/hero-yearn-blender-coins.png" alt="" width={500} height={320} priority style={{ objectFit: "contain" }} />
         </div>
       </section>
 
@@ -85,7 +85,7 @@ export default function HomePage() {
           <div>
             <h2 className="card-title" id="brief-title">Worth inspecting now</h2>
             <p className="card-description">
-              {pulseStatement}{pulse?.data_state === "ready" && pulse.directional_tvl_ratio != null ? ` across ${Math.round(pulse.directional_tvl_ratio * 100)}% of comparable TVL` : ""}{pulseAge ? ` · source PPS ${pulseAge}` : ""}.
+              {pulseStatement}{pulse?.data_state === "ready" && pulse.directional_tvl_ratio != null ? ` across ${Math.round(pulse.directional_tvl_ratio * 100)}% of comparable TVL` : ""}{pulseAge ? ` · price per share (PPS) updated ${pulseAge}` : ""}.
             </p>
           </div>
         </div>
@@ -94,11 +94,11 @@ export default function HomePage() {
           <div className="brief-list">
             {mover ? (
               <article className="brief-item brief-item-lead">
-                <div className="brief-kicker">Lead signal · 7d vs preceding 7d · source PPS {ageLabel(mover.age_seconds) || "age unavailable"}</div>
+                <div className="brief-kicker">Lead signal · 7d vs prior 7d · PPS {ageLabel(mover.age_seconds) || "age unavailable"}</div>
                 <div className="brief-content">
                   <div>
                     <h3 className="brief-title">{moverName(mover)} moved {signedPoints(mover.delta_apy)}</h3>
-                    <p className="brief-description">Current realized APY {formatPct(mover.realized_apy_window, 2)} · tracked TVL {formatUsd(mover.tvl_usd)}. This is the largest absolute move in the established set, not a recommendation.</p>
+                    <p className="brief-description">Current realized APY {formatPct(mover.realized_apy_window, 2)} · tracked TVL {formatUsd(mover.tvl_usd)}. This is the largest absolute move among established vaults, not a recommendation.</p>
                     <div className="brief-actions">
                       {mover.chain_id != null && mover.vault_address ? <a className="evidence-link-primary" href={yearnVaultUrl(mover.chain_id, mover.vault_address)} target="_blank" rel="noreferrer">Inspect vault</a> : null}
                       {mover.token_symbol ? <Link className="evidence-link-secondary" href={`/markets?view=compare&token=${encodeURIComponent(mover.token_symbol)}`}>Compare {mover.token_symbol}</Link> : null}
@@ -110,21 +110,21 @@ export default function HomePage() {
               <article className="brief-item brief-item-lead brief-quiet">
                 <div className="brief-kicker">Market check · freshness gate applied</div>
                 <div className="brief-content"><div>
-                  <h3 className="brief-title">No fresh vault move needs attention</h3>
-                  <p className="brief-description">Nothing in the established set currently clears the freshness threshold for a lead signal. The full comparison remains available for inspection.</p>
-                  <div className="brief-actions"><Link className="evidence-link-secondary" href="/markets">Review market coverage</Link></div>
+                  <h3 className="brief-title">No fresh vault move to inspect</h3>
+                  <p className="brief-description">Nothing among established vaults falls within the freshness window for a lead signal. Review the full comparison for coverage.</p>
+                  <div className="brief-actions"><Link className="evidence-link-secondary" href="/markets">Review markets</Link></div>
                 </div></div>
               </article>
             )}
 
             {hasSecondaryEvidence ? <div className="brief-secondary">
             {report ? <article className="brief-item">
-                <div className="brief-kicker">Latest realized report · {formatUtcDateTime(report.block_time)}</div>
+                <div className="brief-kicker">Latest meaningful report · {formatUtcDateTime(report.block_time)}</div>
                 <div className="brief-content">
                   <div>
                     <h3 className="brief-title">{report.vault_symbol || "A Yearn vault"} {reportDirection(report)}</h3>
-                    <p className="brief-description">{report.strategy_name || "Strategy report"}. Open the ledger to verify the transaction, gain or loss, fees, and debt after the update.</p>
-                    <div className="brief-actions"><Link className="evidence-link-primary" href={`/reports?vault_address=${encodeURIComponent(report.vault_address)}`}>Open report evidence</Link></div>
+                    <p className="brief-description">{report.strategy_name || "Strategy report"}. Verify the transaction, gain or loss, fees, and debt in the report ledger.</p>
+                    <div className="brief-actions"><Link className="evidence-link-primary" href={`/reports?vault_address=${encodeURIComponent(report.vault_address)}`}>View report</Link></div>
                   </div>
                 </div>
               </article> : null}
@@ -133,9 +133,9 @@ export default function HomePage() {
                 <div className="brief-kicker">stYFI · snapshot {styfiAge || "age unavailable"}</div>
                 <div className="brief-content">
                   <div>
-                    <h3 className="brief-title">Epoch {styfiReward?.epoch ?? styfiSummary?.reward_epoch ?? "—"} · {formatPct(styfiReward?.styfi_current_apr, 2)} APR</h3>
-                    <p className="brief-description">{styfiSummary?.combined_staked != null ? `${styfiSummary.combined_staked.toLocaleString("en-US", { maximumFractionDigits: 1 })} YFI participating. ` : ""}Inspect reward allocation, stake flows, recent actions, and epoch history.</p>
-                    <div className="brief-actions"><Link className="evidence-link-primary" href="/styfi">Open stYFI evidence</Link></div>
+                    <h3 className="brief-title">Epoch {styfiReward?.epoch ?? styfiSummary?.reward_epoch ?? "n/a"} · {formatPct(styfiReward?.styfi_current_apr, 2)} APR</h3>
+                    <p className="brief-description">{styfiSummary?.combined_staked != null ? `${styfiSummary.combined_staked.toLocaleString("en-US", { maximumFractionDigits: 1 })} YFI participating. ` : ""}Review rewards, stake flows, recent actions, and epoch history.</p>
+                    <div className="brief-actions"><Link className="evidence-link-primary" href="/styfi">View stYFI</Link></div>
                   </div>
                 </div>
               </article> : null}
