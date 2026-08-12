@@ -58,9 +58,9 @@ function formatUpdatedAt(value: string | null): string | null {
 function pulseHeadline(pulse: YieldPulse): string {
   if (pulse.data_state === "limited") return "7d comparison is limited";
   if (pulse.data_state === "delayed") return "7d yield data is delayed";
-  if (pulse.trend === "improving") return "7d realized yield improved";
-  if (pulse.trend === "softening") return "7d realized yield softened";
-  return "7d realized yield held steady";
+  if (pulse.trend === "improving") return "7d realized yield strengthened";
+  if (pulse.trend === "softening") return "7d realized yield weakened";
+  return "7d realized yield was steady";
 }
 
 function pulseBreadth(pulse: YieldPulse): string {
@@ -233,13 +233,13 @@ export function Sidebar() {
           <div className="sidebar-note-title" id="yield-pulse-title">Yield pulse</div>
           <div className="sidebar-pulse-headline">{pulseHeadline(pulse)}</div>
           <div className="sidebar-pulse-value">{formatPulsePercent(pulse.latest_7d_apy)}</div>
-          <div className="sidebar-pulse-label">TVL-weighted 7d realized APY</div>
+          <div className="sidebar-pulse-label">TVL-weighted realized 7d APY</div>
           <div className={`sidebar-pulse-change tone-${pulse.trend}`}>
-            {formatPercentagePointChange(pulse.change_7d)} vs preceding 7d
+            {formatPercentagePointChange(pulse.change_7d)} vs prior 7d
           </div>
           <div className="sidebar-pulse-breadth">{pulseBreadth(pulse)}</div>
           <div className="sidebar-pulse-meta">
-            {pulse.comparable_vaults}/{pulse.eligible_vaults} eligible vaults · {pulse.coverage_ratio === null ? "n/a" : `${Math.round(pulse.coverage_ratio * 100)}%`} TVL coverage
+            {pulse.comparable_vaults} of {pulse.eligible_vaults} eligible vaults compared · {pulse.coverage_ratio === null ? "n/a" : `${Math.round(pulse.coverage_ratio * 100)}%`} of eligible TVL
           </div>
           {pulseUpdatedAt ? <div className="sidebar-pulse-meta">{pulseUpdatedAt}</div> : null}
           <Link href="/markets" className="sidebar-pulse-link">Inspect markets</Link>

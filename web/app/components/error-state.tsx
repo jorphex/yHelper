@@ -13,7 +13,7 @@ interface ErrorStateProps {
 
 export function ErrorState({
   title = "Something went wrong",
-  description = "We couldn't load the data. This might be a temporary issue.",
+  description = "We couldn't load the data. Try again in a moment.",
   error,
   onRetry,
   showHomeLink = true,

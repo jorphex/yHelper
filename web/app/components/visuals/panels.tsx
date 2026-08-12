@@ -9,7 +9,7 @@ export function BarList({
   title,
   items,
   valueFormatter,
-  emptyText = "No data available.",
+  emptyText = "No data for this view.",
 }: {
   title: string;
   items: BarDatum[];
@@ -59,7 +59,7 @@ export function ShareMeter({
   valueFormatter,
   legend,
   embedded = false,
-  emptyText = "No data available.",
+  emptyText = "No data for this view.",
 }: {
   title: string;
   segments: MeterSegmentDatum[];
@@ -138,7 +138,7 @@ export function TrendStrips({
   columns = 1,
   embedded = false,
   domain,
-  emptyText = "No trend data available.",
+  emptyText = "No trend data for this view.",
 }: {
   title: string;
   items: TrendStripDatum[];

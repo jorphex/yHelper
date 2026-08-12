@@ -5,7 +5,7 @@ import path from "node:path";
 import { ImageResponse } from "next/og";
 import { internalApiUrl } from "./api";
 
-export const alt = "yHelper — Yearn yield, interpreted";
+export const alt = "yHelper: Yearn yield, interpreted";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

@@ -85,9 +85,9 @@ function MomentumPageContent() {
   const currentComparisons = data?.freshness?.current_comparisons;
   const trackedComparisons = data?.freshness?.tracked_comparisons;
   const currentScopeNote = [
-    newestMetricAge ? `Newest source metric ${newestMetricAge}` : null,
+    newestMetricAge ? `Latest price per share (PPS) ${newestMetricAge}` : null,
     currentComparisons != null && trackedComparisons != null
-      ? `${currentComparisons} of ${trackedComparisons} comparisons within the selected freshness threshold`
+      ? `${currentComparisons} of ${trackedComparisons} comparisons within the freshness window`
       : null,
   ].filter(Boolean).join(" · ");
 
@@ -95,7 +95,7 @@ function MomentumPageContent() {
     <div className="markets-surface">
       <section className="page-header page-header-no-border">
         <h1 className="page-title">Markets<br /><em className="page-title-accent">What changed enough to inspect</em></h1>
-        <p className="page-description">Find material realized-yield changes, check how broad they are, then open the vault or compare its underlying asset. Movement is evidence to investigate, not a recommendation.</p>
+        <p className="page-description">Find material realized-yield changes, see how widespread they are, then inspect the vault or compare the same asset. A move is evidence to investigate, not a recommendation.</p>
         <MarketModeNav active="changes" />
       </section>
       <section className="section section-md"><div className="card market-filter-panel"><div className="filter-grid">
@@ -113,9 +113,9 @@ function MomentumPageContent() {
         </div>}
       </section>
 
-      <section className="section section-lg"><div className="card-header"><div><h2 className="card-title">Is the move broad or isolated?</h2><p className="card-description">Breadth shows whether the selected window moved across many comparable vaults or only a concentrated share of TVL.</p></div></div><div className="cols-2"><ShareMeter title="By vaults" segments={breadthByVault} total={compared} valueFormatter={(value) => String(value ?? 0)} /><ShareMeter title="By TVL" segments={breadthByTvl} total={totalTvl} valueFormatter={formatUsd} /></div></section>
+      <section className="section section-lg"><div className="card-header"><div><h2 className="card-title">Is the move broad or isolated?</h2><p className="card-description">See whether a move spans many comparable vaults or a concentrated share of TVL.</p></div></div><div className="cols-2"><ShareMeter title="By vaults" segments={breadthByVault} total={compared} valueFormatter={(value) => String(value ?? 0)} /><ShareMeter title="By TVL" segments={breadthByTvl} total={totalTvl} valueFormatter={formatUsd} /></div></section>
 
-      <section className="section section-lg market-scatter"><div className="card-header"><div><h2 className="card-title">Which moves combine scale and current yield?</h2><p className="card-description">Separate large-TVL changes from small outliers before opening the underlying vault evidence.</p></div></div><ScatterPlot title={`Current yield against ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size is tracked TVL. The zero line separates strengthening from weakening. Select a point to inspect the Yearn vault.</p></section>
+      <section className="section section-lg market-scatter"><div className="card-header"><div><h2 className="card-title">Which moves combine scale and current yield?</h2><p className="card-description">Use TVL to distinguish broad evidence from small outliers before opening a vault.</p></div></div><ScatterPlot title={`Current yield against ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size is tracked TVL. The zero line separates strengthening from weakening. Select a point to open the Yearn vault.</p></section>
 
       <section className="section section-lg">
         {isLoading ? <><TableSkeleton rows={4} columns={7} /><TableSkeleton rows={4} columns={7} /></> : <>

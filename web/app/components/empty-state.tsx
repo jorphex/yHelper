@@ -12,8 +12,8 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  title = "No data found",
-  description = "Try adjusting your filters to see more results.",
+  title = "No results",
+  description = "Try changing a filter.",
   actionLabel,
   onAction,
   icon = "search",
@@ -75,8 +75,8 @@ export function EmptyState({
 export function NoVaultsEmptyState({ onReset }: { onReset?: () => void }) {
   return (
     <EmptyState
-      title="No vaults match your filters"
-      description="Try adjusting your filter criteria to see more vaults. You can lower the minimum TVL or change the universe."
+      title="No vaults match this view"
+      description="Try a different market, chain, or vault set."
       actionLabel={onReset ? "Reset filters" : undefined}
       onAction={onReset}
       icon="filter"
@@ -88,7 +88,7 @@ export function NoChangesEmptyState() {
   return (
     <EmptyState
       title="No changes detected"
-      description="There are no significant realized APY changes in the selected time window. Try extending the range or adjusting the stale threshold."
+      description="No material realized APY changes were found for this window. Try a longer window."
       icon="chart"
     />
   );
@@ -97,8 +97,8 @@ export function NoChangesEmptyState() {
 export function NoAssetsEmptyState({ onReset }: { onReset?: () => void }) {
   return (
     <EmptyState
-      title="No assets found"
-      description="No tokens match your current filter set. Try changing the token scope or reducing the minimum TVL."
+      title="No assets match this view"
+      description="Try another vault set."
       actionLabel={onReset ? "Reset filters" : undefined}
       onAction={onReset}
       icon="data"

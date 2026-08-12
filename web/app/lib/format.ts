@@ -52,7 +52,7 @@ export function compactChainLabel(chainId: number | null | undefined, compact = 
 
 export function formatPct(value: number | null | undefined, digits = 2, isLoading = false): string {
   if (isLoading) {
-    return "—";
+    return "Loading…";
   }
   if (value === null || value === undefined) {
     return "n/a";
@@ -78,7 +78,7 @@ export function deltaArrow(value: number | null | undefined): string {
 
 export function formatUsd(value: number | null | undefined, digits = 0, isLoading = false): string {
   if (isLoading) {
-    return "—";
+    return "Loading…";
   }
   if (value === null || value === undefined) {
     return "n/a";
@@ -104,7 +104,7 @@ export function formatUsdCompact(value: number | null | undefined): string {
 
 export function formatHours(seconds: number | null | undefined, digits = 1, isLoading = false): string {
   if (isLoading) {
-    return "—";
+    return "Loading…";
   }
   if (seconds === null || seconds === undefined) {
     return "n/a";
@@ -125,7 +125,7 @@ const UTC_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
 
 export function formatUtcDateTime(value: Date | number | string | null | undefined, isLoading = false): string {
   if (isLoading) {
-    return "—";
+    return "Loading…";
   }
   if (value === null || value === undefined) {
     return "n/a";

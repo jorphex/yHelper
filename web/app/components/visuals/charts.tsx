@@ -13,7 +13,7 @@ export function ScatterPlot({
   points,
   xFormatter,
   yFormatter,
-  emptyText = "No points available for this filter.",
+  emptyText = "No points for this view.",
   className,
   densityBackdrop = false,
 }: {

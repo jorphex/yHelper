@@ -142,8 +142,8 @@ function ReportsPageContent() {
         <div>
           <h1 className="page-title">Vault reports</h1>
           <p className="page-description">
-            Strategy accounting updates emitted by Yearn vaults. The default view keeps reports that realized a gain,
-            loss, fee, or refund; use all updates when you need the complete ledger trail.
+            Strategy accounting updates from Yearn vaults. By default, this shows reports with a gain, loss, fee,
+            or refund; choose all updates for the full ledger trail.
           </p>
         </div>
       </header>
@@ -164,7 +164,7 @@ function ReportsPageContent() {
             value={query.meaningfulOnly ? "meaningful" : "all"}
             onChange={(event) => updateQuery({ all: event.target.value === "all" ? 1 : null })}
           >
-            <option value="meaningful">Realized results</option>
+            <option value="meaningful">Results, fees, or refunds</option>
             <option value="all">All accounting updates</option>
           </select>
         </label>
@@ -190,8 +190,8 @@ function ReportsPageContent() {
         <section className="section section-md"><p className="section-note">
           Last 24 hours: <strong>{data?.trailing_24h?.report_count ?? 0}</strong> reports from{" "}
           <strong>{data?.trailing_24h?.vault_count ?? 0}</strong> vaults and{" "}
-          <strong>{data?.trailing_24h?.strategy_count ?? 0}</strong> strategies. Amounts use each vault&apos;s
-          underlying asset and are not USD-normalized.
+          <strong>{data?.trailing_24h?.strategy_count ?? 0}</strong> strategies. Amounts are shown in each vault&apos;s
+          asset, not converted to USD.
         </p></section>
       )}
 
@@ -203,7 +203,7 @@ function ReportsPageContent() {
           </div>
         </div>
         {!isLoading && (data?.recent?.length ?? 0) === 0 ? (
-          <EmptyState title="No matching reports" description="Try another chain, vault, or include all accounting updates." />
+          <EmptyState title="No matching reports" description="Try another chain or vault, or include all accounting updates." />
         ) : (
           <TableWrap className="reports-table-wrap">
             <table className="reports-table">
@@ -230,7 +230,7 @@ function ReportsPageContent() {
                     <td data-label="Fees / refund" className="numeric">
                       {hasAmount(row.fee_assets) ? <div>{amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals)} fee</div> : null}
                       {hasAmount(row.refund_assets) ? <div className="muted">{amountWithUnit(row.refund_assets, row.token_symbol, row.token_decimals)} refund</div> : null}
-                      {!hasAmount(row.fee_assets) && !hasAmount(row.refund_assets) ? "—" : null}
+                      {!hasAmount(row.fee_assets) && !hasAmount(row.refund_assets) ? "None" : null}
                     </td>
                     <td data-label="Debt after" className="numeric">{amountWithUnit(row.debt_after, row.token_symbol, row.token_decimals)}</td>
                   </tr>
@@ -239,7 +239,7 @@ function ReportsPageContent() {
             </table>
           </TableWrap>
         )}
-        {!isLoading && compact && recentRows.length > 10 ? <button className="button button-ghost section-sm" onClick={() => setMobileExpanded((value) => !value)}>{mobileExpanded ? "Show 10 recent reports" : `Show all ${recentRows.length} loaded reports`}</button> : null}
+        {!isLoading && compact && recentRows.length > 10 ? <button className="button button-ghost section-sm" onClick={() => setMobileExpanded((value) => !value)}>{mobileExpanded ? "Show 10 recent reports" : `Show all ${recentRows.length} reports`}</button> : null}
         {!isLoading && !compact && (recentRows.length >= 25 || query.limit > 25) ? <button className="button button-ghost section-sm" onClick={() => updateQuery({ limit: query.limit > 25 ? 25 : 50 })}>{query.limit > 25 ? "Show fewer" : "Show 50 recent reports"}</button> : null}
       </section>
     </>
