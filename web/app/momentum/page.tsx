@@ -95,7 +95,7 @@ function MomentumPageContent() {
     <div className="markets-surface">
       <section className="page-header page-header-no-border">
         <h1 className="page-title">Markets<br /><em className="page-title-accent">What changed enough to inspect</em></h1>
-        <p className="page-description">Find material realized-yield changes, see how widespread they are, then inspect the vault or compare the same asset. A move is evidence to investigate, not a recommendation.</p>
+        <p className="page-description">Find realized-yield changes and see how widespread they are. A move is evidence, not a recommendation.</p>
         <MarketModeNav active="changes" />
       </section>
       <section className="section section-md"><div className="card market-filter-panel"><div className="filter-grid">

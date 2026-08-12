@@ -3,7 +3,6 @@
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { fetchAssetsData } from "./hooks/use-assets-data";
 import { fetchChangesData, fetchTrendDailyData } from "./hooks/use-changes-data";
 import { fetchCompositionData } from "./hooks/use-composition-data";
 import { fetchDiscoverData } from "./hooks/use-discover-data";
@@ -60,29 +59,6 @@ function GlobalPrefetch() {
             sort: "tvl",
             dir: "desc",
             chain: null,
-          }),
-          staleTime: 30_000,
-        }),
-        () => client.prefetchQuery({
-          queryKey: ["assets", {
-            universe: "core",
-            market: "all",
-            minTvl: 1000000,
-            minPoints: 45,
-            limit: 120,
-            tokenScope: "featured",
-            apiSort: "tvl",
-            apiDir: "desc",
-          }],
-          queryFn: () => fetchAssetsData({
-            universe: "core",
-            market: "all",
-            minTvl: 1000000,
-            minPoints: 45,
-            limit: 120,
-            tokenScope: "featured",
-            apiSort: "tvl",
-            apiDir: "desc",
           }),
           staleTime: 30_000,
         }),

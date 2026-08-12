@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Explore",
-  description: "Understand Yearn vault structure, screen vaults, and compare like assets.",
+  description: "Browse Yearn vaults and inspect their structure.",
 };
 
 export default function ExploreLayout({ children }: { children: ReactNode }) {

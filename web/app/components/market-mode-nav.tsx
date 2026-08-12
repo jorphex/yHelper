@@ -4,12 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export type MarketMode = "changes" | "vaults" | "compare" | "structure";
+export type MarketMode = "changes" | "vaults" | "structure";
 
 const modes: Array<{ id: MarketMode; label: string }> = [
   { id: "changes", label: "What changed" },
   { id: "vaults", label: "Vaults" },
-  { id: "compare", label: "Compare assets" },
   { id: "structure", label: "Composition" },
 ];
 
@@ -27,11 +26,6 @@ export function MarketModeNav({ active }: { active: MarketMode }) {
     return new Map(modes.map((mode) => {
       const params = new URLSearchParams(shared);
       params.set("view", mode.id);
-      if (mode.id === "compare") {
-        params.delete("market");
-        const token = searchParams.get("token");
-        if (token) params.set("token", token);
-      }
       if (mode.id === "vaults") {
         const chain = searchParams.get("chain");
         if (chain) params.set("chain", chain);
@@ -60,9 +54,12 @@ export function MarketModeNav({ active }: { active: MarketMode }) {
     const activeLink = activeRef.current;
     if (!nav || !activeLink) return;
 
-    // Keep the selected view fully visible on first load and when switching views.
-    // An explicit auto behavior avoids inheriting a global smooth-scroll setting.
-    activeLink.scrollIntoView({ behavior: "auto", block: "nearest", inline: "start" });
+    if (nav.scrollWidth <= nav.clientWidth + 1) {
+      nav.scrollLeft = 0;
+    } else {
+      // Keep the selected view fully visible when the labels genuinely overflow.
+      activeLink.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+    }
     updateOverflow();
   }, [active, updateOverflow]);
 

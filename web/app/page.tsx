@@ -101,7 +101,6 @@ export default function HomePage() {
                     <p className="brief-description">Current realized APY {formatPct(mover.realized_apy_window, 2)} · tracked TVL {formatUsd(mover.tvl_usd)}. This is the largest absolute move among established vaults, not a recommendation.</p>
                     <div className="brief-actions">
                       {mover.chain_id != null && mover.vault_address ? <a className="evidence-link-primary" href={yearnVaultUrl(mover.chain_id, mover.vault_address)} target="_blank" rel="noreferrer">Inspect vault</a> : null}
-                      {mover.token_symbol ? <Link className="evidence-link-secondary" href={`/markets?view=compare&token=${encodeURIComponent(mover.token_symbol)}`}>Compare {mover.token_symbol}</Link> : null}
                     </div>
                   </div>
                 </div>

@@ -8,6 +8,7 @@ type DiscoverRow = {
   vault_address: string;
   chain_id: number;
   symbol: string | null;
+  token_symbol: string | null;
   market: MarketKind;
   tvl_usd: number | null;
   est_apy: number | null;
