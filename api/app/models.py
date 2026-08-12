@@ -25,6 +25,7 @@ class UniverseFilters(ApiModel):
 class DiscoverFilters(UniverseFilters):
     market: Literal["all", "stablecoins", "eth", "bitcoin", "other"]
     chain_id: int | None
+    token_symbol: str | None
     sort_by: Literal["tvl", "est_apy", "apy_30d", "momentum"]
     direction: Literal["asc", "desc"]
 
@@ -36,7 +37,11 @@ class Pagination(ApiModel):
 
 
 class DiscoverSummary(ApiModel):
+    vaults: int
     total_tvl_usd: float | None
+    best_realized_apy_30d: float | None
+    worst_realized_apy_30d: float | None
+    realized_spread_30d: float | None
     tvl_weighted_realized_apy_30d: float | None
 
 
@@ -68,6 +73,7 @@ class VaultMetricRow(ApiModel):
 
 class DiscoverRow(VaultMetricRow):
     market: str
+    token_symbol: str | None
 
 
 class DiscoverResponse(ApiModel):

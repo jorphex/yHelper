@@ -32,6 +32,7 @@ def discover(
     limit: int = Query(default=50, ge=1, le=250),
     offset: int = Query(default=0, ge=0),
     chain_id: int | None = Query(default=None),
+    token_symbol: str | None = Query(default=None, min_length=1, max_length=64),
     market: Literal["all", "stablecoins", "eth", "bitcoin", "other"] = "all",
     universe: Literal["core", "extended", "raw"] = "core",
     min_tvl_usd: float | None = Query(default=None, ge=0.0),
@@ -46,6 +47,7 @@ def discover(
     min_tvl_usd = float(universe_gate["min_tvl_usd"])
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
+    token_symbol = token_symbol.strip().upper() or None if token_symbol is not None else None
     realized_apy_sql = _bounded_realized_apy_sql()
     momentum_sql = _bounded_momentum_sql()
     order_map = {
@@ -66,6 +68,9 @@ def discover(
         "offset": offset,
         "market": market,
     }
+    if token_symbol:
+        base_filters.append("LOWER(COALESCE(d.token_symbol, '')) = LOWER(%(token_symbol)s)")
+        params["token_symbol"] = token_symbol
     rank_filter = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     if rank_filter:
         base_filters.append(rank_filter)
@@ -115,6 +120,9 @@ def discover(
                 SELECT
                     COUNT(*) AS vaults,
                     SUM(COALESCE(d.tvl_usd, 0.0)) AS total_tvl_usd,
+                    MAX({realized_apy_sql}) AS best_realized_apy_30d,
+                    MIN({realized_apy_sql}) AS worst_realized_apy_30d,
+                    MAX({realized_apy_sql}) - MIN({realized_apy_sql}) AS realized_spread_30d,
                     CASE
                         WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE m.apy_30d IS NOT NULL) > 0
                         THEN SUM(COALESCE(d.tvl_usd, 0.0) * {realized_apy_sql})
@@ -130,13 +138,14 @@ def discover(
                 params,
             )
             summary = cur.fetchone() or {}
-            total = int(summary.pop("vaults", 0) or 0)
+            total = int(summary.get("vaults", 0) or 0)
             cur.execute(
                 f"""
                 SELECT
                     d.vault_address,
                     d.chain_id,
                     d.symbol,
+                    d.token_symbol,
                     {_market_group_sql("d")} AS market,
                     d.tvl_usd,
                     d.est_apy,
@@ -160,6 +169,7 @@ def discover(
             "universe": universe,
             "market": market,
             "chain_id": chain_id,
+            "token_symbol": token_symbol,
             "min_tvl_usd": min_tvl_usd,
             "min_points": min_points,
             "max_vaults": max_vaults,
