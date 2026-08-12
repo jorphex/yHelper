@@ -92,27 +92,21 @@ export async function renderSocialImage() {
       </div>
       <div style={{ position: "relative", display: "flex", flex: 1, margin: "0 56px", borderTop: "1px solid rgba(255,255,255,.16)" }}>
         <div style={{ display: "flex", flexDirection: "column", width: 690, justifyContent: "center", padding: "34px 46px 34px 0" }}>
-          <div style={{ display: "flex", color: "#9b958c", fontSize: 18, letterSpacing: ".1em", textTransform: "uppercase" }}>Yearn yield, interpreted</div>
-          <div style={{ display: "flex", marginTop: 18, fontSize: 45, fontWeight: 700, letterSpacing: "-.045em", lineHeight: 1.02 }}>See what changed.</div>
-          <div style={{ display: "flex", fontSize: 45, fontWeight: 700, letterSpacing: "-.045em", lineHeight: 1.02 }}>Verify the evidence.</div>
-          <div style={{ display: "flex", maxWidth: 610, marginTop: 20, color: "#c9c1b7", fontSize: 21, lineHeight: 1.35 }}>Compare like vaults, inspect realized-yield movement, and open the strategy reports behind it.</div>
+          <div style={{ display: "flex", maxWidth: 610, fontSize: 58, fontWeight: 700, letterSpacing: "-.045em", lineHeight: 1.02 }}>Yearn yield, interpreted.</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", width: 398, justifyContent: "center", padding: "34px 0 34px 42px", borderLeft: "1px solid rgba(255,255,255,.10)" }}>
           {mover ? <div style={{ display: "flex", width: "100%", flexDirection: "column" }}>
-            <div style={{ display: "flex", width: "100%", color: "#9b958c", fontSize: 16, letterSpacing: ".09em", lineHeight: 1.25, textTransform: "uppercase" }}>Current 7d move to inspect</div>
-            <div style={{ display: "flex", width: "100%", marginTop: 18, fontSize: moverName.length > 17 ? 29 : 36, fontWeight: 700, letterSpacing: "-.035em", lineHeight: 1.05 }}>{moverName}</div>
-            <div style={{ display: "flex", width: "100%", marginTop: 10, color: (mover.delta_apy ?? 0) >= 0 ? "#62d6a2" : "#ff887c", fontSize: 27, fontWeight: 700 }}>{signedPoints(mover.delta_apy ?? 0)}</div>
-            <div style={{ display: "flex", width: "100%", marginTop: 10, color: "#9b958c", fontSize: 16 }}>7d vs preceding 7d</div>
-            <div style={{ display: "flex", width: "100%", marginTop: 4, color: "#9b958c", fontSize: 16 }}>Source PPS {ageLabel(mover.age_seconds ?? 0)}</div>
+            <div style={{ display: "flex", width: "100%", color: "#9b958c", fontSize: 22, letterSpacing: ".09em", lineHeight: 1.25, textTransform: "uppercase" }}>7d yield change</div>
+            <div style={{ display: "flex", width: "100%", marginTop: 18, fontSize: moverName.length > 17 ? 32 : 42, fontWeight: 700, letterSpacing: "-.035em", lineHeight: 1.05 }}>{moverName}</div>
+            <div style={{ display: "flex", width: "100%", marginTop: 12, color: (mover.delta_apy ?? 0) >= 0 ? "#62d6a2" : "#ff887c", fontSize: 34, fontWeight: 700 }}>{signedPoints(mover.delta_apy ?? 0)}</div>
+            <div style={{ display: "flex", width: "100%", marginTop: 14, color: "#9b958c", fontSize: 22, lineHeight: 1.3 }}>vs prior 7d · PPS {ageLabel(mover.age_seconds ?? 0)}</div>
           </div> : <div style={{ display: "flex", width: "100%", flexDirection: "column" }}>
-            <div style={{ display: "flex", width: "100%", color: "#9b958c", fontSize: 16, letterSpacing: ".09em", textTransform: "uppercase" }}>Built for inspection</div>
-            <div style={{ display: "flex", width: "100%", marginTop: 18, fontSize: 34, fontWeight: 700, lineHeight: 1.08 }}>Markets · Reports · stYFI</div>
-            <div style={{ display: "flex", width: "100%", marginTop: 18, color: "#9b958c", fontSize: 16, lineHeight: 1.35 }}>Live signals appear only when their source data is current.</div>
+            <div style={{ display: "flex", width: "100%", color: "#9b958c", fontSize: 22, letterSpacing: ".09em", lineHeight: 1.25, textTransform: "uppercase" }}>No current 7d signal</div>
+            <div style={{ display: "flex", width: "100%", flexDirection: "column", marginTop: 18, fontSize: 38, fontWeight: 700, letterSpacing: "-.035em", lineHeight: 1.08 }}>
+              <span>Markets</span><span>Reports</span><span>stYFI</span>
+            </div>
           </div>}
         </div>
-      </div>
-      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56, margin: "0 56px", borderTop: "1px solid rgba(255,255,255,.10)", color: "#85817a", fontSize: 16, letterSpacing: ".035em" }}>
-        <span>Yearn vault intelligence with evidence and freshness</span><span>yhelper.app</span>
       </div>
     </div>,
     { ...size, fonts: [
