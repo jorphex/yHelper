@@ -6,9 +6,8 @@ import { useLayoutEffect, useRef } from "react";
 
 const NAV_LINKS: Array<{ href: string; label: string }> = [
   { href: "/", label: "Overview" },
-  { href: "/explore", label: "Explore" },
-  { href: "/momentum", label: "Momentum" },
-  { href: "/harvests", label: "Reports" },
+  { href: "/markets", label: "Markets" },
+  { href: "/reports", label: "Reports" },
   { href: "/styfi", label: "stYFI" },
 ];
 

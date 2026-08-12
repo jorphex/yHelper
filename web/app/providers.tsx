@@ -30,7 +30,7 @@ function GlobalPrefetch() {
     let cancelled = false;
 
     const run = async () => {
-      const routePrefetches = ["/", "/explore", "/momentum", "/harvests", "/styfi"];
+      const routePrefetches = ["/", "/markets", "/reports", "/styfi"];
       for (const href of routePrefetches) {
         router.prefetch(href);
       }

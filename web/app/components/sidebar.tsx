@@ -7,9 +7,8 @@ import { apiUrl } from "../lib/api";
 
 const navItems = [
   { href: "/", label: "Overview" },
-  { href: "/explore", label: "Explore" },
-  { href: "/momentum", label: "Momentum" },
-  { href: "/harvests", label: "Reports" },
+  { href: "/markets", label: "Markets", paths: ["/markets", "/momentum", "/explore", "/structure"] },
+  { href: "/reports", label: "Reports", paths: ["/reports", "/harvests"] },
   { href: "/styfi", label: "stYFI" },
 ];
 
@@ -214,16 +213,19 @@ export function Sidebar() {
       </div>
 
       <nav className="sidebar-nav" aria-label="Primary">
-        {navItems.map((item) => (
+        {navItems.map((item) => {
+          const active = item.paths ? item.paths.some((path) => pathname === path || pathname.startsWith(`${path}/`)) : pathname === item.href;
+          return (
           <Link
             key={item.href}
             href={item.href}
-            aria-current={pathname === item.href ? "page" : undefined}
-            className={`sidebar-link ${pathname === item.href ? "is-active" : ""}`}
+            aria-current={active ? "page" : undefined}
+            className={`sidebar-link ${active ? "is-active" : ""}`}
           >
             {item.label}
           </Link>
-        ))}
+          );
+        })}
       </nav>
 
       {pulse && (
@@ -240,7 +242,7 @@ export function Sidebar() {
             {pulse.comparable_vaults}/{pulse.eligible_vaults} eligible vaults · {pulse.coverage_ratio === null ? "n/a" : `${Math.round(pulse.coverage_ratio * 100)}%`} TVL coverage
           </div>
           {pulseUpdatedAt ? <div className="sidebar-pulse-meta">{pulseUpdatedAt}</div> : null}
-          <Link href="/momentum" className="sidebar-pulse-link">Open Momentum</Link>
+          <Link href="/markets" className="sidebar-pulse-link">Inspect markets</Link>
         </section>
       )}
 

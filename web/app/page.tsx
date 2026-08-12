@@ -2,105 +2,138 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { KpiCardSkeleton } from "./components/skeleton";
-import { useHomeData, type HomeMover } from "./hooks/use-home-data";
+import { useHomeData, type HomeMover, type HomeReport } from "./hooks/use-home-data";
 import { formatPct, formatUsd, formatUtcDateTime, yearnVaultUrl } from "./lib/format";
 
-function signedPercent(value: number | null | undefined): string {
+function signedPoints(value: number | null | undefined): string {
   if (!Number.isFinite(value ?? null)) return "n/a";
   const points = (value ?? 0) * 100;
-  return `${points > 0 ? "+" : ""}${points.toFixed(2)} pp`;
+  return `${points > 0 ? "+" : points < 0 ? "−" : ""}${Math.abs(points).toFixed(2)} pp`;
+}
+
+function ageLabel(seconds: number | null | undefined): string | null {
+  if (!Number.isFinite(seconds ?? null)) return null;
+  const value = Math.max(0, seconds ?? 0);
+  if (value < 3_600) return `${Math.max(1, Math.round(value / 60))}m ago`;
+  if (value < 86_400) return `${Math.max(1, Math.round(value / 3_600))}h ago`;
+  return `${Math.max(1, Math.round(value / 86_400))}d ago`;
+}
+
+function absoluteMove(row: HomeMover | undefined): number {
+  if (!Number.isFinite(row?.delta_apy ?? null)) return Number.NEGATIVE_INFINITY;
+  return Math.abs(row?.delta_apy ?? 0);
 }
 
 function moverName(row: HomeMover | undefined): string {
-  return row?.symbol?.trim() || row?.token_symbol?.trim() || "No comparable move";
+  return row?.symbol?.trim() || row?.token_symbol?.trim() || "Vault yield";
 }
 
-function MoverLink({ row }: { row: HomeMover | undefined }) {
-  const url = row?.vault_address && row.chain_id != null ? yearnVaultUrl(row.chain_id, row.vault_address) : null;
-  return url ? <a className="external-link text-accent" href={url} target="_blank" rel="noreferrer">{moverName(row)}</a> : <>{moverName(row)}</>;
+function reportDirection(report: HomeReport): string {
+  if (report.loss && Number(report.loss) > 0) return "reported a realized loss";
+  if (report.gain && Number(report.gain) > 0) return "reported a realized gain";
+  return "posted a meaningful strategy report";
 }
 
 export default function HomePage() {
   const { data, isLoading } = useHomeData();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   const riser = data?.changes?.movers?.risers?.[0];
   const faller = data?.changes?.movers?.fallers?.[0];
-  const opportunity = data?.assets?.rows?.find((row) => Number.isFinite(row.realized_spread_30d));
-  const protocolTvl = data?.overview?.protocol?.tvl_usd;
-  const protocolFetchedAt = data?.overview?.protocol?.fetched_at;
-  const summary = data?.changes?.summary;
+  const pulse = data?.pulse?.pulse;
+  const freshnessLimit = (pulse?.freshness_window_hours ?? 48) * 3_600;
+  const freshRiser = (riser?.age_seconds ?? Number.POSITIVE_INFINITY) <= freshnessLimit ? riser : undefined;
+  const freshFaller = (faller?.age_seconds ?? Number.POSITIVE_INFINITY) <= freshnessLimit ? faller : undefined;
+  const mover = absoluteMove(freshRiser) >= absoluteMove(freshFaller) ? freshRiser : freshFaller;
+  const report = data?.reports?.recent?.[0];
+  const styfiSummary = data?.styfi?.summary;
+  const styfiReward = data?.styfi?.current_reward_state;
+  const protocol = data?.overview?.protocol;
+  const styfiAge = ageLabel(data?.styfi?.freshness?.latest_snapshot_age_seconds);
+  const pulseAge = ageLabel(pulse?.latest_data_at ? Math.max(0, (Date.now() - Date.parse(pulse.latest_data_at)) / 1_000) : null);
+  const pulseStatement = pulse?.data_state === "ready"
+    ? `Core realized yield is ${pulse.trend === "improving" ? "strengthening" : pulse.trend === "softening" ? "softening" : "steady"}`
+    : pulse?.data_state === "limited"
+      ? "The core comparison has limited coverage"
+      : pulse?.data_state === "delayed"
+        ? "Core yield data is delayed"
+        : "Current market direction is syncing";
 
   return (
-    <div className={`transition-opacity duration-500 ${mounted ? "opacity-100" : "opacity-0"}`}>
+    <div>
       <section className="page-header page-header-hero page-header-no-border">
         <div>
-          <h1 className="page-title">See where Yearn yield<br /><em className="page-title-accent">is moving</em></h1>
+          <div className="scope-label">Current Yearn brief</div>
+          <h1 className="page-title">What changed<br /><em className="page-title-accent">and where to look</em></h1>
           <p className="page-description">
-            Compare like assets, follow realized-yield changes, and understand where Yearn&apos;s vault TVL is concentrated.
+            A concise route into meaningful vault movements, strategy reports, and stYFI activity—with the evidence and freshness needed to inspect them.
           </p>
           <div className="tab-bar-plain">
-            <Link href="/explore" className="button button-primary">Compare vaults</Link>
-            <Link href="/momentum" className="button button-secondary">Follow momentum</Link>
+            <Link href="/markets" className="button button-primary">Inspect markets</Link>
+            <Link href="/reports" className="button button-secondary">Verify reports</Link>
           </div>
+          {protocol?.tvl_usd != null && protocol.freshness_status === "fresh" ? (
+            <p className="hero-context">Yearn website TVL {formatUsd(protocol.tvl_usd, 0, false)}{protocol.fetched_at ? ` · source fetched ${formatUtcDateTime(protocol.fetched_at)}` : ""}</p>
+          ) : null}
         </div>
         <div className="hero-image">
           <Image src="/home-assets-yearn-blender/hero-yearn-blender-coins.png" alt="Yearn Finance" width={500} height={320} priority style={{ objectFit: "contain" }} />
         </div>
       </section>
 
-      <section className="section section-lg">
-        <div className="card-header"><div><h2 className="card-title">This week</h2><p className="card-subtitle">Realized APY, compared with the preceding seven-day window</p></div></div>
-        {isLoading ? <div className="kpi-grid kpi-grid-3"><KpiCardSkeleton /><KpiCardSkeleton /><KpiCardSkeleton /></div> : (
-          <div className="kpi-grid kpi-grid-3">
-            <div className="kpi-card">
-              <div className="kpi-label">Strongest riser</div>
-              <div className="kpi-value kpi-value-md"><MoverLink row={riser} /></div>
-              <div className="kpi-hint">{signedPercent(riser?.delta_apy)} · current 7d {formatPct(riser?.realized_apy_window ?? null, 2)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Largest faller</div>
-              <div className="kpi-value kpi-value-md"><MoverLink row={faller} /></div>
-              <div className="kpi-hint">{signedPercent(faller?.delta_apy)} · current 7d {formatPct(faller?.realized_apy_window ?? null, 2)}</div>
-            </div>
-            <div className="kpi-card">
-              <div className="kpi-label">Widest exact-symbol range</div>
-              <div className="kpi-value kpi-value-md">{opportunity ? <Link className="text-accent" href={`/explore?tab=compare&token=${encodeURIComponent(opportunity.token_symbol)}`}>{opportunity.token_symbol}</Link> : "n/a"}</div>
-              <div className="kpi-hint">{formatPct(opportunity?.realized_spread_30d ?? null, 2)} across {opportunity?.vaults ?? 0} exact-symbol vaults · compare differences</div>
-            </div>
+      <section className="section section-lg" aria-labelledby="brief-title">
+        <div className="card-header">
+          <div>
+            <h2 className="card-title" id="brief-title">Worth inspecting now</h2>
+            <p className="card-description">
+              {pulseStatement}{pulse?.data_state === "ready" && pulse.directional_tvl_ratio != null ? ` across ${Math.round(pulse.directional_tvl_ratio * 100)}% of comparable TVL` : ""}{pulseAge ? ` · source PPS ${pulseAge}` : ""}.
+            </p>
           </div>
-        )}
-      </section>
-
-      <section className="section">
-        <div className="card-header"><div><h2 className="card-title">Market context</h2><p className="card-subtitle">Protocol size and the direction of comparable established vaults</p></div></div>
-        {isLoading ? <div className="kpi-grid kpi-grid-3"><KpiCardSkeleton /><KpiCardSkeleton /><KpiCardSkeleton /></div> : (
-          <div className="kpi-grid kpi-grid-3">
-            <div className="kpi-card"><div className="kpi-label">Yearn website TVL</div><div className="kpi-value kpi-value-md">{formatUsd(protocolTvl ?? null, 0, false)}</div><div className="kpi-hint">DefiLlama-sourced{protocolFetchedAt ? ` · fetched ${formatUtcDateTime(protocolFetchedAt)}` : ""}</div></div>
-            <div className="kpi-card"><div className="kpi-label">TVL-weighted change</div><div className="kpi-value kpi-value-md">{signedPercent(summary?.tvl_weighted_delta)}</div><div className="kpi-hint">Across {summary?.vaults_with_change ?? 0} comparable vaults</div></div>
-            <div className="kpi-card"><div className="kpi-label">Direction</div><div className="kpi-value kpi-value-md">{summary?.riser_vaults ?? 0} rising · {summary?.faller_vaults ?? 0} falling</div><div className="kpi-hint">{formatUsd(summary?.riser_tvl_usd ?? null, 0, false)} rising TVL · {formatUsd(summary?.faller_tvl_usd ?? null, 0, false)} falling</div></div>
-          </div>
-        )}
-      </section>
-
-      <section className="section">
-        <div className="card-header"><h2 className="card-title">Go deeper</h2></div>
-        <div className="card-grid">
-          {[
-            { href: "/explore", title: "Explore", desc: "Understand the market, screen vaults, and compare vaults sharing an exact token symbol.", tag: "Choose" },
-            { href: "/momentum", title: "Momentum", desc: "See which realized yields are strengthening or weakening.", tag: "Time" },
-            { href: "/harvests", title: "Reports", desc: "Inspect recent strategy gains, losses, fees, and debt updates.", tag: "Verify" },
-            { href: "/styfi", title: "stYFI", desc: "Track participation, reward allocation, and epochs.", tag: "Stake" },
-          ].map((item) => (
-            <Link key={item.href} href={item.href} className="hover-card card-grid-link">
-              <div className="card-grid-link-head"><span className="card-grid-link-title">{item.title}</span><span className="card-grid-link-tag">{item.tag}</span></div>
-              <p className="card-grid-link-desc">{item.desc}</p>
-            </Link>
-          ))}
         </div>
+
+        {isLoading ? <div className="brief-list"><div className="brief-item skeleton" /><div className="brief-item skeleton" /><div className="brief-item skeleton" /></div> : (
+          <div className="brief-list">
+            {mover ? (
+              <article className="brief-item">
+                <div className="brief-kicker">Vault yield · 7d vs preceding 7d · source PPS {ageLabel(mover.age_seconds) || "age unavailable"}</div>
+                <div className="brief-content">
+                  <div>
+                    <h3 className="brief-title">{moverName(mover)} moved {signedPoints(mover.delta_apy)}</h3>
+                    <p className="brief-description">Current realized APY {formatPct(mover.realized_apy_window, 2)} · tracked TVL {formatUsd(mover.tvl_usd)}. This is the largest absolute move in the established set, not a recommendation.</p>
+                  </div>
+                  <div className="brief-actions">
+                    {mover.chain_id != null && mover.vault_address ? <a href={yearnVaultUrl(mover.chain_id, mover.vault_address)} target="_blank" rel="noreferrer">Inspect vault</a> : null}
+                    {mover.token_symbol ? <Link href={`/explore?tab=compare&token=${encodeURIComponent(mover.token_symbol)}`}>Compare {mover.token_symbol}</Link> : null}
+                  </div>
+                </div>
+              </article>
+            ) : null}
+
+            {report ? (
+              <article className="brief-item">
+                <div className="brief-kicker">Latest realized report · {formatUtcDateTime(report.block_time)}</div>
+                <div className="brief-content">
+                  <div>
+                    <h3 className="brief-title">{report.vault_symbol || "A Yearn vault"} {reportDirection(report)}</h3>
+                    <p className="brief-description">{report.strategy_name || "Strategy report"}. Open the ledger to verify the transaction, gain or loss, fees, and debt after the update.</p>
+                  </div>
+                  <div className="brief-actions"><Link href={`/reports?vault_address=${encodeURIComponent(report.vault_address)}`}>Open report evidence</Link></div>
+                </div>
+              </article>
+            ) : null}
+
+            {styfiReward || styfiSummary ? (
+              <article className="brief-item">
+                <div className="brief-kicker">stYFI · snapshot {styfiAge || "age unavailable"}</div>
+                <div className="brief-content">
+                  <div>
+                    <h3 className="brief-title">Epoch {styfiReward?.epoch ?? styfiSummary?.reward_epoch ?? "—"} · {formatPct(styfiReward?.styfi_current_apr, 2)} APR</h3>
+                    <p className="brief-description">{styfiSummary?.combined_staked != null ? `${styfiSummary.combined_staked.toLocaleString("en-US", { maximumFractionDigits: 1 })} YFI participating. ` : ""}Inspect reward allocation, stake flows, recent actions, and epoch history.</p>
+                  </div>
+                  <div className="brief-actions"><Link href="/styfi">Open stYFI evidence</Link></div>
+                </div>
+              </article>
+            ) : null}
+          </div>
+        )}
       </section>
     </div>
   );

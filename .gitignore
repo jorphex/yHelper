@@ -12,7 +12,7 @@ DESIGN.md
 DESIGN_CRITIQUE.md
 FIXES_SUMMARY.md
 plan.md
-reports/
+/reports/
 infra/cloudflared/config.yml.example
 Screenshot *.png
 screenshots/

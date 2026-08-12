@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DataLoadError } from "../components/error-state";
 import { MarketFilter } from "../components/market-filter";
+import { MarketModeNav } from "../components/market-mode-nav";
 import { NoVaultsEmptyState } from "../components/empty-state";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { TableWrap } from "../components/table-wrap";
@@ -113,15 +114,11 @@ function ExplorePageContent() {
   return (
     <div>
       <section className="page-header page-header-no-border">
-        <h1 className="page-title">Explore<br /><em className="page-title-accent">Compare like with like</em></h1>
+        <h1 className="page-title">Markets<br /><em className="page-title-accent">Compare like with like</em></h1>
         <p className="page-description">
-          Understand where capital sits, choose the exposure you want, then compare vault yield and direction.
+          Screen established vaults, compare identical token symbols, or inspect where tracked capital is concentrated.
         </p>
-        <div className="tab-bar">
-          <button aria-pressed={query.tab === "vaults"} className={`button ${query.tab === "vaults" ? "button-primary" : "button-ghost"}`} onClick={() => updateQuery({ tab: "vaults" })}>Vaults</button>
-          <button aria-pressed={query.tab === "compare"} className={`button ${query.tab === "compare" ? "button-primary" : "button-ghost"}`} onClick={() => updateQuery({ tab: "compare", market: "all", token: null })}>Asset comparison</button>
-          <button aria-pressed={query.tab === "structure"} className={`button ${query.tab === "structure" ? "button-primary" : "button-ghost"}`} onClick={() => updateQuery({ tab: "structure", token: null })}>Market structure</button>
-        </div>
+        <MarketModeNav active={query.tab} />
       </section>
 
       <section className="section section-md">

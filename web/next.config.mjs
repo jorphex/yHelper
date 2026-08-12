@@ -12,7 +12,16 @@ const nextConfig = {
         destination: "/twitter-image",
         permanent: false,
       },
-
+      {
+        source: "/momentum",
+        destination: "/markets",
+        permanent: true,
+      },
+      {
+        source: "/harvests",
+        destination: "/reports",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {
