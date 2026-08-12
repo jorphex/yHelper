@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     default: "yHelper",
     template: "%s · yHelper",
   },
-  description: "Yearn vault discovery, yield shifts, and strategic decisions.",
+  description: "See what changed across Yearn vaults, compare like assets, and verify strategy reports.",
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     url: siteUrl,
     siteName: "yHelper",
     title: "yHelper",
-    description: "Yearn vault discovery, yield shifts, and strategic decisions.",
+    description: "See what changed across Yearn vaults, compare like assets, and verify strategy reports.",
     images: [
       {
         url: OPEN_GRAPH_IMAGE_URL,
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "yHelper",
-    description: "Yearn vault discovery, yield shifts, and strategic decisions.",
+    description: "See what changed across Yearn vaults, compare like assets, and verify strategy reports.",
     images: [TWITTER_IMAGE_URL],
   },
   other: {
