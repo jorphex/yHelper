@@ -1,12 +1,12 @@
 # yHelper
 
-yHelper is a public Yearn analytics dashboard for inspecting yield changes, vault coverage, accounting reports, and stYFI participation. It does not provide recommendations.
+yHelper is a public Yearn analytics dashboard for inspecting yield changes, vault coverage, accounting reports, yLocker rewards, and stYFI participation. It does not provide recommendations.
 
 ## Product
 
 - **Overview** (`/`): a freshness-aware Yearn brief.
 - **Markets** (`/markets`): yield changes, vault discovery, and market structure.
-- **Reports** (`/reports`): Yearn `StrategyReported` events, with meaningful accounting results shown by default.
+- **Reports** (`/reports`): recent vault reports and yCRV and yYB reward history.
 - **stYFI** (`/styfi`): participation, rewards, flows, snapshots, and recent activity.
 
 `/momentum` redirects to `/markets`, and `/harvests` redirects to `/reports`. Legacy `/explore` and `/structure` entry points remain for compatibility; `/structure` redirects to Markets.
@@ -17,7 +17,9 @@ The worker refreshes a PostgreSQL store from:
 
 - Yearn Kong REST catalog snapshots and GraphQL PPS history
 - DefiLlama Yearn parent and component TVL snapshots
-- configured chain RPC or WebSocket sources for activity, reports, and optional stYFI synchronization
+- configured chain RPC or WebSocket sources for activity, reports, yLocker reward history, and optional stYFI synchronization
+
+yLocker history follows deposits from Yearn's designated distributors to yCRV and yYB. Values use the crvUSD value at the time of each deposit.
 
 TVL has distinct meanings in the product. DefiLlama parent TVL is used for Yearn website parity; Kong vault TVL is product-catalog context and may overlap; filtered analytics TVL describes only the selected vault set. These figures are not interchangeable.
 
@@ -65,7 +67,7 @@ The web app consumes the API under `/api`. The key endpoints are:
 - `GET /health`
 - `GET /api/overview-pulse`
 - `GET /api/changes`, `GET /api/discover`, and `GET /api/composition`
-- `GET /api/reports` and `GET /api/styfi`
+- `GET /api/reports`, `GET /api/ylockers/rewards`, and `GET /api/styfi`
 - `GET /api/meta/status`, `GET /api/meta/freshness`, `GET /api/meta/coverage`, and `GET /api/meta/protocol-context`
 
 For complete contracts, inspect `/openapi.json` on a directly exposed API instance.

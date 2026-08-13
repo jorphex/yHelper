@@ -57,6 +57,7 @@ def run_checks(base_url: str, timeout: float, retries: int, retry_delay: float, 
         "/api/composition?top_n=6",
         "/api/changes?window=7d&limit=5",
         "/api/reports?days=30&limit=5",
+        "/api/ylockers/rewards?limit=2&include_events=false",
     ]
 
     failures = 0
