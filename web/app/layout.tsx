@@ -52,10 +52,6 @@ export const metadata: Metadata = {
     description: "Track Yearn vault changes, browse vaults, and verify strategy reports.",
     images: [TWITTER_IMAGE_URL],
   },
-  other: {
-    "og:image:secure_url": OPEN_GRAPH_IMAGE_URL,
-    "twitter:image:src": TWITTER_IMAGE_URL,
-  },
 };
 
 export const viewport: Viewport = {
