@@ -318,3 +318,30 @@ def ylocker_rewards_response(
                 include_events=include_events,
                 now=now or datetime.now(UTC),
             )
+
+
+def ylocker_reward_cycle_response(*, product: str, native_week: int) -> tuple[str, dict[str, object] | None]:
+    response = ylocker_rewards_response(
+        product=product,
+        limit=52,
+        include_events=True,
+    )
+    product_freshness = next(
+        row for row in response["freshness"]["products"] if row["product"] == product
+    )
+    if product_freshness["indexed_through_block"] is None:
+        return "unavailable", None
+    cycle = next(
+        (row for row in response["cycles"] if int(row["native_week"]) == native_week),
+        None,
+    )
+    if cycle is None:
+        pending = any(
+            int(row["native_week"]) == native_week for row in response["current_cycles"]
+        )
+        return ("pending" if pending else "missing"), None
+    return "finalized", {
+        "reward_token": response["scope"]["reward_token"],
+        "freshness": product_freshness,
+        "cycle": cycle,
+    }

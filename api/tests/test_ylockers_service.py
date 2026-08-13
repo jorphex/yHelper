@@ -3,10 +3,11 @@ from __future__ import annotations
 import unittest
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from app.config import YLOCKER_PRODUCTS, YLOCKER_REWARD_TOKEN
-from app.models import YlockerRewardsResponse
-from app.ylockers_service import WEEK_SECONDS, _build_response
+from app.models import YlockerRewardCycleResponse, YlockerRewardsResponse
+from app.ylockers_service import WEEK_SECONDS, _build_response, ylocker_reward_cycle_response
 
 
 NOW = datetime(2026, 8, 13, 12, tzinfo=UTC)
@@ -214,6 +215,26 @@ class YlockerServiceTests(unittest.TestCase):
         self.assertEqual(parsed.scope.chain_id, 1)
         self.assertEqual(parsed.scope.reward_token.symbol, YLOCKER_REWARD_TOKEN["symbol"])
         self.assertEqual(parsed.filters.product, "all")
+
+    def test_exact_cycle_response_matches_typed_model(self) -> None:
+        result = self._response(product="ycrv")
+        cycle = next(row for row in result["cycles"] if row["native_week"] == 1)
+        response = {
+            "reward_token": result["scope"]["reward_token"],
+            "freshness": result["freshness"]["products"][0],
+            "cycle": cycle,
+        }
+        parsed = YlockerRewardCycleResponse.model_validate(response)
+        self.assertEqual(parsed.cycle.native_week, 1)
+        self.assertEqual(parsed.cycle.value_crvusd_at_deposit, 3.0)
+
+    def test_exact_cycle_is_unavailable_without_an_index_cursor(self) -> None:
+        result = self._response(product="ycrv")
+        result["freshness"]["products"][0]["indexed_through_block"] = None
+        with patch("app.ylockers_service.ylocker_rewards_response", return_value=result):
+            status, response = ylocker_reward_cycle_response(product="ycrv", native_week=1)
+        self.assertEqual(status, "unavailable")
+        self.assertIsNone(response)
 
 
 if __name__ == "__main__":

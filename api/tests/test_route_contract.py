@@ -52,6 +52,7 @@ class RouteContractTests(unittest.TestCase):
             "/api/assets/{token_symbol}/vaults": "AssetVaultsResponse",
             "/api/reports": "ReportsResponse",
             "/api/ylockers/rewards": "YlockerRewardsResponse",
+            "/api/ylockers/rewards/{product}/cycles/{native_week}": "YlockerRewardCycleResponse",
             "/api/styfi": "StyfiResponse",
         }
         for path, model_name in expected_models.items():

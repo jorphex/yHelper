@@ -353,6 +353,12 @@ class YlockerRewardsResponse(ApiModel):
     reporting_weeks: list[YlockerReportingWeek]
 
 
+class YlockerRewardCycleResponse(ApiModel):
+    reward_token: YlockerRewardToken
+    freshness: YlockerProductFreshness
+    cycle: YlockerRewardCycle
+
+
 class HealthResponse(ApiModel):
     status: Literal["ok"]
 
