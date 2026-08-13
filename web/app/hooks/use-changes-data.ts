@@ -44,22 +44,6 @@ type ChangesResponse = {
   };
 };
 
-type TrendDailyRow = {
-  day: string;
-  weighted_apy_7d?: number | null;
-  weighted_apy_30d?: number | null;
-  riser_ratio?: number | null;
-};
-
-export type TrendDailyResponse = {
-  methodology?: {
-    membership?: "current_selected_vault_set";
-    weighting?: "current_tvl_usd";
-    interpretation?: "retrospective_yield_for_current_set";
-  };
-  rows?: TrendDailyRow[];
-};
-
 interface UseChangesDataParams {
   universe: UniverseKind;
   market: MarketKind;
@@ -67,15 +51,6 @@ interface UseChangesDataParams {
   minPoints: number;
   window: WindowKey;
   staleThreshold: StaleThresholdKey;
-}
-
-interface UseTrendDailyParams {
-  universe: UniverseKind;
-  market: MarketKind;
-  minTvl: number;
-  minPoints: number;
-  days: number;
-  enabled?: boolean;
 }
 
 export async function fetchChangesData(params: UseChangesDataParams): Promise<ChangesResponse> {
@@ -94,34 +69,10 @@ export async function fetchChangesData(params: UseChangesDataParams): Promise<Ch
   return res.json() as Promise<ChangesResponse>;
 }
 
-export async function fetchTrendDailyData(params: UseTrendDailyParams): Promise<TrendDailyResponse> {
-  const searchParams = new URLSearchParams({
-    universe: params.universe,
-    min_tvl_usd: String(params.minTvl),
-    min_points: String(params.minPoints),
-    days: String(params.days),
-    market: params.market,
-  });
-
-  const res = await fetch(apiUrl("/trends/daily", searchParams), { cache: "no-store" });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json() as Promise<TrendDailyResponse>;
-}
-
 export function useChangesData(params: UseChangesDataParams) {
   return useQuery({
     queryKey: ["changes", params],
     queryFn: () => fetchChangesData(params),
-    staleTime: 30_000,
-    gcTime: 30 * 60_000,
-  });
-}
-
-export function useTrendDailyData(params: UseTrendDailyParams) {
-  return useQuery({
-    queryKey: ["trend-daily", params],
-    queryFn: () => fetchTrendDailyData(params),
-    enabled: params.enabled ?? true,
     staleTime: 30_000,
     gcTime: 30 * 60_000,
   });

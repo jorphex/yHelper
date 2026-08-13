@@ -41,6 +41,7 @@ interface UseDiscoverDataParams {
   sort: string;
   dir: string;
   chain?: string | null;
+  enabled?: boolean;
 }
 
 export async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<DiscoverResponse> {
@@ -60,9 +61,11 @@ export async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<
 }
 
 export function useDiscoverData(params: UseDiscoverDataParams) {
+  const { enabled = true, ...request } = params;
   return useQuery({
-    queryKey: ["discover", params],
-    queryFn: () => fetchDiscoverData(params),
+    queryKey: ["discover", request],
+    queryFn: () => fetchDiscoverData(request),
+    enabled,
     staleTime: 30_000,
     gcTime: 30 * 60_000,
   });

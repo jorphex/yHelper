@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useHomeData, type HomeMover, type HomeReport } from "./hooks/use-home-data";
+import { useHomeData, useOverviewPulseData, type HomeMover, type HomeReport } from "./hooks/use-home-data";
 import { formatPct, formatUsd, formatUtcDateTime, yearnVaultUrl } from "./lib/format";
 
 function signedPoints(value: number | null | undefined): string {
@@ -36,9 +36,10 @@ function reportDirection(report: HomeReport): string {
 
 export default function HomePage() {
   const { data, isLoading } = useHomeData();
+  const { data: pulseData, isLoading: pulseLoading } = useOverviewPulseData();
   const riser = data?.changes?.movers?.risers?.[0];
   const faller = data?.changes?.movers?.fallers?.[0];
-  const pulse = data?.pulse?.pulse;
+  const pulse = pulseData?.pulse;
   const freshnessLimit = (pulse?.freshness_window_hours ?? 48) * 3_600;
   const freshRiser = (riser?.age_seconds ?? Number.POSITIVE_INFINITY) <= freshnessLimit ? riser : undefined;
   const freshFaller = (faller?.age_seconds ?? Number.POSITIVE_INFINITY) <= freshnessLimit ? faller : undefined;
@@ -90,7 +91,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {isLoading ? <div className="brief-list"><div className="brief-item brief-item-lead skeleton" /><div className="brief-secondary"><div className="brief-item skeleton" /><div className="brief-item skeleton" /></div></div> : (
+        {isLoading || pulseLoading ? <div className="brief-list"><div className="brief-item brief-item-lead skeleton" /><div className="brief-secondary"><div className="brief-item skeleton" /><div className="brief-item skeleton" /></div></div> : (
           <div className="brief-list">
             {mover ? (
               <article className="brief-item brief-item-lead">

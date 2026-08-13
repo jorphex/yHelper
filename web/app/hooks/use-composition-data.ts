@@ -27,6 +27,7 @@ interface UseCompositionDataParams {
   universe: UniverseKind;
   market: MarketKind;
   minTvl: number;
+  enabled?: boolean;
 }
 
 export async function fetchCompositionData(params: UseCompositionDataParams): Promise<CompositionResponse> {
@@ -42,9 +43,11 @@ export async function fetchCompositionData(params: UseCompositionDataParams): Pr
 }
 
 export function useCompositionData(params: UseCompositionDataParams) {
+  const { enabled = true, ...request } = params;
   return useQuery({
-    queryKey: ["composition", params],
-    queryFn: () => fetchCompositionData(params),
+    queryKey: ["composition", request],
+    queryFn: () => fetchCompositionData(request),
+    enabled,
     staleTime: 30_000,
     gcTime: 30 * 60_000,
   });

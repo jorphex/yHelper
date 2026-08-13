@@ -101,11 +101,13 @@ function ExplorePageContent() {
     sort,
     dir: direction,
     chain: query.chain,
+    enabled: query.tab === "vaults",
   });
   const { data: composition, isLoading: compositionLoading } = useCompositionData({
     universe: query.universe,
     market: query.market,
     minTvl: query.minTvl,
+    enabled: query.tab === "structure",
   });
   if (error && !data) return <DataLoadError onRetry={() => refetch()} />;
 

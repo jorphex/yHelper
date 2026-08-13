@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { apiUrl } from "../lib/api";
+import { useOverviewPulseData, type HomePulse } from "../hooks/use-home-data";
 
 const navItems = [
   { href: "/", label: "Overview" },
@@ -15,24 +15,6 @@ const navItems = [
 const externalLinks = [
   { href: "https://powerglove.yearn.fi", label: "Powerglove" },
 ];
-
-type YieldPulse = {
-  trend: "improving" | "softening" | "steady";
-  data_state: "ready" | "limited" | "delayed";
-  latest_7d_apy: number;
-  change_7d: number;
-  directional_tvl_ratio: number | null;
-  coverage_ratio: number | null;
-  fresh_tvl_ratio: number | null;
-  freshness_window_hours: number;
-  eligible_vaults: number;
-  comparable_vaults: number;
-  latest_data_at: string | null;
-};
-
-type OverviewPulseResponse = {
-  pulse?: YieldPulse | null;
-};
 
 function formatPulsePercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
@@ -55,7 +37,7 @@ function formatUpdatedAt(value: string | null): string | null {
   return `Updated ${ageDays}d ago`;
 }
 
-function pulseHeadline(pulse: YieldPulse): string {
+function pulseHeadline(pulse: HomePulse): string {
   if (pulse.data_state === "limited") return "7d comparison is limited";
   if (pulse.data_state === "delayed") return "7d yield data is delayed";
   if (pulse.trend === "improving") return "7d realized yield strengthened";
@@ -63,7 +45,7 @@ function pulseHeadline(pulse: YieldPulse): string {
   return "7d realized yield was steady";
 }
 
-function pulseBreadth(pulse: YieldPulse): string {
+function pulseBreadth(pulse: HomePulse): string {
   if (pulse.data_state === "limited") {
     const coverage = pulse.coverage_ratio === null ? "An unknown share" : `${Math.round(pulse.coverage_ratio * 100)}%`;
     return `${coverage} of core TVL has comparable windows.`;
@@ -111,7 +93,8 @@ function MenuIcon({ open }: { open: boolean }) {
 export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const [pulse, setPulse] = useState<YieldPulse | null>(null);
+  const { data: pulseData } = useOverviewPulseData();
+  const pulse = pulseData?.pulse ?? null;
   const sidebarRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const pulseUpdatedAt = pulse ? formatUpdatedAt(pulse.latest_data_at) : null;
@@ -119,26 +102,6 @@ export function Sidebar() {
   useEffect(() => {
     setIsOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchOverviewPulse() {
-      try {
-        const res = await fetch(apiUrl("/overview-pulse"), { cache: "no-store" });
-        if (!res.ok) {
-          return;
-        }
-        const data: OverviewPulseResponse = await res.json();
-        if (!cancelled) {
-          setPulse(data.pulse || null);
-        }
-      } catch {
-        // Silently fail - box will be hidden
-      }
-    }
-    fetchOverviewPulse();
-    return () => { cancelled = true; };
-  }, []);
 
   // Focus trap for mobile sidebar
   useEffect(() => {

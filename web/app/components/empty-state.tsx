@@ -83,25 +83,3 @@ export function NoVaultsEmptyState({ onReset }: { onReset?: () => void }) {
     />
   );
 }
-
-export function NoChangesEmptyState() {
-  return (
-    <EmptyState
-      title="No changes detected"
-      description="No material realized APY changes were found for this window. Try a longer window."
-      icon="chart"
-    />
-  );
-}
-
-export function NoAssetsEmptyState({ onReset }: { onReset?: () => void }) {
-  return (
-    <EmptyState
-      title="No assets match this view"
-      description="Try another vault set."
-      actionLabel={onReset ? "Reset filters" : undefined}
-      onAction={onReset}
-      icon="data"
-    />
-  );
-}

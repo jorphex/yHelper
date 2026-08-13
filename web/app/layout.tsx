@@ -79,11 +79,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Skip to main content
         </a>
         
-        <div className="app-shell">
-          <Sidebar />
-          
-          <main id="main-content" className="main-content" tabIndex={-1}>
-            <Providers>
+        <Providers>
+          <div className="app-shell">
+            <Sidebar />
+
+            <main id="main-content" className="main-content" tabIndex={-1}>
               <div className="content-area">
                 <Suspense fallback={null}>
                   <PageTransition>
@@ -92,9 +92,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </Suspense>
               </div>
               <Footer />
-            </Providers>
-          </main>
-        </div>
+            </main>
+          </div>
+        </Providers>
       </body>
     </html>
   );

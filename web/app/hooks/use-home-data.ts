@@ -27,7 +27,7 @@ export type HomePulse = {
   latest_data_at: string | null;
 };
 
-type PulseResponse = { pulse?: HomePulse | null };
+export type PulseResponse = { pulse?: HomePulse | null };
 
 export type HomeMover = {
   vault_address?: string | null;
@@ -84,31 +84,42 @@ type StyfiResponse = {
 
 type HomeData = {
   overview: OverviewResponse | null;
-  pulse: PulseResponse | null;
   changes: ChangesResponse | null;
   reports: ReportsResponse | null;
   styfi: StyfiResponse | null;
 };
 
 export async function fetchHomeData(): Promise<HomeData> {
-  const [overviewRes, pulseRes, changesRes, reportsRes, styfiRes] = await Promise.allSettled([
+  const [overviewRes, changesRes, reportsRes, styfiRes] = await Promise.allSettled([
     fetch(apiUrl("/meta/protocol-context"), { cache: "no-store" }),
-    fetch(apiUrl("/overview-pulse"), { cache: "no-store" }),
     fetch(apiUrl("/changes", { window: "7d", universe: "core", limit: 3 }), { cache: "no-store" }),
     fetch(apiUrl("/reports", { days: 7, limit: 1, meaningful_only: true }), { cache: "no-store" }),
-    fetch(apiUrl("/styfi", { days: 30, epoch_limit: 3 }), { cache: "no-store" }),
+    fetch(apiUrl("/styfi", { days: 30, epoch_limit: 3, include_history: false }), { cache: "no-store" }),
   ]);
   const overview = overviewRes.status === "fulfilled" && overviewRes.value.ok
     ? await overviewRes.value.json() as OverviewResponse : null;
-  const pulse = pulseRes.status === "fulfilled" && pulseRes.value.ok
-    ? await pulseRes.value.json() as PulseResponse : null;
   const changes = changesRes.status === "fulfilled" && changesRes.value.ok
     ? await changesRes.value.json() as ChangesResponse : null;
   const reports = reportsRes.status === "fulfilled" && reportsRes.value.ok
     ? await reportsRes.value.json() as ReportsResponse : null;
   const styfi = styfiRes.status === "fulfilled" && styfiRes.value.ok
     ? await styfiRes.value.json() as StyfiResponse : null;
-  return { overview, pulse, changes, reports, styfi };
+  return { overview, changes, reports, styfi };
+}
+
+export async function fetchOverviewPulseData(): Promise<PulseResponse> {
+  const response = await fetch(apiUrl("/overview-pulse"), { cache: "no-store" });
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  return response.json() as Promise<PulseResponse>;
+}
+
+export function useOverviewPulseData() {
+  return useQuery({
+    queryKey: ["overview-pulse"],
+    queryFn: fetchOverviewPulseData,
+    refetchInterval: HOME_REFRESH_MS,
+    staleTime: 30_000,
+  });
 }
 
 export function useHomeData() {
