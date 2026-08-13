@@ -72,12 +72,17 @@ HARVEST_WSS_REPLAY_BLOCKS = int(os.getenv("HARVEST_WSS_REPLAY_BLOCKS", "128"))
 HARVEST_WSS_HEARTBEAT_SEC = int(os.getenv("HARVEST_WSS_HEARTBEAT_SEC", "30"))
 HARVEST_WSS_CONNECT_TIMEOUT_SEC = int(os.getenv("HARVEST_WSS_CONNECT_TIMEOUT_SEC", "20"))
 HARVEST_WSS_SUBSCRIPTION_CHUNK = int(os.getenv("HARVEST_WSS_SUBSCRIPTION_CHUNK", "100"))
+YLOCKER_SYNC_ENABLED = os.getenv("YLOCKER_SYNC_ENABLED", "1") == "1"
+YLOCKER_BACKFILL_DAYS = int(os.getenv("YLOCKER_BACKFILL_DAYS", "180"))
+YLOCKER_BLOCK_SPAN = int(os.getenv("YLOCKER_BLOCK_SPAN", "50000"))
+YLOCKER_REPLAY_BLOCKS = int(os.getenv("YLOCKER_REPLAY_BLOCKS", "128"))
 JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
 JOB_PROTOCOL_TVL = "protocol_tvl_snapshot"
 JOB_STYFI = "styfi_snapshot"
 JOB_PRODUCT_ACTIVITY = "product_activity"
 JOB_VAULT_HARVESTS = "vault_harvests"
+JOB_YLOCKER_REWARDS = "ylocker_rewards"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "21600"))
 ALERT_NOTIFY_ON_RECOVERY = os.getenv("ALERT_NOTIFY_ON_RECOVERY", "1") == "1"
@@ -226,6 +231,7 @@ EVENT_TOPIC_STRATEGY_REPORTED_V2 = (
 EVENT_TOPIC_STRATEGY_REPORTED_V3 = (
     f"0x{keccak(text='StrategyReported(address,uint256,uint256,uint256,uint256,uint256,uint256)').hex()}"
 )
+EVENT_TOPIC_REWARD_DEPOSITED = f"0x{keccak(text='RewardDeposited(uint256,address,uint256)').hex()}"
 PRODUCT_ACTIVITY_TOPICS = {
     EVENT_TOPIC_DEPOSIT: "deposit",
     EVENT_TOPIC_WITHDRAW: "withdraw",
@@ -253,6 +259,27 @@ STYFI_INTERNAL_ACTIVITY_ACCOUNTS = {
     STYFI_CONTRACTS["reward_distributor"],
     STYFI_CONTRACTS["veyfi_reward_distributor"],
     STYFI_CONTRACTS["liquid_locker_reward_distributor"],
+}
+
+YLOCKER_CHAIN_ID = 1
+YLOCKER_REWARD_TOKEN = {
+    "address": "0xbf319ddc2edc1eb6fdf9910e39b37be221c8805f",
+    "symbol": "yvcrvUSD-2",
+    "decimals": 18,
+    "asset_symbol": "crvUSD",
+    "asset_decimals": 18,
+}
+YLOCKER_PRODUCTS = {
+    "ycrv": {
+        "label": "yCRV",
+        "distributor": "0xb226c52eb411326cdb54824a88abafdaaff16d3d",
+        "official_depositors": {"0x642a16a7885d7a8b9353e2a4b68834f31389dc2c"},
+    },
+    "yyb": {
+        "label": "yYB",
+        "distributor": "0x1d02f6a86ed5650f93e40fcd62fa5727c32ad746",
+        "official_depositors": {"0x4444aaaacdba5580282365e25b16309bd770ce4a"},
+    },
 }
 
 KONG_PPS_QUERY = """
@@ -494,6 +521,42 @@ CREATE INDEX IF NOT EXISTS idx_vault_harvests_vault
 CREATE INDEX IF NOT EXISTS idx_vault_harvests_strategy
     ON vault_harvests(strategy_address, block_time DESC);
 
+CREATE TABLE IF NOT EXISTS ylocker_reward_events (
+    chain_id INTEGER NOT NULL,
+    product TEXT NOT NULL,
+    distributor_address TEXT NOT NULL,
+    block_number BIGINT NOT NULL,
+    block_hash TEXT NOT NULL,
+    block_time TIMESTAMPTZ NOT NULL,
+    tx_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    native_week BIGINT NOT NULL,
+    cycle_start TIMESTAMPTZ NOT NULL,
+    cycle_end TIMESTAMPTZ NOT NULL,
+    depositor_address TEXT NOT NULL,
+    is_official BOOLEAN NOT NULL,
+    reward_shares_raw NUMERIC(78, 0) NOT NULL,
+    pps_raw NUMERIC(78, 0) NOT NULL,
+    reward_assets_raw NUMERIC(78, 0) NOT NULL,
+    raw_event JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (chain_id, tx_hash, log_index)
+);
+CREATE INDEX IF NOT EXISTS idx_ylocker_reward_events_cycle
+    ON ylocker_reward_events(product, native_week DESC, block_time DESC);
+CREATE INDEX IF NOT EXISTS idx_ylocker_reward_events_time
+    ON ylocker_reward_events(block_time DESC, product);
+
+CREATE TABLE IF NOT EXISTS ylocker_reward_sync_state (
+    product TEXT PRIMARY KEY,
+    chain_id INTEGER NOT NULL,
+    distributor_address TEXT NOT NULL,
+    cursor BIGINT,
+    observed_at TIMESTAMPTZ,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 """
 
 
@@ -505,6 +568,8 @@ def _validate_data_policy_config() -> None:
         )
     if STYFI_SYNC_ENABLED and not ETH_RPC_URL:
         raise ValueError("Invalid stYFI config: ETH_RPC_URL is required when STYFI_SYNC_ENABLED=1")
+    if YLOCKER_SYNC_ENABLED and not ETH_RPC_URL:
+        raise ValueError("Invalid yLocker config: ETH_RPC_URL is required when YLOCKER_SYNC_ENABLED=1")
     if STYFI_CHAIN_ID <= 0:
         raise ValueError(f"Invalid stYFI config: STYFI_CHAIN_ID must be > 0 (got {STYFI_CHAIN_ID})")
     if STYFI_RETENTION_DAYS < 0:
@@ -536,6 +601,18 @@ def _validate_data_policy_config() -> None:
         raise ValueError(
             "Invalid DAU backfill: PRODUCT_ACTIVITY_BACKFILL_DAYS must be > 0 "
             f"(got {PRODUCT_ACTIVITY_BACKFILL_DAYS})"
+        )
+    if YLOCKER_BACKFILL_DAYS <= 0:
+        raise ValueError(
+            "Invalid yLocker backfill: YLOCKER_BACKFILL_DAYS must be > 0 "
+            f"(got {YLOCKER_BACKFILL_DAYS})"
+        )
+    if YLOCKER_BLOCK_SPAN <= 0:
+        raise ValueError(f"Invalid yLocker block span: YLOCKER_BLOCK_SPAN must be > 0 (got {YLOCKER_BLOCK_SPAN})")
+    if YLOCKER_REPLAY_BLOCKS < 0:
+        raise ValueError(
+            "Invalid yLocker replay depth: YLOCKER_REPLAY_BLOCKS must be >= 0 "
+            f"(got {YLOCKER_REPLAY_BLOCKS})"
         )
     if PRODUCT_ACTIVITY_BLOCK_SPAN <= 0:
         raise ValueError(

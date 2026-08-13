@@ -10,6 +10,7 @@ from .config import (
     HARVEST_WSS_ENABLED,
     KONG_REST_VAULTS_URL,
     STYFI_SYNC_ENABLED,
+    YLOCKER_SYNC_ENABLED,
     _validate_data_policy_config,
     configure_logging,
 )
@@ -20,6 +21,7 @@ from .kong import _maybe_cleanup_old_data, _run_kong_ingestion, _run_kong_snapsh
 from .notifications import _evaluate_alerts, _retry_failed_discord_notifications
 from .product_activity import _backfill_styfi_activity_amounts, _run_product_activity
 from .styfi import _run_styfi_snapshot
+from .ylockers import _run_ylocker_rewards
 
 HARVEST_WSS_MANAGER: HarvestWssManager | None = None
 
@@ -48,6 +50,10 @@ def run_once() -> None:
         if HARVEST_WSS_MANAGER is not None:
             HARVEST_WSS_MANAGER.refresh(_select_harvest_contracts(conn))
         _run_vault_harvests(conn)
+        if YLOCKER_SYNC_ENABLED:
+            _run_ylocker_rewards(conn)
+        else:
+            logging.info("Skipping yLocker reward sync because YLOCKER_SYNC_ENABLED=0")
         _retry_failed_discord_notifications(conn)
         _evaluate_alerts(conn)
         _maybe_cleanup_old_data(conn)

@@ -375,6 +375,32 @@ def _eth_call_uint(address: str, signature: str, *args: tuple[str, str] | tuple[
     return _eth_decode_uint256(_eth_call(address, signature, encoded))
 
 
+def _eth_call_uint_for_chain(
+    chain_id: int,
+    address: str,
+    signature: str,
+    *args: tuple[str, str] | tuple[str, int],
+    block_number: int | None = None,
+) -> int:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    encoded = ""
+    for arg_type, value in args:
+        if arg_type == "address":
+            encoded += _eth_encode_address(str(value))
+        elif arg_type == "uint256":
+            encoded += _eth_encode_uint256(int(value))
+        else:
+            raise ValueError(f"Unsupported abi arg type: {arg_type}")
+    data = f"0x{_eth_selector(signature)}{encoded}"
+    block_tag = hex(block_number) if block_number is not None else "latest"
+    result = _eth_rpc_to_url(rpc_url, "eth_call", [{"to": address, "data": data}, block_tag])
+    if not isinstance(result, str) or not result.startswith("0x"):
+        raise ValueError(f"Unexpected eth_call result for {signature} on chain {chain_id}: {result!r}")
+    return _eth_decode_uint256(result)
+
+
 def _eth_call_address(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> str:
     encoded = ""
     for arg_type, value in args:
@@ -437,6 +463,16 @@ def _eth_block_number_for_chain(chain_id: int) -> int:
     if not isinstance(block_number, str):
         raise ValueError(f"Unexpected eth_blockNumber result for chain {chain_id}: {block_number!r}")
     return int(block_number, 16)
+
+
+def _eth_finalized_block_for_chain(chain_id: int) -> dict[str, object]:
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if not rpc_url:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    payload = _eth_rpc_to_url(rpc_url, "eth_getBlockByNumber", ["finalized", False])
+    if not isinstance(payload, dict):
+        raise ValueError(f"Unexpected finalized block result for chain {chain_id}: {payload!r}")
+    return payload
 
 
 def _eth_get_block_for_chain(chain_id: int, block_number: int) -> dict[str, object]:
