@@ -43,7 +43,7 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|opengraph-image|twitter-image).*)",
+        source: "/((?!api|og|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|opengraph-image|twitter-image).*)",
         headers: [
           {
             key: "Cache-Control",
