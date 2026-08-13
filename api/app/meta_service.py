@@ -103,12 +103,18 @@ def _freshness_snapshot(
         result["pps_stale_ratio"] = (pps_vaults_stale / pps_vaults_total) if pps_vaults_total > 0 else None
 
         cur.execute(
-            """
+            f"""
             SELECT
                 COUNT(*) AS metrics_rows,
-                MAX(last_point_time) AS metrics_newest_point_at
-            FROM vault_metrics_latest
-            """
+                MAX(m.last_point_time) AS metrics_newest_point_at
+            FROM vault_metrics_latest m
+            JOIN vault_dim d
+              ON d.chain_id = m.chain_id
+             AND d.vault_address = m.vault_address
+             AND {_user_visible_filter_sql("d", include_retired=False)}
+             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
+            """,
+            {"min_tvl_usd": min_tvl_usd},
         )
         row = cur.fetchone() or {}
         metrics_newest = row.get("metrics_newest_point_at")

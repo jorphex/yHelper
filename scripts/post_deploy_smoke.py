@@ -45,14 +45,14 @@ def check_with_retries(url: str, timeout: float, retries: int, retry_delay: floa
 def run_checks(base_url: str, timeout: float, retries: int, retry_delay: float, allow_status: set[int]) -> int:
     routes = ["/", "/markets", "/reports", "/styfi", "/explore", "/momentum", "/harvests", "/structure"]
     apis = [
+        "/health",
+        "/api/overview-pulse",
         "/api/meta/status",
         "/api/meta/freshness?threshold=24h",
         "/api/meta/coverage?min_tvl_usd=100000&min_points=30&split_limit=8",
         "/api/meta/protocol-context",
         "/api/styfi",
         "/api/discover?limit=1",
-        "/api/trends/daily?days=30",
-        "/api/assets?limit=5",
         "/api/assets/USDC/vaults?limit=5",
         "/api/composition?top_n=6",
         "/api/changes?window=7d&limit=5",

@@ -64,7 +64,7 @@ The web app consumes the API under `/api`. The key endpoints are:
 
 - `GET /health`
 - `GET /api/overview-pulse`
-- `GET /api/changes`, `GET /api/discover`, `GET /api/composition`, and `GET /api/trends/daily`
+- `GET /api/changes`, `GET /api/discover`, and `GET /api/composition`
 - `GET /api/reports` and `GET /api/styfi`
 - `GET /api/meta/status`, `GET /api/meta/freshness`, `GET /api/meta/coverage`, and `GET /api/meta/protocol-context`
 

@@ -10,11 +10,12 @@ from app.accounting_service import _protocol_context_snapshot
 from app.config import DATABASE_URL, DEFAULT_MIN_POINTS, DEFAULT_MIN_TVL_USD, WORKER_INTERVAL_SEC
 from app.meta_service import _coverage_snapshot, _freshness_snapshot, _tracked_scope_snapshot
 from app.product_service import _overview_pulse_response
+from app.models import OperationalStatusResponse, OverviewPulseResponse
 
 router = APIRouter()
 
 
-@router.get("/api/overview-pulse")
+@router.get("/api/overview-pulse", response_model=OverviewPulseResponse)
 def overview_pulse() -> dict[str, object]:
     return _overview_pulse_response()
 
@@ -47,6 +48,6 @@ def _operational_status() -> dict[str, object]:
     }
 
 
-@router.get("/api/meta/status")
+@router.get("/api/meta/status", response_model=OperationalStatusResponse)
 def operational_status() -> dict[str, object]:
     return _operational_status()

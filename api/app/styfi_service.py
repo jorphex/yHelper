@@ -270,7 +270,7 @@ def _styfi_current_reward_state(cur: psycopg.Cursor) -> dict[str, object] | None
 def _styfi_snapshot_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, object]]:
     cur.execute(
         """
-        SELECT
+        SELECT DISTINCT ON ((observed_at AT TIME ZONE 'UTC')::date)
             observed_at,
             reward_epoch,
             (styfi_total_assets_raw::numeric / %(scale)s)::double precision AS styfi_staked,
@@ -299,7 +299,7 @@ def _styfi_snapshot_series(cur: psycopg.Cursor, *, days: int) -> list[dict[str, 
         FROM styfi_snapshots
         WHERE chain_id = %(chain_id)s
           AND observed_at >= NOW() - (%(days)s * INTERVAL '1 day')
-        ORDER BY observed_at
+        ORDER BY (observed_at AT TIME ZONE 'UTC')::date, observed_at DESC
         """,
         {"chain_id": STYFI_CHAIN_ID, "days": days, "scale": STYFI_TOKEN_SCALE},
     )

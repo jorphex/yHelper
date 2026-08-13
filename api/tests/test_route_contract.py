@@ -16,7 +16,6 @@ class RouteContractTests(unittest.TestCase):
                 "/api/discover",
                 "/api/composition",
                 "/api/changes",
-                "/api/trends/daily",
             }.issubset(paths)
         )
 
@@ -35,21 +34,33 @@ class RouteContractTests(unittest.TestCase):
         self.assertNotIn("/api/harvests", paths)
         self.assertNotIn("/api/meta/social-preview", paths)
         self.assertNotIn("/api/assets/{token_symbol:path}/venues", paths)
+        self.assertNotIn("/api/assets", paths)
+        self.assertNotIn("/api/trends/daily", paths)
 
     def test_canonical_product_routes_publish_typed_responses(self) -> None:
         schema = app.openapi()
         expected_models = {
+            "/health": "HealthResponse",
+            "/api/overview-pulse": "OverviewPulseResponse",
+            "/api/meta/freshness": "FreshnessResponse",
+            "/api/meta/coverage": "CoverageResponse",
+            "/api/meta/protocol-context": "ProtocolContextResponse",
+            "/api/meta/status": "OperationalStatusResponse",
             "/api/discover": "DiscoverResponse",
             "/api/composition": "CompositionResponse",
             "/api/changes": "ChangesResponse",
-            "/api/trends/daily": "TrendsResponse",
-            "/api/assets": "AssetsResponse",
             "/api/assets/{token_symbol}/vaults": "AssetVaultsResponse",
             "/api/reports": "ReportsResponse",
+            "/api/styfi": "StyfiResponse",
         }
         for path, model_name in expected_models.items():
             response_schema = schema["paths"][path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
             self.assertEqual(response_schema["$ref"], f"#/components/schemas/{model_name}")
+
+    def test_asset_vault_compatibility_route_is_deprecated(self) -> None:
+        operation = app.openapi()["paths"]["/api/assets/{token_symbol}/vaults"]["get"]
+        self.assertTrue(operation["deprecated"])
+        self.assertIn("/api/discover?token_symbol=", operation["description"])
 
 
 if __name__ == "__main__":

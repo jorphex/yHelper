@@ -11,7 +11,6 @@ from app.config import _ensure_schema_columns, cors_origins
 from app.explore_routes import router as explore_router
 from app.meta_routes import router as meta_router
 from app.overview_routes import router as overview_router
-from app.trends_routes import router as trends_router
 
 
 @asynccontextmanager
@@ -32,5 +31,4 @@ app.include_router(meta_router)
 app.include_router(overview_router)
 app.include_router(activity_router)
 app.include_router(explore_router)
-app.include_router(trends_router)
 app.include_router(assets_router)

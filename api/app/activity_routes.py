@@ -13,7 +13,7 @@ from app.config import (
     STYFI_RETENTION_DAYS,
     STYFI_SNAPSHOT_RETENTION_DAYS,
 )
-from app.models import ReportsResponse
+from app.models import ReportsResponse, StyfiResponse
 from app.product_service import (
     _recent_reports,
     _report_chain_facets,
@@ -80,10 +80,19 @@ def reports(
     return _reports_response(days, chain_id, vault_address, limit, meaningful_only)
 
 
-@router.get("/api/styfi")
+@router.get(
+    "/api/styfi",
+    response_model=StyfiResponse,
+    summary="Get stYFI participation and reward data",
+    description=(
+        "Returns current stYFI state. History is sampled at the latest observation per UTC day. "
+        "Set include_history=false for summary consumers that do not render charts or activity."
+    ),
+)
 def styfi(
     days: int = Query(default=30, ge=7, le=STYFI_RETENTION_DAYS if STYFI_RETENTION_DAYS > 0 else 365),
     epoch_limit: int = Query(default=STYFI_EPOCH_LOOKBACK, ge=3, le=max(STYFI_EPOCH_LOOKBACK, 24)),
+    include_history: bool = Query(default=True),
 ) -> dict[str, object]:
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
@@ -91,15 +100,19 @@ def styfi(
             reward_scale = float(10 ** int(reward_token.get("decimals") or 0))
             current_reward_state = _styfi_current_reward_state(cur)
             summary = _styfi_summary_snapshot(cur)
-            series = _styfi_snapshot_series(cur, days=days)
-            epochs = _styfi_epoch_series(cur, epoch_limit=epoch_limit, reward_scale=reward_scale)
-            component_split = _styfi_latest_component_split(
-                cur,
-                current_epoch=summary.get("reward_epoch"),
-                reward_scale=reward_scale,
+            series = _styfi_snapshot_series(cur, days=days) if include_history else []
+            epochs = _styfi_epoch_series(cur, epoch_limit=epoch_limit, reward_scale=reward_scale) if include_history else []
+            component_split = (
+                _styfi_latest_component_split(
+                    cur,
+                    current_epoch=summary.get("reward_epoch"),
+                    reward_scale=reward_scale,
+                )
+                if include_history
+                else {"epoch": None, "rows": []}
             )
             last_run = _styfi_last_run(cur)
-            recent_activity = _styfi_recent_activity(cur)
+            recent_activity = _styfi_recent_activity(cur) if include_history else []
 
     latest_snapshot_at = summary.get("latest_snapshot_at")
     latest_snapshot_dt = datetime.fromisoformat(latest_snapshot_at) if isinstance(latest_snapshot_at, str) else None
@@ -113,6 +126,7 @@ def styfi(
             "days": days,
             "epoch_limit": epoch_limit,
             "chain_id": STYFI_CHAIN_ID,
+            "include_history": include_history,
         },
         "summary": summary,
         "reward_token": reward_token,

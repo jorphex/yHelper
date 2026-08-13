@@ -5,7 +5,9 @@ import unittest
 from app.analytics_service import _fetch_change_movers
 from app.common import _market_filter_sql, _market_group_sql, _user_visible_filter_sql
 from app.models import ChangesResponse
+from app.meta_service import _freshness_snapshot
 from app.product_service import _recent_reports
+from app.styfi_service import _styfi_snapshot_series
 
 
 class RecordingCursor:
@@ -20,6 +22,20 @@ class RecordingCursor:
 
     def fetchone(self) -> dict:
         return {}
+
+    def __enter__(self) -> RecordingCursor:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+
+class RecordingConnection:
+    def __init__(self) -> None:
+        self.cursor_instance = RecordingCursor()
+
+    def cursor(self, **_: object) -> RecordingCursor:
+        return self.cursor_instance
 
 
 class ProductSemanticsTests(unittest.TestCase):
@@ -101,6 +117,36 @@ class ProductSemanticsTests(unittest.TestCase):
         self.assertEqual(ChangesResponse.model_validate(payload).window.name, "7d")
         with self.assertRaises(ValueError):
             ChangesResponse.model_validate({**payload, "undocumented": True})
+
+    def test_styfi_history_selects_one_latest_snapshot_per_utc_day(self) -> None:
+        cursor = RecordingCursor()
+
+        rows = _styfi_snapshot_series(cursor, days=30)  # type: ignore[arg-type]
+
+        self.assertEqual(rows, [])
+        sql, params = cursor.calls[0]
+        self.assertIn("DISTINCT ON ((observed_at AT TIME ZONE 'UTC')::date)", sql)
+        self.assertIn("observed_at DESC", sql)
+        self.assertEqual(params["days"], 30)
+
+    def test_freshness_metrics_use_the_visible_vault_scope(self) -> None:
+        connection = RecordingConnection()
+
+        _freshness_snapshot(  # type: ignore[arg-type]
+            connection,
+            stale_threshold_seconds=86_400,
+            min_tvl_usd=100_000,
+        )
+
+        metrics_sql, metrics_params = next(
+            call for call in connection.cursor_instance.calls if "metrics_rows" in call[0]
+        )
+        self.assertIn("JOIN vault_dim d", metrics_sql)
+        self.assertIn("d.catalog_is_yearn = TRUE", metrics_sql)
+        self.assertIn("d.is_hidden = FALSE", metrics_sql)
+        self.assertIn("d.is_retired = FALSE", metrics_sql)
+        self.assertIn("COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s", metrics_sql)
+        self.assertEqual(metrics_params["min_tvl_usd"], 100_000)
 
 
 if __name__ == "__main__":
