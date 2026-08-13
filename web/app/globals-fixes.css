@@ -572,59 +572,6 @@ table tbody a:focus-visible {
 .table-filter-action:hover,
 .table-filter-action:focus-visible { color: var(--yearn-link-hover) !important; }
 
-/* Reports is a ledger: data leads, links reveal themselves on intent. */
-.reports-table .report-link,
-.reports-table .report-link:visited {
-  text-decoration: none !important;
-  transition: color var(--duration-fast) var(--ease-out) !important;
-}
-
-.reports-table .report-link-utility,
-.reports-table .report-link-utility:visited {
-  color: var(--text-tertiary) !important;
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.reports-table .report-link-utility:hover,
-.reports-table .report-link-utility:focus-visible { color: var(--text-primary) !important; }
-
-.reports-table .report-link-vault,
-.reports-table .report-link-vault:visited {
-  color: var(--text-primary) !important;
-  font-weight: 600;
-}
-
-.reports-table .report-link-strategy,
-.reports-table .report-link-strategy:visited { color: var(--text-secondary) !important; }
-
-.reports-table .report-link-address { font-family: var(--font-data); }
-
-.reports-table .report-link-entity:hover,
-.reports-table .report-link-entity:focus-visible { color: var(--yearn-link) !important; }
-
-.reports-table .report-link::after { opacity: .48 !important; }
-.reports-table .report-link:hover::after,
-.reports-table .report-link:focus-visible::after { opacity: 1 !important; }
-
-.reports-table .report-filter-action,
-.reports-table .report-filter-action:visited {
-  color: var(--text-secondary) !important;
-  text-decoration-color: rgba(160, 160, 160, .55) !important;
-}
-
-.reports-table .report-filter-action:hover,
-.reports-table .report-filter-action:focus-visible {
-  color: var(--text-primary) !important;
-  text-decoration-color: currentColor !important;
-}
-
-.reports-table .report-result {
-  font-family: var(--font-data);
-  font-weight: 700;
-}
-
 .table-wrap tbody a[target="_blank"] > svg,
 table tbody a[target="_blank"] > svg { display: none !important; }
 

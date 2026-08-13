@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Reports",
-  description: "Verify recent Yearn vault strategy accounting reports.",
+  description: "Recent Yearn vault reports, plus yCRV and yYB reward history.",
 };
 
 export default function ReportsLayout({ children }: { children: ReactNode }) {

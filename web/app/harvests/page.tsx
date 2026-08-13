@@ -1,11 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DataLoadError } from "../components/error-state";
 import { EmptyState } from "../components/empty-state";
 import { TableSkeleton } from "../components/skeleton";
 import { TableWrap } from "../components/table-wrap";
+import { LockerRewards } from "../components/ylocker-rewards";
 import { useReportData } from "../hooks/use-report-data";
 import {
   chainLabel,
@@ -95,7 +97,7 @@ function signedResult(
   }
 }
 
-function ReportsPageContent() {
+function VaultReportsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -138,16 +140,6 @@ function ReportsPageContent() {
 
   return (
     <>
-      <header className="page-header">
-        <div>
-          <h1 className="page-title">Vault reports</h1>
-          <p className="page-description">
-            Strategy accounting updates from Yearn vaults. By default, this shows reports with a gain, loss, fee,
-            or refund; choose all updates for the full ledger trail.
-          </p>
-        </div>
-      </header>
-
       <section className="section section-md" aria-label="Report filters">
         <div className="card"><div className="filter-grid">
         <label>
@@ -186,7 +178,7 @@ function ReportsPageContent() {
         {query.vaultAddress ? <p className="section-note active-filter-note">Showing one vault: <span className="data-value">{data?.recent?.[0]?.vault_symbol || shortAddress(query.vaultAddress)}</span> <button className="button-reset table-filter-action" onClick={() => updateQuery({ vault_address: null })}>Clear vault filter</button></p> : null}
       </section>
 
-      {isLoading && !data ? <p className="section section-md muted">Loading report scope…</p> : (
+      {isLoading && !data ? <p className="section section-md muted">Loading reports…</p> : (
         <section className="section section-md"><p className="section-note">
           Last 24 hours: <strong>{data?.trailing_24h?.report_count ?? 0}</strong> reports from{" "}
           <strong>{data?.trailing_24h?.vault_count ?? 0}</strong> vaults and{" "}
@@ -203,7 +195,7 @@ function ReportsPageContent() {
           </div>
         </div>
         {!isLoading && (data?.recent?.length ?? 0) === 0 ? (
-          <EmptyState title="No matching reports" description="Try another chain or vault, or include all accounting updates." />
+          <EmptyState title="No matching reports" description="Try another chain or vault, or show all accounting updates." />
         ) : (
           <TableWrap className="reports-table-wrap">
             <table className="reports-table">
@@ -246,6 +238,28 @@ function ReportsPageContent() {
   );
 }
 
+function ReportsPageContent() {
+  const searchParams = useSearchParams();
+  const view = searchParams.get("view") === "lockers" ? "lockers" : "vaults";
+  return (
+    <>
+      <header className="page-header reports-page-header">
+        <div>
+          <h1 className="page-title">Reports<br /><em className="page-title-accent">{view === "lockers" ? "Locker rewards" : "Vault reports"}</em></h1>
+          <p className="page-description">{view === "lockers"
+            ? "Weekly yCRV and yYB rewards."
+            : "A clear view of recent vault activity."}</p>
+        </div>
+        <nav className="reports-view-nav" aria-label="Reports">
+          <Link href="/reports?view=vaults" className={`reports-view-link ${view === "vaults" ? "is-active" : ""}`.trim()} aria-current={view === "vaults" ? "page" : undefined}>Vault reports</Link>
+          <Link href="/reports?view=lockers" className={`reports-view-link ${view === "lockers" ? "is-active" : ""}`.trim()} aria-current={view === "lockers" ? "page" : undefined}>Locker rewards</Link>
+        </nav>
+      </header>
+      {view === "lockers" ? <LockerRewards /> : <VaultReportsContent />}
+    </>
+  );
+}
+
 export default function ReportsPage() {
-  return <Suspense fallback={<div className="page-loading">Loading vault reports…</div>}><ReportsPageContent /></Suspense>;
+  return <Suspense fallback={<div className="page-loading">Loading reports…</div>}><ReportsPageContent /></Suspense>;
 }
