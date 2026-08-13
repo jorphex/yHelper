@@ -235,6 +235,124 @@ class ReportsResponse(ApiModel):
     recent: list[ReportRow]
 
 
+class YlockerRewardToken(ApiModel):
+    address: str
+    symbol: str
+    decimals: int
+    asset_symbol: str
+    asset_decimals: int
+
+
+class YlockerReportingWeekPolicy(ApiModel):
+    anchor: Literal["thursday_00_utc"]
+    seconds: int
+
+
+class YlockerScope(ApiModel):
+    chain_id: Literal[1]
+    products: list[Literal["ycrv", "yyb"]]
+    official_deposits_only: Literal[True] = Field(description="Tracks deposits from Yearn's designated distributors.")
+    reward_token: YlockerRewardToken
+    reporting_week: YlockerReportingWeekPolicy
+
+
+class YlockerFilters(ApiModel):
+    product: Literal["all", "ycrv", "yyb"]
+    limit: int
+    include_events: bool
+
+
+class YlockerProductFreshness(ApiModel):
+    product: Literal["ycrv", "yyb"]
+    product_label: str
+    indexed_through_block: int | None
+    indexed_through: str | None = Field(description="Most recent block time in this response.")
+    age_seconds: int | None
+    status: str
+
+
+class YlockerFreshness(ApiModel):
+    status: Literal["fresh", "delayed", "unavailable"]
+    indexed_through: str | None = Field(description="Most recent block time in this response.")
+    age_seconds: int | None
+    stale_after_seconds: int
+    products: list[YlockerProductFreshness]
+
+
+class YlockerCurrentCycle(ApiModel):
+    product: Literal["ycrv", "yyb"]
+    product_label: str
+    native_week: int
+    cycle_start: str
+    cycle_end: str
+    status: Literal["current"] = Field(description="This locker week is in progress.")
+    event_count: int
+    reward_shares_raw: str
+    reward_shares: float
+    value_crvusd_raw: str
+    value_crvusd_at_deposit: float
+
+
+class YlockerRewardEvent(ApiModel):
+    block_number: int
+    block_time: str
+    tx_hash: str
+    log_index: int
+    depositor_address: str
+    reward_shares_raw: str
+    reward_shares: float = Field(description="yvcrvUSD-2 shares added to the locker.")
+    pps_raw: str
+    pps_at_deposit: float
+    value_crvusd_raw: str
+    value_crvusd_at_deposit: float = Field(
+        description="crvUSD value at the time of deposit, using the recorded yvcrvUSD-2 PPS."
+    )
+
+
+class YlockerRewardCycle(ApiModel):
+    product: Literal["ycrv", "yyb"]
+    product_label: str
+    native_week: int
+    cycle_start: str
+    cycle_end: str
+    status: Literal["finalized"] = Field(description="This locker week is complete.")
+    event_count: int = Field(description="Deposits in this locker week.")
+    reward_shares_raw: str
+    reward_shares: float = Field(description="yvcrvUSD-2 shares added to the locker.")
+    value_crvusd_raw: str
+    value_crvusd_at_deposit: float = Field(
+        description="crvUSD value at the time of deposit, using the recorded yvcrvUSD-2 PPS."
+    )
+    events: list[YlockerRewardEvent]
+
+
+class YlockerReportingProduct(ApiModel):
+    product: Literal["ycrv", "yyb"]
+    product_label: str
+    event_count: int
+    value_crvusd_at_deposit: float
+
+
+class YlockerReportingWeek(ApiModel):
+    calendar_week: int = Field(description="Thu-to-Thu presentation group. Each locker keeps its own schedule.")
+    week_start: str
+    week_end: str
+    status: Literal["finalized", "awaiting_product_cycles"]
+    digest_ready_at: str | None
+    ready_for_digest: bool
+    total_crvusd_at_deposit: float
+    products: list[YlockerReportingProduct]
+
+
+class YlockerRewardsResponse(ApiModel):
+    filters: YlockerFilters
+    scope: YlockerScope
+    freshness: YlockerFreshness
+    current_cycles: list[YlockerCurrentCycle]
+    cycles: list[YlockerRewardCycle]
+    reporting_weeks: list[YlockerReportingWeek]
+
+
 class HealthResponse(ApiModel):
     status: Literal["ok"]
 

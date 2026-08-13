@@ -40,7 +40,7 @@ def _freshness_snapshot(
         "ingestion_jobs": {},
         "alerts": {},
     }
-    job_names = ("kong_vault_snapshot", "kong_pps_metrics", "protocol_tvl_snapshot")
+    job_names = ("kong_vault_snapshot", "kong_pps_metrics", "protocol_tvl_snapshot", "ylocker_rewards")
 
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(

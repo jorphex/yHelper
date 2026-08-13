@@ -59,6 +59,17 @@ STYFI_CHAIN_ID = int(os.getenv("STYFI_CHAIN_ID", "1"))
 STYFI_TOKEN_SCALE = float(10**18)
 STYFI_SITE_REWARD_SCALE = float(10**18)
 STYFI_REWARD_TOKEN_DEFAULT = {"address": None, "symbol": "yvUSDC-1", "decimals": 6}
+YLOCKER_PRODUCTS = {
+    "ycrv": {"label": "yCRV", "distributor": "0xb226c52eb411326cdb54824a88abafdaaff16d3d"},
+    "yyb": {"label": "yYB", "distributor": "0x1d02f6a86ed5650f93e40fcd62fa5727c32ad746"},
+}
+YLOCKER_REWARD_TOKEN = {
+    "address": "0xbf319ddc2edc1eb6fdf9910e39b37be221c8805f",
+    "symbol": "yvcrvUSD-2",
+    "decimals": 18,
+    "asset_symbol": "crvUSD",
+    "asset_decimals": 18,
+}
 STYFI_INTERNAL_ACTIVITY_ACCOUNTS = {
     "0x42b25284e8ae427d79da78b65dffc232aaecc016",
     "0x9c42461aa8422926e3aef7b1c6e3743597149d79",
@@ -139,6 +150,40 @@ def _ensure_schema_columns() -> None:
                     tvl_usd NUMERIC(38, 12) NOT NULL CHECK (tvl_usd >= 0),
                     chain_tvls JSONB NOT NULL DEFAULT '{}'::jsonb,
                     PRIMARY KEY (snapshot_id, slug)
+                );
+                CREATE TABLE IF NOT EXISTS ylocker_reward_events (
+                    chain_id INTEGER NOT NULL,
+                    product TEXT NOT NULL,
+                    distributor_address TEXT NOT NULL,
+                    block_number BIGINT NOT NULL,
+                    block_hash TEXT NOT NULL,
+                    block_time TIMESTAMPTZ NOT NULL,
+                    tx_hash TEXT NOT NULL,
+                    log_index INTEGER NOT NULL,
+                    native_week BIGINT NOT NULL,
+                    cycle_start TIMESTAMPTZ NOT NULL,
+                    cycle_end TIMESTAMPTZ NOT NULL,
+                    depositor_address TEXT NOT NULL,
+                    is_official BOOLEAN NOT NULL,
+                    reward_shares_raw NUMERIC(78, 0) NOT NULL,
+                    pps_raw NUMERIC(78, 0) NOT NULL,
+                    reward_assets_raw NUMERIC(78, 0) NOT NULL,
+                    raw_event JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY (chain_id, tx_hash, log_index)
+                );
+                CREATE INDEX IF NOT EXISTS idx_ylocker_reward_events_cycle
+                    ON ylocker_reward_events(product, native_week DESC, block_time DESC);
+                CREATE INDEX IF NOT EXISTS idx_ylocker_reward_events_time
+                    ON ylocker_reward_events(block_time DESC, product);
+                CREATE TABLE IF NOT EXISTS ylocker_reward_sync_state (
+                    product TEXT PRIMARY KEY,
+                    chain_id INTEGER NOT NULL,
+                    distributor_address TEXT NOT NULL,
+                    cursor BIGINT,
+                    observed_at TIMESTAMPTZ,
+                    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
                 """
             )

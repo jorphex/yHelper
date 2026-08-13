@@ -142,7 +142,7 @@ class YlockerServiceTests(unittest.TestCase):
         self.assertTrue(all(row["product"] == "ycrv" for row in filtered["cycles"]))
         self.assertTrue(all(not row["events"] for row in filtered["cycles"]))
 
-    def test_reporting_rollup_is_thursday_based_and_digest_readiness_waits_for_both(self) -> None:
+    def test_reporting_rollup_closes_at_the_thursday_calendar_boundary(self) -> None:
         result = self._response()
         week = next(row for row in result["reporting_weeks"] if row["week_start"] == "2026-08-06T00:00:00+00:00")
         self.assertEqual(week["week_end"], "2026-08-13T00:00:00+00:00")
@@ -151,8 +151,42 @@ class YlockerServiceTests(unittest.TestCase):
             [(row["product"], row["value_crvusd_at_deposit"]) for row in week["products"]],
             [("ycrv", 3.0), ("yyb", 2.0)],
         )
-        self.assertEqual(week["digest_ready_at"], "2026-08-13T11:00:00+00:00")
+        self.assertEqual(week["digest_ready_at"], "2026-08-13T00:00:00+00:00")
+        self.assertEqual(week["status"], "finalized")
         self.assertTrue(week["ready_for_digest"])
+
+    def test_reporting_week_does_not_wait_for_a_later_native_cycle_boundary(self) -> None:
+        late_yyb_start = datetime(2026, 7, 30, 15, tzinfo=UTC)
+        states = [self.states[0], _state("yyb", late_yyb_start)]
+        events = [
+            self.events[0],
+            _event(
+                "yyb",
+                start=late_yyb_start,
+                week=1,
+                block_time=datetime(2026, 8, 6, 15, 30, tzinfo=UTC),
+                shares_raw=10**18,
+                pps_raw=2 * 10**18,
+                block_number=12,
+            ),
+        ]
+
+        result = _build_response(
+            FakeCursor(states, events),
+            product_filter="all",
+            limit=2,
+            include_events=True,
+            now=NOW,
+        )
+
+        week = next(row for row in result["reporting_weeks"] if row["week_start"] == "2026-08-06T00:00:00+00:00")
+        self.assertEqual(week["status"], "finalized")
+        self.assertEqual(week["digest_ready_at"], "2026-08-13T00:00:00+00:00")
+        self.assertTrue(week["ready_for_digest"])
+        self.assertEqual(week["total_crvusd_at_deposit"], 5.0)
+        yyb_current = next(row for row in result["current_cycles"] if row["product"] == "yyb")
+        self.assertEqual(yyb_current["cycle_end"], "2026-08-13T15:00:00+00:00")
+        self.assertEqual(yyb_current["event_count"], 1)
 
     def test_freshness_is_delayed_when_one_product_lags(self) -> None:
         self.states[1]["observed_at"] = NOW - timedelta(seconds=3600)
@@ -160,6 +194,18 @@ class YlockerServiceTests(unittest.TestCase):
         self.assertEqual(result["freshness"]["status"], "delayed")
         self.assertEqual(result["freshness"]["indexed_through"], "2026-08-13T11:00:00+00:00")
         week = next(row for row in result["reporting_weeks"] if row["week_start"] == "2026-08-06T00:00:00+00:00")
+        self.assertEqual(week["status"], "finalized")
+        self.assertFalse(week["ready_for_digest"])
+
+    def test_freshness_and_digest_are_delayed_after_a_sync_failure(self) -> None:
+        self.states[1]["payload"] = {
+            "start_time": int(YYB_START.timestamp()),
+            "status": "failed",
+        }
+        result = self._response()
+        self.assertEqual(result["freshness"]["status"], "delayed")
+        week = next(row for row in result["reporting_weeks"] if row["week_start"] == "2026-08-06T00:00:00+00:00")
+        self.assertEqual(week["status"], "finalized")
         self.assertFalse(week["ready_for_digest"])
 
     def test_response_matches_typed_openapi_model(self) -> None:
