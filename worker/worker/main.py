@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from .accounting import _run_protocol_tvl_ingestion
 from .config import (
+    FLEX_SYNC_ENABLED,
     HARVEST_WSS_ENABLED,
     KONG_REST_VAULTS_URL,
     STYFI_SYNC_ENABLED,
@@ -16,8 +17,13 @@ from .config import (
 )
 from .db_state import _ensure_schema, _mark_boot_orphaned_runs, _mark_stale_running_runs
 from .eth import _connect
+from .flex import _run_flex_sync
 from .harvests import HarvestWssManager, _run_vault_harvests, _select_harvest_contracts
-from .kong import _maybe_cleanup_old_data, _run_kong_ingestion, _run_kong_snapshot_ingestion
+from .kong import (
+    _maybe_cleanup_old_data,
+    _run_kong_ingestion,
+    _run_kong_snapshot_ingestion,
+)
 from .notifications import _evaluate_alerts, _retry_failed_discord_notifications
 from .product_activity import _backfill_styfi_activity_amounts, _run_product_activity
 from .styfi import _run_styfi_snapshot
@@ -54,6 +60,10 @@ def run_once() -> None:
             _run_ylocker_rewards(conn)
         else:
             logging.info("Skipping yLocker reward sync because YLOCKER_SYNC_ENABLED=0")
+        if FLEX_SYNC_ENABLED:
+            _run_flex_sync(conn)
+        else:
+            logging.info("Skipping Flex market sync because FLEX_SYNC_ENABLED=0")
         _retry_failed_discord_notifications(conn)
         _evaluate_alerts(conn)
         _maybe_cleanup_old_data(conn)

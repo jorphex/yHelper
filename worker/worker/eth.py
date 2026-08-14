@@ -11,6 +11,7 @@ from eth_utils import keccak
 from psycopg.types.json import Json
 
 from .config import (
+    CHAIN_LABELS,
     CHAIN_RPC_URLS,
     CHAIN_WSS_URLS,
     DATABASE_URL,
@@ -20,7 +21,6 @@ from .config import (
     ETH_RPC_URL,
     ETH_TX_BATCH_SIZE,
     EXPLORER_BASE_URLS,
-    CHAIN_LABELS,
     KONG_GQL_URL,
 )
 
@@ -307,6 +307,52 @@ def _eth_rpc_to_url(rpc_url: str, method: str, params: list[object]) -> object:
     raise RuntimeError(f"Ethereum RPC call failed without error for method {method}")
 
 
+def _eth_rpc_batch_to_url(
+    rpc_url: str,
+    calls: list[tuple[str, list[object]]],
+) -> list[object]:
+    if not calls:
+        return []
+    payload = [
+        {"jsonrpc": "2.0", "id": index, "method": method, "params": params}
+        for index, (method, params) in enumerate(calls, start=1)
+    ]
+    last_error: Exception | None = None
+    for attempt in range(1, ETH_RPC_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.post(rpc_url, json=payload, timeout=ETH_CALL_TIMEOUT_SEC)
+            if response.status_code >= 500 or response.status_code == 429:
+                response.raise_for_status()
+            if response.status_code >= 400:
+                response.raise_for_status()
+            body = response.json()
+            if not isinstance(body, list):
+                raise TypeError(f"Unexpected Ethereum RPC batch response: {body!r}")
+            rows = {int(row.get("id") or 0): row for row in body if isinstance(row, dict)}
+            results: list[object] = []
+            for index in range(1, len(calls) + 1):
+                row = rows.get(index)
+                if row is None:
+                    raise ValueError(f"Missing Ethereum RPC batch response id={index}")
+                if row.get("error"):
+                    raise ValueError(f"Ethereum RPC batch error id={index}: {row['error']}")
+                results.append(row.get("result"))
+            return results
+        except (requests.RequestException, ValueError) as exc:
+            last_error = exc
+            is_retryable = isinstance(exc, requests.RequestException) and (
+                getattr(exc.response, "status_code", None) in {429}
+                or getattr(exc.response, "status_code", 0) >= 500
+                or exc.response is None
+            )
+            if attempt >= ETH_RPC_MAX_ATTEMPTS or not is_retryable:
+                raise
+            time.sleep(ETH_RPC_RETRY_SLEEP_SEC * attempt)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Ethereum RPC batch failed without error")
+
+
 def _eth_rpc(method: str, params: list[object]) -> object:
     return _eth_rpc_to_url(ETH_RPC_URL, method, params)
 
@@ -349,7 +395,7 @@ def _eth_decode_uint256(result: str) -> int:
 
 
 def _eth_decode_string(result: str) -> str:
-    payload = result[2:] if result.startswith("0x") else result
+    payload = result.removeprefix("0x")
     if len(payload) < 128:
         raise ValueError(f"Unexpected string result length: {result!r}")
     offset = int(payload[:64], 16) * 2

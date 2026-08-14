@@ -76,6 +76,24 @@ YLOCKER_SYNC_ENABLED = os.getenv("YLOCKER_SYNC_ENABLED", "1") == "1"
 YLOCKER_BACKFILL_DAYS = int(os.getenv("YLOCKER_BACKFILL_DAYS", "180"))
 YLOCKER_BLOCK_SPAN = int(os.getenv("YLOCKER_BLOCK_SPAN", "50000"))
 YLOCKER_REPLAY_BLOCKS = int(os.getenv("YLOCKER_REPLAY_BLOCKS", "128"))
+FLEX_SYNC_ENABLED = os.getenv("FLEX_SYNC_ENABLED", "0") == "1"
+FLEX_BACKFILL_DAYS = int(os.getenv("FLEX_BACKFILL_DAYS", "90"))
+FLEX_BLOCK_SPAN = int(os.getenv("FLEX_BLOCK_SPAN", "50000"))
+FLEX_REPLAY_BLOCKS = int(os.getenv("FLEX_REPLAY_BLOCKS", "128"))
+FLEX_SNAPSHOT_INTERVAL_SEC = int(os.getenv("FLEX_SNAPSHOT_INTERVAL_SEC", "3600"))
+FLEX_MAX_SNAPSHOT_HOURS_PER_RUN = int(os.getenv("FLEX_MAX_SNAPSHOT_HOURS_PER_RUN", "48"))
+FLEX_API_URL = os.getenv("FLEX_API_URL", "https://api.flexmeow.com").strip().rstrip("/")
+FLEX_CHAIN_ID = 1
+FLEX_REGISTRY_ADDRESS = "0x9117440a7d03238905d1c8908157bd7a547c77c8"
+FLEX_FACTORIES = {
+    "0xe2c4a5c2ab1ed5745d206b33cc0abf0a5d34753d": "1.0.0",
+    "0xffc787ad990da8f73dda2b971dce31c0d9d2501f": "1.1.0",
+}
+FLEX_IMPLEMENTATIONS = {
+    "1.0.0": "0x4ecbdebc8bbc7896905209b0070cbd283a8324b7",
+    "1.1.0": "0x41d491d261ad0d34bbfffb3e2098f57bec4139ce",
+}
+FLEX_USDC_USD_FEED = "0x8fffffd4afb6115b954bd326cbe7b4ba576818f6"
 JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
 JOB_PROTOCOL_TVL = "protocol_tvl_snapshot"
@@ -83,6 +101,7 @@ JOB_STYFI = "styfi_snapshot"
 JOB_PRODUCT_ACTIVITY = "product_activity"
 JOB_VAULT_HARVESTS = "vault_harvests"
 JOB_YLOCKER_REWARDS = "ylocker_rewards"
+JOB_FLEX_SYNC = "flex_market_sync"
 ALERT_STALE_SECONDS = int(os.getenv("ALERT_STALE_SECONDS", "86400"))
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "21600"))
 ALERT_NOTIFY_ON_RECOVERY = os.getenv("ALERT_NOTIFY_ON_RECOVERY", "1") == "1"
@@ -557,6 +576,143 @@ CREATE TABLE IF NOT EXISTS ylocker_reward_sync_state (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS flex_market_dim (
+    chain_id INTEGER NOT NULL,
+    market_address TEXT NOT NULL,
+    registry_address TEXT NOT NULL,
+    factory_address TEXT NOT NULL,
+    contract_version TEXT NOT NULL,
+    implementation_address TEXT NOT NULL,
+    deployment_block BIGINT NOT NULL,
+    deployment_time TIMESTAMPTZ NOT NULL,
+    deployment_tx_hash TEXT NOT NULL,
+    endorsement_status TEXT NOT NULL,
+    market_status TEXT NOT NULL,
+    lender_address TEXT NOT NULL,
+    collateral_token_address TEXT NOT NULL,
+    collateral_token_symbol TEXT NOT NULL,
+    collateral_token_decimals INTEGER NOT NULL,
+    borrow_token_address TEXT NOT NULL,
+    borrow_token_symbol TEXT NOT NULL,
+    borrow_token_decimals INTEGER NOT NULL,
+    sorted_troves_address TEXT NOT NULL,
+    dutch_desk_address TEXT NOT NULL,
+    auction_address TEXT NOT NULL,
+    price_oracle_address TEXT NOT NULL,
+    one_pct_raw NUMERIC(78, 0) NOT NULL,
+    min_debt_raw NUMERIC(78, 0),
+    safe_collateral_ratio_raw NUMERIC(78, 0),
+    minimum_collateral_ratio_raw NUMERIC(78, 0),
+    max_penalty_collateral_ratio_raw NUMERIC(78, 0),
+    min_liquidation_fee_raw NUMERIC(78, 0),
+    max_liquidation_fee_raw NUMERIC(78, 0),
+    min_annual_interest_rate_raw NUMERIC(78, 0),
+    max_annual_interest_rate_raw NUMERIC(78, 0),
+    oracle_description TEXT,
+    raw_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    discovered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (chain_id, market_address)
+);
+ALTER TABLE flex_market_dim ADD COLUMN IF NOT EXISTS one_pct_raw NUMERIC(78, 0);
+CREATE INDEX IF NOT EXISTS idx_flex_market_status
+    ON flex_market_dim(market_status, deployment_block DESC);
+
+CREATE TABLE IF NOT EXISTS flex_market_snapshots (
+    chain_id INTEGER NOT NULL,
+    market_address TEXT NOT NULL,
+    sampled_hour TIMESTAMPTZ NOT NULL,
+    block_number BIGINT NOT NULL,
+    block_hash TEXT NOT NULL,
+    block_time TIMESTAMPTZ NOT NULL,
+    contract_version TEXT NOT NULL,
+    collateral_raw NUMERIC(78, 0) NOT NULL,
+    debt_raw NUMERIC(78, 0) NOT NULL,
+    weighted_debt_raw NUMERIC(78, 0) NOT NULL,
+    deposits_raw NUMERIC(78, 0) NOT NULL,
+    idle_liquidity_raw NUMERIC(78, 0) NOT NULL,
+    collateral_price_in_borrow_wad NUMERIC(78, 0) NOT NULL,
+    borrow_usd_price_raw NUMERIC(78, 0) NOT NULL,
+    borrow_usd_price_decimals INTEGER NOT NULL,
+    collateral_usd_e18 NUMERIC(78, 0) NOT NULL,
+    debt_usd_e18 NUMERIC(78, 0) NOT NULL,
+    deposits_usd_e18 NUMERIC(78, 0) NOT NULL,
+    idle_liquidity_usd_e18 NUMERIC(78, 0) NOT NULL,
+    utilization_wad NUMERIC(78, 0) NOT NULL,
+    lender_apr_wad NUMERIC(78, 0) NOT NULL,
+    avg_borrow_rate_raw NUMERIC(78, 0) NOT NULL,
+    source TEXT NOT NULL,
+    collected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (chain_id, market_address, sampled_hour),
+    FOREIGN KEY (chain_id, market_address)
+        REFERENCES flex_market_dim(chain_id, market_address) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_flex_snapshots_time
+    ON flex_market_snapshots(sampled_hour DESC, market_address);
+
+CREATE TABLE IF NOT EXISTS flex_events (
+    chain_id INTEGER NOT NULL,
+    market_address TEXT NOT NULL,
+    contract_version TEXT NOT NULL,
+    contract_address TEXT NOT NULL,
+    block_number BIGINT NOT NULL,
+    block_hash TEXT NOT NULL,
+    block_time TIMESTAMPTZ NOT NULL,
+    tx_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    event_name TEXT NOT NULL,
+    event_topic0 TEXT NOT NULL,
+    actors JSONB NOT NULL DEFAULT '{}'::jsonb,
+    amounts JSONB NOT NULL DEFAULT '{}'::jsonb,
+    raw_event JSONB NOT NULL DEFAULT '{}'::jsonb,
+    source TEXT NOT NULL,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (chain_id, tx_hash, log_index),
+    FOREIGN KEY (chain_id, market_address)
+        REFERENCES flex_market_dim(chain_id, market_address) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_flex_events_time
+    ON flex_events(block_time DESC, market_address, event_name);
+
+CREATE TABLE IF NOT EXISTS flex_sync_state (
+    stream_name TEXT PRIMARY KEY,
+    chain_id INTEGER NOT NULL,
+    cursor BIGINT,
+    observed_at TIMESTAMPTZ,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS flex_reconciliations (
+    id BIGSERIAL PRIMARY KEY,
+    checked_at TIMESTAMPTZ NOT NULL,
+    api_block_number BIGINT,
+    api_block_time TIMESTAMPTZ,
+    rpc_block_number BIGINT NOT NULL,
+    verdict TEXT NOT NULL,
+    market_results JSONB NOT NULL DEFAULT '[]'::jsonb,
+    source_url TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_flex_reconciliations_checked
+    ON flex_reconciliations(checked_at DESC);
+
+CREATE TABLE IF NOT EXISTS flex_redemption_priority_current (
+    chain_id INTEGER NOT NULL,
+    market_address TEXT NOT NULL,
+    source_block_number BIGINT,
+    source_block_time TIMESTAMPTZ,
+    total_debt_raw NUMERIC(78, 0),
+    points JSONB NOT NULL DEFAULT '[]'::jsonb,
+    raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    source_url TEXT NOT NULL,
+    fetched_at TIMESTAMPTZ,
+    attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_error TEXT,
+    PRIMARY KEY (chain_id, market_address),
+    FOREIGN KEY (chain_id, market_address)
+        REFERENCES flex_market_dim(chain_id, market_address) ON DELETE CASCADE
+);
+
 """
 
 
@@ -570,6 +726,28 @@ def _validate_data_policy_config() -> None:
         raise ValueError("Invalid stYFI config: ETH_RPC_URL is required when STYFI_SYNC_ENABLED=1")
     if YLOCKER_SYNC_ENABLED and not ETH_RPC_URL:
         raise ValueError("Invalid yLocker config: ETH_RPC_URL is required when YLOCKER_SYNC_ENABLED=1")
+    if FLEX_SYNC_ENABLED and not ETH_RPC_URL:
+        raise ValueError("Invalid Flex config: ETH_RPC_URL is required when FLEX_SYNC_ENABLED=1")
+    if FLEX_BACKFILL_DAYS <= 0:
+        raise ValueError(
+            f"Invalid Flex backfill: FLEX_BACKFILL_DAYS must be > 0 (got {FLEX_BACKFILL_DAYS})"
+        )
+    if FLEX_BLOCK_SPAN <= 0:
+        raise ValueError(f"Invalid Flex block span: FLEX_BLOCK_SPAN must be > 0 (got {FLEX_BLOCK_SPAN})")
+    if FLEX_REPLAY_BLOCKS < 0:
+        raise ValueError(
+            f"Invalid Flex replay depth: FLEX_REPLAY_BLOCKS must be >= 0 (got {FLEX_REPLAY_BLOCKS})"
+        )
+    if FLEX_SNAPSHOT_INTERVAL_SEC <= 0:
+        raise ValueError(
+            "Invalid Flex snapshot interval: FLEX_SNAPSHOT_INTERVAL_SEC must be > 0 "
+            f"(got {FLEX_SNAPSHOT_INTERVAL_SEC})"
+        )
+    if FLEX_MAX_SNAPSHOT_HOURS_PER_RUN < 0:
+        raise ValueError(
+            "Invalid Flex snapshot limit: FLEX_MAX_SNAPSHOT_HOURS_PER_RUN must be >= 0 "
+            f"(got {FLEX_MAX_SNAPSHOT_HOURS_PER_RUN})"
+        )
     if STYFI_CHAIN_ID <= 0:
         raise ValueError(f"Invalid stYFI config: STYFI_CHAIN_ID must be > 0 (got {STYFI_CHAIN_ID})")
     if STYFI_RETENTION_DAYS < 0:
