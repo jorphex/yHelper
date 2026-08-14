@@ -438,6 +438,9 @@ function FlexPageContent() {
       <section className="page-header page-header-no-border">
         <h1 className="page-title">{flexCopy.hero.title}<br /><em className="page-title-accent">{flexCopy.hero.accent}</em></h1>
         <p className="page-description">{flexCopy.hero.blurb}</p>
+        <div className="tab-bar-plain">
+          <a href="https://flexmeow.com" target="_blank" rel="noopener noreferrer" className="button button-primary">{flexCopy.hero.officialLink}</a>
+        </div>
       </section>
 
       <section className="section section-lg">

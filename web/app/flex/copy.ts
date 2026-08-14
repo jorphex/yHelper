@@ -7,10 +7,14 @@ export const flexCopy = {
     title: "Flex Markets | yHelper",
     description: "A clear view of Flex lending markets on Ethereum.",
   },
+  social: {
+    activeDeposits: "Active market deposits",
+  },
   hero: {
     title: "Flex Markets",
     accent: "Ethereum lending",
     blurb: "Compare active markets, rates, and available liquidity.",
+    officialLink: "Open Flex",
   },
   freshness: {
     label: "Updated",
