@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useOverviewPulseData, type HomePulse } from "../hooks/use-home-data";
+import { flexCopy } from "../flex/copy";
 
 const navItems = [
   { href: "/", label: "Overview" },
   { href: "/markets", label: "Markets", paths: ["/markets", "/momentum", "/explore", "/structure"] },
   { href: "/reports", label: "Reports", paths: ["/reports", "/harvests"] },
   { href: "/styfi", label: "stYFI" },
+  { href: "/flex", label: flexCopy.nav.label },
 ];
 
 const externalLinks = [

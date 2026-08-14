@@ -6,6 +6,7 @@ export const pageSocialCopy = {
   markets: { label: "Markets", promise: "Explore Yearn vaults by market." },
   reports: { label: "Reports", promise: "Follow vault activity and locker rewards." },
   styfi: { label: "stYFI", promise: "Follow the stYFI lending position." },
+  flex: { label: "Flex Markets", promise: "Ethereum lending." },
 } as const;
 
 export type PageSocialSurface = keyof typeof pageSocialCopy;

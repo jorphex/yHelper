@@ -1,0 +1,535 @@
+.flex-page .page-header {
+  padding-bottom: 0;
+}
+
+.flex-market-table-wrap,
+.flex-activity-wrap {
+  margin-top: var(--space-5);
+}
+
+.flex-market-table th,
+.flex-market-table td {
+  white-space: nowrap;
+}
+
+.flex-market-table td:first-child {
+  min-width: 150px;
+}
+
+.flex-market-version {
+  margin-left: var(--space-2);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.flex-history-section,
+.flex-activity-section {
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.flex-history-heading-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin-top: var(--space-12);
+}
+
+.flex-market-selector {
+  margin-top: 0;
+}
+
+.flex-market-tabs,
+.flex-range-tabs {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.flex-market-tab,
+.flex-range-tab {
+  position: relative;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.flex-market-tab:first-child,
+.flex-range-tab:first-child {
+  padding-left: 0;
+}
+
+.flex-market-tab:hover,
+.flex-range-tab:hover,
+.flex-market-tab:focus-visible,
+.flex-range-tab:focus-visible,
+.flex-market-tab.is-active,
+.flex-range-tab.is-active {
+  color: var(--text-primary);
+}
+
+.flex-market-tab.is-active::after,
+.flex-range-tab.is-active::after {
+  position: absolute;
+  right: var(--space-4);
+  bottom: 3px;
+  left: var(--space-4);
+  height: 2px;
+  background: var(--accent);
+  content: "";
+}
+
+.flex-market-tab:first-child.is-active::after,
+.flex-range-tab:first-child.is-active::after {
+  left: 0;
+}
+
+.flex-risk-section {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 2fr);
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.flex-risk-section h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 17px;
+}
+
+.flex-risk-section p {
+  margin: var(--space-2) 0 0;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.flex-risk-grid {
+  display: grid;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.flex-risk-grid-all {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.flex-risk-grid div {
+  min-width: 0;
+}
+
+.flex-risk-grid dt {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flex-risk-grid dd {
+  margin: var(--space-2) 0 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.flex-risk-content {
+  min-width: 0;
+}
+
+.flex-redemption-section {
+  margin-top: var(--space-12);
+}
+
+.flex-redemption-heading h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 17px;
+}
+
+.flex-redemption-heading > p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.flex-redemption-freshness {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.flex-redemption-freshness span:not(:first-child) {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.flex-redemption-freshness span + span::before {
+  margin-right: var(--space-2);
+  content: "·";
+}
+
+.flex-redemption-chart {
+  margin-top: var(--space-5);
+}
+
+.flex-redemption-area {
+  fill: rgba(var(--accent-rgb), 0.09);
+  stroke: none;
+}
+
+.flex-redemption-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.flex-redemption-point,
+.flex-redemption-active-point {
+  fill: var(--accent);
+  stroke: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.flex-redemption-active-point {
+  stroke: var(--text-primary);
+  stroke-width: 2;
+}
+
+.flex-redemption-skeleton {
+  height: 260px;
+  margin-top: var(--space-5);
+}
+
+.flex-redemption-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  min-height: 120px;
+  margin-top: var(--space-5);
+}
+
+.flex-redemption-error p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.flex-redemption-section .empty-state {
+  min-height: 180px;
+  margin-top: var(--space-5);
+}
+
+.flex-chart-grid-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.flex-chart-panel {
+  min-width: 0;
+}
+
+.flex-chart-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 60px;
+}
+
+.flex-chart-heading h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 17px;
+}
+
+.flex-chart-heading p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.flex-chart-latest {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--text-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.flex-chart-latest span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.flex-chart-latest i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.flex-chart-latest strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.flex-chart-interactive {
+  position: relative;
+  margin-top: var(--space-4);
+  outline: none;
+  touch-action: pan-y;
+}
+
+.flex-chart-interactive:focus-visible {
+  outline: 2px solid var(--yearn-link);
+  outline-offset: 4px;
+}
+
+.flex-line-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.flex-chart-grid {
+  stroke: rgba(255, 255, 255, 0.09);
+  stroke-width: 1;
+}
+
+.flex-chart-axis {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.flex-chart-axis-inset {
+  paint-order: stroke;
+  stroke: var(--bg-base);
+  stroke-linejoin: round;
+  stroke-width: 3px;
+}
+
+.flex-chart-line {
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.flex-chart-inspection line {
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.flex-chart-inspection circle {
+  stroke: var(--text-primary);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.flex-chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-3);
+  display: grid;
+  min-width: 190px;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-soft);
+  background: rgba(8, 10, 14, 0.96);
+  box-shadow: var(--shadow-md);
+  color: var(--text-secondary);
+  font-size: 12px;
+  pointer-events: none;
+  transform: translateX(var(--space-3));
+}
+
+.flex-chart-tooltip.is-right {
+  transform: translateX(calc(-100% - var(--space-3)));
+}
+
+.flex-chart-tooltip time {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.flex-chart-tooltip span {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.flex-chart-tooltip strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.flex-chart-skeleton {
+  height: 300px;
+}
+
+.flex-activity-table td:first-child {
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .flex-chart-grid-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .flex-risk-grid-all {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .flex-redemption-freshness span + span::before {
+    content: none;
+  }
+
+  .flex-history-heading-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .flex-risk-section {
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+
+  .flex-risk-grid-all {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .flex-market-tabs,
+  .flex-range-tabs {
+    width: 100%;
+  }
+
+  .flex-market-table,
+  .flex-market-table tbody,
+  .flex-market-table tr,
+  .flex-market-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .flex-market-table thead {
+    display: none;
+  }
+
+  .flex-market-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .flex-market-table td {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3) !important;
+    border: 0 !important;
+    text-align: right !important;
+  }
+
+  .flex-market-table td:first-child {
+    display: block;
+    grid-column: 1 / -1;
+    min-width: 0;
+    text-align: left !important;
+  }
+
+  .flex-market-table td:not(:first-child)::before {
+    color: var(--text-tertiary);
+    content: attr(data-label);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .flex-market-table .mobile-secondary-column {
+    display: grid !important;
+  }
+
+  .flex-activity-table,
+  .flex-activity-table tbody,
+  .flex-activity-table tr,
+  .flex-activity-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .flex-activity-table thead {
+    display: none;
+  }
+
+  .flex-activity-table tr {
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .flex-activity-table td {
+    display: grid;
+    grid-template-columns: minmax(96px, 0.35fr) 1fr;
+    gap: var(--space-3);
+    padding: var(--space-1) var(--space-3) !important;
+    border: 0 !important;
+    text-align: left !important;
+  }
+
+  .flex-activity-table td::before {
+    color: var(--text-tertiary);
+    content: attr(data-label);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .flex-chart-heading {
+    min-height: 0;
+  }
+
+  .flex-chart-tooltip {
+    min-width: 176px;
+  }
+
+  .flex-redemption-skeleton {
+    height: 200px;
+  }
+
+  .flex-redemption-error {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flex-market-tab,
+  .flex-range-tab {
+    transition: none;
+  }
+}

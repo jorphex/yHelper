@@ -44,7 +44,6 @@
 /* Reports views and yLocker evidence. */
 .reports-page-header {
   padding-bottom: 0 !important;
-  margin-bottom: var(--space-8) !important;
   border-bottom: 0 !important;
 }
 .reports-view-nav {

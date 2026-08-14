@@ -26,15 +26,16 @@ const nextConfig = {
   },
   async rewrites() {
     const base = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
+    const proxyTarget = process.env.YHELPER_API_PROXY_TARGET || "http://yhelper-api:8000";
     if (base === "/api") {
       return [
         {
           source: "/api/:path*",
-          destination: "http://yhelper-api:8000/api/:path*"
+          destination: `${proxyTarget}/api/:path*`
         },
         {
           source: "/health",
-          destination: "http://yhelper-api:8000/health"
+          destination: `${proxyTarget}/health`
         }
       ];
     }

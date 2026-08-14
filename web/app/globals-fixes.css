@@ -952,7 +952,6 @@ table tbody .external-link-inline::after {
 
   .overview-hero {
     gap: var(--space-5);
-    margin-bottom: var(--space-10) !important;
   }
   .overview-hero-copy { min-width: 0; }
   .overview-hero-image {

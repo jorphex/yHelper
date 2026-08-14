@@ -2,6 +2,7 @@ import "./globals-editorial.css";
 import "./globals-editorial-viz.css";
 import "./globals-fixes.css";
 import "./globals-ylockers.css";
+import "./globals-flex.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode, Suspense } from "react";
 import { Sidebar } from "./components/sidebar";
