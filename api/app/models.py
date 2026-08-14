@@ -586,3 +586,241 @@ class StyfiResponse(ApiModel):
     freshness: StyfiFreshness
     data_policy: StyfiDataPolicy
     ingestion: StyfiIngestion
+
+
+class FlexScope(ApiModel):
+    chain_id: Literal[1]
+    network: Literal["ethereum"]
+    source: Literal["ethereum_archive_rpc"]
+
+
+class FlexFreshness(ApiModel):
+    data_state: Literal["ready", "delayed", "unavailable"]
+    indexed_through: str | None
+    age_seconds: int | None
+    stale_after_seconds: int
+    block_number: int | None
+    reconciliation_verdict: Literal["ok", "mismatch", "unavailable"] | None
+    reconciliation_checked_at: str | None
+
+
+class FlexToken(ApiModel):
+    address: str
+    symbol: str
+    decimals: int
+
+
+class FlexMarketAddresses(ApiModel):
+    market: str
+    lender: str
+    collateral_token: str
+    borrow_token: str
+    price_oracle: str
+    auction: str
+
+
+class FlexMarketMetrics(ApiModel):
+    collateral_raw: str
+    collateral: float
+    collateral_usd: float
+    debt_raw: str
+    debt: float
+    debt_usd: float
+    deposits_raw: str
+    deposits: float
+    deposits_usd: float
+    idle_liquidity_raw: str
+    idle_liquidity: float
+    idle_liquidity_usd: float
+    utilization: float
+    lender_apr: float
+    average_borrow_rate: float
+
+
+class FlexMarketRow(ApiModel):
+    chain_id: Literal[1]
+    label: str
+    status: Literal["active", "deprecated", "unendorsed"]
+    endorsement_status: Literal["endorsed", "unendorsed"]
+    contract_version: Literal["1.0.0", "1.1.0"]
+    deployment_block: int
+    deployment_time: str
+    collateral_token: FlexToken
+    borrow_token: FlexToken
+    addresses: FlexMarketAddresses
+    metrics: FlexMarketMetrics | None
+    latest_block_number: int | None
+    latest_block_time: str | None
+
+
+class FlexMarketCounts(ApiModel):
+    total: int
+    active: int
+    deprecated: int
+    unendorsed: int
+
+
+class FlexProtocolSummary(ApiModel):
+    markets: FlexMarketCounts
+    collateral_usd: float
+    debt_usd: float
+    deposits_usd: float
+    idle_liquidity_usd: float
+    utilization: float | None
+    weighted_lender_apr: float | None
+    weighted_average_borrow_rate: float | None
+
+
+class FlexProtocolResponse(ApiModel):
+    scope: FlexScope
+    freshness: FlexFreshness
+    summary: FlexProtocolSummary
+
+
+class FlexMarketFilters(ApiModel):
+    status: Literal["all", "active", "deprecated", "unendorsed"]
+
+
+class FlexMarketsResponse(ApiModel):
+    scope: FlexScope
+    filters: FlexMarketFilters
+    freshness: FlexFreshness
+    summary: FlexProtocolSummary
+    rows: list[FlexMarketRow]
+
+
+class FlexRiskParameters(ApiModel):
+    minimum_debt_raw: str | None
+    minimum_debt: float | None
+    safe_ltv: float | None
+    maximum_ltv: float | None
+    maximum_penalty_ltv: float | None
+    minimum_liquidation_fee: float | None
+    maximum_liquidation_fee: float | None
+    minimum_annual_interest_rate: float | None
+    maximum_annual_interest_rate: float | None
+
+
+class FlexOracle(ApiModel):
+    address: str
+    description: str | None
+    collateral_price_in_borrow_token: float | None
+    borrow_token_usd_price: float | None
+
+
+class FlexMarketDetailResponse(ApiModel):
+    scope: FlexScope
+    freshness: FlexFreshness
+    market: FlexMarketRow
+    risk: FlexRiskParameters
+    oracle: FlexOracle
+
+
+class FlexRedemptionPriorityScope(ApiModel):
+    chain_id: Literal[1]
+    network: Literal["ethereum"]
+    source: Literal["flex_ui_api"]
+
+
+class FlexRedemptionRateScale(ApiModel):
+    one_pct_raw: str
+    unit: Literal["annual_decimal_ratio"]
+
+
+class FlexRedemptionPriorityPoint(ApiModel):
+    annual_interest_rate_raw: str
+    annual_interest_rate: float
+    redeemable_before_raw: str
+    redeemable_before: float
+
+
+class FlexRedemptionPriorityFreshness(ApiModel):
+    data_state: Literal["ready", "delayed", "unavailable"]
+    source_block_number: int | None
+    source_block_time: str | None
+    source_age_seconds: int | None
+    fetched_at: str | None
+    fetched_age_seconds: int | None
+    stale_after_seconds: int
+    last_attempted_at: str | None
+    last_error: str | None
+
+
+class FlexRedemptionPriorityResponse(ApiModel):
+    scope: FlexRedemptionPriorityScope
+    market_address: str
+    borrow_token: FlexToken
+    rate_scale: FlexRedemptionRateScale
+    total_debt_raw: str | None
+    total_debt: float | None
+    points: list[FlexRedemptionPriorityPoint]
+    source_url: str | None
+    freshness: FlexRedemptionPriorityFreshness
+
+
+class FlexHistoryFilters(ApiModel):
+    days: Literal[7, 30, 90]
+    interval: Literal["hour", "day"]
+
+
+class FlexHistoryCoverage(ApiModel):
+    requested_start: str
+    first_point_at: str | None
+    latest_point_at: str | None
+    points: int
+    expected_points: int
+    coverage_ratio: float
+
+
+class FlexHistoryPoint(ApiModel):
+    sampled_at: str
+    block_number: int
+    block_time: str
+    collateral_usd: float
+    debt_usd: float
+    deposits_usd: float
+    idle_liquidity_usd: float
+    utilization: float
+    lender_apr: float
+    average_borrow_rate: float
+
+
+class FlexMarketHistoryResponse(ApiModel):
+    scope: FlexScope
+    market_address: str
+    filters: FlexHistoryFilters
+    freshness: FlexFreshness
+    coverage: FlexHistoryCoverage
+    points: list[FlexHistoryPoint]
+
+
+class FlexActivityFilters(ApiModel):
+    market_address: str | None
+    event: str | None
+
+
+class FlexCursorPagination(ApiModel):
+    limit: int
+    next_cursor: str | None
+
+
+class FlexActivityRow(ApiModel):
+    chain_id: Literal[1]
+    market_address: str
+    market_label: str
+    contract_version: str
+    block_number: int
+    block_time: str
+    tx_hash: str
+    log_index: int
+    event: str
+    actors: dict[str, str | int | bool]
+    amounts: dict[str, str | int | bool]
+
+
+class FlexActivityResponse(ApiModel):
+    scope: FlexScope
+    filters: FlexActivityFilters
+    freshness: FlexFreshness
+    pagination: FlexCursorPagination
+    rows: list[FlexActivityRow]

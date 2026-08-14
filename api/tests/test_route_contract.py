@@ -16,6 +16,12 @@ class RouteContractTests(unittest.TestCase):
                 "/api/discover",
                 "/api/composition",
                 "/api/changes",
+                "/api/flex/protocol",
+                "/api/flex/markets",
+                "/api/flex/markets/{market_address}",
+                "/api/flex/markets/{market_address}/history",
+                "/api/flex/markets/{market_address}/redemption-priority",
+                "/api/flex/activity",
             }.issubset(paths)
         )
 
@@ -54,6 +60,12 @@ class RouteContractTests(unittest.TestCase):
             "/api/ylockers/rewards": "YlockerRewardsResponse",
             "/api/ylockers/rewards/{product}/cycles/{native_week}": "YlockerRewardCycleResponse",
             "/api/styfi": "StyfiResponse",
+            "/api/flex/protocol": "FlexProtocolResponse",
+            "/api/flex/markets": "FlexMarketsResponse",
+            "/api/flex/markets/{market_address}": "FlexMarketDetailResponse",
+            "/api/flex/markets/{market_address}/history": "FlexMarketHistoryResponse",
+            "/api/flex/markets/{market_address}/redemption-priority": "FlexRedemptionPriorityResponse",
+            "/api/flex/activity": "FlexActivityResponse",
         }
         for path, model_name in expected_models.items():
             response_schema = schema["paths"][path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
