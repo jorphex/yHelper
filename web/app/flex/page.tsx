@@ -32,7 +32,7 @@ const dateTime = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
-  hour12: false,
+  hourCycle: "h23",
   timeZone: "UTC",
 });
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
@@ -479,7 +479,7 @@ function FlexPageContent() {
         <TableWrap className="flex-activity-wrap"><table className="decision-table flex-activity-table">
           <thead><tr><th>{flexCopy.activity.headers.time}</th><th>{flexCopy.activity.headers.event}</th><th>{flexCopy.activity.headers.market}</th><th className="numeric">{flexCopy.activity.headers.amount}</th></tr></thead>
           <tbody>{activity.isLoading && !activity.data ? <TableSkeleton rows={8} columns={4} /> : activityRows.map((row) => <tr key={`${row.tx_hash}:${row.log_index}`}>
-            <td data-label={flexCopy.activity.mobile.time}><Link className="report-link report-link-utility" href={`https://etherscan.io/tx/${row.tx_hash}`} target="_blank" rel="noreferrer" aria-label={flexA11y(flexCopy.accessibility.transaction, { hash: row.tx_hash })}><time dateTime={row.block_time}>{dateTime.format(new Date(row.block_time))}</time></Link></td>
+            <td data-label={flexCopy.activity.mobile.time}><Link className="report-link report-link-utility" href={`https://etherscan.io/tx/${row.tx_hash}`} target="_blank" rel="noreferrer" aria-label={flexA11y(flexCopy.accessibility.transaction, { hash: row.tx_hash })}><time dateTime={row.block_time}>{dateTime.format(new Date(row.block_time))} UTC</time></Link></td>
             <td data-label={flexCopy.activity.mobile.event}>{eventLabel(row.event)}</td>
             <td data-label={flexCopy.activity.mobile.market}>{row.market_label}</td>
             <td data-label={flexCopy.activity.mobile.amount} className="numeric data-value">{primaryAmount(row, marketByAddress.get(row.market_address))}</td>

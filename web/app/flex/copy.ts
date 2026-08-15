@@ -86,8 +86,8 @@ export const flexCopy = {
       },
       secondary: {
         safeLtv: "Safe LTV",
-        maximumFeeThreshold: "Maximum fee applies at",
-        liquidationFeeRange: "Liquidation fee range",
+        maximumFeeThreshold: "Max fee at",
+        liquidationFeeRange: "Liquidation fee",
       },
     },
   },
