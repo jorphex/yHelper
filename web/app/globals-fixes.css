@@ -749,14 +749,23 @@ table tbody .external-link-inline::after {
 
 @media (max-width: 768px) {
   .sidebar {
+    visibility: hidden !important;
     transform: translateX(-100%) !important;
-    transition: transform var(--duration-base) var(--ease-out) !important;
+    transition:
+      transform var(--duration-base) var(--ease-out),
+      visibility 0s linear var(--duration-base) !important;
     overflow-y: auto !important;
     overscroll-behavior: contain;
     padding-top: calc(var(--space-16) + var(--space-3)) !important;
   }
 
-  .sidebar.is-open { transform: translateX(0) !important; }
+  .sidebar.is-open {
+    visibility: visible !important;
+    transform: translateX(0) !important;
+    transition:
+      transform var(--duration-base) var(--ease-out),
+      visibility 0s linear 0s !important;
+  }
   .sidebar-toggle { display: flex !important; }
 
   .main-content {
@@ -962,6 +971,13 @@ table tbody .external-link-inline::after {
   .overview-hero-image img {
     width: min(100%, 270px) !important;
     height: auto !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) and (max-width: 768px) {
+  .sidebar,
+  .sidebar.is-open {
+    transition-delay: 0s !important;
   }
 }
 

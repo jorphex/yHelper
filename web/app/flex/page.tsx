@@ -77,7 +77,7 @@ function MarketTable({ rows }: { rows: FlexMarket[] }) {
   );
   return (
     <TableWrap className="flex-market-table-wrap">
-      <table className="decision-table flex-market-table">
+      <table className="decision-table flex-market-table" aria-labelledby="flex-markets-title">
         <thead><tr>
           <th>{flexCopy.markets.headers.market}</th>
           {header("deposits", flexCopy.markets.headers.deposits, flexCopy.markets.mobile.deposits)}
@@ -106,7 +106,7 @@ function MarketTable({ rows }: { rows: FlexMarket[] }) {
   );
 }
 
-type ChartSeries = { key: keyof FlexHistoryPoint; label: string; color: string };
+type ChartSeries = { key: keyof FlexHistoryPoint; label: string; color: string; dashed?: boolean };
 
 function HistoryChart({
   title,
@@ -184,7 +184,7 @@ function HistoryChart({
     <section className="flex-chart-panel" aria-labelledby={`${chartId}-title`}>
       <div className="flex-chart-heading">
         <div><h3 id={`${String(series[0].key)}-title`}>{title}</h3><p>{description}</p></div>
-        {latest ? <div className="flex-chart-latest" aria-label={summary}>{series.map((item) => <span key={String(item.key)}><i style={{ background: item.color }} />{item.label} <strong>{formatPct(Number(latest[item.key]) || 0)}</strong></span>)}</div> : null}
+        {latest ? <div className="flex-chart-latest" aria-label={summary}>{series.map((item) => <span key={String(item.key)}><i style={{ borderTopColor: item.color, borderTopStyle: item.dashed ? "dashed" : "solid" }} />{item.label} <strong>{formatPct(Number(latest[item.key]) || 0)}</strong></span>)}</div> : null}
       </div>
       <div
         ref={chartRef}
@@ -204,7 +204,7 @@ function HistoryChart({
             <line x1={left} x2={width - right} y1={top + ratio * (height - top - bottom)} y2={top + ratio * (height - top - bottom)} className="flex-chart-grid" />
             <text x="4" y={top + ratio * (height - top - bottom) - 4} textAnchor="start" className="flex-chart-axis flex-chart-axis-inset">{formatPct(maxValue * (1 - ratio), 0)}</text>
           </g>)}
-          {series.map((item) => <path key={String(item.key)} d={path(item)} fill="none" stroke={item.color} className="flex-chart-line" />)}
+          {series.map((item) => <path key={String(item.key)} d={path(item)} fill="none" stroke={item.color} strokeDasharray={item.dashed ? "5 4" : undefined} className="flex-chart-line" />)}
           {series.map((item) => latest ? <circle key={String(item.key)} cx={x(points.length - 1)} cy={y(Number(latest[item.key]) || 0)} r="4" fill={item.color} /> : null)}
           {inspected && inspectedX !== null ? <g className="flex-chart-inspection">
             <line x1={inspectedX} x2={inspectedX} y1={top} y2={height - bottom} />
@@ -242,7 +242,7 @@ function HistoryCharts({ points }: { points: FlexHistoryPoint[] }) {
       title={flexCopy.history.rates.title}
       description={flexCopy.history.rates.description}
       points={points}
-      series={[{ key: "lender_apr", label: flexCopy.history.rates.lenderApr, color: "#3b82f6" }, { key: "average_borrow_rate", label: flexCopy.history.rates.borrowerRate, color: "#2dd4bf" }]}
+      series={[{ key: "lender_apr", label: flexCopy.history.rates.lenderApr, color: "#3b82f6" }, { key: "average_borrow_rate", label: flexCopy.history.rates.borrowerRate, color: "#2dd4bf", dashed: true }]}
       inspectionIndex={inspection?.index ?? null}
       activeInspector={inspection?.chart ?? null}
       onInspect={(chart, index) => setInspection({ chart, index })}
@@ -444,13 +444,13 @@ function FlexPageContent() {
       </section>
 
       <section className="section section-lg">
-        <div className="card-header"><div><h2 className="card-title">{flexCopy.markets.title}</h2><p className="card-description">{flexCopy.markets.description}</p></div></div>
-        {isLoading && !data ? <TableWrap><table className="decision-table"><tbody><TableSkeleton rows={2} columns={8} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
+        <div className="card-header"><div><h2 className="card-title" id="flex-markets-title">{flexCopy.markets.title}</h2><p className="card-description">{flexCopy.markets.description}</p></div></div>
+        {isLoading && !data ? <TableWrap><table className="decision-table" aria-labelledby="flex-markets-title"><tbody><TableSkeleton rows={2} columns={8} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
       </section>
 
       {selected ? <section className="section section-lg flex-history-section">
-        <div className="flex-market-tabs flex-market-selector" role="tablist" aria-label={flexCopy.detail.selectLabel}>
-          {active.map((market) => <button key={market.addresses.market} type="button" role="tab" aria-selected={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}
+        <div className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
+          {active.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}
         </div>
         {detail.data ? <section className="flex-risk-section" aria-labelledby="flex-risk-title">
           <div><h3 id="flex-risk-title">{flexCopy.detail.risk.title}</h3><p>{flexCopy.detail.risk.description}</p></div>
@@ -475,8 +475,8 @@ function FlexPageContent() {
       </section> : null}
 
       <section className="section section-lg flex-activity-section">
-        <div className="card-header"><div><h2 className="card-title">{flexCopy.activity.title}</h2><p className="card-description">{flexCopy.activity.description}</p></div></div>
-        <TableWrap className="flex-activity-wrap"><table className="decision-table flex-activity-table">
+        <div className="card-header"><div><h2 className="card-title" id="flex-activity-title">{flexCopy.activity.title}</h2><p className="card-description">{flexCopy.activity.description}</p></div></div>
+        <TableWrap className="flex-activity-wrap"><table className="decision-table flex-activity-table" aria-labelledby="flex-activity-title">
           <thead><tr><th>{flexCopy.activity.headers.time}</th><th>{flexCopy.activity.headers.event}</th><th>{flexCopy.activity.headers.market}</th><th className="numeric">{flexCopy.activity.headers.amount}</th></tr></thead>
           <tbody>{activity.isLoading && !activity.data ? <TableSkeleton rows={8} columns={4} /> : activityRows.map((row) => <tr key={`${row.tx_hash}:${row.log_index}`}>
             <td data-label={flexCopy.activity.mobile.time}><Link className="report-link report-link-utility" href={`https://etherscan.io/tx/${row.tx_hash}`} target="_blank" rel="noreferrer" aria-label={flexA11y(flexCopy.accessibility.transaction, { hash: row.tx_hash })}><time dateTime={row.block_time}>{dateTime.format(new Date(row.block_time))} UTC</time></Link></td>

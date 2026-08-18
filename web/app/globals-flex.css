@@ -279,9 +279,10 @@
 }
 
 .flex-chart-latest i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top-width: 2px;
 }
 
 .flex-chart-latest strong {
@@ -316,7 +317,7 @@
 .flex-chart-axis {
   fill: var(--text-tertiary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .flex-chart-axis-inset {
