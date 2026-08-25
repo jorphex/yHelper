@@ -43,7 +43,17 @@ def check_with_retries(url: str, timeout: float, retries: int, retry_delay: floa
 
 
 def run_checks(base_url: str, timeout: float, retries: int, retry_delay: float, allow_status: set[int]) -> int:
-    routes = ["/", "/markets", "/reports", "/styfi", "/explore", "/momentum", "/harvests", "/structure"]
+    routes = [
+        "/",
+        "/markets",
+        "/reports",
+        "/styfi",
+        "/flex",
+        "/explore",
+        "/momentum",
+        "/harvests",
+        "/structure",
+    ]
     apis = [
         "/health",
         "/api/overview-pulse",
@@ -58,6 +68,7 @@ def run_checks(base_url: str, timeout: float, retries: int, retry_delay: float, 
         "/api/changes?window=7d&limit=5",
         "/api/reports?days=30&limit=5",
         "/api/ylockers/rewards?limit=2&include_events=false",
+        "/api/flex/markets?status=active",
     ]
 
     failures = 0
