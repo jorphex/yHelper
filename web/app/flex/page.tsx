@@ -15,6 +15,7 @@ import {
   useFlexMarketDetail,
   useFlexMarkets,
   useFlexRedemptionPriority,
+  useFlexTroveHealth,
   type FlexActivityRow,
   type FlexHistoryPoint,
   type FlexMarket,
@@ -36,6 +37,7 @@ const dateTime = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
+const percentagePoints = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 function metric(market: FlexMarket, key: SortKey): number {
   const values = market.metrics;
@@ -382,6 +384,40 @@ function RedemptionPrioritySection({
   </section>;
 }
 
+function TroveHealthSection({
+  query,
+}: {
+  query: ReturnType<typeof useFlexTroveHealth>;
+}) {
+  const data = query.data;
+  const metrics = data?.metrics;
+  const freshness = data?.freshness;
+  const sourceTime = freshness?.source_block_time
+    ? `${dateTime.format(new Date(freshness.source_block_time))} UTC`
+    : null;
+
+  return <section className="flex-trove-section" aria-labelledby="flex-trove-title">
+    <div className="flex-trove-heading">
+      <h3 id="flex-trove-title">{flexCopy.troveHealth.title}</h3>
+      <p>{flexCopy.troveHealth.description}</p>
+      <p className="flex-trove-definition" id="flex-trove-ltv-definition">{flexCopy.troveHealth.definition}</p>
+      {sourceTime ? <p className="flex-trove-freshness"><span>{freshness?.data_state === "delayed" ? flexCopy.redemptionPriority.freshness.delayed : flexCopy.redemptionPriority.freshness.ready}</span><time dateTime={freshness?.source_block_time ?? undefined}>{sourceTime}</time></p> : null}
+    </div>
+    <div className="flex-trove-content">
+      {query.isLoading && !data ? <p className="muted" role="status">{flexCopy.troveHealth.loading}</p> : null}
+      {query.error || freshness?.data_state === "unavailable" ? <p className="muted">{flexCopy.troveHealth.unavailable}</p> : null}
+      {metrics?.active_troves === 0 ? <p className="muted">{flexCopy.troveHealth.empty}</p> : null}
+      {metrics && metrics.active_troves > 0 ? <dl className="flex-trove-grid" aria-describedby="flex-trove-ltv-definition">
+        <div><dt>{flexCopy.troveHealth.metrics.activeTroves}</dt><dd>{metrics.active_troves}</dd></div>
+        <div><dt title={flexCopy.troveHealth.ltvDefinition}>{flexCopy.troveHealth.metrics.medianLtv}</dt><dd>{formatPct(metrics.median_ltv)}</dd></div>
+        <div><dt title={flexCopy.troveHealth.ltvDefinition}>{flexCopy.troveHealth.metrics.minimumBuffer}</dt><dd>{metrics.minimum_buffer_to_max_ltv === null ? flexCopy.values.unavailable : `${percentagePoints.format(metrics.minimum_buffer_to_max_ltv * 100)} pp`}</dd></div>
+        <div><dt title={flexCopy.troveHealth.ltvDefinition}>{flexCopy.troveHealth.metrics.debtNearMax}</dt><dd>{formatPct(metrics.debt_near_max_share)}</dd></div>
+        <div><dt>{flexCopy.troveHealth.metrics.largestDebtShare}</dt><dd>{formatPct(metrics.largest_debt_share)}</dd></div>
+      </dl> : null}
+    </div>
+  </section>;
+}
+
 function eventLabel(event: string): string {
   const normalized = event.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
   return flexCopy.events[normalized as keyof typeof flexCopy.events] ?? event.replaceAll("_", " ");
@@ -418,6 +454,7 @@ function FlexPageContent() {
   const history = useFlexHistory(selected?.addresses.market ?? null, days);
   const detail = useFlexMarketDetail(selected?.addresses.market ?? null);
   const redemptionPriority = useFlexRedemptionPriority(selected?.addresses.market ?? null);
+  const troveHealth = useFlexTroveHealth(selected?.addresses.market ?? null);
   const activity = useFlexActivity();
   const activityRows = activity.data?.pages.flatMap((page) => page.rows) ?? [];
   const marketByAddress = useMemo(() => new Map(data?.rows.map((market) => [market.addresses.market, market])), [data]);
@@ -464,6 +501,7 @@ function FlexPageContent() {
             </dl>
           </div>
         </section> : null}
+        <TroveHealthSection query={troveHealth} />
         <RedemptionPrioritySection query={redemptionPriority} />
         <div className="flex-history-heading-row">
           <div><h2 className="card-title">{flexCopy.history.title}</h2><p className="card-description">{flexCopy.history.description}</p></div>

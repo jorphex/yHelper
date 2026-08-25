@@ -151,6 +151,30 @@ export type FlexRedemptionPriorityResponse = {
   };
 };
 
+export type FlexTroveHealthResponse = {
+  scope: { chain_id: 1; network: "ethereum"; source: "flex_ui_api" };
+  market_address: string;
+  collateral_token: { address: string; symbol: string; decimals: number };
+  borrow_token: { address: string; symbol: string; decimals: number };
+  metrics: {
+    active_troves: number;
+    total_collateral_raw: string;
+    total_collateral: number;
+    total_debt_raw: string;
+    total_debt: number;
+    median_ltv: number | null;
+    maximum_position_ltv: number | null;
+    minimum_buffer_to_max_ltv: number | null;
+    near_max_threshold: number;
+    near_max_troves: number;
+    debt_near_max_raw: string;
+    debt_near_max: number;
+    debt_near_max_share: number | null;
+    largest_debt_share: number | null;
+  } | null;
+  freshness: FlexRedemptionPriorityResponse["freshness"];
+};
+
 export type FlexActivityRow = {
   chain_id: 1;
   market_address: string;
@@ -211,6 +235,16 @@ export function useFlexRedemptionPriority(marketAddress: string | null) {
   return useQuery({
     queryKey: ["flex-redemption-priority", marketAddress],
     queryFn: () => fetchJson<FlexRedemptionPriorityResponse>(apiUrl(`/flex/markets/${marketAddress}/redemption-priority`)),
+    enabled: Boolean(marketAddress),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+export function useFlexTroveHealth(marketAddress: string | null) {
+  return useQuery({
+    queryKey: ["flex-trove-health", marketAddress],
+    queryFn: () => fetchJson<FlexTroveHealthResponse>(apiUrl(`/flex/markets/${marketAddress}/trove-health`)),
     enabled: Boolean(marketAddress),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,

@@ -156,6 +156,22 @@ export const flexCopy = {
     },
     summary: "At {rate}, {debtAhead} at strictly lower rates would be redeemed first. That is {share} of total debt.",
   },
+  troveHealth: {
+    title: "Trove health",
+    description: "A market-wide view of collateral and borrowing across active troves.",
+    definition: "Near max LTV includes troves within 1 percentage point of the market's maximum LTV. Debt share is measured against total active-trove debt.",
+    ltvDefinition: "LTV means loan-to-value, the borrowed amount relative to collateral value.",
+    metrics: {
+      activeTroves: "Active troves",
+      medianLtv: "Median LTV",
+      minimumBuffer: "Smallest max-LTV buffer",
+      debtNearMax: "Debt share near max LTV",
+      largestDebtShare: "Largest single-trove debt share",
+    },
+    loading: "Loading trove metrics…",
+    empty: "No active troves in this market.",
+    unavailable: "Trove metrics are unavailable right now. Try again.",
+  },
   activity: {
     title: "Protocol activity",
     description: "Recent activity across Flex markets.",
