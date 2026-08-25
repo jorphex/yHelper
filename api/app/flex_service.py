@@ -454,6 +454,144 @@ def flex_redemption_priority_response(market_address: str) -> dict[str, object] 
     return _redemption_priority_response(row, now=datetime.now(UTC))
 
 
+def _trove_health_response(
+    row: dict[str, object],
+    *,
+    now: datetime,
+) -> dict[str, object]:
+    source_block_time = row.get("source_block_time")
+    fetched_at = row.get("fetched_at")
+    attempted_at = row.get("attempted_at")
+    source_age = _age_seconds(
+        source_block_time if isinstance(source_block_time, datetime) else None,
+        now,
+    )
+    fetched_age = _age_seconds(fetched_at if isinstance(fetched_at, datetime) else None, now)
+    last_error = str(row["last_error"]) if row.get("last_error") else None
+    has_sample = (
+        row.get("source_block_number") is not None
+        and isinstance(source_block_time, datetime)
+        and row.get("active_troves") is not None
+        and isinstance(fetched_at, datetime)
+    )
+    if not has_sample:
+        data_state = "unavailable"
+    elif (
+        last_error is not None
+        or source_age is None
+        or source_age > FLEX_STALE_AFTER_SECONDS
+        or fetched_age is None
+        or fetched_age > FLEX_STALE_AFTER_SECONDS
+    ):
+        data_state = "delayed"
+    else:
+        data_state = "ready"
+
+    collateral_decimals = int(row["collateral_token_decimals"])
+    borrow_decimals = int(row["borrow_token_decimals"])
+    metrics = None
+    if has_sample:
+        total_collateral_raw = str(row.get("total_collateral_raw") or "0")
+        total_debt_raw = str(row.get("total_debt_raw") or "0")
+        debt_near_max_raw = str(row.get("debt_near_max_raw") or "0")
+        total_debt = _decimal(total_debt_raw)
+        debt_near_max = _decimal(debt_near_max_raw)
+
+        def _ratio(field: str) -> float | None:
+            value = row.get(field)
+            return float(_decimal(value) / WAD) if value is not None else None
+
+        metrics = {
+            "active_troves": int(row.get("active_troves") or 0),
+            "total_collateral_raw": total_collateral_raw,
+            "total_collateral": _scaled(total_collateral_raw, collateral_decimals),
+            "total_debt_raw": total_debt_raw,
+            "total_debt": _scaled(total_debt_raw, borrow_decimals),
+            "median_ltv": _ratio("median_ltv_wad"),
+            "maximum_position_ltv": _ratio("maximum_position_ltv_wad"),
+            "minimum_buffer_to_max_ltv": _ratio("minimum_buffer_wad"),
+            "near_max_threshold": 0.01,
+            "near_max_troves": int(row.get("near_max_troves") or 0),
+            "debt_near_max_raw": debt_near_max_raw,
+            "debt_near_max": _scaled(debt_near_max_raw, borrow_decimals),
+            "debt_near_max_share": float(debt_near_max / total_debt) if total_debt else None,
+            "largest_debt_share": _ratio("largest_debt_share_wad"),
+        }
+    return {
+        "scope": _redemption_priority_scope(),
+        "market_address": str(row["market_address"]),
+        "collateral_token": {
+            "address": str(row["collateral_token_address"]),
+            "symbol": str(row["collateral_token_symbol"]),
+            "decimals": collateral_decimals,
+        },
+        "borrow_token": {
+            "address": str(row["borrow_token_address"]),
+            "symbol": str(row["borrow_token_symbol"]),
+            "decimals": borrow_decimals,
+        },
+        "metrics": metrics,
+        "freshness": {
+            "data_state": data_state,
+            "source_block_number": (
+                int(row["source_block_number"]) if row.get("source_block_number") is not None else None
+            ),
+            "source_block_time": _iso(
+                source_block_time if isinstance(source_block_time, datetime) else None
+            ),
+            "source_age_seconds": source_age,
+            "fetched_at": _iso(fetched_at if isinstance(fetched_at, datetime) else None),
+            "fetched_age_seconds": fetched_age,
+            "stale_after_seconds": FLEX_STALE_AFTER_SECONDS,
+            "last_attempted_at": _iso(
+                attempted_at if isinstance(attempted_at, datetime) else None
+            ),
+            "last_error": last_error,
+        },
+    }
+
+
+def flex_trove_health_response(market_address: str) -> dict[str, object] | None:
+    with _read_cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                d.market_address,
+                d.collateral_token_address,
+                d.collateral_token_symbol,
+                d.collateral_token_decimals,
+                d.borrow_token_address,
+                d.borrow_token_symbol,
+                d.borrow_token_decimals,
+                health.source_block_number,
+                health.source_block_time,
+                health.active_troves,
+                health.total_collateral_raw,
+                health.total_debt_raw,
+                health.median_ltv_wad,
+                health.maximum_position_ltv_wad,
+                health.minimum_buffer_wad,
+                health.near_max_troves,
+                health.debt_near_max_raw,
+                health.largest_debt_share_wad,
+                health.fetched_at,
+                health.attempted_at,
+                health.last_error
+            FROM flex_market_dim d
+            LEFT JOIN flex_trove_health_current health
+                ON health.chain_id = d.chain_id
+               AND health.market_address = d.market_address
+            WHERE d.chain_id = 1
+              AND d.market_address = %s
+            """,
+            (market_address,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    return _trove_health_response(row, now=datetime.now(UTC))
+
+
 def flex_market_history_response(
     market_address: str,
     *,

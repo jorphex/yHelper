@@ -316,6 +316,28 @@ def _ensure_schema_columns() -> None:
                     FOREIGN KEY (chain_id, market_address)
                         REFERENCES flex_market_dim(chain_id, market_address) ON DELETE CASCADE
                 );
+                CREATE TABLE IF NOT EXISTS flex_trove_health_current (
+                    chain_id INTEGER NOT NULL,
+                    market_address TEXT NOT NULL,
+                    source_block_number BIGINT,
+                    source_block_time TIMESTAMPTZ,
+                    active_troves INTEGER,
+                    total_collateral_raw NUMERIC(78, 0),
+                    total_debt_raw NUMERIC(78, 0),
+                    median_ltv_wad NUMERIC(78, 0),
+                    maximum_position_ltv_wad NUMERIC(78, 0),
+                    minimum_buffer_wad NUMERIC(78, 0),
+                    near_max_troves INTEGER,
+                    debt_near_max_raw NUMERIC(78, 0),
+                    largest_debt_share_wad NUMERIC(78, 0),
+                    source_url TEXT NOT NULL,
+                    fetched_at TIMESTAMPTZ,
+                    attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_error TEXT,
+                    PRIMARY KEY (chain_id, market_address),
+                    FOREIGN KEY (chain_id, market_address)
+                        REFERENCES flex_market_dim(chain_id, market_address) ON DELETE CASCADE
+                );
                 """
             )
             cur.execute("ALTER TABLE product_interactions ADD COLUMN IF NOT EXISTS amount_raw NUMERIC(78, 0)")

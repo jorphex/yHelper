@@ -10,8 +10,9 @@ from app.flex_service import (
     _floor_bucket,
     _redemption_priority_response,
     _summary,
+    _trove_health_response,
 )
-from app.models import FlexRedemptionPriorityResponse
+from app.models import FlexRedemptionPriorityResponse, FlexTroveHealthResponse
 
 
 def _redemption_row(now: datetime) -> dict[str, object]:
@@ -29,6 +30,32 @@ def _redemption_row(now: datetime) -> dict[str, object]:
             {"rate": "55000", "redeemable_before": "1964702059"},
         ],
         "source_url": "https://api.flexmeow.com/v1/ui/borrow?chain_id=1&trove_manager=0x11",
+        "fetched_at": now - timedelta(minutes=2),
+        "attempted_at": now - timedelta(minutes=2),
+        "last_error": None,
+    }
+
+
+def _trove_health_row(now: datetime) -> dict[str, object]:
+    return {
+        "market_address": "0x" + "11" * 20,
+        "collateral_token_address": "0x" + "22" * 20,
+        "collateral_token_symbol": "yvUSD",
+        "collateral_token_decimals": 6,
+        "borrow_token_address": "0x" + "33" * 20,
+        "borrow_token_symbol": "USDC",
+        "borrow_token_decimals": 6,
+        "source_block_number": 25_754_070,
+        "source_block_time": now - timedelta(minutes=5),
+        "active_troves": 3,
+        "total_collateral_raw": Decimal(400_000_000),
+        "total_debt_raw": Decimal(350_000_000),
+        "median_ltv_wad": Decimal(900_000_000_000_000_000),
+        "maximum_position_ltv_wad": Decimal(900_000_000_000_000_000),
+        "minimum_buffer_wad": Decimal(9_090_000_000_000_000),
+        "near_max_troves": 2,
+        "debt_near_max_raw": Decimal(270_000_000),
+        "largest_debt_share_wad": Decimal(514_285_714_285_714_285),
         "fetched_at": now - timedelta(minutes=2),
         "attempted_at": now - timedelta(minutes=2),
         "last_error": None,
@@ -141,6 +168,33 @@ class FlexServiceSemanticsTests(unittest.TestCase):
         self.assertEqual(response["freshness"]["data_state"], "unavailable")  # type: ignore[index]
         self.assertIsNone(response["total_debt_raw"])
         self.assertEqual(response["points"], [])
+
+    def test_trove_health_scales_aggregate_metrics(self) -> None:
+        now = datetime(2026, 8, 14, 12, tzinfo=UTC)
+        response = _trove_health_response(_trove_health_row(now), now=now)
+        validated = FlexTroveHealthResponse.model_validate(response)
+
+        self.assertEqual(validated.scope.source, "flex_ui_api")
+        self.assertEqual(validated.freshness.data_state, "ready")
+        assert validated.metrics is not None
+        self.assertEqual(validated.metrics.active_troves, 3)
+        self.assertEqual(validated.metrics.total_collateral, 400)
+        self.assertEqual(validated.metrics.total_debt, 350)
+        self.assertAlmostEqual(validated.metrics.median_ltv or 0, 0.9)
+        self.assertAlmostEqual(validated.metrics.minimum_buffer_to_max_ltv or 0, 0.00909)
+        self.assertAlmostEqual(validated.metrics.debt_near_max_share or 0, 270 / 350)
+        self.assertAlmostEqual(validated.metrics.largest_debt_share or 0, 180 / 350)
+
+    def test_trove_health_retains_last_sample_when_refresh_fails(self) -> None:
+        now = datetime(2026, 8, 14, 12, tzinfo=UTC)
+        row = _trove_health_row(now)
+        row["attempted_at"] = now
+        row["last_error"] = "upstream unavailable"
+
+        response = _trove_health_response(row, now=now)
+
+        self.assertEqual(response["freshness"]["data_state"], "delayed")  # type: ignore[index]
+        self.assertIsNotNone(response["metrics"])
 
 
 if __name__ == "__main__":

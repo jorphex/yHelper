@@ -758,6 +758,32 @@ class FlexRedemptionPriorityResponse(ApiModel):
     freshness: FlexRedemptionPriorityFreshness
 
 
+class FlexTroveHealthMetrics(ApiModel):
+    active_troves: int
+    total_collateral_raw: str
+    total_collateral: float
+    total_debt_raw: str
+    total_debt: float
+    median_ltv: float | None
+    maximum_position_ltv: float | None
+    minimum_buffer_to_max_ltv: float | None
+    near_max_threshold: float
+    near_max_troves: int
+    debt_near_max_raw: str
+    debt_near_max: float
+    debt_near_max_share: float | None
+    largest_debt_share: float | None
+
+
+class FlexTroveHealthResponse(ApiModel):
+    scope: FlexRedemptionPriorityScope
+    market_address: str
+    collateral_token: FlexToken
+    borrow_token: FlexToken
+    metrics: FlexTroveHealthMetrics | None
+    freshness: FlexRedemptionPriorityFreshness
+
+
 class FlexHistoryFilters(ApiModel):
     days: Literal[7, 30, 90]
     interval: Literal["hour", "day"]

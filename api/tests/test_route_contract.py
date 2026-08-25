@@ -21,6 +21,7 @@ class RouteContractTests(unittest.TestCase):
                 "/api/flex/markets/{market_address}",
                 "/api/flex/markets/{market_address}/history",
                 "/api/flex/markets/{market_address}/redemption-priority",
+                "/api/flex/markets/{market_address}/trove-health",
                 "/api/flex/activity",
             }.issubset(paths)
         )
@@ -65,6 +66,7 @@ class RouteContractTests(unittest.TestCase):
             "/api/flex/markets/{market_address}": "FlexMarketDetailResponse",
             "/api/flex/markets/{market_address}/history": "FlexMarketHistoryResponse",
             "/api/flex/markets/{market_address}/redemption-priority": "FlexRedemptionPriorityResponse",
+            "/api/flex/markets/{market_address}/trove-health": "FlexTroveHealthResponse",
             "/api/flex/activity": "FlexActivityResponse",
         }
         for path, model_name in expected_models.items():

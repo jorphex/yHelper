@@ -14,6 +14,7 @@ from worker.flex import (
 from worker.flex_api import (
     _record_redemption_priority_failure,
     _validated_redemption_priority_payload,
+    _validated_trove_health_payload,
 )
 
 
@@ -37,6 +38,43 @@ def _redemption_payload() -> dict[str, object]:
                 {"rate": "55000", "redeemable_before": "1964702059"},
             ],
         },
+    }
+
+
+def _explorer_payload() -> dict[str, object]:
+    return {
+        "chain_id": 1,
+        "block_number": 25_754_070,
+        "block_timestamp": 1_786_720_079,
+        "markets": {
+            f"1:{MARKET_ADDRESS}": {
+                "collateral_token_price_in_borrow_token": str(10**18),
+                "max_ltv": "909090",
+            }
+        },
+        "rows": [
+            {
+                "market_id": f"1:{MARKET_ADDRESS}",
+                "trove_id": str(index),
+                "collateral": str(collateral),
+                "debt": str(debt),
+                "annual_interest_rate": "20000",
+                "status": 1,
+            }
+            for index, (collateral, debt) in enumerate(
+                ((100_000_000, 90_000_000), (200_000_000, 180_000_000), (100_000_000, 80_000_000)),
+                start=1,
+            )
+        ],
+    }
+
+
+def _active_market() -> dict[str, object]:
+    return {
+        "market_address": MARKET_ADDRESS,
+        "market_status": "active",
+        "collateral_token_decimals": 6,
+        "borrow_token_decimals": 6,
     }
 
 
@@ -207,6 +245,39 @@ class FlexWorkerTests(unittest.TestCase):
         self.assertNotIn("fetched_at", update_clause)
         self.assertIn("attempted_at = EXCLUDED.attempted_at", update_clause)
         self.assertEqual(params[-1], "upstream unavailable")
+
+    def test_trove_health_validation_aggregates_without_position_identity(self) -> None:
+        aggregates = _validated_trove_health_payload(_explorer_payload(), [_active_market()])
+
+        self.assertEqual(len(aggregates), 1)
+        aggregate = aggregates[0]
+        self.assertEqual(aggregate["active_troves"], 3)
+        self.assertEqual(aggregate["total_collateral_raw"], "400000000")
+        self.assertEqual(aggregate["total_debt_raw"], "350000000")
+        self.assertEqual(aggregate["median_ltv_wad"], "900000000000000000")
+        self.assertEqual(aggregate["maximum_position_ltv_wad"], "900000000000000000")
+        self.assertEqual(aggregate["minimum_buffer_wad"], "9090000000000000")
+        self.assertEqual(aggregate["near_max_troves"], 2)
+        self.assertEqual(aggregate["debt_near_max_raw"], "270000000")
+        self.assertEqual(aggregate["largest_debt_share_wad"], "514285714285714285")
+        self.assertNotIn("owner", aggregate)
+        self.assertNotIn("trove_id", aggregate)
+
+    def test_trove_health_validation_requires_every_active_market(self) -> None:
+        payload = _explorer_payload()
+        payload["markets"] = {}
+
+        with self.assertRaisesRegex(ValueError, "missing active market"):
+            _validated_trove_health_payload(payload, [_active_market()])
+
+    def test_trove_health_validation_rejects_duplicate_troves(self) -> None:
+        payload = _explorer_payload()
+        rows = payload["rows"]
+        assert isinstance(rows, list)
+        rows.append(deepcopy(rows[0]))
+
+        with self.assertRaisesRegex(ValueError, "repeats trove"):
+            _validated_trove_health_payload(payload, [_active_market()])
 
 
 if __name__ == "__main__":

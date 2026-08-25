@@ -48,6 +48,7 @@ from .flex_api import (
     _api_payload,
     _live_api_metadata,
     _sync_redemption_priorities,
+    _sync_trove_health,
 )
 
 WAD = 10**18
@@ -898,13 +899,21 @@ def _run_flex_sync(conn: psycopg.Connection, *, max_snapshot_hours: int | None =
             FLEX_MAX_SNAPSHOT_HOURS_PER_RUN if max_snapshot_hours is None else max_snapshot_hours,
         )
         redemption_priority = _sync_redemption_priorities(conn, markets)
+        trove_health = _sync_trove_health(conn, markets)
         reconciliation = _reconcile(conn, finalized_block)
-        records = len(markets) + events + snapshots + redemption_priority["ready"]
+        records = (
+            len(markets)
+            + events
+            + snapshots
+            + redemption_priority["ready"]
+            + trove_health["ready"]
+        )
         result = {
             "markets": len(markets),
             "events": events,
             "snapshots": snapshots,
             "redemption_priority": redemption_priority,
+            "trove_health": trove_health,
             "finalized_block": finalized_block,
             "finalized_at": finalized_at.isoformat(),
             "reconciliation": reconciliation,

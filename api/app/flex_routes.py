@@ -13,6 +13,7 @@ from app.flex_service import (
     flex_markets_response,
     flex_protocol_response,
     flex_redemption_priority_response,
+    flex_trove_health_response,
 )
 from app.models import (
     FlexActivityResponse,
@@ -21,6 +22,7 @@ from app.models import (
     FlexMarketsResponse,
     FlexProtocolResponse,
     FlexRedemptionPriorityResponse,
+    FlexTroveHealthResponse,
 )
 
 router = APIRouter()
@@ -95,6 +97,23 @@ def flex_market_detail(market_address: str) -> dict[str, object]:
 )
 def flex_redemption_priority(market_address: str) -> dict[str, object]:
     response = flex_redemption_priority_response(_address(market_address))
+    if response is None:
+        raise HTTPException(status_code=404, detail="Flex market not found")
+    return response
+
+
+@router.get(
+    "/api/flex/markets/{market_address}/trove-health",
+    response_model=FlexTroveHealthResponse,
+    summary="Get current aggregate Flex trove health",
+    description=(
+        "Returns privacy-preserving aggregate position metrics for one current Flex market. "
+        "LTV and debt-share fields are decimal ratios; near-maximum debt is within one "
+        "percentage point of the market maximum. No owner or trove identifiers are returned."
+    ),
+)
+def flex_trove_health(market_address: str) -> dict[str, object]:
+    response = flex_trove_health_response(_address(market_address))
     if response is None:
         raise HTTPException(status_code=404, detail="Flex market not found")
     return response
