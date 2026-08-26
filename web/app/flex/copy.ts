@@ -42,7 +42,7 @@ export const flexCopy = {
       liquidity: "Liquidity",
       utilization: "Utilization",
       lenderApr: "Lender APR",
-      borrowerRate: "Borrower rate",
+      borrowerRate: "Debt-weighted rate",
       age: "Age",
     },
     mobile: {
@@ -51,7 +51,7 @@ export const flexCopy = {
       liquidity: "Available",
       utilization: "Used",
       lenderApr: "Lender APR",
-      borrowerRate: "Borrower rate",
+      borrowerRate: "Debt-weighted rate",
     },
   },
   status: {
