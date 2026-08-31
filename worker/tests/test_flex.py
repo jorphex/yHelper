@@ -33,6 +33,7 @@ def _redemption_payload() -> dict[str, object]:
         "addresses": {"trove_manager": MARKET_ADDRESS.upper().replace("0X", "0x")},
         "metrics": {
             "total_debt": "1968818629",
+            "idle_liquidity": "4123456",
             "redeemable_before_you": [
                 {"rate": "20000", "redeemable_before": "0"},
                 {"rate": "55000", "redeemable_before": "1964702059"},
@@ -164,6 +165,7 @@ class FlexWorkerTests(unittest.TestCase):
             datetime.fromtimestamp(1_786_720_079, UTC),
         )
         self.assertEqual(validated["total_debt_raw"], "1968818629")
+        self.assertEqual(validated["idle_liquidity_raw"], "4123456")
         self.assertEqual(
             validated["points"],
             [
@@ -189,6 +191,13 @@ class FlexWorkerTests(unittest.TestCase):
         assert isinstance(metrics, dict)
         metrics["total_debt"] = 1_968_818_629
         with self.assertRaisesRegex(ValueError, "total_debt"):
+            _validated_redemption_priority_payload(payload, MARKET_ADDRESS)
+
+        payload = _redemption_payload()
+        metrics = payload["metrics"]
+        assert isinstance(metrics, dict)
+        metrics["idle_liquidity"] = 4.123456
+        with self.assertRaisesRegex(ValueError, "idle_liquidity"):
             _validated_redemption_priority_payload(payload, MARKET_ADDRESS)
 
         payload = _redemption_payload()

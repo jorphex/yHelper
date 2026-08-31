@@ -347,6 +347,14 @@ def _redemption_priority_response(
     source_block_time = row.get("source_block_time")
     fetched_at = row.get("fetched_at")
     attempted_at = row.get("attempted_at")
+    raw_payload = row.get("raw_payload")
+    raw_metrics = raw_payload.get("metrics") if isinstance(raw_payload, dict) else None
+    idle_value = raw_metrics.get("idle_liquidity") if isinstance(raw_metrics, dict) else None
+    idle_liquidity_raw = (
+        idle_value
+        if isinstance(idle_value, str) and idle_value.isascii() and idle_value.isdigit()
+        else None
+    )
     source_age = _age_seconds(source_block_time if isinstance(source_block_time, datetime) else None, now)
     fetched_age = _age_seconds(fetched_at if isinstance(fetched_at, datetime) else None, now)
     last_error = str(row["last_error"]) if row.get("last_error") else None
@@ -354,6 +362,7 @@ def _redemption_priority_response(
         row.get("source_block_number") is not None
         and isinstance(source_block_time, datetime)
         and row.get("total_debt_raw") is not None
+        and idle_liquidity_raw is not None
         and isinstance(fetched_at, datetime)
     )
     if not has_sample:
@@ -403,6 +412,8 @@ def _redemption_priority_response(
         },
         "total_debt_raw": total_debt_raw,
         "total_debt": _scaled(total_debt_raw, decimals) if total_debt_raw is not None else None,
+        "idle_liquidity_raw": idle_liquidity_raw if has_sample else None,
+        "idle_liquidity": _scaled(idle_liquidity_raw, decimals) if has_sample else None,
         "points": points,
         "source_url": str(row["source_url"]) if row.get("source_url") else None,
         "freshness": {
@@ -435,6 +446,7 @@ def flex_redemption_priority_response(market_address: str) -> dict[str, object] 
                 priority.source_block_time,
                 priority.total_debt_raw,
                 priority.points,
+                priority.raw_payload,
                 priority.source_url,
                 priority.fetched_at,
                 priority.attempted_at,

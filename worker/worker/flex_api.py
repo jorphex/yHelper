@@ -84,6 +84,7 @@ def _validated_redemption_priority_payload(
     if not isinstance(metrics, dict):
         raise ValueError("Flex borrow response is missing metrics")
     total_debt_raw = _raw_uint_string(metrics.get("total_debt"), "total_debt")
+    idle_liquidity_raw = _raw_uint_string(metrics.get("idle_liquidity"), "idle_liquidity")
     total_debt = int(total_debt_raw)
     raw_points = metrics.get("redeemable_before_you")
     if not isinstance(raw_points, list):
@@ -114,6 +115,7 @@ def _validated_redemption_priority_payload(
         "source_block_number": block_number,
         "source_block_time": datetime.fromtimestamp(block_timestamp, UTC),
         "total_debt_raw": total_debt_raw,
+        "idle_liquidity_raw": idle_liquidity_raw,
         "points": points,
     }
 

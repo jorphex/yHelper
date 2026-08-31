@@ -753,6 +753,8 @@ class FlexRedemptionPriorityResponse(ApiModel):
     rate_scale: FlexRedemptionRateScale
     total_debt_raw: str | None
     total_debt: float | None
+    idle_liquidity_raw: str | None
+    idle_liquidity: float | None
     points: list[FlexRedemptionPriorityPoint]
     source_url: str | None
     freshness: FlexRedemptionPriorityFreshness

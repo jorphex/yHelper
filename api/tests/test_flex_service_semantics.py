@@ -25,6 +25,7 @@ def _redemption_row(now: datetime) -> dict[str, object]:
         "source_block_number": 25_754_070,
         "source_block_time": now - timedelta(minutes=5),
         "total_debt_raw": Decimal(1_968_818_629),
+        "raw_payload": {"metrics": {"idle_liquidity": "4123456"}},
         "points": [
             {"rate": "20000", "redeemable_before": "0"},
             {"rate": "55000", "redeemable_before": "1964702059"},
@@ -118,6 +119,8 @@ class FlexServiceSemanticsTests(unittest.TestCase):
         self.assertEqual(response["freshness"]["data_state"], "ready")  # type: ignore[index]
         self.assertEqual(response["rate_scale"]["one_pct_raw"], "10000")  # type: ignore[index]
         self.assertAlmostEqual(response["total_debt"], 1968.818629)  # type: ignore[arg-type]
+        self.assertEqual(response["idle_liquidity_raw"], "4123456")
+        self.assertAlmostEqual(response["idle_liquidity"], 4.123456)  # type: ignore[arg-type]
         points = response["points"]
         assert isinstance(points, list)
         self.assertEqual(points[0]["annual_interest_rate_raw"], "20000")
@@ -157,6 +160,7 @@ class FlexServiceSemanticsTests(unittest.TestCase):
                 "source_block_number": None,
                 "source_block_time": None,
                 "total_debt_raw": None,
+                "raw_payload": {},
                 "points": [],
                 "fetched_at": None,
                 "last_error": "not found upstream",
@@ -167,6 +171,7 @@ class FlexServiceSemanticsTests(unittest.TestCase):
 
         self.assertEqual(response["freshness"]["data_state"], "unavailable")  # type: ignore[index]
         self.assertIsNone(response["total_debt_raw"])
+        self.assertIsNone(response["idle_liquidity_raw"])
         self.assertEqual(response["points"], [])
 
     def test_trove_health_scales_aggregate_metrics(self) -> None:

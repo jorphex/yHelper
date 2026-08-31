@@ -92,7 +92,8 @@ def flex_market_detail(market_address: str) -> dict[str, object]:
     summary="Get current Flex redemption priority",
     description=(
         "Returns the official current discrete rate curve for one Flex market. Each point reports accrued "
-        "borrow-token debt at strictly lower chosen annual rates. Freshness is independent from archive history."
+        "borrow-token debt at strictly lower chosen annual rates, together with idle liquidity from the same "
+        "source block. Freshness is independent from archive history."
     ),
 )
 def flex_redemption_priority(market_address: str) -> dict[str, object]:
