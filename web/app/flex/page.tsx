@@ -271,17 +271,21 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
   const top = width < 480 ? 16 : 20;
   const bottom = width < 480 ? 32 : 40;
   const points = data.points;
+  const idleLiquidity = Math.max(0, data.idle_liquidity ?? 0);
   const totalDebt = data.total_debt ?? Math.max(0, ...points.map((point) => point.redeemable_before));
+  const borrowingCapacity = (redeemableBefore: number) => idleLiquidity + redeemableBefore;
   const xMax = Math.max(points.at(-1)?.annual_interest_rate ?? 0, 0.0001);
-  const yMax = niceCeiling(Math.max(totalDebt, ...points.map((point) => point.redeemable_before), 1));
+  const yMax = niceCeiling(Math.max(borrowingCapacity(totalDebt), ...points.map((point) => borrowingCapacity(point.redeemable_before)), 1));
   const plotWidth = width - left - right;
   const plotHeight = height - top - bottom;
   const x = (rate: number) => left + (rate / xMax) * plotWidth;
   const y = (debt: number) => top + (1 - debt / yMax) * plotHeight;
-  const stepPath = points.reduce((path, point) => `${path} H${x(point.annual_interest_rate).toFixed(2)} V${y(point.redeemable_before).toFixed(2)}`, `M${x(0).toFixed(2)},${y(0).toFixed(2)}`);
-  const areaPath = `${stepPath} L${x(xMax).toFixed(2)},${y(0).toFixed(2)} Z`;
+  const stepPath = points.reduce((path, point) => `${path} H${x(point.annual_interest_rate).toFixed(2)} V${y(borrowingCapacity(point.redeemable_before)).toFixed(2)}`, `M${x(0).toFixed(2)},${y(idleLiquidity).toFixed(2)}`);
+  const areaPath = `${stepPath} L${x(xMax).toFixed(2)},${y(idleLiquidity).toFixed(2)} Z`;
   const inspected = inspectionIndex === null ? null : points[inspectionIndex];
+  const inspectedCapacity = inspected ? borrowingCapacity(inspected.redeemable_before) : 0;
   const inspectedShare = inspected && totalDebt > 0 ? inspected.redeemable_before / totalDebt : 0;
+  const idlePatternId = `flex-idle-${data.market_address.slice(2, 10)}`;
   const tickStep = 10 ** Math.floor(Math.log10(xMax));
   const xTicks = width < 480
     ? [0, xMax / 2, xMax]
@@ -316,16 +320,30 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
   };
   const summary = inspected ? flexA11y(flexCopy.redemptionPriority.summary, {
     rate: formatPct(inspected.annual_interest_rate),
-    debtAhead: `${compact.format(inspected.redeemable_before)} ${data.borrow_token.symbol}`,
+    idle: compact.format(idleLiquidity),
+    redeemed: `${compact.format(inspected.redeemable_before)} ${data.borrow_token.symbol}`,
+    total: `${compact.format(inspectedCapacity)} ${data.borrow_token.symbol}`,
     share: formatPct(inspectedShare),
   }) : "";
+  const inspectionDetails = inspected ? [
+    [flexCopy.redemptionPriority.tooltip.annualRate, formatPct(inspected.annual_interest_rate)],
+    [flexCopy.redemptionPriority.tooltip.idle, `${compact.format(idleLiquidity)} ${data.borrow_token.symbol}`],
+    [flexCopy.redemptionPriority.tooltip.redeemed, `${compact.format(inspected.redeemable_before)} ${data.borrow_token.symbol}`],
+    [flexCopy.redemptionPriority.tooltip.total, `${compact.format(inspectedCapacity)} ${data.borrow_token.symbol}`],
+    [flexCopy.redemptionPriority.tooltip.shareOfTotal, formatPct(inspectedShare)],
+  ] : [];
 
-  return <div
+  return <>
+  <div className="flex-redemption-legend">
+    <span><i className="flex-redemption-idle-swatch" aria-hidden="true" />{flexCopy.redemptionPriority.legend.idle}<strong>{compact.format(idleLiquidity)} {data.borrow_token.symbol}</strong></span>
+    <span><i className="flex-redemption-redeemable-swatch" aria-hidden="true" />{flexCopy.redemptionPriority.legend.redeemable}</span>
+  </div>
+  <div
     ref={chartRef}
     className="flex-chart-interactive flex-redemption-chart"
     tabIndex={0}
     role="group"
-    aria-label={`${flexCopy.redemptionPriority.chart.ariaLabel}. ${flexCopy.redemptionPriority.axes.annualRate}. ${flexA11y(flexCopy.redemptionPriority.axes.debtAhead, { symbol: data.borrow_token.symbol })}. ${flexCopy.redemptionPriority.chart.interaction}`}
+    aria-label={`${flexCopy.redemptionPriority.chart.ariaLabel}. ${flexCopy.redemptionPriority.axes.annualRate}. ${flexA11y(flexCopy.redemptionPriority.axes.capacity, { symbol: data.borrow_token.symbol })}. ${flexCopy.redemptionPriority.chart.interaction}`}
     onFocus={() => setInspectionIndex((current) => current ?? points.length - 1)}
     onBlur={() => setInspectionIndex(null)}
     onKeyDown={moveInspection}
@@ -334,26 +352,35 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
     onPointerLeave={(event) => { if (event.pointerType === "mouse") setInspectionIndex(null); }}
   >
     <svg className="flex-line-chart" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+      <defs>
+        <pattern id={idlePatternId} width="6" height="6" patternUnits="userSpaceOnUse">
+          <path d="M0 6L6 0" className="flex-redemption-idle-pattern" />
+        </pattern>
+      </defs>
       {yTicks.map((ratio) => <g key={ratio}>
         <line x1={left} x2={width - right} y1={y(yMax * ratio)} y2={y(yMax * ratio)} className="flex-chart-grid" />
         <text x="4" y={y(yMax * ratio) - 4} textAnchor="start" className="flex-chart-axis flex-chart-axis-inset">{compact.format(yMax * ratio)}</text>
       </g>)}
+      <rect x={left} y={y(idleLiquidity)} width={plotWidth} height={Math.max(0, y(0) - y(idleLiquidity))} fill={`url(#${idlePatternId})`} className="flex-redemption-idle-area" />
+      <line x1={left} x2={width - right} y1={y(idleLiquidity)} y2={y(idleLiquidity)} className="flex-redemption-idle-line" />
       <path d={areaPath} className="flex-redemption-area" />
       <path d={stepPath} className="flex-redemption-line" />
-      {points.map((point) => <circle key={`${point.annual_interest_rate_raw}:${point.redeemable_before_raw}`} cx={x(point.annual_interest_rate)} cy={y(point.redeemable_before)} r={width < 480 ? "2" : "3.5"} className="flex-redemption-point" />)}
+      {points.map((point) => <circle key={`${point.annual_interest_rate_raw}:${point.redeemable_before_raw}`} cx={x(point.annual_interest_rate)} cy={y(borrowingCapacity(point.redeemable_before))} r={width < 480 ? "2" : "3.5"} className="flex-redemption-point" />)}
       {inspected ? <g className="flex-chart-inspection">
         <line x1={x(inspected.annual_interest_rate)} x2={x(inspected.annual_interest_rate)} y1={top} y2={height - bottom} />
-        <circle cx={x(inspected.annual_interest_rate)} cy={y(inspected.redeemable_before)} r={width < 480 ? "4" : "5"} className="flex-redemption-active-point" />
+        <circle cx={x(inspected.annual_interest_rate)} cy={y(inspectedCapacity)} r={width < 480 ? "4" : "5"} className="flex-redemption-active-point" />
       </g> : null}
       {xTicks.map((tick, index) => <text key={`${tick}:${index}`} x={x(tick)} y={height - 10} textAnchor={index === 0 ? "start" : index === xTicks.length - 1 ? "end" : "middle"} className="flex-chart-axis">{formatPct(tick, tick === 0 ? 0 : width < 480 || tick === xMax ? 1 : 0)}</text>)}
     </svg>
-    {inspected ? <div className={`flex-chart-tooltip ${inspectionIndex !== null && inspectionIndex > points.length * 0.65 ? "is-right" : ""}`} style={{ left: `${(x(inspected.annual_interest_rate) / width) * 100}%` }}>
-      <span>{flexCopy.redemptionPriority.tooltip.annualRate}<strong>{formatPct(inspected.annual_interest_rate)}</strong></span>
-      <span>{flexCopy.redemptionPriority.tooltip.debtAhead}<strong>{compact.format(inspected.redeemable_before)} {data.borrow_token.symbol}</strong></span>
-      <span>{flexCopy.redemptionPriority.tooltip.shareOfTotal}<strong>{formatPct(inspectedShare)}</strong></span>
-    </div> : null}
+    {inspected && width >= 480 ? <dl className={`flex-chart-tooltip flex-redemption-detail-list ${inspectionIndex !== null && inspectionIndex > points.length * 0.65 ? "is-right" : ""}`} style={{ left: `${(x(inspected.annual_interest_rate) / width) * 100}%` }}>
+      {inspectionDetails.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+    </dl> : null}
     <span className="sr-only" aria-live="polite">{summary}</span>
-  </div>;
+  </div>
+  {inspected && width < 480 ? <dl className="flex-redemption-mobile-details flex-redemption-detail-list">
+    {inspectionDetails.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+  </dl> : null}
+  </>;
 }
 
 function RedemptionPrioritySection({

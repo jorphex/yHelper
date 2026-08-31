@@ -247,6 +247,65 @@
   margin-top: var(--space-5);
 }
 
+.flex-redemption-legend + .flex-redemption-chart {
+  margin-top: var(--space-3);
+}
+
+.flex-redemption-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin-top: var(--space-4);
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.flex-redemption-legend span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.flex-redemption-legend strong {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.flex-redemption-legend i {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 18px;
+}
+
+.flex-redemption-idle-swatch {
+  height: 8px;
+  border-bottom: 1px dashed var(--text-tertiary);
+  background: repeating-linear-gradient(135deg, transparent 0 3px, rgba(255, 255, 255, 0.34) 3px 4px);
+}
+
+.flex-redemption-redeemable-swatch {
+  height: 0;
+  border-top: 2px solid var(--accent);
+}
+
+.flex-redemption-idle-pattern {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 1;
+}
+
+.flex-redemption-idle-area {
+  stroke: none;
+}
+
+.flex-redemption-idle-line {
+  stroke: var(--text-tertiary);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
 .flex-redemption-area {
   fill: rgba(var(--accent-rgb), 0.09);
   stroke: none;
@@ -271,6 +330,44 @@
 .flex-redemption-active-point {
   stroke: var(--text-primary);
   stroke-width: 2;
+}
+
+.flex-redemption-chart .flex-chart-tooltip {
+  width: min(340px, calc(100% - var(--space-6)));
+  min-width: 0;
+}
+
+.flex-redemption-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: baseline;
+}
+
+.flex-redemption-detail-list {
+  margin: 0;
+}
+
+.flex-redemption-detail-list dt {
+  color: var(--text-secondary);
+}
+
+.flex-redemption-detail-list dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.flex-redemption-mobile-details {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
 }
 
 .flex-redemption-skeleton {

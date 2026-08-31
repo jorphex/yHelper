@@ -136,6 +136,8 @@ export type FlexRedemptionPriorityResponse = {
   rate_scale: { one_pct_raw: string; unit: string };
   total_debt_raw: string | null;
   total_debt: number | null;
+  idle_liquidity_raw: string | null;
+  idle_liquidity: number | null;
   points: FlexRedemptionPriorityPoint[];
   source_url: string | null;
   freshness: {

@@ -13,7 +13,7 @@ export const flexCopy = {
   hero: {
     title: "Flex Markets",
     accent: "Ethereum lending",
-    blurb: "Compare active markets, rates, and available liquidity.",
+    blurb: "Compare active markets, borrowing rates, and idle USDC, then inspect rate-dependent borrowing capacity.",
     officialLink: "Open Flex",
   },
   freshness: {
@@ -39,7 +39,7 @@ export const flexCopy = {
       status: "Status",
       deposits: "Deposits",
       debt: "Debt",
-      liquidity: "Liquidity",
+      liquidity: "Idle USDC",
       utilization: "Utilization",
       lenderApr: "Lender APR",
       borrowerRate: "Debt-weighted rate",
@@ -48,7 +48,7 @@ export const flexCopy = {
     mobile: {
       deposits: "Deposits",
       debt: "Debt",
-      liquidity: "Available",
+      liquidity: "Idle USDC",
       utilization: "Used",
       lenderApr: "Lender APR",
       borrowerRate: "Debt-weighted rate",
@@ -71,7 +71,7 @@ export const flexCopy = {
     selectedLabel: "Selected market",
     collateral: "Collateral",
     borrowAsset: "Borrow asset",
-    availableLiquidity: "Available liquidity",
+    availableLiquidity: "Idle lender USDC",
     lenderApr: "Lender APR",
     borrowerRate: "Borrower rate",
     utilization: "Utilization",
@@ -125,8 +125,8 @@ export const flexCopy = {
     noResults: "No history was recorded in this period.",
   },
   redemptionPriority: {
-    title: "Redemption priority",
-    description: "Debt at lower rates would redeem first. None sits below the lowest official rate, and the last official tier is the highest rate shown.",
+    title: "Estimated borrowing capacity by rate",
+    description: "At each inspected rate, estimated borrowing capacity combines idle USDC with debt from lower-rate troves that could be redeemed.",
     freshness: {
       ready: "Current",
       delayed: "Delayed",
@@ -134,27 +134,33 @@ export const flexCopy = {
       sourceTime: "As of {time}",
     },
     empty: {
-      title: "No active debt to rank",
-      description: "This market has no debt in the redemption queue.",
+      title: "No active trove rates",
+      description: "This market has no active trove debt for estimating rate-dependent borrowing capacity.",
     },
     unavailable: {
-      title: "Redemption priority is unavailable right now.",
+      title: "Borrowing capacity estimates are unavailable right now.",
       retry: "Try again",
     },
     axes: {
       annualRate: "Annual interest rate",
-      debtAhead: "Debt ahead in {symbol}",
+      capacity: "Estimated borrowing capacity ({symbol})",
+    },
+    legend: {
+      idle: "Idle USDC",
+      redeemable: "Redeemable lower-rate debt",
     },
     chart: {
-      ariaLabel: "Redemption priority by annual interest rate",
+      ariaLabel: "Estimated borrowing capacity by annual rate",
       interaction: "Use touch, pointer, or arrow keys to inspect rates.",
     },
     tooltip: {
       annualRate: "Annual rate",
-      debtAhead: "Debt ahead",
-      shareOfTotal: "Share of total",
+      idle: "Idle USDC",
+      redeemed: "Lower-rate debt potentially redeemed",
+      total: "Estimated borrowing capacity",
+      shareOfTotal: "Debt share potentially affected",
     },
-    summary: "At {rate}, {debtAhead} at strictly lower rates would be redeemed first. That is {share} of total debt.",
+    summary: "At {rate} annual rate, {idle} idle USDC plus {redeemed} of lower-rate debt potentially redeemed gives {total} estimated borrowing capacity; {share} of trove debt may be affected.",
   },
   troveHealth: {
     title: "Trove health",
