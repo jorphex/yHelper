@@ -178,19 +178,35 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
     performance_obj = performance if isinstance(performance, dict) else {}
     oracle = performance_obj.get("oracle")
     oracle_obj = oracle if isinstance(oracle, dict) else {}
+    historical = performance_obj.get("historical")
+    historical_obj = historical if isinstance(historical, dict) else {}
     raw_tvl = (
         _first_present(tvl_obj, ("close", "tvl", "tvlUsd", "usd", "totalValueLockedUSD"))
         if tvl_obj
         else tvl
     )
-    raw_apr = _first_present(oracle_obj, ("apy", "netAPY", "netApy"))
     tvl_usd = _to_float(raw_tvl)
-    est_apy = _to_float(raw_apr)
     numeric_parse_failures: list[str] = []
     if tvl_usd is None and _has_raw_numeric_value(raw_tvl):
         numeric_parse_failures.append("tvl_usd")
-    if est_apy is None and _has_raw_numeric_value(raw_apr):
-        numeric_parse_failures.append("est_apy")
+    if str(vault.get("symbol") or "").strip().lower() in {"ybold", "ysybold"}:
+        raw_apy_values = [
+            _first_present(oracle_obj, ("netAPY", "netApy")),
+            _first_present(historical_obj, ("weeklyNet",)),
+        ]
+        parsed_apy_values = [_to_float(value) for value in raw_apy_values]
+        if any(
+            parsed is None and _has_raw_numeric_value(raw)
+            for raw, parsed in zip(raw_apy_values, parsed_apy_values, strict=True)
+        ):
+            numeric_parse_failures.append("est_apy")
+        valid_apy_values = [value for value in parsed_apy_values if value is not None]
+        est_apy = max(valid_apy_values) if valid_apy_values else None
+    else:
+        raw_apr = _first_present(oracle_obj, ("apy", "netAPY", "netApy"))
+        est_apy = _to_float(raw_apr)
+        if est_apy is None and _has_raw_numeric_value(raw_apr):
+            numeric_parse_failures.append("est_apy")
     row = {
         "vault_address": vault_address,
         "chain_id": chain_id,

@@ -33,6 +33,51 @@ class KongSnapshotValidationTests(unittest.TestCase):
         self.assertIs(row["is_hidden"], False)
         self.assertIs(row["is_retired"], False)
 
+    def test_ybold_family_uses_maximum_net_oracle_or_weekly_apy(self) -> None:
+        row = _normalize_kong_snapshot(
+            [
+                _vault(
+                    symbol="ysyBOLD",
+                    performance={
+                        "oracle": {"apy": 0.05, "netAPY": 0.04},
+                        "historical": {"weeklyNet": 0.17},
+                    },
+                )
+            ]
+        )[0]
+        self.assertEqual(row["est_apy"], 0.17)
+
+    def test_ybold_family_falls_back_to_available_component(self) -> None:
+        row = _normalize_kong_snapshot(
+            [_vault(symbol="yBOLD", performance={"oracle": {"netAPY": 0.04}})]
+        )[0]
+        self.assertEqual(row["est_apy"], 0.04)
+
+    def test_non_ybold_vault_retains_oracle_apy_semantics(self) -> None:
+        row = _normalize_kong_snapshot(
+            [
+                _vault(
+                    symbol="yvUSDC",
+                    performance={
+                        "oracle": {"apy": 0.05, "netAPY": 0.04},
+                        "historical": {"weeklyNet": 0.17},
+                    },
+                )
+            ]
+        )[0]
+        self.assertEqual(row["est_apy"], 0.05)
+
+    def test_ybold_family_rejects_malformed_present_component(self) -> None:
+        record = _vault(
+            symbol="ysyBOLD",
+            performance={
+                "oracle": {"netAPY": 0.04},
+                "historical": {"weeklyNet": "not-a-number"},
+            },
+        )
+        with self.assertRaisesRegex(ValueError, "malformed numeric"):
+            _normalize_kong_snapshot([record])
+
     def test_missing_identity_or_lifecycle_and_invalid_inclusion_fail_snapshot(self) -> None:
         invalid_records = [
             _vault(address=""),
