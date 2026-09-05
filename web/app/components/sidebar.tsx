@@ -5,13 +5,14 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { flexCopy } from "../flex/copy";
 
+const researchPaths = ["/markets", "/momentum", "/explore", "/structure"];
 const navItems = [
   { href: "/", label: "Home" },
   { href: "/styfi", label: "stYFI" },
   { href: "/flex", label: flexCopy.nav.label },
   { href: "/reports", label: "Rewards & reports", paths: ["/reports", "/harvests"] },
+  { href: "/markets", label: "Vault research", paths: researchPaths },
 ];
-const researchPaths = ["/markets", "/momentum", "/explore", "/structure"];
 const externalLinks = [{ href: "https://powerglove.yearn.fi", label: "Powerglove" }];
 
 function ExternalLinkIcon() {
@@ -139,11 +140,6 @@ export function Sidebar() {
           </Link>
           );
         })}
-      </nav>
-
-      <nav className="sidebar-nav sidebar-research" aria-label="Research">
-        <span className="sidebar-group-label">Research</span>
-        <Link href="/markets" className={`sidebar-link ${researchPaths.some((path) => pathname === path) ? "is-active" : ""}`} aria-current={researchPaths.some((path) => pathname === path) ? "page" : undefined}>Vault research</Link>
       </nav>
 
       <div className="sidebar-divider" />
