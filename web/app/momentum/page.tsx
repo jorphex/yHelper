@@ -110,7 +110,7 @@ function MomentumPageContent() {
           <MoverTable title="Yield decreased" direction="weakening" rows={(data?.movers?.fallers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
         </>}
       </section>
-      <details className="detail-disclosure"><summary>Explore the broader pattern</summary><div className="disclosure-body">
+      <section className="detail-section"><h2 className="detail-title">Explore the broader pattern</h2><div className="detail-body">
       <section className="section section-lg analysis-scope" aria-labelledby="current-comparison-title">
         <div className="card-header"><div><div className="scope-label">Selected comparison</div><h2 className="card-title" id="current-comparison-title">{comparisonLabel(query.window)}</h2>{currentScopeNote ? <p className="card-description">{currentScopeNote}</p> : null}</div></div>
         {isLoading ? <KpiGridSkeleton count={3} /> : <div className="kpi-grid kpi-grid-3">
@@ -124,7 +124,7 @@ function MomentumPageContent() {
 
       <section className="section section-lg market-scatter"><div className="card-header"><div><h2 className="card-title">Which moves combine scale and current yield?</h2><p className="card-description">Use TVL to distinguish broad evidence from small outliers before opening a vault.</p></div></div><ScatterPlot title={`Current yield against ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size is tracked TVL. The zero line separates strengthening from weakening. Select a point to open the Yearn vault.</p></section>
 
-      </div></details>
+      </div></section>
 
 
     </div>

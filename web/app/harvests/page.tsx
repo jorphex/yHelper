@@ -160,7 +160,7 @@ function VaultReportsContent() {
           <datalist id="report-vault-options">{(catalog.data?.rows ?? []).filter((row) => !query.chainId || row.chain_id === query.chainId).map((row) => <option key={`${row.chain_id}:${row.vault_address}`} value={row.vault_address} label={`${row.symbol || "Vault"} · ${chainLabel(row.chain_id)}`} />)}</datalist>
           {searchError ? <p id="report-search-error" role="alert" className="explanation">{searchError}</p> : null}
         </form>
-        <details className="detail-disclosure report-filters"><summary>Filter reports{query.chainId ? ` · ${chainLabel(query.chainId)}` : ""}{!query.meaningfulOnly ? " · all accounting updates" : ""}</summary><div className="disclosure-body"><div className="filter-grid">
+        <section className="detail-section report-filters"><h2 className="detail-title">Filter reports{query.chainId ? ` · ${chainLabel(query.chainId)}` : ""}{!query.meaningfulOnly ? " · all accounting updates" : ""}</h2><div className="detail-body"><div className="filter-grid">
         <label>
           <span className="filter-label">Chain</span>
           <select className="filter-control" value={query.chainId ?? ""} onChange={(event) => updateQuery({ chain_id: event.target.value || null })}>
@@ -180,7 +180,7 @@ function VaultReportsContent() {
           </select>
         </label>
 
-        </div></div></details>
+        </div></div></section>
         {query.vaultAddress ? <p className="section-note active-filter-note">Showing one vault: <span className="data-value">{data?.recent?.[0]?.vault_symbol || shortAddress(query.vaultAddress)}</span> <button className="button-reset table-filter-action" onClick={() => updateQuery({ vault_address: null })}>Clear vault filter</button></p> : null}
       </section>
 
@@ -188,9 +188,9 @@ function VaultReportsContent() {
         <div className="card-header">
           <div>
             <h2 className="card-title">Reported results</h2>
-            <p className="card-subtitle">Newest first · last {HISTORY_DAYS} days. Open details for exact amounts and transactions.</p>
+            <p className="card-subtitle">Newest first · last {HISTORY_DAYS} days. Exact accounting amounts and transaction links are shown below.</p>
             <p className="explanation">Reported result is gain minus loss, in the vault&apos;s asset.</p>
-            <details className="scope-details"><summary>What does a report tell me?</summary><p>A strategy report records gains, losses, and accounting changes for a vault. It is not your personal return. Fees and refunds are shown separately in accounting details.</p>      {isLoading && !data ? <p className="section section-md muted">Loading reports…</p> : (
+            <section className="scope-note"><h2 className="detail-title">What does a report tell me?</h2><p>A strategy report records gains, losses, and accounting changes for a vault. It is not your personal return. Fees and refunds are shown separately alongside each result.</p>      {isLoading && !data ? <p className="section section-md muted">Loading reports…</p> : (
         <div><p className="section-note">
           Last 24 hours: <strong>{data?.trailing_24h?.report_count ?? 0}</strong> reports from{" "}
           <strong>{data?.trailing_24h?.vault_count ?? 0}</strong> vaults and{" "}
@@ -199,7 +199,7 @@ function VaultReportsContent() {
         </p></div>
       )}
 
-</details>
+</section>
           </div>
         </div>
         {!isLoading && (data?.recent?.length ?? 0) === 0 ? (
@@ -207,32 +207,22 @@ function VaultReportsContent() {
         ) : (
           <TableWrap className="reports-table-wrap">
             <table className="reports-table" aria-label="Vault strategy reports">
-              <thead><tr><th>Time</th><th>Vault</th><th className="numeric">Reported result</th><th>Details</th></tr></thead>
-              <tbody>{isLoading && !data ? <TableSkeleton rows={8} columns={4} /> : visibleRecentRows.map((row) => {
+              <thead><tr><th>Time</th><th>Vault</th><th className="numeric">Reported result</th><th>Strategy</th><th className="numeric">Fees / refund</th><th className="numeric">Debt after</th></tr></thead>
+              <tbody>{isLoading && !data ? <TableSkeleton rows={8} columns={6} /> : visibleRecentRows.map((row) => {
                 const vaultUrl = yearnVaultUrl(row.chain_id, row.vault_address);
                 const strategyUrl = explorerAddressUrl(row.chain_id, row.strategy_address);
                 const txUrl = explorerTxUrl(row.chain_id, row.tx_hash);
                 return (
                   <tr key={`${row.chain_id}-${row.tx_hash}-${row.log_index}`}>
-                    <td data-label="Time">{txUrl ? <a className="external-link report-link report-link-utility" href={txUrl} target="_blank" rel="noreferrer" title={formatUtcDateTime(row.block_time)}>{compactTimestamp(row.block_time)}</a> : compactTimestamp(row.block_time)}</td>
+                    <td data-label="Time">{txUrl ? <a className="external-link report-link report-link-utility" href={txUrl} target="_blank" rel="noreferrer" title={formatUtcDateTime(row.block_time)} aria-label={`View transaction ${row.tx_hash}`}>{compactTimestamp(row.block_time)}</a> : compactTimestamp(row.block_time)}</td>
                     <td data-label="Vault">
                       <a className="external-link report-link report-link-entity report-link-vault" href={vaultUrl} target="_blank" rel="noreferrer">{row.vault_symbol || shortAddress(row.vault_address)}</a>
                       <div className="muted">{chainLabel(row.chain_id)} · {row.token_symbol || "asset"} · <button className="button-reset table-filter-action report-filter-action" aria-label={`Show only reports for ${row.vault_symbol || row.vault_address}`} onClick={() => updateQuery({ vault_address: row.vault_address })}>Only this vault</button></div>
                     </td>
-                    <td data-label="Reported result" className={`numeric report-result ${signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals).startsWith("-") ? "text-negative" : signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals).startsWith("+") ? "text-positive" : ""}`}>{signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals)}</td>
-                    <td data-label="Details"><details className="report-evidence"><summary aria-label={`Accounting details for ${row.vault_symbol || row.vault_address} at ${compactTimestamp(row.block_time)}`}>Accounting details</summary>
-                      <dl className="evidence-grid">
-                        <div><dt>Strategy</dt><dd>{strategyUrl ? <a href={strategyUrl} target="_blank" rel="noreferrer">{row.strategy_name || row.strategy_address}</a> : row.strategy_name || row.strategy_address}</dd></div>
-                        <div><dt>Report type</dt><dd>{row.report_type === "realized_result" ? "Realized result" : "Accounting update"}</dd></div>
-                        <div><dt>Reported gain</dt><dd>{amountWithUnit(row.gain, row.token_symbol, row.token_decimals, true)}</dd></div>
-                        <div><dt>Reported loss</dt><dd>{amountWithUnit(row.loss, row.token_symbol, row.token_decimals, true)}</dd></div>
-                        <div><dt>Fees</dt><dd>{amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals, true)}</dd></div>
-                        <div><dt>Refund</dt><dd>{amountWithUnit(row.refund_assets, row.token_symbol, row.token_decimals, true)}</dd></div>
-                        <div><dt>Debt after report</dt><dd>{amountWithUnit(row.debt_after, row.token_symbol, row.token_decimals, true)}</dd></div>
-                        <div><dt>Vault address</dt><dd>{row.vault_address}</dd></div>
-                        <div><dt>Transaction</dt><dd>{txUrl ? <a href={txUrl} target="_blank" rel="noreferrer">{row.tx_hash}</a> : row.tx_hash}</dd></div>
-                      </dl>
-                    </details></td>
+                    <td data-label="Reported result" className={`numeric report-result ${signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals).startsWith("-") ? "text-negative" : signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals).startsWith("+") ? "text-positive" : ""}`}>{signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals)}<div className="muted report-exact">Gain: {amountWithUnit(row.gain, row.token_symbol, row.token_decimals, true)}</div><div className="muted report-exact">Loss: {amountWithUnit(row.loss, row.token_symbol, row.token_decimals, true)}</div></td>
+                    <td data-label="Strategy">{strategyUrl ? <a href={strategyUrl} target="_blank" rel="noreferrer" title={row.strategy_address}>{row.strategy_name || shortAddress(row.strategy_address)}</a> : row.strategy_name || shortAddress(row.strategy_address)}<div className="muted">{row.report_type === "realized_result" ? "Realized result" : "Accounting update"}</div></td>
+                    <td data-label="Fees / refund" className="numeric report-exact"><div>{amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals, true)} fee</div><div className="muted">{amountWithUnit(row.refund_assets, row.token_symbol, row.token_decimals, true)} refund</div></td>
+                    <td data-label="Debt after" className="numeric report-exact">{amountWithUnit(row.debt_after, row.token_symbol, row.token_decimals, true)}</td>
                   </tr>
                 );
               })}</tbody>

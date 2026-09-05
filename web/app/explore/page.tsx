@@ -170,9 +170,9 @@ function ExplorePageContent() {
           <section className="section market-scope-summary" aria-label="Selected vault scope">
             {isLoading ? <span className="muted">Loading vault set…</span> : <>
               <span><strong>{vaultCountLabel(matchingRows.length)}</strong> {search ? "matching your search" : "in view"}</span>
-              <details className="scope-details"><summary>About this vault set</summary>
+              <section className="scope-note"><h2 className="detail-title">About this vault set</h2>
                 <p>{formatUsd(summary?.total_tvl_usd)} tracked TVL · {formatPct(summary?.tvl_weighted_realized_apy_30d)} TVL-weighted 30d realized APY{query.universe === "raw" ? ` · ${formatPct(coverage, 0)} history coverage` : ""}. These totals cover the selected filters before name search.</p>
-              </details>
+              </section>
             </>}
           </section>
 

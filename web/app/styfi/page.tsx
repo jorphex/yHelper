@@ -284,14 +284,14 @@ function StYfiPageContent() {
       </section>
 
       <p className="explanation">An epoch is a reward period. {currentEpoch != null ? `Current epoch: ${currentEpoch}. ` : ""}{epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ? `Started ${formatUtcDate(epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ?? null)} at 00:00 UTC. ` : ""}{data?.freshness?.latest_snapshot_at ? `Participation updated ${formatUtcDateTime(data.freshness.latest_snapshot_at)}.` : "Participation update time unavailable."}{(data?.freshness?.latest_snapshot_age_seconds ?? 0) > 3600 ? " Updates are delayed." : ""}</p>
-      <details className="detail-disclosure">
-        <summary>Understand participation and reward rates</summary>
-        <div className="disclosure-body">
+      <section className="detail-section">
+        <h2 className="detail-title">Understand participation and reward rates</h2>
+        <div className="detail-body">
           <p>APR expresses the current reward rate over a year; it can change between reward periods. Rewards here are denominated in {rewardSymbol} shares.</p>
           <p>Tracked participation combines underlying stYFI stake, liquid-locker capacity, and migrated veYFI. The stYFIx balance is shown separately but is already included in underlying stYFI stake, so adding every chart together would count it twice. Liquid-locker capacity is the amount recorded in stYFI&apos;s global state.</p>
           <div className="kpi-grid kpi-grid-2">{[summaryItems[1], summaryItems[3]].map((item) => <div className="kpi-card" key={item.label}><div className="kpi-label">{item.label}</div><div className="kpi-value">{item.value}</div><p>{item.hint}</p></div>)}</div>
         </div>
-      </details>
+      </section>
       {/* Reward Split */}
       <section className="section section-lg">
         <BarList
@@ -318,10 +318,10 @@ function StYfiPageContent() {
         />
       </section>
 
-      <details className="detail-disclosure"><summary>Participation by component</summary><div className="disclosure-body">
+      <section className="detail-section"><h2 className="detail-title">Participation by component</h2><div className="detail-body">
         <TrendStrips title="" items={stakeTrendItems.slice(1)} valueFormatter={(value) => formatTokenCompact(value, "YFI")} deltaFormatter={(value) => formatSignedToken(value, "YFI", 2)} columns={2} emptyText="Snapshot history is not available yet." />
-      </div></details>
-      <details className="detail-disclosure"><summary>Recent staking activity</summary><div className="disclosure-body">
+      </div></section>
+      <section className="detail-section"><h2 className="detail-title">Recent staking activity</h2><div className="detail-body">
         <div className="card-header">
           <div>
             <p className="card-description">
@@ -406,10 +406,10 @@ function StYfiPageContent() {
             </tbody>
           </table>
             </TableWrap>
-      </div></details>
+      </div></section>
 
       {/* Epoch Detail Table */}
-      <details className="detail-disclosure"><summary>Epoch allocations and history</summary><div className="disclosure-body">
+      <section className="detail-section"><h2 className="detail-title">Epoch allocations and history</h2><div className="detail-body">
         <div className="card-header">
           <div>
             <p className="card-description">
@@ -458,7 +458,7 @@ function StYfiPageContent() {
             </tbody>
           </table>
         </TableWrap>
-      </div></details>
+      </div></section>
     </div>
   );
 }

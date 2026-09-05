@@ -44,7 +44,7 @@ test("Vault search includes later API pages and keeps its query in the URL", asy
   await expect(page.getByRole("link", { name: "Reports", exact: true })).toHaveAttribute("href", new RegExp(`vault_address=${address}&chain_id=1`));
 });
 
-test("Reports find a named vault and disclose exact accounting without rounding", async ({ page }) => {
+test("Reports find a named vault and show exact accounting without rounding", async ({ page }) => {
   await page.route("**/api/discover?**", (route) => route.fulfill({ json: catalog }));
   await page.route("**/api/reports?**", (route) => route.fulfill({ json: {
     available_chains: [{ chain_id: 1, chain_label: "Ethereum" }],
@@ -56,20 +56,15 @@ test("Reports find a named vault and disclose exact accounting without rounding"
   await page.getByRole("button", { name: "Find", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`vault_address=${address}`));
   await expect(page).toHaveURL(/chain_id=1/);
-  const summary = page.locator(".report-evidence summary").first();
-  await summary.focus();
-  await page.keyboard.press("Enter");
-  const evidence = page.locator(".report-evidence[open]");
+  const evidence = page.getByRole("table", { name: "Vault strategy reports" }).locator("tbody tr").first();
   await expect(evidence).toContainText("1.234567890123456789 TEST");
   await expect(evidence).toContainText("0.000000000000000001 TEST");
   await expect(evidence).toContainText("900,719,925,474,099,312.34567890123456789 TEST");
-  await expect(evidence.getByRole("link", { name: transaction })).toHaveAttribute("href", `https://etherscan.io/tx/${transaction}`);
-  await page.keyboard.press("Enter");
-  await expect(page.locator(".report-evidence[open]")).toHaveCount(0);
+  await expect(evidence.getByRole("link", { name: `View transaction ${transaction}` })).toHaveAttribute("href", `https://etherscan.io/tx/${transaction}`);
 });
 
 for (const width of [1440, 720, 390]) {
-  test(`Product pages reflow and disclose evidence at ${width}px`, async ({ page }) => {
+  test(`Product pages reflow with visible evidence at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -77,15 +72,8 @@ for (const width of [1440, 720, 390]) {
       await page.goto(path, { waitUntil: "networkidle" });
       await expect(page.locator("h1")).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), path).toBe(true);
-      for (const summary of await page.locator("main > div summary, main summary").all()) {
-        // Only open the first report row; other disclosures contain distinct functionality.
-        if (await summary.evaluate((el) => el.closest(".report-evidence") !== null) && await page.locator(".report-evidence[open]").count()) continue;
-        if (!await summary.isVisible()) continue;
-        await summary.focus();
-        await page.keyboard.press("Enter");
-        expect(await summary.evaluate((el) => (el.parentElement as HTMLDetailsElement).open)).toBe(true);
-      }
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${path} expanded`).toBe(true);
+      await expect(page.locator("main details")).toHaveCount(0);
+      for (const section of await page.locator(".detail-section").all()) await expect(section).toBeVisible();
     }
     expect(errors).toEqual([]);
   });
