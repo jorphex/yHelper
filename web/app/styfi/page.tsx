@@ -204,11 +204,11 @@ function StYfiPageContent() {
   }, [summary, data?.current_reward_state, hasNetFlow24h, hasNetFlow7d]);
 
   const stakeTrendItems = useMemo(() => [
-    { id: "combined", label: "Total", points: snapshotSeries.map((r) => r.combined_staked), note: "Latest participating balance vs previous snapshot" },
-    { id: "styfi", label: "stYFI", points: snapshotSeries.map((r) => r.styfi_staked), note: "Latest stYFI balance vs previous snapshot" },
-    { id: "styfix", label: "stYFIx", points: snapshotSeries.map((r) => r.styfix_staked), note: "Shown separately; included in stYFI underlying stake" },
-    { id: "liquid-lockers", label: "Liquid lockers", points: snapshotSeries.map((r) => r.liquid_lockers_staked), note: "Latest liquid-locker capacity from stYFI global state" },
-    { id: "migrated-yfi", label: "Migrated veYFI", points: snapshotSeries.map((r) => r.migrated_yfi), note: "Latest migrated veYFI balance from stYFI global state" },
+    { id: "combined", label: "Total", points: snapshotSeries.map((r) => r.combined_staked), note: "Change since previous snapshot" },
+    { id: "styfi", label: "stYFI", points: snapshotSeries.map((r) => r.styfi_staked), note: "" },
+    { id: "styfix", label: "stYFIx", points: snapshotSeries.map((r) => r.styfix_staked), note: "Included in stYFI stake" },
+    { id: "liquid-lockers", label: "Liquid lockers", points: snapshotSeries.map((r) => r.liquid_lockers_staked), note: "Capacity recorded by stYFI" },
+    { id: "migrated-yfi", label: "Migrated veYFI", points: snapshotSeries.map((r) => r.migrated_yfi), note: "Balance recorded by stYFI" },
   ], [snapshotSeries]);
 
   const rewardBars = useMemo(() => [
@@ -246,7 +246,7 @@ function StYfiPageContent() {
             <em className="page-title-accent">YFI staking rewards</em>
           </h1>
           <p className="page-description">
-            See the current reward rate, follow YFI participation, and review past reward periods.
+            Current rewards and staking activity.
           </p>
           <div className="tab-bar-plain">
             <a
@@ -283,17 +283,17 @@ function StYfiPageContent() {
         )}
       </section>
 
-      <p className="explanation">An epoch is a reward period. {currentEpoch != null ? `Current epoch: ${currentEpoch}. ` : ""}{epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ? `Started ${formatUtcDate(epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ?? null)} at 00:00 UTC. ` : ""}{data?.freshness?.latest_snapshot_at ? `Participation updated ${formatUtcDateTime(data.freshness.latest_snapshot_at)}.` : "Participation update time unavailable."}{(data?.freshness?.latest_snapshot_age_seconds ?? 0) > 3600 ? " Updates are delayed." : ""}</p>
+      <p className="explanation">Reward period · {currentEpoch != null ? `Epoch ${currentEpoch} · ` : ""}{epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ? `Started ${formatUtcDate(epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ?? null)} at 00:00 UTC. ` : ""}</p>
+      <p className="explanation">{data?.freshness?.latest_snapshot_at ? `Participation updated ${formatUtcDateTime(data.freshness.latest_snapshot_at)}.` : "Participation update time unavailable."}{(data?.freshness?.latest_snapshot_age_seconds ?? 0) > 3600 ? " Updates are delayed." : ""}</p>
       <section className="detail-section">
-        <h2 className="detail-title">Understand participation and reward rates</h2>
+        <h2 className="detail-title">Participation</h2>
         <div className="detail-body">
-          <p>APR expresses the current reward rate over a year; it can change between reward periods. Rewards here are denominated in {rewardSymbol} shares.</p>
-          <p>Tracked participation combines underlying stYFI stake, liquid-locker capacity, and migrated veYFI. The stYFIx balance is shown separately but is already included in underlying stYFI stake, so adding every chart together would count it twice. Liquid-locker capacity is the amount recorded in stYFI&apos;s global state.</p>
           <div className="kpi-grid kpi-grid-2">{[summaryItems[1], summaryItems[3]].map((item) => <div className="kpi-card" key={item.label}><div className="kpi-label">{item.label}</div><div className="kpi-value">{item.value}</div><p>{item.hint}</p></div>)}</div>
         </div>
       </section>
       {/* Reward Split */}
       <section className="section section-lg">
+        <p className="section-note">APR: annualized reward rate; may change each epoch. Rewards in {rewardSymbol} shares.</p>
         <BarList
           title={`Current reward split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
           items={rewardBars}
@@ -325,7 +325,7 @@ function StYfiPageContent() {
         <div className="card-header">
           <div>
             <p className="card-description">
-              The latest 10 stYFI and stYFIx stake, unstake, withdrawal, and claim actions.
+              Latest 10 actions.
             </p>
           </div>
         </div>
@@ -413,7 +413,7 @@ function StYfiPageContent() {
         <div className="card-header">
           <div>
             <p className="card-description">
-              Epochs start at 00:00 UTC. Columns show protocol allocations, not individual claim totals.
+              Protocol allocations, not individual claims. Epochs start at 00:00 UTC.
             </p>
           </div>
         </div>

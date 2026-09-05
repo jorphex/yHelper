@@ -121,11 +121,11 @@ function ExplorePageContent() {
   const pageCopy = query.tab === "vaults"
     ? {
         accent: "Find a vault",
-        description: "Find a Yearn vault and compare its estimated yield with what it has earned over time.",
+        description: "Compare estimated and past vault yields.",
       }
       : {
           accent: "Where tracked capital sits",
-        description: "See how the selected vault set is distributed across markets, chains, and underlying assets.",
+        description: "Vault TVL by market, chain, and asset.",
         };
 
   return (
@@ -171,13 +171,13 @@ function ExplorePageContent() {
             {isLoading ? <span className="muted">Loading vault set…</span> : <>
               <span><strong>{vaultCountLabel(matchingRows.length)}</strong> {search ? "matching your search" : "in view"}</span>
               <section className="scope-note"><h2 className="detail-title">About this vault set</h2>
-                <p>{formatUsd(summary?.total_tvl_usd)} tracked TVL · {formatPct(summary?.tvl_weighted_realized_apy_30d)} TVL-weighted 30d realized APY{query.universe === "raw" ? ` · ${formatPct(coverage, 0)} history coverage` : ""}. These totals cover the selected filters before name search.</p>
+                <p>{formatUsd(summary?.total_tvl_usd)} tracked TVL · {formatPct(summary?.tvl_weighted_realized_apy_30d)} TVL-weighted 30d realized APY{query.universe === "raw" ? ` · ${formatPct(coverage, 0)} history coverage` : ""}. Totals exclude the name search filter.</p>
               </section>
             </>}
           </section>
 
           <section className="section section-lg">
-            <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">Estimated APY is the current estimate. Realized APY annualizes past earnings. The 7d vs 30d column shows how recent yield differs from the longer baseline.</p></div></div>
+            <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">Estimated APY projects yield. Realized APY annualizes past earnings.</p></div></div>
             {!isLoading && !matchingRows.length ? <NoVaultsEmptyState onReset={() => updateQuery({ market: "all", chain: null, universe: "raw", q: null })} /> : (
               <TableWrap><table className="decision-table" aria-label="Vault comparison">
                 <thead><tr>
@@ -205,7 +205,7 @@ function ExplorePageContent() {
               </table></TableWrap>
             )}
             {matchingRows.length > visibleRows.length ? <button className="button button-ghost" onClick={() => updateQuery({ limit: query.limit + 30 })}>Show more vaults ({matchingRows.length - visibleRows.length} remaining)</button> : null}
-            <p className="explanation">Search covers the selected vault set. Choose All tracked vaults to include smaller vaults.</p>
+            <p className="explanation">Choose All tracked vaults to include smaller vaults.</p>
           </section>
         </>
       ) : (

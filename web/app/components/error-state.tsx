@@ -12,8 +12,8 @@ interface ErrorStateProps {
 }
 
 export function ErrorState({
-  title = "Something went wrong",
-  description = "We couldn't load the data. Try again in a moment.",
+  title = "Data unavailable",
+  description = "",
   error,
   onRetry,
   showHomeLink = true,
@@ -34,9 +34,9 @@ export function ErrorState({
         {title}
       </h3>
 
-      <p className="error-state-description" style={{ marginBottom: errorMessage ? "var(--space-2)" : "var(--space-4)" }}>
+      {description && <p className="error-state-description" style={{ marginBottom: errorMessage ? "var(--space-2)" : "var(--space-4)" }}>
         {description}
-      </p>
+      </p>}
 
       {errorMessage && (
         <code className="error-state-trace">
@@ -78,8 +78,7 @@ export function ErrorState({
 export function DataLoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <ErrorState
-      title="Failed to load data"
-      description="We couldn't fetch the latest data from our servers. This might be due to a network issue or temporary server downtime."
+      title="Data unavailable"
       onRetry={onRetry}
     />
   );
@@ -88,8 +87,7 @@ export function DataLoadError({ onRetry }: { onRetry: () => void }) {
 export function ApiError({ error, onRetry }: { error?: Error; onRetry: () => void }) {
   return (
     <ErrorState
-      title="API error"
-      description="There was a problem communicating with our data API."
+      title="Data unavailable"
       error={error}
       onRetry={onRetry}
     />

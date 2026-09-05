@@ -13,7 +13,7 @@ export const flexCopy = {
   hero: {
     title: "Flex Markets",
     accent: "Ethereum lending",
-    blurb: "Lend USDC or explore borrowing against collateral. Compare rates, capacity, and market health before opening Flex.",
+    blurb: "USDC lending rates and borrowing capacity.",
     officialLink: "Open Flex",
   },
   freshness: {
@@ -33,7 +33,7 @@ export const flexCopy = {
   markets: {
     title: "Markets",
     description: "Active, endorsed lending markets.",
-    noActive: "No active markets are available right now.",
+    noActive: "No active markets.",
     headers: {
       market: "Market",
       status: "Status",
@@ -126,7 +126,7 @@ export const flexCopy = {
   },
   redemptionPriority: {
     title: "Estimated borrowing capacity by rate",
-    description: "At each inspected rate, estimated borrowing capacity combines idle USDC with debt from lower-rate troves that could be redeemed.",
+    description: "Estimated capacity = idle USDC + lower-rate debt that could be redeemed. Capacity may remain when idle USDC is zero. Redemptions can affect existing borrowers.",
     freshness: {
       ready: "Current",
       delayed: "Delayed",
@@ -135,10 +135,10 @@ export const flexCopy = {
     },
     empty: {
       title: "No active trove rates",
-      description: "This market has no active trove debt for estimating rate-dependent borrowing capacity.",
+      description: "No active borrowing positions.",
     },
     unavailable: {
-      title: "Borrowing capacity estimates are unavailable right now.",
+      title: "Borrowing capacity unavailable.",
       retry: "Try again",
     },
     axes: {
@@ -164,8 +164,8 @@ export const flexCopy = {
   },
   troveHealth: {
     title: "Borrowing position health",
-    description: "Each borrowing position is called a trove. LTV (loan-to-value) compares its debt with its collateral value.",
-    definition: "Near max LTV includes troves within 1 percentage point of the market's maximum LTV. Debt share is measured against total active-trove debt.",
+    description: "A trove is a borrowing position.",
+    definition: "Near max LTV: within 1 percentage point of the limit. Debt shares use total active-trove debt.",
     ltvDefinition: "LTV means loan-to-value, the borrowed amount relative to collateral value.",
     metrics: {
       activeTroves: "Active troves",
@@ -176,7 +176,7 @@ export const flexCopy = {
     },
     loading: "Loading trove metrics…",
     empty: "No active troves in this market.",
-    unavailable: "Trove metrics are unavailable right now. Try again.",
+    unavailable: "Position metrics unavailable.",
   },
   activity: {
     title: "Protocol activity",
@@ -248,8 +248,8 @@ export const flexCopy = {
     activity: "Loading activity",
   },
   error: {
-    title: "Flex data is unavailable right now.",
-    description: "Please try again shortly.",
+    title: "Flex data unavailable.",
+    description: "Try again in a moment.",
     retry: "Try again",
   },
   accessibility: {

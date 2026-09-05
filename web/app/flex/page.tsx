@@ -513,17 +513,13 @@ function FlexPageContent() {
         {isLoading && !data ? <TableWrap><table className="decision-table" aria-labelledby="flex-markets-title"><tbody><TableSkeleton rows={2} columns={8} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
       </section>
 
-      <section className="detail-section"><h2 className="detail-title">Understand lending rates and borrowing capacity</h2><div className="detail-body">
-        <p>Lender APR is the annualized lending rate. The debt-weighted rate averages existing borrowers&apos; chosen rates, weighted by their debt. It is not a quote for a new loan.</p>
-        <p>Idle USDC is cash currently held by the lender. Even when it is zero, a higher-rate borrowing position may replace lower-rate debt through redemptions. The capacity chart combines idle cash with lower-rate debt that could be redeemed at each inspected rate.</p>
-        <p>These are estimates of capacity. Existing borrowing positions at lower rates can be affected by redemptions.</p>
-      </div></section>
+      <p className="section-note">Lender APR: annualized lending rate. Debt-weighted rate: existing borrower rates weighted by debt, not a new loan quote.</p>
       {selected ? <section className="section section-lg flex-history-section">
         <div className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
           {active.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}
         </div>
         {detail.data ? <section className="flex-risk-section" aria-labelledby="flex-risk-title">
-          <div><h3 id="flex-risk-title">{flexCopy.detail.risk.title}</h3><p>{flexCopy.detail.risk.description}</p></div>
+          <div><h3 id="flex-risk-title">{flexCopy.detail.risk.title}</h3></div>
           <div className="flex-risk-content">
             <dl className="flex-risk-grid flex-risk-grid-all">
               <div><dt>{flexCopy.detail.risk.primary.minimumDebt}</dt><dd>{detail.data.risk.minimum_debt === null ? flexCopy.values.unavailable : `${compact.format(detail.data.risk.minimum_debt)} ${selected.borrow_token.symbol}`}</dd></div>
@@ -534,11 +530,11 @@ function FlexPageContent() {
             </dl>
           </div>
         </section> : null}
-        <p className="explanation">LTV is debt divided by collateral value. Compare it with the market&apos;s limits to understand how much room a position has as prices change. The label Safe LTV is a protocol parameter, not a guarantee against loss.</p>
+        <p className="explanation">LTV = debt ÷ collateral value. Safe LTV is a protocol limit, not a guarantee against loss.</p>
         <TroveHealthSection query={troveHealth} />
         <RedemptionPrioritySection query={redemptionPriority} />
         <div className="flex-history-heading-row">
-          <div><h2 className="card-title">{flexCopy.history.title}</h2><p className="card-description">{flexCopy.history.description}</p></div>
+          <div><h2 className="card-title">{flexCopy.history.title}</h2></div>
           <div className="flex-range-tabs" role="group" aria-label={flexCopy.history.rangeLabel}>
             {([[7, flexCopy.history.ranges.seven], [30, flexCopy.history.ranges.thirty], [90, flexCopy.history.ranges.ninety]] as const).map(([value, label]) => <button key={value} type="button" className={`flex-range-tab ${days === value ? "is-active" : ""}`} aria-pressed={days === value} onClick={() => updateQuery({ days: value })}>{label}</button>)}
           </div>
@@ -547,7 +543,7 @@ function FlexPageContent() {
       </section> : null}
 
       <section className="detail-section flex-activity-section" aria-labelledby="flex-activity-title"><div className="detail-body">
-        <div className="card-header"><div><h2 className="card-title" id="flex-activity-title">{flexCopy.activity.title}</h2><p className="card-description">{flexCopy.activity.description}</p></div></div>
+        <div className="card-header"><div><h2 className="card-title" id="flex-activity-title">{flexCopy.activity.title}</h2></div></div>
         <TableWrap className="flex-activity-wrap"><table className="decision-table flex-activity-table" aria-labelledby="flex-activity-title">
           <thead><tr><th>{flexCopy.activity.headers.time}</th><th>{flexCopy.activity.headers.event}</th><th>{flexCopy.activity.headers.market}</th><th className="numeric">{flexCopy.activity.headers.amount}</th></tr></thead>
           <tbody>{activity.isLoading && !activity.data ? <TableSkeleton rows={8} columns={4} /> : activityRows.map((row) => <tr key={`${row.tx_hash}:${row.log_index}`}>

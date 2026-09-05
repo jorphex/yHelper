@@ -144,7 +144,7 @@ function VaultReportsContent() {
       setSearchError("");
       setVaultDraft(matches[0].vault_address);
       updateQuery({ vault_address: matches[0].vault_address, chain_id: matches[0].chain_id });
-    } else setSearchError(catalog.isLoading ? "Vault names are loading. You can also enter a full address." : "Choose a suggested vault address, or enter a full 0x address. Narrow the chain if a name has multiple matches.");
+    } else setSearchError(catalog.isLoading ? "Vault names are loading. You can also enter a full address." : "Select a vault from the list or enter its full address.");
   };
   const recentRows = data?.recent ?? [];
   const visibleRecentRows = compact && !mobileExpanded ? recentRows.slice(0, 10) : recentRows;
@@ -188,18 +188,15 @@ function VaultReportsContent() {
         <div className="card-header">
           <div>
             <h2 className="card-title">Reported results</h2>
-            <p className="card-subtitle">Newest first · last {HISTORY_DAYS} days. Exact accounting amounts and transaction links are shown below.</p>
-            <p className="explanation">Reported result is gain minus loss, in the vault&apos;s asset.</p>
-            <section className="scope-note"><h2 className="detail-title">What does a report tell me?</h2><p>A strategy report records gains, losses, and accounting changes for a vault. It is not your personal return. Fees and refunds are shown separately alongside each result.</p>      {isLoading && !data ? <p className="section section-md muted">Loading reports…</p> : (
-        <div><p className="section-note">
-          Last 24 hours: <strong>{data?.trailing_24h?.report_count ?? 0}</strong> reports from{" "}
-          <strong>{data?.trailing_24h?.vault_count ?? 0}</strong> vaults and{" "}
-          <strong>{data?.trailing_24h?.strategy_count ?? 0}</strong> strategies. Amounts are shown in each vault&apos;s
-          asset, not converted to USD.
-        </p></div>
-      )}
-
-</section>
+            <p className="card-subtitle">Newest first · last {HISTORY_DAYS} days</p>
+            <p className="explanation">Result = gain − loss, in the vault&apos;s asset. This is a strategy result, not your personal return.</p>
+            {isLoading && !data ? <p className="section-note muted">Loading reports…</p> : (
+              <p className="section-note">
+                Last 24 hours: <strong>{data?.trailing_24h?.report_count ?? 0}</strong> reports from{" "}
+                <strong>{data?.trailing_24h?.vault_count ?? 0}</strong> vaults and{" "}
+                <strong>{data?.trailing_24h?.strategy_count ?? 0}</strong> strategies.
+              </p>
+            )}
           </div>
         </div>
         {!isLoading && (data?.recent?.length ?? 0) === 0 ? (
@@ -246,7 +243,7 @@ function ReportsPageContent() {
           <h1 className="page-title">Rewards & reports<br /><em className="page-title-accent">{view === "lockers" ? "Locker rewards" : "Vault reports"}</em></h1>
           <p className="page-description">{view === "lockers"
             ? "Weekly yCRV and yYB rewards."
-            : "Look up a vault and understand its reported gains, losses, and accounting activity."}</p>
+            : "Vault gains, losses, and accounting updates."}</p>
         </div>
         <nav className="reports-view-nav" aria-label="Reports">
           <Link href="/reports?view=vaults" className={`reports-view-link ${view === "vaults" ? "is-active" : ""}`.trim()} aria-current={view === "vaults" ? "page" : undefined}>Vault reports</Link>

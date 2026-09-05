@@ -95,7 +95,7 @@ function MomentumPageContent() {
     <div className="markets-surface">
       <section className="page-header page-header-no-border">
         <h1 className="page-title">Vault research<br /><em className="page-title-accent">Yield changes</em></h1>
-        <p className="page-description">Compare recent realized yield with the preceding period. Start with individual vaults, then explore the wider pattern.</p>
+        <p className="page-description">Realized yield compared with the preceding period.</p>
         <MarketModeNav active="changes" />
       </section>
       <section className="section section-md"><div className="card market-filter-panel"><div className="filter-grid">
@@ -110,7 +110,7 @@ function MomentumPageContent() {
           <MoverTable title="Yield decreased" direction="weakening" rows={(data?.movers?.fallers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
         </>}
       </section>
-      <section className="detail-section"><h2 className="detail-title">Explore the broader pattern</h2><div className="detail-body">
+      <section className="detail-section"><h2 className="detail-title">Across vaults</h2><div className="detail-body">
       <section className="section section-lg analysis-scope" aria-labelledby="current-comparison-title">
         <div className="card-header"><div><div className="scope-label">Selected comparison</div><h2 className="card-title" id="current-comparison-title">{comparisonLabel(query.window)}</h2>{currentScopeNote ? <p className="card-description">{currentScopeNote}</p> : null}</div></div>
         {isLoading ? <KpiGridSkeleton count={3} /> : <div className="kpi-grid kpi-grid-3">
@@ -120,9 +120,9 @@ function MomentumPageContent() {
         </div>}
       </section>
 
-      <section className="section section-lg"><div className="card-header"><div><h2 className="card-title">Is the move broad or isolated?</h2><p className="card-description">See whether a move spans many comparable vaults or a concentrated share of TVL.</p></div></div><div className="cols-2"><ShareMeter title="By vaults" segments={breadthByVault} total={compared} valueFormatter={(value) => String(value ?? 0)} /><ShareMeter title="By TVL" segments={breadthByTvl} total={totalTvl} valueFormatter={formatUsd} /></div></section>
+      <section className="section section-lg"><div className="card-header"><div><h2 className="card-title">Change by vault and TVL</h2></div></div><div className="cols-2"><ShareMeter title="By vaults" segments={breadthByVault} total={compared} valueFormatter={(value) => String(value ?? 0)} /><ShareMeter title="By TVL" segments={breadthByTvl} total={totalTvl} valueFormatter={formatUsd} /></div></section>
 
-      <section className="section section-lg market-scatter"><div className="card-header"><div><h2 className="card-title">Which moves combine scale and current yield?</h2><p className="card-description">Use TVL to distinguish broad evidence from small outliers before opening a vault.</p></div></div><ScatterPlot title={`Current yield against ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size is tracked TVL. The zero line separates strengthening from weakening. Select a point to open the Yearn vault.</p></section>
+      <section className="section section-lg market-scatter"><div className="card-header"><div><h2 className="card-title">Yield vs change</h2></div></div><ScatterPlot title={`Current yield against ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size: TVL. Select a vault to open it.</p></section>
 
       </div></section>
 

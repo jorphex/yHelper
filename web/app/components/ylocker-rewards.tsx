@@ -62,10 +62,10 @@ function RewardChart({ weeks, mode }: { weeks: YlockerReportingWeek[]; mode: Cha
   );
   const maximum = Math.max(1, ...chronological.map(chartValue));
   const description = mode === "combined"
-    ? "Completed yCRV and yYB deposits, grouped Thursday to Thursday UTC. Values use the crvUSD value at the time of each deposit."
+    ? "Completed yCRV and yYB deposits, grouped Thursday–Thursday UTC. crvUSD value at deposit."
     : mode === "ycrv"
-      ? "Completed yCRV deposits, grouped Thursday to Thursday UTC. Values use the crvUSD value at the time of each deposit."
-      : "Completed yYB deposits, grouped Thursday to Thursday UTC. Values use the crvUSD value at the time of each deposit.";
+      ? "Completed yCRV deposits, grouped Thursday–Thursday UTC. crvUSD value at deposit."
+      : "Completed yYB deposits, grouped Thursday–Thursday UTC. crvUSD value at deposit.";
   const label = mode === "combined"
     ? "yLocker rewards, Thu to Thu UTC"
     : mode === "ycrv"
@@ -201,7 +201,7 @@ export function LockerRewards() {
   return (
     <>
       <section className="section section-lg ylocker-chart-section">
-        <div className="card-header ylocker-chart-header"><div><h2 className="card-title">Reward deposits by week</h2><p className="card-description">Thursday to Thursday UTC. Values use the crvUSD value at the time of each deposit.</p>
+        <div className="card-header ylocker-chart-header"><div><h2 className="card-title">Reward deposits by week</h2><p className="card-description">Thursday–Thursday UTC. crvUSD value at deposit.</p>
           <div className="ylocker-freshness" aria-label="Locker reward freshness">{isLoading && !data ? <span>Loading locker rewards…</span> : <span className="ylocker-freshness-time"><span className="ylocker-freshness-label">{data?.freshness.status === "fresh" ? "Updated" : data?.freshness.status === "delayed" ? "Update delayed" : "Updates unavailable"}</span>{data?.freshness.indexed_through ? <time className="ylocker-freshness-value" dateTime={data.freshness.indexed_through}>{formatFreshness(data.freshness.indexed_through)}</time> : null}</span>}</div>
         </div>
           <div className="ylocker-chart-modes" role="group" aria-label="Chart scale">
@@ -212,7 +212,7 @@ export function LockerRewards() {
       </section>
 
       <section className="section section-lg ylocker-history-section">
-        <div className="card-header"><div><h2 className="card-title">Reward history</h2><p className="card-subtitle">Each locker keeps its own weekly schedule. Newest first.</p></div></div>
+        <div className="card-header"><div><h2 className="card-title">Reward history</h2><p className="card-subtitle">Each locker’s reward schedule · newest first</p></div></div>
         {!isLoading && cycles.length === 0 ? <EmptyState title="No reward history yet" description="Completed yCRV and yYB weeks will appear here." /> : (
           <TableWrap className="reports-table-wrap ylocker-cycles-wrap">
             <table className="reports-table ylocker-cycles-table">

@@ -139,7 +139,7 @@ export function TvlTreemap({
             document.body,
           )
         : null}
-      <p className="text-sm text-secondary section-sm">Bars show the full selected TVL, with smaller contributors grouped as Other.</p>
+      <p className="text-sm text-secondary section-sm">Smaller contributors grouped as Other.</p>
     </section>
   );
 }
