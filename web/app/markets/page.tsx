@@ -19,7 +19,5 @@ export default function MarketsPage({
     params.set("view", "vaults");
     redirect(`/markets?${params.toString()}`);
   }
-  return view === "vaults" || view === "structure"
-    ? <ExplorePage />
-    : <MomentumPage />;
+  return view === "changes" ? <MomentumPage /> : <ExplorePage />;
 }

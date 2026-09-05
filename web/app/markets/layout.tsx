@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import { pageSocialMetadata } from "../lib/page-social-metadata";
 
 export const metadata: Metadata = {
-  title: "Markets",
-  description: "Find consequential realized-yield changes across comparable Yearn vaults.",
+  title: "Vault research",
+  description: "Find a Yearn vault, compare yields, and explore changes and composition.",
   ...pageSocialMetadata("markets"),
 };
 

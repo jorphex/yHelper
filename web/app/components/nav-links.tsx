@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { useLayoutEffect, useRef } from "react";
 
 const NAV_LINKS: Array<{ href: string; label: string }> = [
-  { href: "/", label: "Overview" },
-  { href: "/markets", label: "Markets" },
-  { href: "/reports", label: "Reports" },
+  { href: "/", label: "Home" },
   { href: "/styfi", label: "stYFI" },
+  { href: "/flex", label: "Flex" },
+  { href: "/reports", label: "Rewards & reports" },
+  { href: "/markets", label: "Vault research" },
 ];
 
 export function NavLinks() {

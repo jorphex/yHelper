@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Suspense, useMemo } from "react";
 import { explorerAddressUrl, explorerTxUrl, formatPct, formatUtcDateTime } from "../lib/format";
 import { BarList, TrendStrips } from "../components/visuals";
@@ -239,15 +238,15 @@ function StYfiPageContent() {
   return (
     <div>
       {/* Header */}
-      <section className="page-header page-header-hero page-header-no-border">
+      <section className="page-header page-header-no-border staking-header">
         <div>
           <h1 className="page-title">
             stYFI
             <br />
-            <em className="page-title-accent">Governance staking</em>
+            <em className="page-title-accent">YFI staking rewards</em>
           </h1>
           <p className="page-description">
-            Track stYFI participation, rewards, and epochs.
+            See the current reward rate, follow YFI participation, and review past reward periods.
           </p>
           <div className="tab-bar-plain">
             <a
@@ -260,29 +259,20 @@ function StYfiPageContent() {
             </a>
           </div>
         </div>
-        <div className="hero-image">
-          <Image
-            src="/styfi-assets-blender/hero-styfi-blender-coin-tilt-left.png"
-            alt="stYFI"
-            width={420}
-            height={280}
-            priority
-            style={{ objectFit: "contain" }}
-          />
-        </div>
+
       </section>
 
       {/* Summary KPIs - 5 cards */}
       <section className="section section-lg">
         {isLoading ? (
-          <div className="kpi-grid kpi-grid-5">
-            {Array(5).fill(null).map((_, i) => (
+          <div className="kpi-grid staking-summary">
+            {Array(3).fill(null).map((_, i) => (
               <KpiGridSkeleton key={i} count={1} />
             ))}
           </div>
         ) : (
-          <div className="kpi-grid kpi-grid-5">
-            {summaryItems.map((item) => (
+          <div className="kpi-grid staking-summary">
+            {[summaryItems[2], summaryItems[0], summaryItems[4]].map((item) => (
               <div key={item.label} className="kpi-card">
                 <div className="kpi-label">{item.label}</div>
                 <div className="kpi-value">{item.value}</div>
@@ -293,6 +283,15 @@ function StYfiPageContent() {
         )}
       </section>
 
+      <p className="explanation">An epoch is a reward period. {currentEpoch != null ? `Current epoch: ${currentEpoch}. ` : ""}{epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ? `Started ${formatUtcDate(epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ?? null)} at 00:00 UTC. ` : ""}{data?.freshness?.latest_snapshot_at ? `Participation updated ${formatUtcDateTime(data.freshness.latest_snapshot_at)}.` : "Participation update time unavailable."}{(data?.freshness?.latest_snapshot_age_seconds ?? 0) > 3600 ? " Updates are delayed." : ""}</p>
+      <details className="detail-disclosure">
+        <summary>Understand participation and reward rates</summary>
+        <div className="disclosure-body">
+          <p>APR expresses the current reward rate over a year; it can change between reward periods. Rewards here are denominated in {rewardSymbol} shares.</p>
+          <p>Tracked participation combines underlying stYFI stake, liquid-locker capacity, and migrated veYFI. The stYFIx balance is shown separately but is already included in underlying stYFI stake, so adding every chart together would count it twice. Liquid-locker capacity is the amount recorded in stYFI&apos;s global state.</p>
+          <div className="kpi-grid kpi-grid-2">{[summaryItems[1], summaryItems[3]].map((item) => <div className="kpi-card" key={item.label}><div className="kpi-label">{item.label}</div><div className="kpi-value">{item.value}</div><p>{item.hint}</p></div>)}</div>
+        </div>
+      </details>
       {/* Reward Split */}
       <section className="section section-lg">
         <BarList
@@ -311,18 +310,20 @@ function StYfiPageContent() {
         </div>
         <TrendStrips
           title=""
-          items={stakeTrendItems}
+          items={stakeTrendItems.slice(0, 1)}
           valueFormatter={(value) => formatTokenCompact(value, "YFI")}
           deltaFormatter={(value) => formatSignedToken(value, "YFI", 2)}
-          columns={3}
+          columns={1}
           emptyText="Snapshot history is not available yet."
         />
       </section>
 
-      <section className="section section-lg">
+      <details className="detail-disclosure"><summary>Participation by component</summary><div className="disclosure-body">
+        <TrendStrips title="" items={stakeTrendItems.slice(1)} valueFormatter={(value) => formatTokenCompact(value, "YFI")} deltaFormatter={(value) => formatSignedToken(value, "YFI", 2)} columns={2} emptyText="Snapshot history is not available yet." />
+      </div></details>
+      <details className="detail-disclosure"><summary>Recent staking activity</summary><div className="disclosure-body">
         <div className="card-header">
           <div>
-            <h2 className="card-title">Recent Activity</h2>
             <p className="card-description">
               The latest 10 stYFI and stYFIx stake, unstake, withdrawal, and claim actions.
             </p>
@@ -330,7 +331,7 @@ function StYfiPageContent() {
         </div>
 
         <TableWrap className="styfi-evidence-table-wrap">
-          <table className="styfi-evidence-table">
+          <table className="styfi-evidence-table" aria-label="Staking activity">
             <thead>
               <tr>
                 <th>Time</th>
@@ -405,20 +406,19 @@ function StYfiPageContent() {
             </tbody>
           </table>
             </TableWrap>
-      </section>
+      </div></details>
 
       {/* Epoch Detail Table */}
-      <section className="section">
+      <details className="detail-disclosure"><summary>Epoch allocations and history</summary><div className="disclosure-body">
         <div className="card-header">
           <div>
-            <h2 className="card-title">Epoch Detail</h2>
             <p className="card-description">
               Epochs start at 00:00 UTC. Columns show protocol allocations, not individual claim totals.
             </p>
           </div>
         </div>
         <TableWrap className="styfi-evidence-table-wrap">
-          <table className="styfi-evidence-table">
+          <table className="styfi-evidence-table" aria-label="Epoch allocations">
             <thead>
               <tr>
                 <th>Epoch</th>
@@ -458,7 +458,7 @@ function StYfiPageContent() {
             </tbody>
           </table>
         </TableWrap>
-      </section>
+      </div></details>
     </div>
   );
 }

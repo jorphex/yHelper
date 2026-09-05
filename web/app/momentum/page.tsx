@@ -94,8 +94,8 @@ function MomentumPageContent() {
   return (
     <div className="markets-surface">
       <section className="page-header page-header-no-border">
-        <h1 className="page-title">Markets<br /><em className="page-title-accent">What changed enough to inspect</em></h1>
-        <p className="page-description">Find realized-yield changes and see how widespread they are. A move is evidence, not a recommendation.</p>
+        <h1 className="page-title">Vault research<br /><em className="page-title-accent">Yield changes</em></h1>
+        <p className="page-description">Compare recent realized yield with the preceding period. Start with individual vaults, then explore the wider pattern.</p>
         <MarketModeNav active="changes" />
       </section>
       <section className="section section-md"><div className="card market-filter-panel"><div className="filter-grid">
@@ -104,6 +104,13 @@ function MomentumPageContent() {
         <label><span className="filter-label">Vault set</span><select className="filter-control" value={query.universe} onChange={(event) => updateQuery({ universe: event.target.value, min_tvl: null, min_points: null })}>{UNIVERSE_VALUES.map((universe) => <option key={universe} value={universe}>{universeLabel(universe)}</option>)}</select></label>
       </div></div></section>
 
+      <section className="section section-lg">
+        {isLoading ? <table className="decision-table" aria-label="Loading yield changes"><tbody><TableSkeleton rows={8} columns={6} /></tbody></table> : <>
+          <MoverTable title="Yield increased" direction="strengthening" rows={(data?.movers?.risers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
+          <MoverTable title="Yield decreased" direction="weakening" rows={(data?.movers?.fallers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
+        </>}
+      </section>
+      <details className="detail-disclosure"><summary>Explore the broader pattern</summary><div className="disclosure-body">
       <section className="section section-lg analysis-scope" aria-labelledby="current-comparison-title">
         <div className="card-header"><div><div className="scope-label">Selected comparison</div><h2 className="card-title" id="current-comparison-title">{comparisonLabel(query.window)}</h2>{currentScopeNote ? <p className="card-description">{currentScopeNote}</p> : null}</div></div>
         {isLoading ? <KpiGridSkeleton count={3} /> : <div className="kpi-grid kpi-grid-3">
@@ -117,12 +124,8 @@ function MomentumPageContent() {
 
       <section className="section section-lg market-scatter"><div className="card-header"><div><h2 className="card-title">Which moves combine scale and current yield?</h2><p className="card-description">Use TVL to distinguish broad evidence from small outliers before opening a vault.</p></div></div><ScatterPlot title={`Current yield against ${query.window} change`} xLabel={`${query.window} change`} yLabel={`Current ${query.window} APY`} points={moverRows.filter((row) => row.delta_apy != null && row.realized_apy_window != null).map((row) => ({ id: `${row.chain_id}:${row.vault_address}`, x: row.delta_apy, y: row.realized_apy_window, size: row.tvl_usd, tone: (row.delta_apy ?? 0) > 0 ? "positive" : "negative", href: yearnVaultUrl(row.chain_id, row.vault_address), tooltip: `${row.symbol ?? row.vault_address}\nChange: ${formatPercentagePoints(row.delta_apy)}\nCurrent: ${formatPct(row.realized_apy_window)}\nTVL: ${formatUsd(row.tvl_usd)}` }))} xFormatter={(value) => formatPercentagePoints(value, 1)} yFormatter={(value) => formatPct(value, 1)} /><p className="muted viz-legend">Bubble size is tracked TVL. The zero line separates strengthening from weakening. Select a point to open the Yearn vault.</p></section>
 
-      <section className="section section-lg">
-        {isLoading ? <><TableSkeleton rows={4} columns={7} /><TableSkeleton rows={4} columns={7} /></> : <>
-          <MoverTable title="Changes to inspect: strengthening" direction="strengthening" rows={(data?.movers?.risers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
-          <MoverTable title="Changes to inspect: weakening" direction="weakening" rows={(data?.movers?.fallers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
-        </>}
-      </section>
+      </div></details>
+
 
     </div>
   );

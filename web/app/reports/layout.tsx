@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { pageSocialMetadata } from "../lib/page-social-metadata";
 
 export const metadata: Metadata = {
-  title: "Reports",
+  title: "Rewards & reports",
   description: "Recent Yearn vault reports, plus yCRV and yYB reward history.",
   ...pageSocialMetadata("reports"),
 };

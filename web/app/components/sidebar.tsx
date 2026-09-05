@@ -3,65 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useOverviewPulseData, type HomePulse } from "../hooks/use-home-data";
 import { flexCopy } from "../flex/copy";
 
 const navItems = [
-  { href: "/", label: "Overview" },
-  { href: "/markets", label: "Markets", paths: ["/markets", "/momentum", "/explore", "/structure"] },
-  { href: "/reports", label: "Reports", paths: ["/reports", "/harvests"] },
+  { href: "/", label: "Home" },
   { href: "/styfi", label: "stYFI" },
   { href: "/flex", label: flexCopy.nav.label },
+  { href: "/reports", label: "Rewards & reports", paths: ["/reports", "/harvests"] },
 ];
-
-const externalLinks = [
-  { href: "https://powerglove.yearn.fi", label: "Powerglove" },
-];
-
-function formatPulsePercent(value: number): string {
-  return `${(value * 100).toFixed(2)}%`;
-}
-
-function formatPercentagePointChange(value: number): string {
-  const points = value * 100;
-  const sign = points > 0 ? "+" : points < 0 ? "−" : "";
-  return `${sign}${Math.abs(points).toFixed(2)} pp`;
-}
-
-function formatUpdatedAt(value: string | null): string | null {
-  if (!value) return null;
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return null;
-  const ageHours = Math.max(0, (Date.now() - timestamp) / 3_600_000);
-  if (ageHours < 1) return "Updated less than 1h ago";
-  if (ageHours < 24) return `Updated ${Math.round(ageHours)}h ago`;
-  const ageDays = Math.max(1, Math.round(ageHours / 24));
-  return `Updated ${ageDays}d ago`;
-}
-
-function pulseHeadline(pulse: HomePulse): string {
-  if (pulse.data_state === "limited") return "7d comparison is limited";
-  if (pulse.data_state === "delayed") return "7d yield data is delayed";
-  if (pulse.trend === "improving") return "7d realized yield strengthened";
-  if (pulse.trend === "softening") return "7d realized yield weakened";
-  return "7d realized yield was steady";
-}
-
-function pulseBreadth(pulse: HomePulse): string {
-  if (pulse.data_state === "limited") {
-    const coverage = pulse.coverage_ratio === null ? "An unknown share" : `${Math.round(pulse.coverage_ratio * 100)}%`;
-    return `${coverage} of core TVL has comparable windows.`;
-  }
-  if (pulse.data_state === "delayed") {
-    const fresh = pulse.fresh_tvl_ratio === null ? "An unknown share" : `${Math.round(pulse.fresh_tvl_ratio * 100)}%`;
-    return `${fresh} of comparable TVL updated within ${pulse.freshness_window_hours}h.`;
-  }
-  if (pulse.directional_tvl_ratio !== null && pulse.directional_tvl_ratio >= 0.6) {
-    const verb = pulse.trend === "improving" ? "improved" : pulse.trend === "softening" ? "softened" : "held steady";
-    return `${Math.round(pulse.directional_tvl_ratio * 100)}% of comparable TVL ${verb}.`;
-  }
-  return "Direction was mixed across comparable vaults.";
-}
+const researchPaths = ["/markets", "/momentum", "/explore", "/structure"];
+const externalLinks = [{ href: "https://powerglove.yearn.fi", label: "Powerglove" }];
 
 function ExternalLinkIcon() {
   return (
@@ -95,11 +46,8 @@ function MenuIcon({ open }: { open: boolean }) {
 export function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const { data: pulseData } = useOverviewPulseData();
-  const pulse = pulseData?.pulse ?? null;
   const sidebarRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const pulseUpdatedAt = pulse ? formatUpdatedAt(pulse.latest_data_at) : null;
 
   useEffect(() => {
     setIsOpen(false);
@@ -193,23 +141,10 @@ export function Sidebar() {
         })}
       </nav>
 
-      {pulse && (
-        <section className="sidebar-note" aria-labelledby="yield-pulse-title">
-          <div className="sidebar-note-title" id="yield-pulse-title">Yield pulse</div>
-          <div className="sidebar-pulse-headline">{pulseHeadline(pulse)}</div>
-          <div className="sidebar-pulse-value">{formatPulsePercent(pulse.latest_7d_apy)}</div>
-          <div className="sidebar-pulse-label">TVL-weighted realized 7d APY</div>
-          <div className={`sidebar-pulse-change tone-${pulse.trend}`}>
-            {formatPercentagePointChange(pulse.change_7d)} vs prior 7d
-          </div>
-          <div className="sidebar-pulse-breadth">{pulseBreadth(pulse)}</div>
-          <div className="sidebar-pulse-meta">
-            {pulse.comparable_vaults} of {pulse.eligible_vaults} eligible vaults compared · {pulse.coverage_ratio === null ? "n/a" : `${Math.round(pulse.coverage_ratio * 100)}%`} of eligible TVL
-          </div>
-          {pulseUpdatedAt ? <div className="sidebar-pulse-meta">{pulseUpdatedAt}</div> : null}
-          <Link href="/markets" className="sidebar-pulse-link">Inspect markets</Link>
-        </section>
-      )}
+      <nav className="sidebar-nav sidebar-research" aria-label="Research">
+        <span className="sidebar-group-label">Research</span>
+        <Link href="/markets" className={`sidebar-link ${researchPaths.some((path) => pathname === path) ? "is-active" : ""}`} aria-current={researchPaths.some((path) => pathname === path) ? "page" : undefined}>Vault research</Link>
+      </nav>
 
       <div className="sidebar-divider" />
 

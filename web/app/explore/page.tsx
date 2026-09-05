@@ -48,7 +48,8 @@ function ExplorePageContent() {
         ? "structure"
         : "vaults") as TabKey,
       chain: searchParams.get("chain"),
-      limit: queryInt(searchParams, "limit", 30, { min: 10, max: 100 }),
+      search: searchParams.get("q") ?? "",
+      limit: queryInt(searchParams, "limit", 30, { min: 10, max: 10000 }),
       sort: queryChoice(
         searchParams,
         "sort",
@@ -97,7 +98,8 @@ function ExplorePageContent() {
     market: query.market,
     minTvl: query.minTvl,
     minPoints: query.minPoints,
-    limit: query.limit,
+    limit: 250,
+    allRows: true,
     sort,
     dir: direction,
     chain: query.chain,
@@ -111,12 +113,15 @@ function ExplorePageContent() {
   });
   if (error && !data) return <DataLoadError onRetry={() => refetch()} />;
 
+  const search = query.search.trim().toLowerCase();
+  const matchingRows = (data?.rows ?? []).filter((row) => !search || [row.symbol, row.token_symbol, row.vault_address].some((value) => value?.toLowerCase().includes(search)));
+  const visibleRows = matchingRows.slice(0, query.limit);
   const coverage = data?.coverage?.coverage_ratio;
   const summary = data?.summary;
   const pageCopy = query.tab === "vaults"
     ? {
-        accent: "Compare vaults with context",
-        description: "Browse Yearn vaults by market, vault set, chain, and realized yield.",
+        accent: "Find a vault",
+        description: "Find a Yearn vault and compare its estimated yield with what it has earned over time.",
       }
       : {
           accent: "Where tracked capital sits",
@@ -126,12 +131,16 @@ function ExplorePageContent() {
   return (
     <div className="markets-surface">
       <section className="page-header page-header-no-border">
-        <h1 className="page-title">Markets<br /><em className="page-title-accent">{pageCopy.accent}</em></h1>
+        <h1 className="page-title">Vault research<br /><em className="page-title-accent">{pageCopy.accent}</em></h1>
         <p className="page-description">{pageCopy.description}</p>
         <MarketModeNav active={query.tab} />
       </section>
 
       <section className="section section-md">
+        {query.tab === "vaults" ? <label className="search-field">
+          <span className="filter-label">Find by vault name, asset, or address</span>
+          <input className="filter-control" type="search" value={query.search} placeholder="Try yvUSD, USDC, or 0x…" onChange={(event) => updateQuery({ q: event.target.value || null, limit: null })} />
+        </label> : null}
         <div className="card market-filter-panel">
           <div className="filter-grid">
             <MarketFilter market={query.market} universe={query.universe} minTvl={query.minTvl} onChange={(market) => updateQuery({ market })} />
@@ -160,17 +169,17 @@ function ExplorePageContent() {
         <>
           <section className="section market-scope-summary" aria-label="Selected vault scope">
             {isLoading ? <span className="muted">Loading vault set…</span> : <>
-              <span><strong>{vaultCountLabel(data?.pagination.total ?? 0)}</strong> in view</span>
-              <span><strong>{formatUsd(summary?.total_tvl_usd)}</strong> tracked TVL</span>
-              <span><strong>{formatPct(summary?.tvl_weighted_realized_apy_30d)}</strong> TVL-weighted 30d realized APY</span>
-              {query.universe === "raw" ? <span><strong>{formatPct(coverage, 0)}</strong> history coverage</span> : null}
+              <span><strong>{vaultCountLabel(matchingRows.length)}</strong> {search ? "matching your search" : "in view"}</span>
+              <details className="scope-details"><summary>About this vault set</summary>
+                <p>{formatUsd(summary?.total_tvl_usd)} tracked TVL · {formatPct(summary?.tvl_weighted_realized_apy_30d)} TVL-weighted 30d realized APY{query.universe === "raw" ? ` · ${formatPct(coverage, 0)} history coverage` : ""}. These totals cover the selected filters before name search.</p>
+              </details>
             </>}
           </section>
 
           <section className="section section-lg">
-            <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">7d vs 30d compares recent realized APY with the 30d baseline. Open a vault for its details.</p></div></div>
-            {!isLoading && !(data?.rows.length ?? 0) ? <NoVaultsEmptyState onReset={() => updateQuery({ market: "all", chain: null, universe: "core" })} /> : (
-              <TableWrap><table className="decision-table">
+            <div className="card-header"><div><h2 className="card-title">Vault comparison</h2><p className="card-description">Estimated APY is the current estimate. Realized APY annualizes past earnings. The 7d vs 30d column shows how recent yield differs from the longer baseline.</p></div></div>
+            {!isLoading && !matchingRows.length ? <NoVaultsEmptyState onReset={() => updateQuery({ market: "all", chain: null, universe: "raw", q: null })} /> : (
+              <TableWrap><table className="decision-table" aria-label="Vault comparison">
                 <thead><tr>
                   <th>Vault</th>
                   <th className="mobile-secondary-column">Asset</th>
@@ -181,9 +190,9 @@ function ExplorePageContent() {
                   <th className="numeric" aria-sort={columnSort("apy_30d")}><button ref={(node) => { sortButtons.current.apy_30d = node; }} className="th-button" aria-label="Sort by 30d realized APY" onClick={() => toggleColumnSort("apy_30d")}><span className="sort-label-desktop" aria-hidden="true">Realized APY · 30d</span><span className="sort-label-mobile" aria-hidden="true">30d APY</span>{columnIndicator("apy_30d") ? <span className="th-indicator" aria-hidden="true">{columnIndicator("apy_30d")}</span> : null}</button></th>
                   <th className="numeric" aria-sort={columnSort("momentum")}><button ref={(node) => { sortButtons.current.momentum = node; }} className="th-button" aria-label="Sort by 7d versus 30d realized APY" onClick={() => toggleColumnSort("momentum")}><span className="sort-label-desktop" aria-hidden="true">7d vs 30d</span><span className="sort-label-mobile" aria-hidden="true">7d−30d</span>{columnIndicator("momentum") ? <span className="th-indicator" aria-hidden="true">{columnIndicator("momentum")}</span> : null}</button></th>
                 </tr></thead>
-                <tbody>{isLoading ? <TableSkeleton rows={7} columns={8} /> : data?.rows.map((row) => (
+                <tbody>{isLoading ? <TableSkeleton rows={7} columns={8} /> : visibleRows.map((row) => (
                   <tr key={`${row.chain_id}:${row.vault_address}`}>
-                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
+                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><Link className="vault-report-link" href={`/reports?view=vaults&vault_address=${row.vault_address}&chain_id=${row.chain_id}`}>Reports</Link><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
                     <td className="mobile-secondary-column">{row.token_symbol || "Unknown"}</td>
                     <td className="mobile-secondary-column">{marketLabel(row.market as MarketKind)}</td>
                     <td className="mobile-secondary-column"><Link className="market-link-secondary" href={`/markets?view=vaults&market=${query.market}&universe=${query.universe}&chain=${row.chain_id}`}>{chainLabel(row.chain_id)}</Link></td>
@@ -195,6 +204,8 @@ function ExplorePageContent() {
                 ))}</tbody>
               </table></TableWrap>
             )}
+            {matchingRows.length > visibleRows.length ? <button className="button button-ghost" onClick={() => updateQuery({ limit: query.limit + 30 })}>Show more vaults ({matchingRows.length - visibleRows.length} remaining)</button> : null}
+            <p className="explanation">Search covers the selected vault set. Choose All tracked vaults to include smaller vaults.</p>
           </section>
         </>
       ) : (

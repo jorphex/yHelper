@@ -7,8 +7,8 @@ import { useSearchParams } from "next/navigation";
 export type MarketMode = "changes" | "vaults" | "structure";
 
 const modes: Array<{ id: MarketMode; label: string }> = [
-  { id: "changes", label: "What changed" },
-  { id: "vaults", label: "Vaults" },
+  { id: "vaults", label: "Find a vault" },
+  { id: "changes", label: "Yield changes" },
   { id: "structure", label: "Composition" },
 ];
 
@@ -81,7 +81,7 @@ export function MarketModeNav({ active }: { active: MarketMode }) {
     <nav
       ref={navRef}
       className="market-mode-nav"
-      aria-label="Market views"
+      aria-label="Vault research views"
       data-scrollable={overflow.start || overflow.end ? "true" : "false"}
       data-overflow-start={overflow.start ? "true" : "false"}
       data-overflow-end={overflow.end ? "true" : "false"}

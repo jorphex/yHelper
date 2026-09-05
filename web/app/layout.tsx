@@ -3,6 +3,7 @@ import "./globals-editorial-viz.css";
 import "./globals-fixes.css";
 import "./globals-ylockers.css";
 import "./globals-flex.css";
+import "./globals-product.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode, Suspense } from "react";
 import { Sidebar } from "./components/sidebar";
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
     default: "yHelper",
     template: "%s · yHelper",
   },
-  description: "Track Yearn vault changes, browse vaults, and verify strategy reports.",
+  description: "Understand Yearn staking rewards, Flex lending, and vault activity. Explore the details when you need them.",
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
@@ -37,7 +38,7 @@ export const metadata: Metadata = {
     url: siteUrl,
     siteName: "yHelper",
     title: "yHelper",
-    description: "Track Yearn vault changes, browse vaults, and verify strategy reports.",
+    description: "Understand Yearn staking rewards, Flex lending, and vault activity. Explore the details when you need them.",
     images: [
       {
         url: OPEN_GRAPH_IMAGE_URL,
@@ -50,7 +51,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "yHelper",
-    description: "Track Yearn vault changes, browse vaults, and verify strategy reports.",
+    description: "Understand Yearn staking rewards, Flex lending, and vault activity. Explore the details when you need them.",
     images: [TWITTER_IMAGE_URL],
   },
 };

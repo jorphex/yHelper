@@ -13,7 +13,7 @@ export const flexCopy = {
   hero: {
     title: "Flex Markets",
     accent: "Ethereum lending",
-    blurb: "Compare active markets, borrowing rates, and idle USDC, then inspect rate-dependent borrowing capacity.",
+    blurb: "Lend USDC or explore borrowing against collateral. Compare rates, capacity, and market health before opening Flex.",
     officialLink: "Open Flex",
   },
   freshness: {
@@ -163,8 +163,8 @@ export const flexCopy = {
     summary: "At {rate} annual rate, {idle} idle USDC plus {redeemed} of lower-rate debt potentially redeemed gives {total} estimated borrowing capacity; {share} of trove debt may be affected.",
   },
   troveHealth: {
-    title: "Trove health",
-    description: "A market-wide view of collateral and borrowing across active troves.",
+    title: "Borrowing position health",
+    description: "Each borrowing position is called a trove. LTV (loan-to-value) compares its debt with its collateral value.",
     definition: "Near max LTV includes troves within 1 percentage point of the market's maximum LTV. Debt share is measured against total active-trove debt.",
     ltvDefinition: "LTV means loan-to-value, the borrowed amount relative to collateral value.",
     metrics: {

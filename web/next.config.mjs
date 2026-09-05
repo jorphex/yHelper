@@ -14,7 +14,7 @@ const nextConfig = {
       },
       {
         source: "/momentum",
-        destination: "/markets",
+        destination: "/markets?view=changes",
         permanent: true,
       },
       {

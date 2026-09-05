@@ -4,10 +4,10 @@ import { internalApiUrl } from "./api";
 import { SocialImageFrame, socialImageAssets, socialImageFonts, socialImageSize } from "./social-image-frame";
 
 export const pageSocialCopy = {
-  overview: { label: "Overview", promise: "Yearn, at a glance." },
-  markets: { label: "Markets", promise: "Explore Yearn vaults by market." },
-  reports: { label: "Reports", promise: "Follow vault activity and locker rewards." },
-  styfi: { label: "stYFI", promise: "Follow the stYFI lending position." },
+  overview: { label: "yHelper", promise: "Understand Yearn rewards, lending, and vault activity." },
+  markets: { label: "Vault research", promise: "Find a vault. Understand its yield." },
+  reports: { label: "Rewards & reports", promise: "Follow vault activity and locker rewards." },
+  styfi: { label: "stYFI", promise: "Understand YFI staking rewards." },
   flex: { label: "Flex Markets", promise: "Ethereum lending" },
 } as const;
 

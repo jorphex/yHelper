@@ -8,6 +8,7 @@ import { EmptyState } from "../components/empty-state";
 import { TableSkeleton } from "../components/skeleton";
 import { TableWrap } from "../components/table-wrap";
 import { LockerRewards } from "../components/ylocker-rewards";
+import { useDiscoverData } from "../hooks/use-discover-data";
 import { useReportData } from "../hooks/use-report-data";
 import {
   chainLabel,
@@ -34,7 +35,7 @@ function compactRawAmount(value: string | null | undefined): string {
   return `${negative ? "-" : ""}${head[0]}.${head.slice(1)}e${digits.length - 1}`;
 }
 
-function formatTokenAmount(value: string | null | undefined, decimals: number | null | undefined): string {
+function formatTokenAmount(value: string | null | undefined, decimals: number | null | undefined, exact = false): string {
   if (!value?.trim()) return "n/a";
   const raw = value.trim();
   const negative = raw.startsWith("-");
@@ -46,7 +47,9 @@ function formatTokenAmount(value: string | null | undefined, decimals: number | 
   const split = Math.max(padded.length - decimals, 1);
   const whole = padded.slice(0, split).replace(/^0+(?=\d)/, "") || "0";
   const fraction = padded.slice(split).replace(/0+$/, "");
-  const shownFraction = fraction.length > 6 ? `${fraction.slice(0, 6)}…` : fraction;
+  const firstNonzero = fraction.search(/[1-9]/);
+  const precision = whole === "0" ? Math.max(4, firstNonzero + 3) : 4;
+  const shownFraction = exact ? fraction : fraction.length > precision ? `${fraction.slice(0, precision)}…` : fraction;
   const shownWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return `${negative ? "-" : ""}${shownWhole}${shownFraction ? `.${shownFraction}` : ""}`;
 }
@@ -55,8 +58,9 @@ function amountWithUnit(
   value: string | null | undefined,
   unit: string | null | undefined,
   decimals: number | null | undefined,
+  exact = false,
 ): string {
-  const amount = formatTokenAmount(value, decimals);
+  const amount = formatTokenAmount(value, decimals, exact);
   return unit?.trim() && amount !== "n/a" ? `${amount} ${unit.trim()}` : amount;
 }
 
@@ -76,10 +80,6 @@ function compactTimestamp(value: string): string {
     hour12: false,
     timeZone: "UTC",
   }).format(date).replace(",", " ·") + " UTC";
-}
-
-function hasAmount(value: string | null | undefined): boolean {
-  return Boolean(value?.trim() && !/^0+$/.test(value.trim()));
 }
 
 function signedResult(
@@ -115,6 +115,8 @@ function VaultReportsContent() {
     limit: query.limit,
     meaningfulOnly: query.meaningfulOnly,
   });
+  const catalog = useDiscoverData({ universe: "raw", market: "all", minTvl: 0, minPoints: 0, limit: 250, sort: "tvl", dir: "desc", allRows: true });
+  const [searchError, setSearchError] = useState("");
   const [vaultDraft, setVaultDraft] = useState(query.vaultAddress);
   const [compact, setCompact] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState(false);
@@ -133,6 +135,17 @@ function VaultReportsContent() {
     .sort((left, right) => left.label.localeCompare(right.label)), [data?.available_chains]);
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
     replaceQuery(router, pathname, searchParams, updates);
+  const applyVaultSearch = () => {
+    const draft = vaultDraft.trim();
+    if (!draft) { setSearchError(""); updateQuery({ vault_address: null }); return; }
+    if (/^0x[a-fA-F0-9]{40}$/.test(draft)) { setSearchError(""); updateQuery({ vault_address: draft.toLowerCase() }); return; }
+    const matches = (catalog.data?.rows ?? []).filter((row) => row.symbol?.toLowerCase() === draft.toLowerCase() && (!query.chainId || row.chain_id === query.chainId));
+    if (matches.length === 1) {
+      setSearchError("");
+      setVaultDraft(matches[0].vault_address);
+      updateQuery({ vault_address: matches[0].vault_address, chain_id: matches[0].chain_id });
+    } else setSearchError(catalog.isLoading ? "Vault names are loading. You can also enter a full address." : "Choose a suggested vault address, or enter a full 0x address. Narrow the chain if a name has multiple matches.");
+  };
   const recentRows = data?.recent ?? [];
   const visibleRecentRows = compact && !mobileExpanded ? recentRows.slice(0, 10) : recentRows;
 
@@ -141,7 +154,13 @@ function VaultReportsContent() {
   return (
     <>
       <section className="section section-md" aria-label="Report filters">
-        <div className="card"><div className="filter-grid">
+        <form onSubmit={(event) => { event.preventDefault(); applyVaultSearch(); }} className="report-search">
+          <label htmlFor="report-vault-search" className="filter-label">Find a vault by name or address</label>
+          <div className="report-search-controls"><input id="report-vault-search" type="search" className="filter-control" value={vaultDraft} list="report-vault-options" placeholder="Try yvUSD or 0x…" aria-describedby={searchError ? "report-search-error" : undefined} aria-invalid={Boolean(searchError)} onChange={(event) => { setVaultDraft(event.target.value); setSearchError(""); }} /><button className="button button-secondary" type="submit">Find</button></div>
+          <datalist id="report-vault-options">{(catalog.data?.rows ?? []).filter((row) => !query.chainId || row.chain_id === query.chainId).map((row) => <option key={`${row.chain_id}:${row.vault_address}`} value={row.vault_address} label={`${row.symbol || "Vault"} · ${chainLabel(row.chain_id)}`} />)}</datalist>
+          {searchError ? <p id="report-search-error" role="alert" className="explanation">{searchError}</p> : null}
+        </form>
+        <details className="detail-disclosure report-filters"><summary>Filter reports{query.chainId ? ` · ${chainLabel(query.chainId)}` : ""}{!query.meaningfulOnly ? " · all accounting updates" : ""}</summary><div className="disclosure-body"><div className="filter-grid">
         <label>
           <span className="filter-label">Chain</span>
           <select className="filter-control" value={query.chainId ?? ""} onChange={(event) => updateQuery({ chain_id: event.target.value || null })}>
@@ -160,50 +179,36 @@ function VaultReportsContent() {
             <option value="all">All accounting updates</option>
           </select>
         </label>
-        <label>
-          <span className="filter-label">Vault address (optional)</span>
-          <input
-            type="text"
-            className="filter-control"
-            value={vaultDraft}
-            placeholder="0x…"
-            onChange={(event) => setVaultDraft(event.target.value)}
-            onBlur={() => updateQuery({ vault_address: vaultDraft.trim() || null })}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") updateQuery({ vault_address: vaultDraft.trim() || null });
-            }}
-          />
-        </label>
-        </div></div>
+
+        </div></div></details>
         {query.vaultAddress ? <p className="section-note active-filter-note">Showing one vault: <span className="data-value">{data?.recent?.[0]?.vault_symbol || shortAddress(query.vaultAddress)}</span> <button className="button-reset table-filter-action" onClick={() => updateQuery({ vault_address: null })}>Clear vault filter</button></p> : null}
       </section>
-
-      {isLoading && !data ? <p className="section section-md muted">Loading reports…</p> : (
-        <section className="section section-md"><p className="section-note">
-          Last 24 hours: <strong>{data?.trailing_24h?.report_count ?? 0}</strong> reports from{" "}
-          <strong>{data?.trailing_24h?.vault_count ?? 0}</strong> vaults and{" "}
-          <strong>{data?.trailing_24h?.strategy_count ?? 0}</strong> strategies. Amounts are shown in each vault&apos;s
-          asset, not converted to USD.
-        </p></section>
-      )}
 
       <section className="section">
         <div className="card-header">
           <div>
-            <h2 className="card-title">Recent strategy reports</h2>
-            <p className="card-subtitle">Newest first · last {HISTORY_DAYS} days</p>
+            <h2 className="card-title">Reported results</h2>
+            <p className="card-subtitle">Newest first · last {HISTORY_DAYS} days. Open details for exact amounts and transactions.</p>
+            <p className="explanation">Reported result is gain minus loss, in the vault&apos;s asset.</p>
+            <details className="scope-details"><summary>What does a report tell me?</summary><p>A strategy report records gains, losses, and accounting changes for a vault. It is not your personal return. Fees and refunds are shown separately in accounting details.</p>      {isLoading && !data ? <p className="section section-md muted">Loading reports…</p> : (
+        <div><p className="section-note">
+          Last 24 hours: <strong>{data?.trailing_24h?.report_count ?? 0}</strong> reports from{" "}
+          <strong>{data?.trailing_24h?.vault_count ?? 0}</strong> vaults and{" "}
+          <strong>{data?.trailing_24h?.strategy_count ?? 0}</strong> strategies. Amounts are shown in each vault&apos;s
+          asset, not converted to USD.
+        </p></div>
+      )}
+
+</details>
           </div>
         </div>
         {!isLoading && (data?.recent?.length ?? 0) === 0 ? (
           <EmptyState title="No matching reports" description="Try another chain or vault, or show all accounting updates." />
         ) : (
           <TableWrap className="reports-table-wrap">
-            <table className="reports-table">
-              <thead><tr>
-                <th>Time</th><th>Vault</th><th>Strategy</th>{query.meaningfulOnly ? null : <th>Type</th>}
-                <th className="numeric">Result</th><th className="numeric">Fees / refund</th><th className="numeric">Debt after</th>
-              </tr></thead>
-              <tbody>{isLoading && !data ? <TableSkeleton rows={8} columns={query.meaningfulOnly ? 6 : 7} /> : visibleRecentRows.map((row) => {
+            <table className="reports-table" aria-label="Vault strategy reports">
+              <thead><tr><th>Time</th><th>Vault</th><th className="numeric">Reported result</th><th>Details</th></tr></thead>
+              <tbody>{isLoading && !data ? <TableSkeleton rows={8} columns={4} /> : visibleRecentRows.map((row) => {
                 const vaultUrl = yearnVaultUrl(row.chain_id, row.vault_address);
                 const strategyUrl = explorerAddressUrl(row.chain_id, row.strategy_address);
                 const txUrl = explorerTxUrl(row.chain_id, row.tx_hash);
@@ -214,17 +219,20 @@ function VaultReportsContent() {
                       <a className="external-link report-link report-link-entity report-link-vault" href={vaultUrl} target="_blank" rel="noreferrer">{row.vault_symbol || shortAddress(row.vault_address)}</a>
                       <div className="muted">{chainLabel(row.chain_id)} · {row.token_symbol || "asset"} · <button className="button-reset table-filter-action report-filter-action" aria-label={`Show only reports for ${row.vault_symbol || row.vault_address}`} onClick={() => updateQuery({ vault_address: row.vault_address })}>Only this vault</button></div>
                     </td>
-                    <td data-label="Strategy">
-                      {strategyUrl ? <a className={`external-link report-link report-link-entity report-link-strategy ${row.strategy_name ? "" : "report-link-address"}`.trim()} href={strategyUrl} target="_blank" rel="noreferrer">{row.strategy_name || shortAddress(row.strategy_address)}</a> : row.strategy_name || shortAddress(row.strategy_address)}
-                    </td>
-                    {query.meaningfulOnly ? null : <td data-label="Type">{row.report_type === "realized_result" ? "Realized result" : "Accounting update"}</td>}
-                    <td data-label="Result" className={`numeric report-result ${hasAmount(row.loss) ? "text-negative" : hasAmount(row.gain) ? "text-positive" : ""}`.trim()}>{signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals)}</td>
-                    <td data-label="Fees / refund" className="numeric">
-                      {hasAmount(row.fee_assets) ? <div>{amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals)} fee</div> : null}
-                      {hasAmount(row.refund_assets) ? <div className="muted">{amountWithUnit(row.refund_assets, row.token_symbol, row.token_decimals)} refund</div> : null}
-                      {!hasAmount(row.fee_assets) && !hasAmount(row.refund_assets) ? "None" : null}
-                    </td>
-                    <td data-label="Debt after" className="numeric">{amountWithUnit(row.debt_after, row.token_symbol, row.token_decimals)}</td>
+                    <td data-label="Reported result" className={`numeric report-result ${signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals).startsWith("-") ? "text-negative" : signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals).startsWith("+") ? "text-positive" : ""}`}>{signedResult(row.gain, row.loss, row.token_symbol, row.token_decimals)}</td>
+                    <td data-label="Details"><details className="report-evidence"><summary aria-label={`Accounting details for ${row.vault_symbol || row.vault_address} at ${compactTimestamp(row.block_time)}`}>Accounting details</summary>
+                      <dl className="evidence-grid">
+                        <div><dt>Strategy</dt><dd>{strategyUrl ? <a href={strategyUrl} target="_blank" rel="noreferrer">{row.strategy_name || row.strategy_address}</a> : row.strategy_name || row.strategy_address}</dd></div>
+                        <div><dt>Report type</dt><dd>{row.report_type === "realized_result" ? "Realized result" : "Accounting update"}</dd></div>
+                        <div><dt>Reported gain</dt><dd>{amountWithUnit(row.gain, row.token_symbol, row.token_decimals, true)}</dd></div>
+                        <div><dt>Reported loss</dt><dd>{amountWithUnit(row.loss, row.token_symbol, row.token_decimals, true)}</dd></div>
+                        <div><dt>Fees</dt><dd>{amountWithUnit(row.fee_assets, row.token_symbol, row.token_decimals, true)}</dd></div>
+                        <div><dt>Refund</dt><dd>{amountWithUnit(row.refund_assets, row.token_symbol, row.token_decimals, true)}</dd></div>
+                        <div><dt>Debt after report</dt><dd>{amountWithUnit(row.debt_after, row.token_symbol, row.token_decimals, true)}</dd></div>
+                        <div><dt>Vault address</dt><dd>{row.vault_address}</dd></div>
+                        <div><dt>Transaction</dt><dd>{txUrl ? <a href={txUrl} target="_blank" rel="noreferrer">{row.tx_hash}</a> : row.tx_hash}</dd></div>
+                      </dl>
+                    </details></td>
                   </tr>
                 );
               })}</tbody>
@@ -245,10 +253,10 @@ function ReportsPageContent() {
     <>
       <header className="page-header reports-page-header">
         <div>
-          <h1 className="page-title">Reports<br /><em className="page-title-accent">{view === "lockers" ? "Locker rewards" : "Vault reports"}</em></h1>
+          <h1 className="page-title">Rewards & reports<br /><em className="page-title-accent">{view === "lockers" ? "Locker rewards" : "Vault reports"}</em></h1>
           <p className="page-description">{view === "lockers"
             ? "Weekly yCRV and yYB rewards."
-            : "A clear view of recent vault activity."}</p>
+            : "Look up a vault and understand its reported gains, losses, and accounting activity."}</p>
         </div>
         <nav className="reports-view-nav" aria-label="Reports">
           <Link href="/reports?view=vaults" className={`reports-view-link ${view === "vaults" ? "is-active" : ""}`.trim()} aria-current={view === "vaults" ? "page" : undefined}>Vault reports</Link>

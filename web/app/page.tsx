@@ -1,147 +1,71 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useHomeData, useOverviewPulseData, type HomeMover, type HomeReport } from "./hooks/use-home-data";
-import { formatPct, formatUsd, formatUtcDateTime, yearnVaultUrl } from "./lib/format";
-
-function signedPoints(value: number | null | undefined): string {
-  if (!Number.isFinite(value ?? null)) return "n/a";
-  const points = (value ?? 0) * 100;
-  return `${points > 0 ? "+" : points < 0 ? "−" : ""}${Math.abs(points).toFixed(2)} pp`;
-}
-
-function ageLabel(seconds: number | null | undefined): string | null {
-  if (!Number.isFinite(seconds ?? null)) return null;
-  const value = Math.max(0, seconds ?? 0);
-  if (value < 3_600) return `${Math.max(1, Math.round(value / 60))}m ago`;
-  if (value < 86_400) return `${Math.max(1, Math.round(value / 3_600))}h ago`;
-  return `${Math.max(1, Math.round(value / 86_400))}d ago`;
-}
-
-function absoluteMove(row: HomeMover | undefined): number {
-  if (!Number.isFinite(row?.delta_apy ?? null)) return Number.NEGATIVE_INFINITY;
-  return Math.abs(row?.delta_apy ?? 0);
-}
-
-function moverName(row: HomeMover | undefined): string {
-  return row?.symbol?.trim() || row?.token_symbol?.trim() || "Vault yield";
-}
-
-function reportDirection(report: HomeReport): string {
-  if (report.loss && Number(report.loss) > 0) return "reported a realized loss";
-  if (report.gain && Number(report.gain) > 0) return "reported a realized gain";
-  return "posted a meaningful strategy report";
-}
+import { useHomeData } from "./hooks/use-home-data";
+import { formatPct, formatUsd, formatUtcDateTime } from "./lib/format";
 
 export default function HomePage() {
   const { data, isLoading } = useHomeData();
-  const { data: pulseData, isLoading: pulseLoading } = useOverviewPulseData();
-  const riser = data?.changes?.movers?.risers?.[0];
-  const faller = data?.changes?.movers?.fallers?.[0];
-  const pulse = pulseData?.pulse;
-  const freshnessLimit = (pulse?.freshness_window_hours ?? 48) * 3_600;
-  const freshRiser = (riser?.age_seconds ?? Number.POSITIVE_INFINITY) <= freshnessLimit ? riser : undefined;
-  const freshFaller = (faller?.age_seconds ?? Number.POSITIVE_INFINITY) <= freshnessLimit ? faller : undefined;
-  const mover = absoluteMove(freshRiser) >= absoluteMove(freshFaller) ? freshRiser : freshFaller;
-  const report = data?.reports?.recent?.[0];
-  const styfiSummary = data?.styfi?.summary;
-  const styfiReward = data?.styfi?.current_reward_state;
-  const protocol = data?.overview?.protocol;
-  const styfiAge = ageLabel(data?.styfi?.freshness?.latest_snapshot_age_seconds);
-  const pulseAge = ageLabel(pulse?.latest_data_at ? Math.max(0, (Date.now() - Date.parse(pulse.latest_data_at)) / 1_000) : null);
-  const pulseStatement = pulse?.data_state === "ready"
-    ? `Core realized yield is ${pulse.trend === "improving" ? "strengthening" : pulse.trend === "softening" ? "softening" : "steady"}`
-    : pulse?.data_state === "limited"
-      ? "The core comparison has limited coverage"
-      : pulse?.data_state === "delayed"
-        ? "Core yield data is delayed"
-        : "Current market direction is not available yet";
-  const hasSecondaryEvidence = Boolean(report || styfiReward || styfiSummary);
+  const staking = data?.styfi;
+  const stakingAge = staking?.freshness?.latest_snapshot_age_seconds;
+  const stakingFresh = stakingAge != null && stakingAge < 3600;
+  const flex = data?.flex;
+  const rewards = data?.rewards;
+  const latestWeek = [...(rewards?.reporting_weeks ?? [])]
+    .filter((week) => week.status === "finalized")
+    .sort((a, b) => b.week_end.localeCompare(a.week_end))[0];
+  const date = (value: string) => new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
   return (
-    <div>
-      <section className="page-header page-header-hero page-header-no-border overview-hero">
-        <div className="overview-hero-copy">
-          <div className="scope-label">Current Yearn brief</div>
-          <h1 className="page-title">What changed<br /><em className="page-title-accent">and where to look</em></h1>
-          <p className="page-description">
-            A clear view of material vault moves, strategy reports, and stYFI activity, with the evidence and freshness to inspect each one.
-          </p>
-          <div className="tab-bar-plain">
-            <Link href="/markets" className="button button-primary">Inspect markets</Link>
-            <Link href="/reports" className="button button-secondary">Verify reports</Link>
+    <div className="home-page">
+      <header className="page-header home-header">
+        <div className="scope-label">Your guide to Yearn</div>
+        <h1 className="page-title">Yearn,<br /><em className="page-title-accent">made clearer</em></h1>
+        <p className="page-description">Check staking rewards, explore lending markets, or follow vault activity. Start with the essentials, then open the details.</p>
+        <nav className="home-shortcuts" aria-label="Product shortcuts"><Link href="/styfi">stYFI</Link><Link href="/flex">Flex</Link><Link href="/reports?view=lockers">Locker rewards</Link></nav>
+      </header>
+
+      <section className="product-grid" aria-label="Explore Yearn products">
+        <article className="product-entry">
+          <div className="scope-label">YFI staking</div>
+          <h2><Link href="/styfi">stYFI <span aria-hidden="true">↗</span></Link></h2>
+          <p>Understand staking rewards and how participation is changing.</p>
+          <div className="product-snapshot" aria-live="polite">
+            <span className="product-metric">{isLoading ? "Loading…" : stakingFresh ? formatPct(staking?.current_reward_state?.styfi_current_apr, 2) : "Check rewards"}</span>
+            <span>{stakingFresh ? `Current stYFI APR · Epoch ${staking?.current_reward_state?.epoch ?? staking?.summary?.reward_epoch ?? "unavailable"}` : isLoading ? "Staking rewards" : staking ? "Staking snapshot is delayed" : "Staking snapshot is unavailable"}</span>
+            {stakingFresh && staking?.freshness?.latest_snapshot_at ? <time dateTime={staking.freshness.latest_snapshot_at}>Updated {formatUtcDateTime(staking.freshness.latest_snapshot_at)}</time> : null}
           </div>
-          {protocol?.tvl_usd != null && protocol.freshness_status === "fresh" ? (
-            <p className="hero-context">Yearn website TVL {formatUsd(protocol.tvl_usd, 0, false)}{protocol.fetched_at ? ` · source fetched ${formatUtcDateTime(protocol.fetched_at)}` : ""}</p>
-          ) : null}
-        </div>
-        <div className="hero-image overview-hero-image">
-          <Image src="/home-assets-yearn-blender/hero-yearn-blender-coins.png" alt="" width={500} height={320} priority style={{ objectFit: "contain" }} />
-        </div>
+          <Link className="button button-primary" href="/styfi">View staking rewards</Link>
+        </article>
+
+        <article className="product-entry">
+          <div className="scope-label">Lending & borrowing</div>
+          <h2><Link href="/flex">Flex <span aria-hidden="true">↗</span></Link></h2>
+          <p>Compare lending rates, borrowing capacity, and the health of each market.</p>
+          <div className="product-snapshot" aria-live="polite">
+            <span className="product-metric">{isLoading ? "Loading…" : flex?.freshness.data_state === "ready" ? `${flex.rows.filter((row) => row.status === "active").length} markets` : "Explore Flex"}</span>
+            <span>{flex?.freshness.data_state === "ready" ? `${formatUsd(flex.summary.deposits_usd)} deposited in active markets` : isLoading ? "Active lending markets" : flex?.freshness.data_state === "delayed" ? "Market snapshot is delayed" : "Market snapshot is unavailable"}</span>
+            {flex?.freshness.data_state === "ready" && flex.freshness.indexed_through ? <time dateTime={flex.freshness.indexed_through}>Updated {formatUtcDateTime(flex.freshness.indexed_through)}</time> : null}
+          </div>
+          <Link className="button button-primary" href="/flex">Explore lending markets</Link>
+        </article>
+
+        <article className="product-entry">
+          <div className="scope-label">Rewards & activity</div>
+          <h2><Link href="/reports?view=lockers">Rewards & reports <span aria-hidden="true">↗</span></Link></h2>
+          <p>Follow yCRV and yYB reward deposits, or look up a vault&apos;s reported results.</p>
+          <div className="product-snapshot" aria-live="polite">
+            <span className="product-metric">{isLoading ? "Loading…" : latestWeek ? `${latestWeek.total_crvusd_at_deposit.toLocaleString("en-US", { maximumFractionDigits: 0 })} crvUSD` : "Follow rewards"}</span>
+            <span>{latestWeek ? `yCRV + yYB deposits · ${date(latestWeek.week_start)}–${date(latestWeek.week_end)} UTC` : isLoading ? "Completed weekly deposits" : "Weekly snapshot is unavailable"}</span>
+            <span className="product-provenance">{latestWeek ? `Value at deposit · completed week${rewards?.freshness.status !== "fresh" ? " · updates delayed" : ""}` : "Browse reward history and vault accounting"}</span>
+          </div>
+          <div className="product-actions"><Link className="button button-primary" href="/reports?view=lockers">View locker rewards</Link><Link className="text-link" href="/reports?view=vaults">Vault reports →</Link></div>
+        </article>
       </section>
 
-      <section className="section section-lg" aria-labelledby="brief-title">
-        <div className="card-header">
-          <div>
-            <h2 className="card-title" id="brief-title">Worth inspecting now</h2>
-            <p className="card-description">
-              {pulseStatement}{pulse?.data_state === "ready" && pulse.directional_tvl_ratio != null ? ` across ${Math.round(pulse.directional_tvl_ratio * 100)}% of comparable TVL` : ""}{pulseAge ? ` · price per share (PPS) updated ${pulseAge}` : ""}.
-            </p>
-          </div>
-        </div>
-
-        {isLoading || pulseLoading ? <div className="brief-list"><div className="brief-item brief-item-lead skeleton" /><div className="brief-secondary"><div className="brief-item skeleton" /><div className="brief-item skeleton" /></div></div> : (
-          <div className="brief-list">
-            {mover ? (
-              <article className="brief-item brief-item-lead">
-                <div className="brief-kicker">Lead signal · 7d vs prior 7d · PPS {ageLabel(mover.age_seconds) || "age unavailable"}</div>
-                <div className="brief-content">
-                  <div>
-                    <h3 className="brief-title">{moverName(mover)} moved {signedPoints(mover.delta_apy)}</h3>
-                    <p className="brief-description">Current realized APY {formatPct(mover.realized_apy_window, 2)} · tracked TVL {formatUsd(mover.tvl_usd)}. This is the largest absolute move among established vaults, not a recommendation.</p>
-                    <div className="brief-actions">
-                      {mover.chain_id != null && mover.vault_address ? <a className="evidence-link-primary" href={yearnVaultUrl(mover.chain_id, mover.vault_address)} target="_blank" rel="noreferrer">Inspect vault</a> : null}
-                    </div>
-                  </div>
-                </div>
-              </article>
-            ) : (
-              <article className="brief-item brief-item-lead brief-quiet">
-                <div className="brief-kicker">Market check · freshness gate applied</div>
-                <div className="brief-content"><div>
-                  <h3 className="brief-title">No fresh vault move to inspect</h3>
-                  <p className="brief-description">Nothing among established vaults falls within the freshness window for a lead signal. Review the full comparison for coverage.</p>
-                  <div className="brief-actions"><Link className="evidence-link-secondary" href="/markets">Review markets</Link></div>
-                </div></div>
-              </article>
-            )}
-
-            {hasSecondaryEvidence ? <div className="brief-secondary">
-            {report ? <article className="brief-item">
-                <div className="brief-kicker">Latest meaningful report · {formatUtcDateTime(report.block_time)}</div>
-                <div className="brief-content">
-                  <div>
-                    <h3 className="brief-title">{report.vault_symbol || "A Yearn vault"} {reportDirection(report)}</h3>
-                    <p className="brief-description">{report.strategy_name || "Strategy report"}. Verify the transaction, gain or loss, fees, and debt in the report ledger.</p>
-                    <div className="brief-actions"><Link className="evidence-link-primary" href={`/reports?vault_address=${encodeURIComponent(report.vault_address)}`}>View report</Link></div>
-                  </div>
-                </div>
-              </article> : null}
-
-            {styfiReward || styfiSummary ? <article className="brief-item">
-                <div className="brief-kicker">stYFI · snapshot {styfiAge || "age unavailable"}</div>
-                <div className="brief-content">
-                  <div>
-                    <h3 className="brief-title">Epoch {styfiReward?.epoch ?? styfiSummary?.reward_epoch ?? "n/a"} · {formatPct(styfiReward?.styfi_current_apr, 2)} APR</h3>
-                    <p className="brief-description">{styfiSummary?.combined_staked != null ? `${styfiSummary.combined_staked.toLocaleString("en-US", { maximumFractionDigits: 1 })} YFI participating. ` : ""}Review rewards, stake flows, recent actions, and epoch history.</p>
-                    <div className="brief-actions"><Link className="evidence-link-primary" href="/styfi">View stYFI</Link></div>
-                  </div>
-                </div>
-              </article> : null}
-            </div> : null}
-          </div>
-        )}
+      <section className="home-research" aria-labelledby="research-title">
+        <div><h2 id="research-title">Looking into a vault?</h2><p>Find a vault, compare estimated and realized yield, and explore changes over time.</p></div>
+        <Link href="/markets" className="button button-secondary">Find a vault</Link>
       </section>
     </div>
   );

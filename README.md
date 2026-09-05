@@ -4,12 +4,13 @@ yHelper is a public Yearn analytics dashboard for inspecting yield changes, vaul
 
 ## Product
 
-- **Overview** (`/`): a freshness-aware Yearn brief.
-- **Markets** (`/markets`): yield changes, vault discovery, and market structure.
-- **Reports** (`/reports`): recent vault reports and yCRV and yYB reward history.
-- **stYFI** (`/styfi`): participation, rewards, flows, snapshots, and recent activity.
+- **Home** (`/`): direct entries to staking, lending, and rewards, with current product context.
+- **stYFI** (`/styfi`): rewards and participation, with explanations and disclosed component, activity, and epoch evidence.
+- **Flex** (`/flex`): lending rates, borrowing capacity, market terms, and position health.
+- **Rewards & reports** (`/reports`): searchable vault accounting; `/reports?view=lockers` opens yCRV and yYB reward history.
+- **Vault research** (`/markets`): searchable vault comparison, with deeper yield changes and composition views.
 
-`/momentum` redirects to `/markets`, and `/harvests` redirects to `/reports`. Legacy `/explore` and `/structure` entry points remain for compatibility; `/structure` redirects to Markets.
+`/momentum` redirects to `/markets?view=changes`, and `/harvests` redirects to `/reports`. Legacy `/explore` and `/structure` entry points remain compatible.
 
 ## Data and scope
 
@@ -80,6 +81,14 @@ Frontend checks:
 npm --prefix web run lint
 npm --prefix web run build
 ```
+
+Browser regression checks against a running preview (default `http://127.0.0.1:3020`):
+
+```bash
+YHELPER_TEST_URL=http://127.0.0.1:3020 npm --prefix web run test:ui
+```
+
+These cover product navigation during source failures, vault search across API pages, exact report accounting, disclosures, responsive layouts, and keyboard controls. Start a local frontend preview with `YHELPER_API_PROXY_TARGET=http://127.0.0.1:8000 npm --prefix web run dev -- --port 3020`.
 
 Python tests, with service dependencies installed:
 

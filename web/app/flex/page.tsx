@@ -508,10 +508,16 @@ function FlexPageContent() {
       </section>
 
       <section className="section section-lg">
+        {data?.freshness.indexed_through ? <p className="explanation">{data.freshness.data_state === "ready" ? "Updated" : "Updates delayed. Last indexed"} {dateTime.format(new Date(data.freshness.indexed_through))} UTC</p> : null}
         <div className="card-header"><div><h2 className="card-title" id="flex-markets-title">{flexCopy.markets.title}</h2><p className="card-description">{flexCopy.markets.description}</p></div></div>
         {isLoading && !data ? <TableWrap><table className="decision-table" aria-labelledby="flex-markets-title"><tbody><TableSkeleton rows={2} columns={8} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
       </section>
 
+      <details className="detail-disclosure"><summary>Understand lending rates and borrowing capacity</summary><div className="disclosure-body">
+        <p>Lender APR is the annualized lending rate. The debt-weighted rate averages existing borrowers&apos; chosen rates, weighted by their debt. It is not a quote for a new loan.</p>
+        <p>Idle USDC is cash currently held by the lender. Even when it is zero, a higher-rate borrowing position may replace lower-rate debt through redemptions. The capacity chart combines idle cash with lower-rate debt that could be redeemed at each inspected rate.</p>
+        <p>These are estimates of capacity. Existing borrowing positions at lower rates can be affected by redemptions.</p>
+      </div></details>
       {selected ? <section className="section section-lg flex-history-section">
         <div className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
           {active.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}
@@ -528,6 +534,7 @@ function FlexPageContent() {
             </dl>
           </div>
         </section> : null}
+        <p className="explanation">LTV is debt divided by collateral value. Compare it with the market&apos;s limits to understand how much room a position has as prices change. The label Safe LTV is a protocol parameter, not a guarantee against loss.</p>
         <TroveHealthSection query={troveHealth} />
         <RedemptionPrioritySection query={redemptionPriority} />
         <div className="flex-history-heading-row">
@@ -539,7 +546,7 @@ function FlexPageContent() {
         {history.isLoading && !history.data ? <div className="flex-chart-grid-layout"><div className="skeleton flex-chart-skeleton" /><div className="skeleton flex-chart-skeleton" /></div> : history.data?.points.length ? <HistoryCharts points={history.data.points} /> : <p className="muted">{flexCopy.history.unavailable}</p>}
       </section> : null}
 
-      <section className="section section-lg flex-activity-section">
+      <details className="detail-disclosure flex-activity-section"><summary>Protocol activity and transactions</summary><div className="disclosure-body">
         <div className="card-header"><div><h2 className="card-title" id="flex-activity-title">{flexCopy.activity.title}</h2><p className="card-description">{flexCopy.activity.description}</p></div></div>
         <TableWrap className="flex-activity-wrap"><table className="decision-table flex-activity-table" aria-labelledby="flex-activity-title">
           <thead><tr><th>{flexCopy.activity.headers.time}</th><th>{flexCopy.activity.headers.event}</th><th>{flexCopy.activity.headers.market}</th><th className="numeric">{flexCopy.activity.headers.amount}</th></tr></thead>
@@ -552,7 +559,7 @@ function FlexPageContent() {
         </table></TableWrap>
         {!activity.isLoading && activityRows.length === 0 ? <p className="muted">{flexCopy.activity.empty}</p> : null}
         {activity.hasNextPage ? <button type="button" className="button button-ghost section-sm" disabled={activity.isFetchingNextPage} onClick={() => activity.fetchNextPage()}>{activity.isFetchingNextPage ? flexCopy.activity.loadingMore : flexCopy.activity.loadMore}</button> : null}
-      </section>
+      </div></details>
     </div>
   );
 }

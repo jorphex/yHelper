@@ -42,6 +42,7 @@ interface UseDiscoverDataParams {
   dir: string;
   chain?: string | null;
   enabled?: boolean;
+  allRows?: boolean;
 }
 
 export async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<DiscoverResponse> {
@@ -57,7 +58,18 @@ export async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<
   if (params.chain) searchParams.set("chain_id", params.chain);
   const res = await fetch(apiUrl("/discover", searchParams), { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json() as Promise<DiscoverResponse>;
+  const data = await res.json() as DiscoverResponse;
+  if (params.allRows) {
+    while (data.rows.length < data.pagination.total) {
+      searchParams.set("offset", String(data.rows.length));
+      const next = await fetch(apiUrl("/discover", searchParams), { cache: "no-store" });
+      if (!next.ok) throw new Error(`API error: ${next.status}`);
+      const page = await next.json() as DiscoverResponse;
+      if (!page.rows.length) break;
+      data.rows.push(...page.rows);
+    }
+  }
+  return data;
 }
 
 export function useDiscoverData(params: UseDiscoverDataParams) {
