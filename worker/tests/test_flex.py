@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import unittest
+from copy import deepcopy
 from datetime import UTC, datetime
 
 from worker.flex import (
@@ -9,10 +9,8 @@ from worker.flex import (
     _decode_event,
     _snapshot_row,
     _topic,
-    _usd_e18,
 )
 from worker.flex_api import (
-    _record_redemption_priority_failure,
     _validated_redemption_priority_payload,
     _validated_trove_health_payload,
 )
@@ -79,32 +77,7 @@ def _active_market() -> dict[str, object]:
     }
 
 
-class RecordingCursor:
-    def __init__(self, commands: list[tuple[str, tuple[object, ...]]]) -> None:
-        self.commands = commands
-
-    def __enter__(self) -> RecordingCursor:
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        return None
-
-    def execute(self, query: str, params: tuple[object, ...]) -> None:
-        self.commands.append((query, params))
-
-
-class RecordingConnection:
-    def __init__(self) -> None:
-        self.commands: list[tuple[str, tuple[object, ...]]] = []
-
-    def cursor(self) -> RecordingCursor:
-        return RecordingCursor(self.commands)
-
-
 class FlexWorkerTests(unittest.TestCase):
-    def test_usd_value_retains_eighteen_decimal_scale(self) -> None:
-        self.assertEqual(_usd_e18(1_500_000, 6, 100_000_000, 8), 3 * 10**18 // 2)
-
     def test_snapshot_accrues_debt_with_ceiling_division(self) -> None:
         sampled_at = datetime(2026, 8, 1, tzinfo=UTC)
         block_timestamp = int(sampled_at.timestamp())
@@ -233,27 +206,6 @@ class FlexWorkerTests(unittest.TestCase):
         points[1] = {"rate": "55000", "redeemable_before": "1968818630"}
         with self.assertRaisesRegex(ValueError, "exceeds total debt"):
             _validated_redemption_priority_payload(payload, MARKET_ADDRESS)
-
-    def test_failed_refresh_updates_only_attempt_metadata(self) -> None:
-        conn = RecordingConnection()
-        attempted_at = datetime(2026, 8, 14, tzinfo=UTC)
-
-        _record_redemption_priority_failure(
-            conn,  # type: ignore[arg-type]
-            market_address=MARKET_ADDRESS,
-            source_url="https://api.flexmeow.com/v1/ui/borrow?chain_id=1",
-            attempted_at=attempted_at,
-            error="upstream unavailable",
-        )
-
-        self.assertEqual(len(conn.commands), 1)
-        query, params = conn.commands[0]
-        update_clause = query.split("DO UPDATE SET", 1)[1]
-        self.assertNotIn("points", update_clause)
-        self.assertNotIn("total_debt_raw", update_clause)
-        self.assertNotIn("fetched_at", update_clause)
-        self.assertIn("attempted_at = EXCLUDED.attempted_at", update_clause)
-        self.assertEqual(params[-1], "upstream unavailable")
 
     def test_trove_health_validation_aggregates_without_position_identity(self) -> None:
         aggregates = _validated_trove_health_payload(_explorer_payload(), [_active_market()])

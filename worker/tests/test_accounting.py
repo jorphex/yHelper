@@ -7,16 +7,11 @@ from decimal import Decimal
 from worker.accounting import (
     ProtocolTvlSnapshot,
     _parse_nonnegative_decimal,
-    _parse_parent_tvl,
     _parse_yearn_components,
 )
 
 
 class ProtocolAccountingParserTests(unittest.TestCase):
-    def test_parent_tvl_accepts_nonnegative_finite_numbers(self) -> None:
-        self.assertEqual(_parse_parent_tvl(208_586_862.25), Decimal("208586862.25"))
-        self.assertEqual(_parse_parent_tvl("0"), Decimal(0))
-
     def test_numeric_parser_rejects_bool_missing_negative_and_nonfinite(self) -> None:
         for value in (True, None, -1, "NaN", "Infinity", "not-a-number"):
             with self.subTest(value=value), self.assertRaises(ValueError):

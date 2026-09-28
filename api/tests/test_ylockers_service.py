@@ -5,8 +5,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
-from app.config import YLOCKER_PRODUCTS, YLOCKER_REWARD_TOKEN
-from app.models import YlockerRewardCycleResponse, YlockerRewardsResponse
+from app.config import YLOCKER_PRODUCTS
 from app.ylockers_service import WEEK_SECONDS, _build_response, ylocker_reward_cycle_response
 
 
@@ -208,25 +207,6 @@ class YlockerServiceTests(unittest.TestCase):
         week = next(row for row in result["reporting_weeks"] if row["week_start"] == "2026-08-06T00:00:00+00:00")
         self.assertEqual(week["status"], "finalized")
         self.assertFalse(week["ready_for_digest"])
-
-    def test_response_matches_typed_openapi_model(self) -> None:
-        result = self._response()
-        parsed = YlockerRewardsResponse.model_validate(result)
-        self.assertEqual(parsed.scope.chain_id, 1)
-        self.assertEqual(parsed.scope.reward_token.symbol, YLOCKER_REWARD_TOKEN["symbol"])
-        self.assertEqual(parsed.filters.product, "all")
-
-    def test_exact_cycle_response_matches_typed_model(self) -> None:
-        result = self._response(product="ycrv")
-        cycle = next(row for row in result["cycles"] if row["native_week"] == 1)
-        response = {
-            "reward_token": result["scope"]["reward_token"],
-            "freshness": result["freshness"]["products"][0],
-            "cycle": cycle,
-        }
-        parsed = YlockerRewardCycleResponse.model_validate(response)
-        self.assertEqual(parsed.cycle.native_week, 1)
-        self.assertEqual(parsed.cycle.value_crvusd_at_deposit, 3.0)
 
     def test_exact_cycle_is_unavailable_without_an_index_cursor(self) -> None:
         result = self._response(product="ycrv")

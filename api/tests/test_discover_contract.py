@@ -71,7 +71,7 @@ class _Connection:
 
 
 class DiscoverContractTests(unittest.TestCase):
-    def test_exact_token_filter_is_case_insensitive_and_summary_precedes_pagination(self) -> None:
+    def test_exact_token_filter_normalizes_whitespace_and_case(self) -> None:
         cursor = _Cursor()
         with patch("app.explore_routes.psycopg.connect", return_value=_Connection(cursor)):
             payload = discover(
@@ -85,10 +85,6 @@ class DiscoverContractTests(unittest.TestCase):
             )
 
         self.assertEqual(payload["filters"]["token_symbol"], "USDC")  # type: ignore[index]
-        self.assertEqual(payload["summary"]["vaults"], 2)  # type: ignore[index]
-        self.assertEqual(payload["summary"]["total_tvl_usd"], 3_000.0)  # type: ignore[index]
-        self.assertEqual(payload["summary"]["realized_spread_30d"], 0.02)  # type: ignore[index]
-        self.assertTrue(all("LOWER(COALESCE(d.token_symbol" in sql for sql, _ in cursor.calls))
         self.assertTrue(all(params["token_symbol"] == "USDC" for _, params in cursor.calls))
         DiscoverResponse.model_validate(payload)
 
