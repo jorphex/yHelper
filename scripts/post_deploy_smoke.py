@@ -14,7 +14,8 @@ import urllib.request
 
 def request_status(url: str, timeout: float) -> tuple[int | None, str | None]:
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:  # nosec B310 - internal health check utility
+        request = urllib.request.Request(url, headers={"User-Agent": "yHelper/1.0"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 - internal health check utility
             return response.status, None
     except urllib.error.HTTPError as exc:
         return exc.code, None
