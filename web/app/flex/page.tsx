@@ -1,5 +1,7 @@
 "use client";
 
+import { RiskAssessmentLink } from "../components/risk-assessment-link";
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -319,6 +321,7 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
     else setInspectionIndex(Math.max(0, Math.min(points.length - 1, current + (event.key === "ArrowRight" ? 1 : -1))));
   };
   const summary = inspected ? flexA11y(flexCopy.redemptionPriority.summary, {
+    symbol: data.borrow_token.symbol,
     rate: formatPct(inspected.annual_interest_rate),
     idle: compact.format(idleLiquidity),
     redeemed: `${compact.format(inspected.redeemable_before)} ${data.borrow_token.symbol}`,
@@ -327,7 +330,7 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
   }) : "";
   const inspectionDetails = inspected ? [
     [flexCopy.redemptionPriority.tooltip.annualRate, formatPct(inspected.annual_interest_rate)],
-    [flexCopy.redemptionPriority.tooltip.idle, `${compact.format(idleLiquidity)} ${data.borrow_token.symbol}`],
+    [flexA11y(flexCopy.redemptionPriority.tooltip.idle, { symbol: data.borrow_token.symbol }), `${compact.format(idleLiquidity)} ${data.borrow_token.symbol}`],
     [flexCopy.redemptionPriority.tooltip.redeemed, `${compact.format(inspected.redeemable_before)} ${data.borrow_token.symbol}`],
     [flexCopy.redemptionPriority.tooltip.total, `${compact.format(inspectedCapacity)} ${data.borrow_token.symbol}`],
     [flexCopy.redemptionPriority.tooltip.shareOfTotal, formatPct(inspectedShare)],
@@ -335,7 +338,7 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
 
   return <>
   <div className="flex-redemption-legend">
-    <span><i className="flex-redemption-idle-swatch" aria-hidden="true" />{flexCopy.redemptionPriority.legend.idle}<strong>{compact.format(idleLiquidity)} {data.borrow_token.symbol}</strong></span>
+    <span><i className="flex-redemption-idle-swatch" aria-hidden="true" />{flexA11y(flexCopy.redemptionPriority.legend.idle, { symbol: data.borrow_token.symbol })}<strong>{compact.format(idleLiquidity)} {data.borrow_token.symbol}</strong></span>
     <span><i className="flex-redemption-redeemable-swatch" aria-hidden="true" />{flexCopy.redemptionPriority.legend.redeemable}</span>
   </div>
   <div
@@ -401,7 +404,7 @@ function RedemptionPrioritySection({
   return <section className="flex-redemption-section" aria-labelledby="flex-redemption-title">
     <div className="flex-redemption-heading">
       <h3 id="flex-redemption-title">{flexCopy.redemptionPriority.title}</h3>
-      <p>{flexCopy.redemptionPriority.description}</p>
+      <p>{flexA11y(flexCopy.redemptionPriority.description, { symbol: data?.borrow_token.symbol ?? "borrow assets" })}</p>
       {freshness && freshness.data_state !== "unavailable" ? <p className="flex-redemption-freshness"><span>{freshnessLabel}</span>{source.map((item) => <span key={item}>{item}</span>)}</p> : null}
     </div>
     {query.isLoading && !data ? <div className="skeleton flex-redemption-skeleton" /> : null}
@@ -513,13 +516,13 @@ function FlexPageContent() {
         {isLoading && !data ? <TableWrap><table className="decision-table" aria-labelledby="flex-markets-title"><tbody><TableSkeleton rows={2} columns={8} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
       </section>
 
-      <p className="section-note">Lender APR: annualized lending rate. Debt-weighted rate: existing borrower rates weighted by debt, not a new loan quote.</p>
+      <p className="section-note">Expected lender APR assumes all debt pays interest. Debt-weighted rate reflects existing loans.</p>
       {selected ? <section className="section section-lg flex-history-section">
         <div className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
           {active.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}
         </div>
         {detail.data ? <section className="flex-risk-section" aria-labelledby="flex-risk-title">
-          <div><h3 id="flex-risk-title">{flexCopy.detail.risk.title}</h3></div>
+          <div><h3 id="flex-risk-title">{flexCopy.detail.risk.title}</h3><RiskAssessmentLink chainId={1} address={selected.addresses.lender} label={selected.label} /></div>
           <div className="flex-risk-content">
             <dl className="flex-risk-grid flex-risk-grid-all">
               <div><dt>{flexCopy.detail.risk.primary.minimumDebt}</dt><dd>{detail.data.risk.minimum_debt === null ? flexCopy.values.unavailable : `${compact.format(detail.data.risk.minimum_debt)} ${selected.borrow_token.symbol}`}</dd></div>

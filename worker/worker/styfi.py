@@ -101,7 +101,14 @@ def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
     styfi_projected = styfi.get("projected") if isinstance(styfi.get("projected"), dict) else {}
     styfix_current = styfix.get("current") if isinstance(styfix.get("current"), dict) else {}
     styfix_projected = styfix.get("projected") if isinstance(styfix.get("projected"), dict) else {}
+    yfi = global_state.get("yfi") if isinstance(global_state.get("yfi"), dict) else {}
     return {
+        "yfi_price": {
+            "status": yfi.get("priceStatus"),
+            "stale": yfi.get("priceStale"),
+            "updated_at": _safe_int(yfi.get("priceUpdatedAt")),
+            "max_age_seconds": _safe_int(yfi.get("priceMaxAgeSeconds")),
+        },
         "source": STYFI_SITE_GLOBAL_DATA_URL,
         "meta": {
             "timestamp": _safe_int(meta.get("timestamp")),

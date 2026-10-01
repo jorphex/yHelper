@@ -76,7 +76,16 @@ class DiscoverRow(VaultMetricRow):
     token_symbol: str | None
 
 
+class SourceFreshness(ApiModel):
+    state: Literal["ready", "delayed", "unknown"]
+    refreshed_at: str | None
+    fetched_at: str | None
+    age_seconds: int | None
+    stale_after_seconds: int
+
+
 class DiscoverResponse(ApiModel):
+    source_freshness: SourceFreshness | None = None
     filters: DiscoverFilters
     realized_apy_policy: RealizedApyPolicy
     pagination: Pagination
@@ -117,6 +126,7 @@ class CompositionToken(ApiModel):
 
 
 class CompositionResponse(ApiModel):
+    source_freshness: SourceFreshness | None = None
     filters: CompositionFilters
     summary: CompositionSummary
     chains: list[CompositionChain]
@@ -165,6 +175,7 @@ class ChangeMovers(ApiModel):
 
 
 class ChangesResponse(ApiModel):
+    source_freshness: SourceFreshness | None = None
     window: ChangeWindow
     realized_apy_policy: RealizedApyPolicy
     summary: ChangeSummary
@@ -396,6 +407,7 @@ class OverviewPulseResponse(ApiModel):
 
 
 class FreshnessResponse(ApiModel):
+    kong_source: SourceFreshness | None = None
     as_of_utc: str
     stale_threshold_seconds: int
     stale_threshold_hours: float
@@ -480,6 +492,9 @@ class StyfiRewardToken(ApiModel):
 
 
 class StyfiCurrentRewardState(ApiModel):
+    source_state: Literal["ready", "delayed", "unknown"] = "unknown"
+    yfi_price_state: Literal["ready", "delayed", "unknown"] = "unknown"
+    yfi_price_updated_at: int | None = None
     source: str | None
     epoch: int | None
     timestamp: int | None

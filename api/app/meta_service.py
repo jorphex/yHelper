@@ -6,6 +6,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from app.common import (
+    _kong_source_freshness,
     _seconds_since,
     _to_float_or_none,
     _user_visible_filter_sql,
@@ -289,6 +290,7 @@ def _freshness_snapshot(
                     "last_notify_result": row.get("last_notify_result"),
                 }
             result["alerts"] = alerts
+        result["kong_source"] = _kong_source_freshness(cur)
 
     return result
 

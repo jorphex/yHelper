@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import psycopg
 
 from app.common import _safe_int, _to_float_or_none
@@ -234,7 +236,21 @@ def _styfi_current_reward_state(cur: psycopg.Cursor) -> dict[str, object] | None
     styfix = state.get("styfix") if isinstance(state.get("styfix"), dict) else {}
     migrations = state.get("migrations") if isinstance(state.get("migrations"), dict) else {}
     liquid_lockers = state.get("liquid_lockers") if isinstance(state.get("liquid_lockers"), dict) else {}
+    now = int(datetime.now(UTC).timestamp())
+    source_ts = _safe_int(meta.get("timestamp"))
+    source_state = "unknown" if not source_ts or source_ts > now else "delayed" if now - source_ts > 3600 else "ready"
+    price = state.get("yfi_price") if isinstance(state.get("yfi_price"), dict) else {}
+    price_ts = _safe_int(price.get("updated_at"))
+    max_age = _safe_int(price.get("max_age_seconds"))
+    price_state = "unknown"
+    if price.get("stale") is True or price.get("status") == "stale":
+        price_state = "delayed"
+    elif price_ts and price_ts <= now and max_age and max_age > 0:
+        price_state = "delayed" if now - price_ts > max_age else "ready"
     return {
+        "source_state": source_state,
+        "yfi_price_state": price_state,
+        "yfi_price_updated_at": price_ts,
         "source": state.get("source") if isinstance(state.get("source"), str) else None,
         "epoch": _safe_int(meta.get("epoch")),
         "timestamp": _safe_int(meta.get("timestamp")),

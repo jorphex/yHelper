@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { StakingSourceNote } from "./components/source-notes";
 import { useHomeData } from "./hooks/use-home-data";
 import { formatPct, formatUsd, formatUtcDateTime } from "./lib/format";
 
@@ -8,8 +9,11 @@ export default function HomePage() {
   const { data, isLoading } = useHomeData();
   const staking = data?.styfi;
   const stakingAge = staking?.freshness?.latest_snapshot_age_seconds;
-  const stakingFresh = stakingAge != null && stakingAge < 3600;
+  const stakingFresh = stakingAge != null && stakingAge < 3600 && staking?.current_reward_state?.source_state !== "delayed";
   const flex = data?.flex;
+  const activeMarkets = flex?.rows.filter((row) => row.status === "active") ?? [];
+  const activeDeposits = activeMarkets.every((row) => row.metrics?.deposits_usd != null)
+    ? activeMarkets.reduce((sum, row) => sum + (row.metrics?.deposits_usd ?? 0), 0) : null;
   const rewards = data?.rewards;
   const latestWeek = [...(rewards?.reporting_weeks ?? [])]
     .filter((week) => week.status === "finalized")
@@ -34,6 +38,7 @@ export default function HomePage() {
             <span>{stakingFresh ? `Current stYFI APR · Epoch ${staking?.current_reward_state?.epoch ?? staking?.summary?.reward_epoch ?? "unavailable"}` : isLoading ? "Staking rewards" : staking ? "Staking snapshot is delayed" : "Staking snapshot is unavailable"}</span>
             {stakingFresh && staking?.freshness?.latest_snapshot_at ? <time dateTime={staking.freshness.latest_snapshot_at}>Updated {formatUtcDateTime(staking.freshness.latest_snapshot_at)}</time> : null}
           </div>
+          <StakingSourceNote state={staking?.current_reward_state} />
           <Link className="button button-primary" href="/styfi">View staking rewards</Link>
         </article>
 
@@ -42,8 +47,8 @@ export default function HomePage() {
           <h2><Link href="/flex">Flex <span aria-hidden="true">↗</span></Link></h2>
           <p>Lending rates and borrowing capacity.</p>
           <div className="product-snapshot" aria-live="polite">
-            <span className="product-metric">{isLoading ? "Loading…" : flex?.freshness.data_state === "ready" ? `${flex.rows.filter((row) => row.status === "active").length} markets` : "Explore Flex"}</span>
-            <span>{flex?.freshness.data_state === "ready" ? `${formatUsd(flex.summary.deposits_usd)} deposited in active markets` : isLoading ? "Active lending markets" : flex?.freshness.data_state === "delayed" ? "Market snapshot is delayed" : "Market snapshot is unavailable"}</span>
+            <span className="product-metric">{isLoading ? "Loading…" : flex?.freshness.data_state === "ready" ? `${activeMarkets.length} ${activeMarkets.length === 1 ? "market" : "markets"}` : "Explore Flex"}</span>
+            <span>{flex?.freshness.data_state === "ready" ? `${formatUsd(activeDeposits)} deposited in active markets` : isLoading ? "Active lending markets" : flex?.freshness.data_state === "delayed" ? "Market snapshot is delayed" : "Market snapshot is unavailable"}</span>
             {flex?.freshness.data_state === "ready" && flex.freshness.indexed_through ? <time dateTime={flex.freshness.indexed_through}>Updated {formatUtcDateTime(flex.freshness.indexed_through)}</time> : null}
           </div>
           <Link className="button button-primary" href="/flex">Explore lending markets</Link>

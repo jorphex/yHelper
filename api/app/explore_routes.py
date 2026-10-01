@@ -15,6 +15,7 @@ from app.analytics_service import (
     _fetch_change_movers,
 )
 from app.common import (
+    _kong_source_freshness,
     _market_filter_sql,
     _market_group_sql,
     _rank_gate_filter_sql,
@@ -161,10 +162,12 @@ def discover(
                 params,
             )
             rows = cur.fetchall()
+            source_freshness = _kong_source_freshness(cur)
 
     visible = int(coverage.get("visible_vaults") or 0)
     covered = int(coverage.get("with_realized_apy") or 0)
     return {
+        "source_freshness": source_freshness,
         "filters": {
             "universe": universe,
             "market": market,
@@ -239,11 +242,13 @@ def composition(
             chains = breakdown(cur, "chain_id", "chain_id")
             categories = breakdown(cur, "market", "category")
             tokens = breakdown(cur, "token_symbol", "token_symbol")
+            source_freshness = _kong_source_freshness(cur)
     total_tvl = float(summary.get("total_tvl_usd") or 0.0)
     for rows in (chains, categories, tokens):
         for row in rows:
             row["share_tvl"] = float(row.get("tvl_usd") or 0.0) / total_tvl if total_tvl else None
     return {
+        "source_freshness": source_freshness,
         "filters": {
             "universe": universe,
             "market": market,
@@ -323,10 +328,12 @@ def changes(
             )
             summary = cur.fetchone() or {}
             movers = _fetch_change_movers(cur, base_cte=base_cte, params=params, limit=limit)
+            source_freshness = _kong_source_freshness(cur)
     tracked = int(summary.get("vaults_with_change") or 0)
     stale = int(summary.pop("stale_comparisons", 0) or 0)
     newest_age = summary.pop("newest_comparison_age_seconds", None)
     return {
+        "source_freshness": source_freshness,
         "window": {"name": window, "stale_after_seconds": threshold_seconds},
         "realized_apy_policy": {"kind": "bounded", "min": APY_MIN, "max": APY_MAX},
         "summary": summary,

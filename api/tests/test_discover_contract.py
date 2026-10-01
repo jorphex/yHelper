@@ -34,6 +34,7 @@ class _Cursor:
                     "momentum_7d_30d": 0.01,
                 }
             ],
+            {"error_summary": None, "ended_at": None},
         ]
 
     def __enter__(self) -> _Cursor:
@@ -42,8 +43,8 @@ class _Cursor:
     def __exit__(self, *args: object) -> None:
         return None
 
-    def execute(self, sql: str, params: dict[str, object]) -> None:
-        self.calls.append((sql, params))
+    def execute(self, sql: str, params: dict[str, object] | None = None) -> None:
+        self.calls.append((sql, params or {}))
 
     def fetchone(self) -> dict[str, object]:
         response = self.responses.pop(0)
@@ -85,7 +86,7 @@ class DiscoverContractTests(unittest.TestCase):
             )
 
         self.assertEqual(payload["filters"]["token_symbol"], "USDC")  # type: ignore[index]
-        self.assertTrue(all(params["token_symbol"] == "USDC" for _, params in cursor.calls))
+        self.assertTrue(all(params["token_symbol"] == "USDC" for _, params in cursor.calls if "token_symbol" in params))
         DiscoverResponse.model_validate(payload)
 
 

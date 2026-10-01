@@ -94,6 +94,10 @@ FLEX_IMPLEMENTATIONS = {
     "1.1.0": "0x41d491d261ad0d34bbfffb3e2098f57bec4139ce",
 }
 FLEX_USDC_USD_FEED = "0x8fffffd4afb6115b954bd326cbe7b4ba576818f6"
+FLEX_BORROW_USD_FEEDS = {
+    "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": FLEX_USDC_USD_FEED,
+    "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": "0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419",
+}
 JOB_KONG_SNAPSHOT = "kong_vault_snapshot"
 JOB_KONG_PPS = "kong_pps_metrics"
 JOB_PROTOCOL_TVL = "protocol_tvl_snapshot"
@@ -647,6 +651,7 @@ CREATE TABLE IF NOT EXISTS flex_market_snapshots (
     FOREIGN KEY (chain_id, market_address)
         REFERENCES flex_market_dim(chain_id, market_address) ON DELETE CASCADE
 );
+ALTER TABLE flex_market_snapshots ADD COLUMN IF NOT EXISTS borrow_usd_feed_address TEXT;
 CREATE INDEX IF NOT EXISTS idx_flex_snapshots_time
     ON flex_market_snapshots(sampled_hour DESC, market_address);
 

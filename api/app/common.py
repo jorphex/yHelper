@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -204,3 +205,39 @@ def _safe_int(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _kong_source_freshness(cur) -> dict[str, object]:
+    cur.execute("""
+        SELECT error_summary, ended_at FROM ingestion_runs
+        WHERE job_name = 'kong_vault_snapshot' AND status = 'success'
+        ORDER BY ended_at DESC LIMIT 1
+    """)
+    row = cur.fetchone() or {}
+    try:
+        metadata = json.loads(row.get("error_summary") or "{}").get("source_freshness") or {}
+    except (ValueError, AttributeError, TypeError):
+        metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    now = datetime.now(UTC)
+
+    def timestamp(value):
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo and parsed <= now else None
+        except (ValueError, TypeError):
+            return None
+
+    refreshed = timestamp(metadata.get("refreshed_at"))
+    fetched = timestamp(metadata.get("fetched_at"))
+    age = int((now - refreshed).total_seconds()) if refreshed else None
+    fetch_age = int((now - fetched).total_seconds()) if fetched else None
+    state = "unknown" if age is None or fetch_age is None else "delayed" if max(age, fetch_age) > 7200 else "ready"
+    return {
+        "state": state,
+        "refreshed_at": refreshed.isoformat() if refreshed else None,
+        "fetched_at": fetched.isoformat() if fetched else None,
+        "age_seconds": age,
+        "stale_after_seconds": 7200,
+    }

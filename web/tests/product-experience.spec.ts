@@ -96,3 +96,44 @@ test("Mobile navigation and Flex chart controls stay usable", async ({ page }) =
   await expect(capacity).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test("Home totals use active rows and disclose delayed staking prices", async ({ page }) => {
+  await page.route("**/api/styfi?**", (route) => route.fulfill({ json: { current_reward_state: { epoch: 17, styfi_current_apr: .12, source_state: "ready", yfi_price_state: "delayed" }, freshness: { latest_snapshot_age_seconds: 10 } } }));
+  await page.route("**/api/flex/markets?**", (route) => route.fulfill({ json: { freshness: { data_state: "ready" }, summary: { deposits_usd: 99000 }, rows: [
+    { status: "active", metrics: { deposits_usd: 27000 } },
+    { status: "unendorsed", metrics: { deposits_usd: 72000 } },
+  ] } }));
+  await page.route("**/api/ylockers/rewards?**", (route) => route.fulfill({ status: 503, body: "Unavailable" }));
+  await page.goto("/");
+  await expect(page.getByText("$27,000 deposited in active markets", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 market", { exact: true })).toBeVisible();
+  await expect(page.getByText("APR uses a delayed YFI price.", { exact: true })).toBeVisible();
+});
+
+test("Research discloses upstream cache age and links only matched vault assessments", async ({ page }) => {
+  const assessed = { ...vault, vault_address: "0xbe53a109b494e5c9f97b9cd39fe969be68bf6204", symbol: "yvUSDC-1" };
+  await page.route("**/api/discover?**", (route) => route.fulfill({ json: { ...catalog, rows: [assessed, { ...assessed, chain_id: 8453 }, vault], source_freshness: { state: "delayed", refreshed_at: "2026-09-30T00:00:00Z" } } }));
+  await page.goto("/markets");
+  await expect(page.getByText(/Vault data delayed/)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Risk assessment/ })).toHaveCount(1);
+  await expect(page.getByRole("link", { name: /Risk assessment for yvUSDC-1/ })).toHaveAttribute("href", /yearn-yvusdc/);
+});
+
+
+test("WETH capacity follows its asset and lender rates are labelled as expected", async ({ page, request }) => {
+  const response = await request.get("/api/flex/markets?status=active");
+  const markets = await response.json();
+  const market = markets.rows.find((row: { borrow_token: { symbol: string } }) => row.borrow_token.symbol === "WETH");
+  expect(market).toBeTruthy();
+  await page.goto(`/flex?market=${market.addresses.market}`);
+  const capacity = page.locator(".flex-redemption-section");
+  await expect(capacity.getByText(/Estimated capacity = idle WETH/)).toBeVisible();
+  await expect(capacity.locator(".flex-redemption-legend")).toContainText("Idle WETH");
+  await expect(capacity).not.toContainText("USDC");
+  await expect(page.getByRole("columnheader", { name: "Expected lender APR" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Risk assessment/ })).toHaveCount(0);
+  await capacity.getByRole("group", { name: /Estimated borrowing capacity/ }).focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(capacity.locator(".flex-chart-tooltip")).toContainText("Idle WETH");
+  await expect(capacity.locator(".sr-only")).toContainText("idle WETH");
+});

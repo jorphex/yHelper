@@ -1,5 +1,7 @@
 "use client";
 
+import { StakingSourceNote, type StakingSourceState } from "../components/source-notes";
+
 import { Suspense, useMemo } from "react";
 import { explorerAddressUrl, explorerTxUrl, formatPct, formatUtcDateTime } from "../lib/format";
 import { BarList, TrendStrips } from "../components/visuals";
@@ -60,7 +62,7 @@ type StYfiResponse = {
     first_snapshot_at?: string | null;
     latest_snapshot_at?: string | null;
   };
-  current_reward_state?: {
+  current_reward_state?: StakingSourceState & {
     epoch?: number | null;
     styfi_current_apr?: number | null;
     styfix_current_apr?: number | null;
@@ -261,6 +263,8 @@ function StYfiPageContent() {
         </div>
 
       </section>
+
+      <StakingSourceNote state={data?.current_reward_state} />
 
       {/* Summary KPIs - 5 cards */}
       <section className="section section-lg">

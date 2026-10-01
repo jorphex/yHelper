@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type { SourceFreshness } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
 import { MarketKind, UniverseKind } from "../lib/universe";
 
@@ -32,6 +33,7 @@ type ChangeRow = {
 };
 
 type ChangesResponse = {
+  source_freshness?: SourceFreshness;
   summary: Summary;
   freshness?: {
     newest_comparison_age_seconds?: number | null;

@@ -255,6 +255,7 @@ def _ensure_schema_columns() -> None:
                     FOREIGN KEY (chain_id, market_address)
                         REFERENCES flex_market_dim(chain_id, market_address) ON DELETE CASCADE
                 );
+                ALTER TABLE flex_market_snapshots ADD COLUMN IF NOT EXISTS borrow_usd_feed_address TEXT;
                 CREATE INDEX IF NOT EXISTS idx_flex_snapshots_time
                     ON flex_market_snapshots(sampled_hour DESC, market_address);
                 CREATE TABLE IF NOT EXISTS flex_events (

@@ -2,12 +2,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
+import type { StakingSourceState } from "../components/source-notes";
 import type { FlexMarketsResponse } from "./use-flex-data";
 import type { YlockerRewardsResponse } from "./use-ylocker-rewards";
 
 type HomeStaking = {
   summary?: { reward_epoch?: number | null; combined_staked?: number | null };
-  current_reward_state?: { epoch?: number | null; styfi_current_apr?: number | null };
+  current_reward_state?: StakingSourceState & { epoch?: number | null; styfi_current_apr?: number | null };
   freshness?: { latest_snapshot_at?: string | null; latest_snapshot_age_seconds?: number | null };
 };
 

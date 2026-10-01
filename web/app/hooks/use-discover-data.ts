@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type { SourceFreshness } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
 import { MarketKind, UniverseKind } from "../lib/universe";
 
@@ -17,6 +18,7 @@ type DiscoverRow = {
 };
 
 type DiscoverResponse = {
+  source_freshness?: SourceFreshness;
   pagination: { total: number; limit: number; offset: number };
   summary?: {
     total_tvl_usd?: number | null;

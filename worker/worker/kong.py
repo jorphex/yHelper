@@ -37,7 +37,7 @@ from .eth import _first_present, _normalize_vault, _parse_chain_id
 LAST_CLEANUP_AT: datetime | None = None
 
 
-def _fetch_kong_snapshot() -> list[dict]:
+def _fetch_kong_snapshot() -> tuple[list[dict], dict[str, object]]:
     response = requests.get(
         KONG_REST_VAULTS_URL,
         timeout=KONG_TIMEOUT_SEC,
@@ -50,7 +50,10 @@ def _fetch_kong_snapshot() -> list[dict]:
     vaults = [vault for vault in payload if isinstance(vault, dict)]
     if len(vaults) != len(payload):
         raise ValueError("Kong REST vault response contains non-object records")
-    return vaults
+    return vaults, {
+        "refreshed_at": response.headers.get("X-Last-Refresh"),
+        "fetched_at": datetime.now(UTC).isoformat(),
+    }
 
 
 def _normalize_kong_snapshot(vaults: list[dict]) -> list[dict]:
@@ -395,9 +398,9 @@ def _run_kong_snapshot_ingestion(conn: psycopg.Connection) -> tuple[int, int]:
     started_at = datetime.now(UTC)
     run_id = _insert_run(conn, JOB_KONG_SNAPSHOT, started_at)
     try:
-        vaults = _fetch_kong_snapshot()
+        vaults, source_freshness = _fetch_kong_snapshot()
         stored = _store_snapshot(conn, vaults)
-        _complete_run(conn, run_id, "success", stored)
+        _complete_run(conn, run_id, "success", stored, json.dumps({"source_freshness": source_freshness}))
         logging.info("Kong vault snapshot success: stored %s vault records", stored)
         return run_id, stored
     except Exception as exc:

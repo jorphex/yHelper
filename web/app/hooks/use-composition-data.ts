@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type { SourceFreshness } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
 import { MarketKind, UniverseKind } from "../lib/universe";
 
@@ -14,6 +15,7 @@ type BreakdownRow = {
 };
 
 type CompositionResponse = {
+  source_freshness?: SourceFreshness;
   summary: {
     vaults: number;
     total_tvl_usd: number | null;

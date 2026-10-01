@@ -1,5 +1,7 @@
 "use client";
 
+import { VaultSourceNote } from "../components/source-notes";
+
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
@@ -97,6 +99,7 @@ function MomentumPageContent() {
         <h1 className="page-title">Vault research<br /><em className="page-title-accent">Yield changes</em></h1>
         <p className="page-description">Realized yield compared with the preceding period.</p>
         <MarketModeNav active="changes" />
+        <VaultSourceNote source={data?.source_freshness} />
       </section>
       <section className="section section-md"><div className="card market-filter-panel"><div className="filter-grid">
         <label><span className="filter-label">Window</span><select className="filter-control" value={query.window} onChange={(event) => updateQuery({ window: event.target.value })}><option value="24h">24 hours vs prior 24 hours</option><option value="7d">7 days vs prior 7 days</option><option value="30d">30 days vs prior 30 days</option></select></label>

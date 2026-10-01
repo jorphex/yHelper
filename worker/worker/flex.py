@@ -20,7 +20,7 @@ from .config import (
     FLEX_REGISTRY_ADDRESS,
     FLEX_REPLAY_BLOCKS,
     FLEX_SNAPSHOT_INTERVAL_SEC,
-    FLEX_USDC_USD_FEED,
+    FLEX_BORROW_USD_FEEDS,
     JOB_FLEX_SYNC,
 )
 from .db_state import _complete_run, _ensure_schema, _insert_run
@@ -595,33 +595,52 @@ def _batch_state(markets: list[dict[str, object]], block_number: int) -> dict[st
                 data += "0" * 64
             calls.append(("eth_call", [{"to": address, "data": data}, hex(block_number)]))
             keys.append((market_address, name))
-    feed_calls = [
-        ("eth_call", [{"to": FLEX_USDC_USD_FEED, "data": _call_data("latestRoundData()")}, hex(block_number)]),
-        ("eth_call", [{"to": FLEX_USDC_USD_FEED, "data": _call_data("decimals()")}, hex(block_number)]),
-    ]
-    results = _eth_rpc_batch_to_url(rpc_url, [*calls, *feed_calls])
+    results = _eth_rpc_batch_to_url(rpc_url, calls)
     state: dict[str, dict[str, int]] = {str(market["market_address"]): {} for market in markets}
-    for (market_address, name), result in zip(keys, results[: len(keys)]):
+    for (market_address, name), result in zip(keys, results):
         if not isinstance(result, str):
             raise TypeError(f"Missing historical state result for {market_address} {name}")
         state[market_address][name] = _eth_decode_uint256(result)
-    round_data = results[-2]
-    feed_decimals_result = results[-1]
-    if not isinstance(round_data, str) or not isinstance(feed_decimals_result, str):
-        raise TypeError("Missing historical USDC oracle result")
-    round_words = _words(round_data)
-    if len(round_words) < 2:
-        raise ValueError("Malformed historical USDC oracle result")
-    answer = int(round_words[1], 16)
-    if answer >= 2**255:
-        answer -= 2**256
-    if answer <= 0:
-        raise ValueError(f"Invalid historical USDC oracle answer: {answer}")
-    feed_decimals = _eth_decode_uint256(feed_decimals_result)
-    for market_state in state.values():
-        market_state["borrow_usd_price"] = answer
-        market_state["borrow_usd_price_decimals"] = feed_decimals
+    prices = _borrow_prices(markets, block_number)
+    for market in markets:
+        answer, decimals = prices[str(market["borrow_token_address"]).lower()]
+        state[str(market["market_address"])].update(
+            borrow_usd_price=answer, borrow_usd_price_decimals=decimals,
+        )
     return state
+
+
+def _borrow_prices(markets: list[dict[str, object]], block_number: int) -> dict[str, tuple[int, int]]:
+    tokens = sorted({str(market["borrow_token_address"]).lower() for market in markets})
+    unsupported = [token for token in tokens if token not in FLEX_BORROW_USD_FEEDS]
+    if unsupported:
+        raise ValueError(f"No USD feed configured for borrow assets: {unsupported}")
+    rpc_url = _rpc_url_for_chain(FLEX_CHAIN_ID)
+    if not rpc_url:
+        raise ValueError("Ethereum RPC is not configured")
+    calls = [
+        ("eth_call", [{"to": FLEX_BORROW_USD_FEEDS[token], "data": _call_data(signature)}, hex(block_number)])
+        for token in tokens for signature in ("latestRoundData()", "decimals()")
+    ]
+    results = _eth_rpc_batch_to_url(rpc_url, calls)
+    prices = {}
+    for index, token in enumerate(tokens):
+        round_data, decimals_data = results[2 * index:2 * index + 2]
+        if not isinstance(round_data, str) or not isinstance(decimals_data, str):
+            raise TypeError(f"Missing historical USD oracle result for {token}")
+        words = _words(round_data)
+        if len(words) < 5:
+            raise ValueError(f"Malformed historical USD oracle result for {token}")
+        answer = int(words[1], 16)
+        if answer >= 2**255:
+            answer -= 2**256
+        if answer <= 0 or int(words[3], 16) <= 0 or int(words[4], 16) < int(words[0], 16):
+            raise ValueError(f"Invalid historical USD oracle round for {token}")
+        decimals = _eth_decode_uint256(decimals_data)
+        if decimals > 18:
+            raise ValueError(f"Unsupported USD oracle precision for {token}: {decimals}")
+        prices[token] = (answer, decimals)
+    return prices
 
 
 def _usd_e18(amount_raw: int, token_decimals: int, price_raw: int, price_decimals: int) -> int:
@@ -674,6 +693,7 @@ def _snapshot_row(
         "collateral_price_in_borrow_wad": state["oracle_price"],
         "borrow_usd_price_raw": price,
         "borrow_usd_price_decimals": price_decimals,
+        "borrow_usd_feed_address": FLEX_BORROW_USD_FEEDS.get(str(market.get("borrow_token_address", "")).lower()),
         "collateral_usd_e18": _usd_e18(collateral_in_borrow, borrow_decimals, price, price_decimals),
         "debt_usd_e18": _usd_e18(debt, borrow_decimals, price, price_decimals),
         "deposits_usd_e18": _usd_e18(deposits, borrow_decimals, price, price_decimals),
@@ -757,7 +777,7 @@ def _sync_snapshots(
                     chain_id, market_address, sampled_hour, block_number, block_hash, block_time,
                     contract_version, collateral_raw, debt_raw, weighted_debt_raw, deposits_raw,
                     idle_liquidity_raw, collateral_price_in_borrow_wad, borrow_usd_price_raw,
-                    borrow_usd_price_decimals, collateral_usd_e18, debt_usd_e18, deposits_usd_e18,
+                    borrow_usd_price_decimals, borrow_usd_feed_address, collateral_usd_e18, debt_usd_e18, deposits_usd_e18,
                     idle_liquidity_usd_e18, utilization_wad, lender_apr_wad,
                     avg_borrow_rate_raw, source
                 ) VALUES (
@@ -765,7 +785,7 @@ def _sync_snapshots(
                     %(block_hash)s, %(block_time)s, %(contract_version)s, %(collateral_raw)s,
                     %(debt_raw)s, %(weighted_debt_raw)s, %(deposits_raw)s, %(idle_liquidity_raw)s,
                     %(collateral_price_in_borrow_wad)s, %(borrow_usd_price_raw)s,
-                    %(borrow_usd_price_decimals)s, %(collateral_usd_e18)s, %(debt_usd_e18)s,
+                    %(borrow_usd_price_decimals)s, %(borrow_usd_feed_address)s, %(collateral_usd_e18)s, %(debt_usd_e18)s,
                     %(deposits_usd_e18)s, %(idle_liquidity_usd_e18)s, %(utilization_wad)s,
                     %(lender_apr_wad)s, %(avg_borrow_rate_raw)s, %(source)s
                 )
@@ -780,6 +800,8 @@ def _sync_snapshots(
                     idle_liquidity_raw = EXCLUDED.idle_liquidity_raw,
                     collateral_price_in_borrow_wad = EXCLUDED.collateral_price_in_borrow_wad,
                     borrow_usd_price_raw = EXCLUDED.borrow_usd_price_raw,
+                    borrow_usd_price_decimals = EXCLUDED.borrow_usd_price_decimals,
+                    borrow_usd_feed_address = EXCLUDED.borrow_usd_feed_address,
                     collateral_usd_e18 = EXCLUDED.collateral_usd_e18,
                     debt_usd_e18 = EXCLUDED.debt_usd_e18,
                     deposits_usd_e18 = EXCLUDED.deposits_usd_e18,
@@ -825,15 +847,17 @@ def _reconcile(conn: psycopg.Connection, finalized_block: int) -> str:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT DISTINCT ON (market_address)
-                    market_address, collateral_raw, debt_raw, deposits_raw, lender_apr_wad, block_number
-                FROM flex_market_snapshots
-                ORDER BY market_address, sampled_hour DESC
+                SELECT DISTINCT ON (s.market_address)
+                    s.market_address, s.collateral_raw, s.debt_raw, s.deposits_raw, s.lender_apr_wad, s.block_number,
+                    s.deposits_usd_e18, d.borrow_token_decimals
+                FROM flex_market_snapshots s
+                JOIN flex_market_dim d USING (chain_id, market_address)
+                ORDER BY s.market_address, s.sampled_hour DESC
                 """
             )
             snapshots = cur.fetchall()
         mismatch = False
-        for market, collateral, debt, deposits, lender_apr, block_number in snapshots:
+        for market, collateral, debt, deposits, lender_apr, block_number, deposits_usd, borrow_decimals in snapshots:
             api_row = api_rows.get(str(market))
             if api_row is None:
                 results.append({"market_address": str(market), "status": "not_in_flex_api"})
@@ -845,8 +869,11 @@ def _reconcile(conn: psycopg.Connection, finalized_block: int) -> str:
                 ("debt_raw", int(debt), "total_debt", 0.003),
                 ("deposits_raw", int(deposits), "total_deposits", 0.001),
                 ("lender_apr_wad", int(lender_apr), "expected_lend_apr", 0.01),
+                ("deposits_usd_e18", int(deposits_usd), "total_deposits_in_usd", 0.02),
             ):
                 api_value = int(str(metrics.get(api_key) or "0"))
+                if name == "deposits_usd_e18":
+                    api_value = api_value * WAD // 10**int(borrow_decimals)
                 denominator = max(abs(api_value), 1)
                 relative_error = abs(rpc_value - api_value) / denominator
                 comparisons[name] = {

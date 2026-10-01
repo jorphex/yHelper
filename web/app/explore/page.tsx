@@ -1,5 +1,8 @@
 "use client";
 
+import { VaultSourceNote } from "../components/source-notes";
+import { RiskAssessmentLink } from "../components/risk-assessment-link";
+
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -134,6 +137,7 @@ function ExplorePageContent() {
         <h1 className="page-title">Vault research<br /><em className="page-title-accent">{pageCopy.accent}</em></h1>
         <p className="page-description">{pageCopy.description}</p>
         <MarketModeNav active={query.tab} />
+        <VaultSourceNote source={query.tab === "structure" ? composition?.source_freshness : data?.source_freshness} />
       </section>
 
       <section className="section section-md">
@@ -192,7 +196,7 @@ function ExplorePageContent() {
                 </tr></thead>
                 <tbody>{isLoading ? <TableSkeleton rows={7} columns={8} /> : visibleRows.map((row) => (
                   <tr key={`${row.chain_id}:${row.vault_address}`}>
-                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><Link className="vault-report-link" href={`/reports?view=vaults&vault_address=${row.vault_address}&chain_id=${row.chain_id}`}>Reports</Link><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
+                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><Link className="vault-report-link" href={`/reports?view=vaults&vault_address=${row.vault_address}&chain_id=${row.chain_id}`}>Reports</Link><RiskAssessmentLink chainId={row.chain_id} address={row.vault_address} label={row.symbol ?? row.vault_address} /><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
                     <td className="mobile-secondary-column">{row.token_symbol || "Unknown"}</td>
                     <td className="mobile-secondary-column">{marketLabel(row.market as MarketKind)}</td>
                     <td className="mobile-secondary-column"><Link className="market-link-secondary" href={`/markets?view=vaults&market=${query.market}&universe=${query.universe}&chain=${row.chain_id}`}>{chainLabel(row.chain_id)}</Link></td>
