@@ -16,7 +16,6 @@ FLEX_API_EXPLORER_URL = f"{FLEX_API_URL}/v1/ui/explorer"
 FLEX_SOFT_ERRORS = (requests.RequestException, ValueError, RuntimeError, KeyError, TypeError)
 LOGGER = logging.getLogger(__name__)
 WAD = 10**18
-FLEX_RATIO_SCALE = 10**6
 NEAR_MAX_LTV_WAD = WAD // 100
 
 
@@ -307,7 +306,8 @@ def _validated_trove_health_payload(
             debt * 10**collateral_decimals * WAD * WAD
             // (collateral * price * 10**borrow_decimals)
         )
-        max_ltv_wad = max_ltv * WAD // FLEX_RATIO_SCALE
+        ratio_scale = int(market.get("one_pct_raw") or 10**borrow_decimals // 100) * 100
+        max_ltv_wad = max_ltv * WAD // ratio_scale
         positions[market_address].append(
             {
                 "collateral": collateral,

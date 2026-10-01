@@ -101,6 +101,32 @@ class Fixture(BaseHTTPRequestHandler):
                     "styfi": {"current": {"aprBps": 1200}},
                 }
             )
+        elif self.path.startswith("/v1/ui/explorer"):
+            self.send(
+                {
+                    "chain_id": 1,
+                    "block_number": 1000,
+                    "block_timestamp": TS,
+                    "markets": {
+                        "1:" + m["market_address"]: {
+                            "collateral_token_price_in_borrow_token": str(10**18),
+                            "max_ltv": str(9 * 10 ** m["borrow_token_decimals"] // 10),
+                        }
+                        for m in self.markets
+                    },
+                    "rows": [
+                        {
+                            "market_id": "1:" + m["market_address"],
+                            "status": 1,
+                            "trove_id": "1",
+                            "collateral": str(10**18),
+                            "debt": str(88 * 10 ** m["borrow_token_decimals"] // 100),
+                            "annual_interest_rate": "0",
+                        }
+                        for m in self.markets
+                    ],
+                }
+            )
         else:
             self.send(
                 {
@@ -246,6 +272,7 @@ def main():
         from worker.config import FLEX_BORROW_USD_FEEDS
         from worker.db_state import _ensure_schema
         from worker.flex import _batch_state, _reconcile, _sync_snapshots
+        from worker.flex_api import _sync_trove_health
         from worker.flex_reprice import repair
         from worker.kong import _run_kong_snapshot_ingestion
         from worker.styfi import (
@@ -320,6 +347,16 @@ def main():
             "Mixed USDC/WETH snapshots and active API totals use separate feeds; reversed RPC responses stay aligned"
         )
         assert _reconcile(conn, 1000) == "ok"
+        assert _sync_trove_health(conn, Fixture.markets) == {"ready": 2, "failed": 0}
+        for market in Fixture.markets:
+            health = get(f"flex/markets/{market['market_address']}/trove-health")[
+                "metrics"
+            ]
+            assert health["minimum_buffer_to_max_ltv"] == 0.02, health
+            assert health["debt_near_max_share"] == 0, health
+        checks.append(
+            "USDC and WETH health buffers use the market ratio precision through source ingestion and HTTP"
+        )
         weth_market = Fixture.markets[1]["market_address"]
         with conn.cursor() as cur:
             cur.execute(
