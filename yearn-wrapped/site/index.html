@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>yearn wrapped · your year in yVaults</title>
+  <meta name="description" content="Every deposit, every exit, every harvest you rode through in 2026, replayed as a story only your wallet can tell." />
+  <meta name="color-scheme" content="dark" />
+  <meta property="og:title" content="yearn wrapped" />
+  <meta property="og:description" content="Your year in yVaults, replayed onchain." />
+  <link rel="icon" href="assets/yearn-symbol-white-rgb.png" />
+  <link rel="modulepreload" href="vendor/scene/shared.js" fetchpriority="high" />
+  <link rel="modulepreload" href="vendor/scene/hero.js" fetchpriority="high" />
+  <link rel="preload" href="assets/yearn-symbol-contour.json" as="fetch" crossorigin />
+  <link rel="preload" href="assets/fonts/Aeonik-Regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/Aeonik-Bold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/AeonikMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="site.css" />
+  <style>html { background: #0a0a0a; } html[data-presentation="pending"] body { visibility: hidden; }</style>
+  <script>
+    // One bounded reveal owns the whole page. Once visible, its background stays chosen.
+    (() => {
+      const root = document.documentElement;
+      root.dataset.presentation = "pending";
+      let fonts = false, scene = false, failed = false;
+      const deadline = performance.now() + 2500;
+      let fontsExpired = false;
+      const pending = () => root.dataset.presentation === "pending";
+      const finish = () => {
+        if (!pending()) return;
+        const mode = scene ? "3d" : "static";
+        if (!fonts) root.classList.add("startup-system-fonts");
+        if (scene) document.getElementById("stage")?.classList.add("is-rendered");
+        root.dataset.presentation = mode;
+        performance.mark("wrapped-visible");
+        dispatchEvent(new Event("wrapped:visible"));
+      };
+      window.wrappedEntrance = {
+        pending,
+        fontsReady() { fonts = true; if (scene || failed) finish(); },
+        sceneReady() {
+          if (!pending()) return false;
+          if (performance.now() > deadline) { finish(); return false; }
+          scene = true;
+          if (fonts || fontsExpired) finish();
+          return true;
+        },
+        sceneFailed() { failed = true; if (fonts || fontsExpired) finish(); },
+      };
+      // Stalled fonts keep their short budget; graphics may need a cold download
+      // and first GPU compile. Neither can change the chosen presentation later.
+      setTimeout(() => { fontsExpired = true; if (scene || failed) finish(); }, 900);
+      setTimeout(finish, 2500);
+    })();
+  </script>
+</head>
+<body class="landing">
+  <canvas id="stage" aria-hidden="true"></canvas>
+  <div id="vignette" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="./">
+      <img src="assets/yearn-wrapped-lockup.svg" alt="yearn wrapped" class="brand-lockup" />
+    </a>
+    <a class="topbar-link" href="https://yhelper.app" target="_blank" rel="noopener noreferrer"
+       data-magnet>yHelper ↗</a>
+  </header>
+
+  <main>
+    <section class="hero" aria-label="yearn wrapped">
+    <div class="hero-par">
+    <section class="hero-copy">
+      <h1 class="headline" aria-label="Your year in yVaults.">
+        <span class="hl-line">Your year</span>
+        <span class="hl-line">in yVaults.</span>
+      </h1>
+      <p class="sub">
+        Every deposit, every exit, every harvest you rode through,
+        replayed as a story only your wallet can tell.
+      </p>
+
+      <div class="entry" id="entry" data-tilt>
+        <button class="btn-primary" id="connect-btn" type="button" data-magnet>
+          <span class="btn-label">Connect wallet</span>
+        </button>
+
+        <div class="entry-or" aria-hidden="true"><span>or paste an address</span></div>
+
+        <form class="entry-form" id="entry-form" autocomplete="off">
+          <input class="entry-input" id="address-input" type="text"
+                 placeholder="0x… or yourname.eth" spellcheck="false"
+                 aria-label="Wallet address or ENS name" />
+          <button class="btn-ghost" id="replay-btn" type="submit" data-magnet>
+            <span class="btn-label">Replay my year</span>
+          </button>
+        </form>
+
+        <div class="entry-status" id="entry-status" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+    </div>
+    </section>
+  </main>
+
+  <div class="launch-flash" id="launch-flash" aria-hidden="true"></div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="motion.js"></script>
+  <script type="module" src="main.js" onerror="window.wrappedEntrance.sceneFailed()"></script>
+</body>
+</html>

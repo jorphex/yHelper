@@ -1,0 +1,8 @@
+# Keep only the shared cohort snapshot and data guide; wallet outputs,
+# upstream caches, private routing records and browser evidence stay local.
+/data/*
+!/data/README.md
+!/data/medians.json
+
+# Rebuilt from the pinned npm lockfile by npm run build (also inside Docker).
+/site/vendor/

@@ -1,0 +1,21 @@
+{
+  "name": "yearn-wrapped-private",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wallet": "node tools/build-wallet.mjs",
+    "build:scene": "node tools/build-scenes.mjs",
+    "build": "npm run build:wallet && npm run build:scene"
+  },
+  "dependencies": {
+    "@walletconnect/ethereum-provider": "2.21.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "playwright": "1.64.1",
+    "three": "0.170.0"
+  },
+  "overrides": {
+    "ws@8.18.0": "8.21.0"
+  }
+}

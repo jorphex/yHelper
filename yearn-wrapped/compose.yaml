@@ -1,0 +1,32 @@
+services:
+  yearn-wrapped:
+    build: .
+    container_name: yearn-wrapped
+    restart: unless-stopped
+    environment:
+      YEARN_WRAPPED_ROOT_PATH: ${YEARN_WRAPPED_ROOT_PATH:?Preview path is required}
+    ports:
+      - "127.0.0.1:8767:8767"
+    volumes:
+      - type: bind
+        source: ./data/cache
+        target: /app/data/cache
+        bind:
+          create_host_path: false
+    networks:
+      - yhelper-net
+    mem_limit: 512m
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "uv", "run", "--frozen", "--no-sync", "--no-cache", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8767/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+networks:
+  yhelper-net:
+    external: true

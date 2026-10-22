@@ -1,0 +1,13 @@
+{
+ "n": 132,
+ "year": 2026,
+ "ledgerVersion": 2,
+ "windowDays": 45,
+ "excludedWallets": 28,
+ "sampledAt": "2026-10-22",
+ "source": "yearn indexer; recent depositors, annual transfer ledger; capped wallets excluded",
+ "vaults": 1,
+ "chains": 1,
+ "deposits": 6,
+ "holdDays": 7
+}

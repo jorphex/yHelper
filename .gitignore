@@ -5,10 +5,12 @@
 
 # Local planning/notes (kept out of git history)
 AGENTS.md
+AUDIT.md
 NOTES.md
 PLAN.md
 PROMPT.md
 DESIGN.md
+!yearn-wrapped/DESIGN.md
 DESIGN_CRITIQUE.md
 FIXES_SUMMARY.md
 plan.md
