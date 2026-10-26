@@ -52,6 +52,11 @@ def discover(
     token_symbol = token_symbol.strip().upper() or None if token_symbol is not None else None
     realized_apy_sql = _bounded_realized_apy_sql()
     momentum_sql = _bounded_momentum_sql()
+    # Locker PPS measures the extra yield only, not the parent vault's return.
+    # Publish the verified combined estimate without inventing realized yield.
+    locked_sql = _locked_yvusd_filter_sql("d")
+    realized_apy_sql = f"CASE WHEN {locked_sql} THEN NULL ELSE ({realized_apy_sql}) END"
+    momentum_sql = f"CASE WHEN {locked_sql} THEN NULL ELSE ({momentum_sql}) END"
     order_map = {
         "tvl": "COALESCE(d.tvl_usd, 0.0)",
         "est_apy": "COALESCE(d.est_apy, -999999.0)",
@@ -94,10 +99,10 @@ def discover(
                 SELECT
                     COUNT(*) AS visible_vaults,
                     COUNT(*) FILTER (
-                        WHERE m.apy_30d IS NOT NULL AND COALESCE(m.points_count, 0) >= %(min_points)s
+                        WHERE ({realized_apy_sql}) IS NOT NULL AND COALESCE(m.points_count, 0) >= %(min_points)s
                     ) AS with_realized_apy,
                     COUNT(*) FILTER (
-                        WHERE m.apy_30d IS NULL OR COALESCE(m.points_count, 0) < %(min_points)s
+                        WHERE ({realized_apy_sql}) IS NULL OR COALESCE(m.points_count, 0) < %(min_points)s
                     ) AS without_realized_apy
                 FROM vault_dim d
                 LEFT JOIN vault_metrics_latest m

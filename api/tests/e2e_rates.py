@@ -316,7 +316,7 @@ def main():
                 ):
                     cursor.executemany(UPSERT_SQL, rows)
                     cursor.executemany(
-                        "INSERT INTO vault_metrics_latest(chain_id,vault_address,as_of) VALUES (1,%s,NOW())",
+                        "INSERT INTO vault_metrics_latest(chain_id,vault_address,as_of,points_count,apy_30d,apy_7d) VALUES (1,%s,NOW(),120,0.02,0.03)",
                         [(r["vault_address"],) for r in rows],
                     )
                 response = client.get(
@@ -326,6 +326,9 @@ def main():
                 assert response.status_code == 200, response.text
                 discover = response.json()
                 assert len(discover["rows"]) == 3
+                locked = next(r for r in discover["rows"] if r["symbol"] == "Locked yvUSD")
+                assert locked["realized_apy_30d"] is None, "Locker-only PPS must not be shown as combined realized APY"
+                assert locked["momentum_7d_30d"] is None
                 assert discover["summary"]["total_tvl_usd"] == 1500, (
                     "A wrapper must not count its underlying TVL twice"
                 )
