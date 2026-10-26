@@ -16,6 +16,7 @@ import {
   useFlexHistory,
   useFlexMarketDetail,
   useFlexMarkets,
+  useFlexMarketPreload,
   useFlexRedemptionPriority,
   useFlexTroveHealth,
   type FlexActivityRow,
@@ -477,9 +478,11 @@ function FlexPageContent() {
   const { data, isLoading, error, refetch } = useFlexMarkets();
   const active = useMemo(() => data?.rows.filter((row) => row.status === "active") ?? [], [data]);
   const requestedMarket = searchParams.get("market")?.toLowerCase() ?? null;
-  const selected = active.find((market) => market.addresses.market === requestedMarket)
-    ?? [...active].sort((a, b) => (b.metrics?.deposits_usd ?? 0) - (a.metrics?.deposits_usd ?? 0))[0]
-    ?? null;
+  const selected = requestedMarket
+    ? data?.rows.find((market) => market.addresses.market === requestedMarket) ?? null
+    : [...active].sort((a, b) => (b.metrics?.deposits_usd ?? 0) - (a.metrics?.deposits_usd ?? 0))[0] ?? null;
+  const selectableMarkets = selected && selected.status !== "active" ? [...active, selected] : active;
+  useFlexMarketPreload(selectableMarkets);
   const marketTabsRef = useRef<HTMLDivElement>(null);
   const rawDays = Number(searchParams.get("days") ?? 30);
   const days: HistoryDays = rawDays === 7 || rawDays === 90 ? rawDays : 30;
@@ -493,12 +496,12 @@ function FlexPageContent() {
   const activityRows = activity.data?.pages.flatMap((page) => page.rows) ?? [];
   const marketByAddress = useMemo(() => new Map(data?.rows.map((market) => [market.addresses.market, market])), [data]);
   const updateQuery = useCallback(
-    (updates: Record<string, string | number | null>) => replaceQuery(router, pathname, searchParams, updates),
+    (updates: Record<string, string | number | null>) => replaceQuery(router, pathname, searchParams, updates, { clientOnly: true }),
     [pathname, router, searchParams],
   );
 
   useEffect(() => {
-    if (!selected || requestedMarket === selected.addresses.market) return;
+    if (!selected || requestedMarket) return;
     updateQuery({ market: selected.addresses.market });
   }, [requestedMarket, selected, updateQuery]);
 
@@ -542,8 +545,9 @@ function FlexPageContent() {
       {selected ? <section className="section section-lg flex-detail-section" aria-labelledby="flex-detail-title">
         <h2 className="card-title" id="flex-detail-title">{flexCopy.detail.title}</h2>
         <div ref={marketTabsRef} className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
-          {active.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}
+          {selectableMarkets.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}{market.status !== "active" ? " (historical)" : ""}</button>)}
         </div>
+        {selected.status !== "active" ? <p className="section-note">Historical market · {flexCopy.status[selected.status]} · <Link className="report-link" href={`https://etherscan.io/address/${selected.addresses.market}`} target="_blank" rel="noreferrer">{selected.addresses.market.slice(0, 6)}…{selected.addresses.market.slice(-4)}</Link></p> : null}
         {detail.data ? <section className="flex-risk-section" aria-labelledby="flex-risk-title">
           <div><h3 id="flex-risk-title">{flexCopy.detail.risk.title}</h3><RiskAssessmentLink chainId={1} address={selected.addresses.lender} label={selected.label} /></div>
           <div className="flex-risk-content">
@@ -560,12 +564,17 @@ function FlexPageContent() {
         <TroveHealthSection query={troveHealth} />
         <RedemptionPrioritySection query={redemptionPriority} />
         <div className="flex-history-heading-row">
-          <div><h3>{flexCopy.history.title}</h3></div>
+          <div><h3>{flexCopy.history.title}{history.isPlaceholderData ? " · Updating…" : ""}</h3></div>
           <div className="flex-range-tabs" role="group" aria-label={flexCopy.history.rangeLabel}>
             {([[7, flexCopy.history.ranges.seven], [30, flexCopy.history.ranges.thirty], [90, flexCopy.history.ranges.ninety]] as const).map(([value, label]) => <button key={value} type="button" className={`flex-range-tab ${days === value ? "is-active" : ""}`} aria-pressed={days === value} onClick={() => updateQuery({ days: value })}>{label}</button>)}
           </div>
         </div>
         {history.isLoading && !history.data ? <div className="flex-chart-grid-layout"><div className="skeleton flex-chart-skeleton" /><div className="skeleton flex-chart-skeleton" /></div> : history.data?.points.length ? <HistoryCharts points={history.data.points} /> : <p className="muted">{flexCopy.history.unavailable}</p>}
+      </section> : null}
+      {requestedMarket && data && !selected ? <section className="section section-lg" aria-labelledby="flex-detail-title">
+        <h2 className="card-title" id="flex-detail-title">{flexCopy.detail.title}</h2>
+        <p className="muted">Market not found.</p>
+        <Link className="report-link" href="/flex">View active markets</Link>
       </section> : null}
 
       <section className="section section-lg flex-activity-section" aria-labelledby="flex-activity-title">

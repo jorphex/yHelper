@@ -1,6 +1,7 @@
 "use client";
 
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { apiUrl } from "../lib/api";
 
 export type FlexStatus = "active" | "deprecated" | "unendorsed";
@@ -232,15 +233,61 @@ export type FlexPerformanceResponse = {
   lenders: FlexPerformanceSide;
 };
 
-export function useFlexPerformance(address: string | null, days: 7 | 30 | 90, enabled: boolean) {
-  return useQuery({
+export const FLEX_PERIODS = [7, 30, 90] as const;
+
+function performanceOptions(address: string | null, days: 7 | 30 | 90) {
+  return {
     queryKey: ["flex-performance", address, days],
     queryFn: () => fetchJson<FlexPerformanceResponse>(apiUrl("/flex/performance", { address, days })),
-    enabled,
     staleTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
+  };
+}
+
+export function useFlexPerformance(address: string | null, days: 7 | 30 | 90, enabled: boolean) {
+  const client = useQueryClient();
+  const query = useQuery({
+    ...performanceOptions(address, days), enabled,
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === address ? previous : undefined,
   });
+  useEffect(() => {
+    if (!enabled || !query.isSuccess || query.isPlaceholderData) return;
+    let cancelled = false;
+    void (async () => {
+      // Archive calculations are expensive; warm one period at a time after the visible result.
+      for (const period of FLEX_PERIODS) {
+        if (cancelled) break;
+        if (period !== days) await client.prefetchQuery(performanceOptions(address, period));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [client, address, days, enabled, query.isSuccess, query.isPlaceholderData]);
+  return query;
+}
+
+export function useFlexMarketPreload(markets: FlexMarket[]) {
+  const client = useQueryClient();
+  const addresses = markets.map(market => market.addresses.market).join(",");
+  useEffect(() => {
+    if (!addresses) return;
+    for (const address of addresses.split(",")) {
+      for (const days of FLEX_PERIODS) void client.prefetchQuery({
+        queryKey: ["flex-history", address, days],
+        queryFn: () => fetchJson<FlexHistoryResponse>(apiUrl(`/flex/markets/${address}/history`, { days, interval: "day" })),
+        staleTime: 60_000,
+      });
+      for (const [key, path] of [
+        ["flex-market-detail", ""],
+        ["flex-redemption-priority", "/redemption-priority"],
+        ["flex-trove-health", "/trove-health"],
+      ]) void client.prefetchQuery({
+        queryKey: [key, address],
+        queryFn: () => fetchJson(apiUrl(`/flex/markets/${address}${path}`)),
+        staleTime: 60_000,
+      });
+    }
+  }, [client, addresses]);
 }
 
 export function useFlexMarkets() {
@@ -261,6 +308,7 @@ export function useFlexHistory(marketAddress: string | null, days: 7 | 30 | 90) 
     })),
     enabled: Boolean(marketAddress),
     staleTime: 60_000,
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === marketAddress ? previous : undefined,
   });
 }
 

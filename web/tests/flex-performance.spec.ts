@@ -120,3 +120,146 @@ test("Flex P&L source errors retain navigation and never invent zero profits", a
   await expect(page.getByRole("heading", { name:"Markets", exact:true })).toBeVisible();
   await expect(panel.getByTestId("performance-total")).toHaveCount(0);
 });
+
+test("Flex period changes discard unavailable filters without hiding remaining P&L", async ({ page }, testInfo) => {
+  const evidence = JSON.parse(fs.readFileSync(source, "utf8"));
+  const original = evidence.cases.simple;
+  const makeRow = (address: string, amount: number | null) => ({
+    ...original.borrowers.rows[0], market_address: address,
+    market_label: address === "0x" + "1".repeat(40) ? "Market A" : "Market B",
+    pnl_usd: amount, is_complete: amount !== null,
+  });
+  const a = "0x" + "1".repeat(40), b = "0x" + "5".repeat(40);
+  await page.route("**/api/flex/performance?**", async route => {
+    const days = Number(new URL(route.request().url()).searchParams.get("days"));
+    const rows = days === 30 ? [makeRow(a, 10), makeRow(b, 20)] : days === 7 ? [makeRow(b, 2)] : [makeRow(b, null)];
+    const summary = { rows, positions: rows.length, covered_positions: rows.filter(row => row.is_complete).length,
+      pnl_usd: days === 90 ? null : days === 7 ? 2 : 30, end_value_usd: 100 };
+    await route.fulfill({ json: { ...original, borrowers: summary, lenders: summary } });
+  });
+  await page.goto("/flex");
+  const panel = page.getByRole("region", { name: "Performance", exact: true });
+  for (const side of ["Borrowing", "Lending"]) {
+    await panel.getByRole("button", { name: side, exact: true }).click();
+    await panel.getByRole("button", { name: "30-day performance", exact: true }).click();
+    await panel.getByLabel("Performance market", { exact: true }).selectOption(a);
+    await expect(panel.getByTestId("performance-total")).toHaveText("+$10.00");
+    await panel.getByRole("button", { name: "7-day performance", exact: true }).click();
+    await expect(panel.getByTestId("performance-total")).toHaveText("+$2.00");
+    await expect(panel.getByRole("table")).toContainText("Market B");
+    await panel.getByRole("button", { name: "30-day performance", exact: true }).click();
+    await expect(panel.getByLabel("Performance market", { exact: true })).toHaveValue("");
+    await panel.getByLabel("Performance market", { exact: true }).selectOption(b);
+    await panel.getByRole("button", { name: "7-day performance", exact: true }).click();
+    await expect(panel.getByTestId("performance-total")).toHaveText("+$2.00");
+    await panel.getByRole("button", { name: "90-day performance", exact: true }).click();
+    await expect(panel.getByTestId("performance-total")).toHaveText("Incomplete coverage");
+  }
+  await panel.screenshot({ path: testInfo.outputPath("period-filter.png") });
+});
+
+test("Flex historical links and unknown market URLs preserve contract identity", async ({ page }, testInfo) => {
+  const evidence = JSON.parse(fs.readFileSync(source, "utf8"));
+  const response = await page.request.get("/api/flex/markets?status=all");
+  const markets = await response.json();
+  const historical = markets.rows.find((row: { status: string }) => row.status !== "active");
+  expect(historical).toBeTruthy();
+  const address = historical.addresses.market;
+  const row = { ...evidence.cases.simple.borrowers.rows[0], market_address: address, market_label: historical.label };
+  await page.route("**/api/flex/performance?**", route => route.fulfill({ json: {
+    ...evidence.cases.simple, borrowers: { ...evidence.cases.simple.borrowers, rows: [row] },
+  } }));
+  await page.goto("/flex?pnl_days=90&days=7");
+  const panel = page.getByRole("region", { name: "Performance", exact: true });
+  await panel.getByRole("link", { name: historical.label, exact: true }).click();
+  const detail = page.getByRole("region", { name: "Market detail", exact: true });
+  await expect(detail.locator('.flex-market-selector [aria-pressed="true"]')).toHaveText(`${historical.label} (historical)`);
+  await expect(detail).toContainText("Historical market");
+  await expect.poll(() => new URL(page.url()).searchParams.get("market")).toBe(address);
+  await page.reload();
+  await expect(detail.locator('.flex-market-selector [aria-pressed="true"]')).toHaveText(`${historical.label} (historical)`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => {
+    const chosen = await detail.locator('.flex-market-selector [aria-pressed="true"]').boundingBox();
+    return !!chosen && chosen.x >= 0 && chosen.x + chosen.width <= 390;
+  }).toBe(true);
+  await detail.screenshot({ path: testInfo.outputPath("historical-market-mobile.png") });
+  const unknown = "0x" + "f".repeat(40);
+  await page.goto(`/flex?market=${unknown}`);
+  await expect(page.getByText("Market not found.", { exact: true })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("market")).toBe(unknown);
+  await expect(page.getByRole("heading", { name: "Markets", exact: true })).toBeVisible();
+});
+
+test("Flex preloads market and period data and switches without route waits or loading flashes", async ({ page }, testInfo) => {
+  const fixture = JSON.parse(fs.readFileSync(source, "utf8")).cases.simple;
+  const completed = new Set<string>();
+  const calls: string[] = [];
+  let serverNavigations = 0;
+  await page.route("**/flex?**", async route => {
+    if (route.request().headers().rsc === "1" && route.request().headers()["next-router-prefetch"] !== "1") {
+      serverNavigations++;
+      await new Promise(resolve => setTimeout(resolve, 700));
+    }
+    await route.continue();
+  });
+  await page.route("**/api/flex/**", async route => {
+    const url = new URL(route.request().url());
+    const key = url.pathname + url.search;
+    calls.push(key);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    if (url.pathname.endsWith("/performance")) {
+      const days = Number(url.searchParams.get("days"));
+      await route.fulfill({ json: { ...fixture, period: { ...fixture.period, days },
+        borrowers: { ...fixture.borrowers, pnl_usd: days } } });
+    } else {
+      const response = await route.fetch();
+      await route.fulfill({ response });
+    }
+    completed.add(key);
+  });
+  await page.goto("/flex");
+  const detail = page.getByRole("region", { name: "Market detail", exact: true });
+  const tabs = detail.getByRole("group", { name: "Choose a market", exact: true });
+  await expect(tabs.getByRole("button").first()).toBeVisible();
+  const count = await tabs.getByRole("button").count();
+  await expect.poll(() => [...completed].filter(key => key.includes("/history?")).length).toBe(count * 3);
+  await expect.poll(() => [...completed].filter(key => key.includes("/performance?")).length).toBe(3);
+  await expect.poll(() => [...completed].filter(key => /\/markets\/0x[^/?]+$/.test(key)).length).toBe(count);
+  for (const endpoint of ["/trove-health", "/redemption-priority"]) {
+    await expect.poll(() => [...completed].filter(key => key.endsWith(endpoint)).length).toBe(count);
+  }
+  await page.evaluate(() => {
+    const state = { flashes: 0 };
+    (window as typeof window & { flexLoading: typeof state }).flexLoading = state;
+    new MutationObserver(() => {
+      if (document.querySelector('.flex-detail-section .skeleton') ||
+        [...document.querySelectorAll('.flex-page [role="status"], .flex-performance .muted')].some(node => /Loading|Calculating/.test(node.textContent || ""))) state.flashes++;
+    }).observe(document.querySelector('.flex-page')!, { childList: true, subtree: true });
+  });
+  const beforeCalls = calls.length, beforeNavigations = serverNavigations;
+  const timings: number[] = [];
+  for (const days of [7, 90, 30]) {
+    const started = Date.now();
+    await detail.getByRole("button", { name: `${days} days`, exact: true }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get("days"), { timeout: 350 }).toBe(String(days));
+    timings.push(Date.now() - started);
+  }
+  const performance = page.getByRole("region", { name: "Performance", exact: true });
+  for (const days of [7, 90, 30]) {
+    await performance.getByRole("button", { name: `${days}-day performance`, exact: true }).click();
+    await expect(performance.getByTestId("performance-total")).toHaveText(`+$${days}.00`, { timeout: 350 });
+  }
+  for (const tab of await tabs.getByRole("button").all()) {
+    await tab.click();
+    await expect(tab).toHaveAttribute("aria-pressed", "true", { timeout: 350 });
+    await expect(detail.getByRole("heading", { name: "Market terms", exact: true })).toBeVisible();
+  }
+  expect(calls).toHaveLength(beforeCalls);
+  expect(serverNavigations).toBe(beforeNavigations);
+  const flashes = await page.evaluate(() => (window as typeof window & { flexLoading: { flashes: number } }).flexLoading.flashes);
+  expect(flashes).toBe(0);
+  await testInfo.attach("switching-results", { body: JSON.stringify({ historySwitchMs: timings, flashes, requestsAfterWarmup: calls.length - beforeCalls, serverNavigationsAfterWarmup: serverNavigations - beforeNavigations }), contentType: "application/json" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath("preloaded-mobile.png") });
+});

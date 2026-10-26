@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { TableWrap } from "../components/table-wrap";
@@ -23,9 +23,13 @@ export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (
   const data = !editing ? query.data : undefined;
   const source = data?.[side];
   const markets = Array.from(new Map((source?.rows || []).map(row => [row.market_address, row.market_label])).entries());
-  const rows = source?.rows.filter(row => !market || row.market_address === market) || [];
+  const selectedMarket = markets.some(([address]) => address === market) ? market : "";
+  useEffect(() => {
+    if (source && market !== selectedMarket) setMarket(selectedMarket);
+  }, [source, market, selectedMarket]);
+  const rows = source?.rows.filter(row => !selectedMarket || row.market_address === selectedMarket) || [];
   const complete = rows.every(row => row.is_complete);
-  const performance = source && market ? {
+  const performance = source && selectedMarket ? {
     ...source, rows, positions: rows.length, covered_positions: rows.filter(row => row.is_complete).length,
     pnl_usd: complete ? rows.reduce((sum, row) => sum + (row.pnl_usd || 0), 0) : null,
     end_value_usd: complete ? rows.reduce((sum, row) => sum + (row.end_value_usd || 0), 0) : null,
@@ -58,7 +62,7 @@ export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (
   return <section className="section section-lg flex-performance" aria-labelledby="flex-performance-title">
     <div className="flex-performance-heading">
       <div><h2 className="card-title" id="flex-performance-title">Performance</h2>
-        <p className="card-description">{address && !editing ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Active Flex markets"}</p>
+        <p className="card-description">{address && !editing ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Active Flex markets"}{query.isPlaceholderData ? " · Updating…" : ""}</p>
       </div>
       <div className="flex-range-tabs" role="group" aria-label="Performance period">
         {([7, 30, 90] as const).map(period => <button type="button" key={period} className={`flex-range-tab ${days === period ? "is-active" : ""}`} aria-pressed={days === period} aria-label={`${period}-day performance`} onClick={() => onDays(period)}>{period}D</button>)}
@@ -74,7 +78,7 @@ export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (
     <div className="flex-range-tabs flex-performance-sides" role="group" aria-label="Performance side">
       {([['borrowers', 'Borrowing'], ['lenders', 'Lending']] as const).map(([key, label]) => <button type="button" key={key} className={`flex-range-tab ${side === key ? "is-active" : ""}`} aria-pressed={side === key} onClick={() => { setSide(key); setMarket(""); }}>{label}</button>)}
     </div>
-    {markets.length > 1 ? <label className="flex-performance-filter">P&amp;L market<select aria-label="Performance market" value={market} onChange={event => setMarket(event.target.value)}><option value="">All markets</option>{markets.map(([address, label]) => <option key={address} value={address}>{label}</option>)}</select></label> : null}
+    {markets.length > 1 ? <label className="flex-performance-filter">P&amp;L market<select aria-label="Performance market" value={selectedMarket} onChange={event => setMarket(event.target.value)}><option value="">All markets</option>{markets.map(([address, label]) => <option key={address} value={address}>{label}</option>)}</select></label> : null}
     <div aria-live="polite" aria-busy={query.isFetching && !editing}>
       {editing && !error ? <p className="muted">Submit to view this address.</p> : null}
       {!editing && query.isLoading ? <p className="muted">Calculating from indexed history…</p> : null}

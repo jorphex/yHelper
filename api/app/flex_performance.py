@@ -307,6 +307,8 @@ def borrower(archive, market, events, start, end, start_time, end_time):
     funding = Decimal(0)
     opening = None
     seen = False
+    terminal = False
+    pending_bad_debt = None
     active_period = False
     precision = 10 ** int(market["borrow_token_decimals"])
     if market["contract_version"] != "1.1.0":
@@ -320,12 +322,14 @@ def borrower(archive, market, events, start, end, start_time, end_time):
                 event["amounts"],
             )
             stamp = int(event["block_time"].timestamp())
+            if terminal or stamp < book["last"]:
+                raise CoverageError("Position history is out of order.")
             if block > start and opening is None:
                 opening = dict(book)
             in_period = block > start
             active_period |= in_period
-            if name == "bad_debt":
-                continue  # The following full liquidation clears the entire position.
+            if pending_bad_debt and name != "liquidation":
+                raise CoverageError("Bad debt does not match a full liquidation.")
             if name == "open_trove":
                 if seen:
                     raise CoverageError("Opening history is inconsistent.")
@@ -343,9 +347,18 @@ def borrower(archive, market, events, start, end, start_time, end_time):
                 continue
             if not seen:
                 raise CoverageError("Opening history is missing.")
+            if name == "bad_debt":
+                loss = int(a["loss_raw"])
+                absorbed = int(a["loss_absorbed_by_fees_raw"])
+                if loss <= 0 or not 0 <= absorbed <= loss:
+                    raise CoverageError("Bad-debt history cannot be reconciled.")
+                pending_bad_debt = event
+                continue
             owed = debt_at(book, stamp, precision)
             coll = int(a.get("collateral_raw", 0))
             amount = int(a.get("debt_raw", 0))
+            if coll < 0 or amount < 0:
+                raise CoverageError("Position history cannot be reconciled.")
             if name in ("add_collateral", "remove_collateral"):
                 sign = 1 if name == "add_collateral" else -1
                 book["collateral"] += sign * coll
@@ -373,18 +386,39 @@ def borrower(archive, market, events, start, end, start_time, end_time):
                     debt=owed - amount, collateral=book["collateral"] - coll, last=stamp
                 )
             elif name in ("close_trove", "close_zombie_trove"):
+                if amount != owed or coll != book["collateral"]:
+                    raise CoverageError("Closeout history cannot be reconciled.")
                 if in_period:
                     funding += archive.value(market, block, amount) - archive.value(
                         market, block, coll, True
                     )
-                book.update(debt=0, collateral=0, last=stamp)
+                book.update(debt=0, collateral=0, rate=0, last=stamp)
+                terminal = True
             elif name == "liquidation":
+                loss = 0
+                if pending_bad_debt:
+                    if (
+                        not a["is_full_liquidation"]
+                        or pending_bad_debt["tx_hash"] != event["tx_hash"]
+                        or int(pending_bad_debt["block_number"]) != block
+                        or int(pending_bad_debt["log_index"]) >= int(event["log_index"])
+                    ):
+                        raise CoverageError(
+                            "Bad debt does not match a full liquidation."
+                        )
+                    loss = int(pending_bad_debt["amounts"]["loss_raw"])
+                    pending_bad_debt = None
+                if coll > book["collateral"]:
+                    raise CoverageError("Liquidation history cannot be reconciled.")
                 if a["is_full_liquidation"]:
+                    if amount + loss != owed:
+                        raise CoverageError("Liquidation debt cannot be reconciled.")
                     if in_period:
                         funding -= archive.value(
-                            market, block, max(0, book["collateral"] - coll), True
+                            market, block, book["collateral"] - coll, True
                         )
-                    book.update(debt=0, collateral=0, last=stamp)
+                    book.update(debt=0, collateral=0, rate=0, last=stamp)
+                    terminal = True
                 else:
                     book.update(
                         debt=owed - amount,
@@ -395,6 +429,8 @@ def borrower(archive, market, events, start, end, start_time, end_time):
                 raise CoverageError("Unsupported trove event.")
             if book["debt"] < 0 or book["collateral"] < 0:
                 raise CoverageError("Position history cannot be reconciled.")
+        if pending_bad_debt:
+            raise CoverageError("Bad debt does not match a full liquidation.")
         opening = opening if opening is not None else dict(book)
         if not active_period and not opening["debt"] and not opening["collateral"]:
             return None

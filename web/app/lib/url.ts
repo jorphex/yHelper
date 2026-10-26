@@ -61,6 +61,7 @@ export function replaceQuery(
   pathname: string,
   params: ReadonlyURLSearchParams,
   updates: Record<string, string | number | null | undefined>,
+  options: { clientOnly?: boolean } = {},
 ): void {
   const next = new URLSearchParams(params.toString());
   for (const [key, value] of Object.entries(updates)) {
@@ -71,5 +72,7 @@ export function replaceQuery(
     next.set(key, String(value));
   }
   const query = next.toString();
-  router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  const href = query ? `${pathname}?${query}` : pathname;
+  if (options.clientOnly) window.history.replaceState(null, "", href);
+  else router.replace(href, { scroll: false });
 }

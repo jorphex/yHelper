@@ -51,6 +51,16 @@ OWNER = {
             "liquidated",
             "auction",
             "weth",
+            "closed_repay",
+            "closed_missing_repay",
+            "closed_missing_collateral",
+            "zombie",
+            "bad_debt",
+            "liquidation_missing_debt",
+            "liquidation_bad_fees",
+            "unmatched_bad_debt",
+            "post_close",
+            "liquidation_excess_collateral",
         ),
         101,
     )
@@ -180,10 +190,102 @@ event(
 )
 transfer(OWNER["auction"], ZERO, 10 * U, 1550, 900)
 
+# Terminal endpoints are empty even when an intermediate event is missing.
+# Compare closing amounts with independently known opening/debt-change amounts.
+for label in list(OWNER)[11:]:
+    trove = int(OWNER[label], 16) - 100
+    collateral, debt = (
+        (100, 60) if "liquidation" in label or label == "bad_debt" else (2000, 1000)
+    )
+    event(
+        "open_trove",
+        OWNER[label],
+        1100,
+        {
+            "collateral_raw": collateral * U,
+            "debt_raw": debt * U,
+            "upfront_fee_raw": 0,
+            "annual_interest_rate_raw": 0,
+        },
+        trove,
+    )
+    if label == "closed_repay":
+        event("repay", OWNER[label], 1300, {"debt_raw": 500 * U}, trove)
+    if label == "zombie":
+        event(
+            "redeem_trove",
+            OWNER[label],
+            1400,
+            {
+                "collateral_raw": 1000 * U,
+                "debt_raw": 1000 * U,
+            },
+            trove,
+        )
+    if label in ("bad_debt", "liquidation_bad_fees", "unmatched_bad_debt"):
+        number = event(
+            "bad_debt",
+            OWNER[label],
+            1550,
+            {
+                "loss_raw": 10 * U,
+                "loss_absorbed_by_fees_raw": (
+                    11 if label == "liquidation_bad_fees" else 5
+                )
+                * U,
+            },
+            trove,
+        )
+    else:
+        number = None
+    if "liquidation" in label or label == "bad_debt":
+        event(
+            "liquidation",
+            OWNER[label],
+            1550,
+            {
+                "collateral_raw": (
+                    110 if label == "liquidation_excess_collateral" else 100
+                )
+                * U,
+                "debt_raw": (60 if label == "liquidation_excess_collateral" else 50)
+                * U,
+                "is_full_liquidation": True,
+            },
+            trove,
+        )
+    else:
+        event(
+            "close_zombie_trove" if label == "zombie" else "close_trove",
+            OWNER[label],
+            1550,
+            {
+                "collateral_raw": (
+                    1000
+                    if label == "zombie"
+                    else 1500
+                    if label == "closed_missing_collateral"
+                    else 2000
+                )
+                * U,
+                "debt_raw": (
+                    0 if label == "zombie" else 500 if "repay" in label else 1000
+                )
+                * U,
+            },
+            trove,
+        )
+    if number is not None:
+        EVENTS[-1]["tx_hash"] = tx(number)
+    if label == "post_close":
+        event("repay", OWNER[label], 1600, {"debt_raw": 0}, trove)
+
 
 def trove_state(trove, block):
     if block < 1100:
         return (0, 0, 0, 0)
+    if trove >= 12:
+        return (0, 0, 0, 0) if block >= 1550 else (1000 * U, 2000 * U, 0, 0)
     if trove == 3 and block >= 1550 or trove == 9 and block >= 1550:
         return (0, 0, 0, 0)
     debt, coll = {
@@ -515,19 +617,7 @@ def main():
                     f"Expected validation, got {invalid.status_code}"
                 )
                 results = {}
-                for name in (
-                    "simple",
-                    "borrow",
-                    "closed",
-                    "interest",
-                    "liquidated",
-                    "missing",
-                    "lender",
-                    "transfer",
-                    "auction",
-                    "empty",
-                    "weth",
-                ):
+                for name in OWNER:
                     response = client.get(
                         endpoint, params={"address": OWNER[name], "days": 30}
                     )
@@ -549,6 +639,23 @@ def main():
                 assert abs(pnl("closed", "borrowers") - 10) < 0.01, (
                     "Closed positions remain in period totals"
                 )
+                assert pnl("closed_repay", "borrowers") == 200
+                for name in ("zombie", "bad_debt"):
+                    assert pnl(name, "borrowers") is not None, name
+                for name in (
+                    "closed_missing_repay",
+                    "closed_missing_collateral",
+                    "liquidation_missing_debt",
+                    "liquidation_bad_fees",
+                    "unmatched_bad_debt",
+                    "post_close",
+                    "liquidation_excess_collateral",
+                ):
+                    assert pnl(name, "borrowers") is None, (
+                        name,
+                        "Terminal state must not hide inconsistent history",
+                        results[name]["borrowers"],
+                    )
                 assert pnl("interest", "borrowers") < 19, "Accrued interest reduces P&L"
                 assert pnl("liquidated", "borrowers") is not None
                 assert pnl("missing", "borrowers") is None, (
