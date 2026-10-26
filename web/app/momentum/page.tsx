@@ -43,7 +43,7 @@ function MomentumPageContent() {
       ...universeDefaults(universe),
     };
   }, [searchParams]);
-  const updateQuery = (updates: Record<string, string | number | null | undefined>) => replaceQuery(router, pathname, searchParams, updates);
+  const updateQuery = (updates: Record<string, string | number | null | undefined>) => replaceQuery(router, pathname, searchParams, updates, { clientOnly: pathname === "/markets" });
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");

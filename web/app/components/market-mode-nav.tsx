@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 export type MarketMode = "changes" | "vaults" | "structure";
 
@@ -13,6 +13,7 @@ const modes: Array<{ id: MarketMode; label: string }> = [
 ];
 
 export function MarketModeNav({ active }: { active: MarketMode }) {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const navRef = useRef<HTMLElement>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
@@ -90,6 +91,13 @@ export function MarketModeNav({ active }: { active: MarketMode }) {
         <Link
           key={mode.id}
           href={hrefs.get(mode.id) || "/markets"}
+          prefetch={pathname === "/markets" ? false : undefined}
+          onClick={(event) => {
+            if (pathname !== "/markets" || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            const href = hrefs.get(mode.id) || "/markets";
+            if (`${window.location.pathname}${window.location.search}` !== href) window.history.pushState(null, "", href);
+          }}
           ref={active === mode.id ? activeRef : undefined}
           aria-current={active === mode.id ? "page" : undefined}
           className={`market-mode-link ${active === mode.id ? "is-active" : ""}`.trim()}

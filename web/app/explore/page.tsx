@@ -74,7 +74,7 @@ function ExplorePageContent() {
   }, [searchParams]);
 
   const updateQuery = (updates: Record<string, string | number | null | undefined>) =>
-    replaceQuery(router, pathname, searchParams, updates);
+    replaceQuery(router, pathname, searchParams, updates, { clientOnly: pathname === "/markets" });
 
   const [sort, direction] = query.sort.split(":");
   const sortKey = sort as VaultSortKey;
@@ -108,13 +108,13 @@ function ExplorePageContent() {
     chain: query.chain,
     enabled: query.tab === "vaults",
   });
-  const { data: composition, isLoading: compositionLoading } = useCompositionData({
+  const { data: composition, isLoading: compositionLoading, error: compositionError, refetch: refetchComposition } = useCompositionData({
     universe: query.universe,
     market: query.market,
     minTvl: query.minTvl,
     enabled: query.tab === "structure",
   });
-  if (error && !data) return <DataLoadError onRetry={() => refetch()} />;
+  const activeError = query.tab === "vaults" ? error && !data : compositionError && !composition;
 
   const search = query.search.trim().toLowerCase();
   const matchingRows = (data?.rows ?? []).filter((row) => !search || [row.symbol, row.token_symbol, row.vault_address].some((value) => value?.toLowerCase().includes(search)));
@@ -169,7 +169,7 @@ function ExplorePageContent() {
         </div>
       </section>
 
-      {query.tab === "vaults" ? (
+      {activeError ? <DataLoadError onRetry={() => query.tab === "vaults" ? refetch() : refetchComposition()} /> : query.tab === "vaults" ? (
         <>
           <section className="section market-scope-summary" aria-label="Selected vault scope">
             {isLoading ? <span className="muted">Loading vault set…</span> : <>

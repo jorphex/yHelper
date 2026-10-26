@@ -1,6 +1,6 @@
-import ExplorePage from "../explore/page";
-import MomentumPage from "../momentum/page";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { MarketsViews } from "./views";
 
 export default function MarketsPage({
   searchParams,
@@ -19,5 +19,5 @@ export default function MarketsPage({
     params.set("view", "vaults");
     redirect(`/markets?${params.toString()}`);
   }
-  return view === "changes" ? <MomentumPage /> : <ExplorePage />;
+  return <Suspense fallback={<div className="page-loading">Loading vaults…</div>}><MarketsViews /></Suspense>;
 }
