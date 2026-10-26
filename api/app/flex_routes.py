@@ -4,8 +4,9 @@ import re
 from enum import IntEnum
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
+from app.flex_performance import performance_response
 from app.flex_service import (
     flex_activity_response,
     flex_market_detail_response,
@@ -20,6 +21,7 @@ from app.models import (
     FlexMarketDetailResponse,
     FlexMarketHistoryResponse,
     FlexMarketsResponse,
+    FlexPerformanceResponse,
     FlexProtocolResponse,
     FlexRedemptionPriorityResponse,
     FlexTroveHealthResponse,
@@ -40,6 +42,20 @@ def _address(value: str) -> str:
     if not ADDRESS_PATTERN.fullmatch(normalized):
         raise HTTPException(status_code=422, detail="Invalid Ethereum address")
     return normalized
+
+
+@router.get(
+    "/api/flex/performance",
+    response_model=FlexPerformanceResponse,
+    summary="Get flow-adjusted borrower and lender performance",
+)
+def flex_performance(
+    response: Response,
+    address: str | None = None,
+    days: HistoryDays = HistoryDays.thirty,
+) -> dict[str, object]:
+    response.headers["Cache-Control"] = "no-store"
+    return performance_response(_address(address) if address is not None else None, int(days))
 
 
 @router.get(

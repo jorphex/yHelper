@@ -709,3 +709,31 @@
     transition: none;
   }
 }
+
+.flex-performance {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: var(--space-8);
+}
+.flex-performance-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-5); }
+.flex-performance-form { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-top: var(--space-5); }
+.flex-performance-form label { font-size: 14px; color: var(--text-secondary); }
+.flex-performance-form input { flex: 1 1 240px; min-width: 0; max-width: 460px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: 6px; background: transparent; color: var(--text-primary); font: 13px var(--font-mono); }
+.flex-performance-form button { min-height: 44px; }
+.flex-performance-sides { margin: var(--space-5) 0; }
+.flex-performance-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); color: var(--text-secondary); font-size: 14px; }
+.flex-performance-filter select { min-height: 44px; max-width: 100%; padding: 8px 12px; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 6px; }
+.flex-performance-rows { max-height: 400px; overflow: auto; }
+.flex-performance-totals { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--space-5); margin: var(--space-5) 0; }
+.flex-performance-totals dt { color: var(--text-secondary); font-size: 13px; }
+.flex-performance-totals dd { margin: var(--space-2) 0 0; font-family: var(--font-mono); font-size: clamp(16px,2vw,24px); overflow-wrap: anywhere; }
+.flex-performance-position { display: block; color: var(--text-secondary); font-size: 12px; margin-top: 4px; max-width: 400px; overflow-wrap: anywhere; }
+.flex-performance-table th,.flex-performance-table td { white-space: normal; }
+.flex-performance-error { color: var(--text-primary); font-size: 14px; }
+.flex-performance-unavailable { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .flex-performance-heading { align-items: flex-start; flex-wrap: wrap; }
+  .flex-performance-form label { flex-basis: 100%; }
+  .flex-performance-form input { flex-basis: 100%; max-width: none; }
+  .flex-performance-totals { grid-template-columns: 1fr 1fr; }
+  .flex-performance-totals > div:first-child { grid-column: 1/-1; }
+}

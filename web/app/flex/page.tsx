@@ -24,6 +24,7 @@ import {
   type FlexRedemptionPriorityResponse,
 } from "../hooks/use-flex-data";
 import { flexA11y, flexCopy } from "./copy";
+import { FlexPerformance } from "./performance";
 
 type SortKey = "deposits" | "debt" | "liquidity" | "utilization" | "lenderApr" | "borrowerRate";
 type HistoryDays = 7 | 30 | 90;
@@ -517,6 +518,7 @@ function FlexPageContent() {
       </section>
 
       <p className="section-note">Expected lender APR assumes all debt pays interest. Debt-weighted rate reflects existing loans.</p>
+      <FlexPerformance days={days} onDays={(value) => updateQuery({ days: value })} />
       {selected ? <section className="section section-lg flex-history-section">
         <div className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
           {active.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}

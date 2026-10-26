@@ -203,6 +203,46 @@ async function fetchJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export type FlexPerformanceRow = {
+  market_address: string;
+  market_label: string;
+  kind: "trove" | "lender_position" | "lender_pool";
+  position_id: string | null;
+  start_value_usd: number | null;
+  end_value_usd: number | null;
+  net_funding_usd: number | null;
+  pnl_usd: number | null;
+  is_complete: boolean;
+  issue: string | null;
+};
+
+type FlexPerformanceSide = {
+  pnl_usd: number | null;
+  end_value_usd: number | null;
+  positions: number;
+  covered_positions: number;
+  rows: FlexPerformanceRow[];
+};
+
+export type FlexPerformanceResponse = {
+  scope: { chain_id: 1; source: "ethereum_archive_rpc"; address: string | null; market_status: "active" | "all" };
+  period: { days: number; start_at: string; end_at: string; start_block: number; end_block: number };
+  freshness: { data_state: "ready" | "delayed" };
+  borrowers: FlexPerformanceSide;
+  lenders: FlexPerformanceSide;
+};
+
+export function useFlexPerformance(address: string | null, days: 7 | 30 | 90, enabled: boolean) {
+  return useQuery({
+    queryKey: ["flex-performance", address, days],
+    queryFn: () => fetchJson<FlexPerformanceResponse>(apiUrl("/flex/performance", { address, days })),
+    enabled,
+    staleTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useFlexMarkets() {
   return useQuery({
     queryKey: ["flex-markets", "all"],

@@ -867,3 +867,51 @@ class FlexActivityResponse(ApiModel):
     freshness: FlexFreshness
     pagination: FlexCursorPagination
     rows: list[FlexActivityRow]
+
+
+class FlexPerformanceRow(ApiModel):
+    market_address: str
+    market_label: str
+    kind: Literal['trove', 'lender_position', 'lender_pool']
+    position_id: str | None
+    start_value_usd: float | None
+    end_value_usd: float | None
+    net_funding_usd: float | None
+    pnl_usd: float | None
+    is_complete: bool
+    issue: str | None
+
+
+class FlexPerformanceSide(ApiModel):
+    pnl_usd: float | None
+    end_value_usd: float | None
+    positions: int
+    covered_positions: int
+    rows: list[FlexPerformanceRow]
+
+
+class FlexPerformanceScope(ApiModel):
+    chain_id: Literal[1]
+    source: Literal['ethereum_archive_rpc']
+    address: str | None
+    market_status: Literal['active', 'all']
+
+
+class FlexPerformancePeriod(ApiModel):
+    days: int
+    start_at: str
+    end_at: str
+    start_block: int
+    end_block: int
+
+
+class FlexPerformanceFreshness(ApiModel):
+    data_state: Literal['ready', 'delayed']
+
+
+class FlexPerformanceResponse(ApiModel):
+    scope: FlexPerformanceScope
+    period: FlexPerformancePeriod
+    freshness: FlexPerformanceFreshness
+    borrowers: FlexPerformanceSide
+    lenders: FlexPerformanceSide
