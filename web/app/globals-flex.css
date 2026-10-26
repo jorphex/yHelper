@@ -722,7 +722,7 @@
 .flex-performance-form button { min-height: 44px; }
 .flex-performance-sides { margin: var(--space-5) 0; }
 .flex-performance-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); color: var(--text-secondary); font-size: 14px; }
-.flex-performance-filter select { min-height: 44px; max-width: 100%; padding: 8px 12px; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 6px; }
+.flex-performance-filter select { width: auto; min-height: 44px; max-width: 100%; }
 .flex-performance-rows { max-height: 400px; overflow: auto; }
 .flex-performance-totals { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--space-5); margin: var(--space-5) 0; }
 .flex-performance-totals dt { color: var(--text-tertiary); font-size: var(--text-xs); letter-spacing: var(--tracking-wider); text-transform: uppercase; }
