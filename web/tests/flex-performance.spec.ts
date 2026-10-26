@@ -88,7 +88,7 @@ test("Flex sections own their market and period controls independently", async (
   expect(detailLink.searchParams.get("pnl_days")).toBe("90");
   expect(detailLink.hash).toBe("#flex-detail-title");
   const marketTabs = detail.getByRole("group", { name: "Choose a market", exact: true });
-  await marketTabs.getByRole("button").nth(1).click();
+  await marketTabs.getByRole("button").last().click();
   await expect.poll(() => new URL(page.url()).searchParams.get("market")).not.toBe(selectedMarket);
   await expect(performance.getByTestId("performance-total")).toContainText("$1,000");
   expect(performanceRequests).toHaveLength(requestCount);
@@ -103,6 +103,11 @@ test("Flex sections own their market and period controls independently", async (
   const heading = await detail.getByRole("heading", { name: "Market detail", level: 2, exact: true }).boundingBox();
   const tabs = await marketTabs.boundingBox();
   expect(heading!.y + heading!.height).toBeLessThan(tabs!.y);
+  await expect.poll(async () => {
+    const active = await marketTabs.locator('[aria-pressed="true"]').boundingBox();
+    const strip = await marketTabs.boundingBox();
+    return !!active && !!strip && active.x >= strip.x - 1 && active.x + active.width <= strip.x + strip.width + 1;
+  }).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("section-ownership-mobile.png") });
   await testInfo.attach("section-ownership-mobile", { path: testInfo.outputPath("section-ownership-mobile.png"), contentType: "image/png" });
 });

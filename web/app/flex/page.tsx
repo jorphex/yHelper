@@ -480,6 +480,7 @@ function FlexPageContent() {
   const selected = active.find((market) => market.addresses.market === requestedMarket)
     ?? [...active].sort((a, b) => (b.metrics?.deposits_usd ?? 0) - (a.metrics?.deposits_usd ?? 0))[0]
     ?? null;
+  const marketTabsRef = useRef<HTMLDivElement>(null);
   const rawDays = Number(searchParams.get("days") ?? 30);
   const days: HistoryDays = rawDays === 7 || rawDays === 90 ? rawDays : 30;
   const rawPerformanceDays = Number(searchParams.get("pnl_days") ?? 30);
@@ -500,6 +501,23 @@ function FlexPageContent() {
     if (!selected || requestedMarket === selected.addresses.market) return;
     updateQuery({ market: selected.addresses.market });
   }, [requestedMarket, selected, updateQuery]);
+
+  useEffect(() => {
+    const strip = marketTabsRef.current;
+    if (!strip) return;
+    const revealSelected = () => {
+      const button = strip.querySelector<HTMLElement>('[aria-pressed="true"]');
+      if (!button) return;
+      const viewport = strip.getBoundingClientRect();
+      const bounds = button.getBoundingClientRect();
+      if (bounds.left < viewport.left) strip.scrollLeft += bounds.left - viewport.left;
+      else if (bounds.right > viewport.right) strip.scrollLeft += bounds.right - viewport.right;
+    };
+    revealSelected();
+    const observer = new ResizeObserver(revealSelected);
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, [selected?.addresses.market]);
 
   if (error && !data) return <DataLoadError onRetry={() => refetch()} />;
 
@@ -523,7 +541,7 @@ function FlexPageContent() {
       <FlexPerformance days={performanceDays} onDays={(value) => updateQuery({ pnl_days: value })} />
       {selected ? <section className="section section-lg flex-detail-section" aria-labelledby="flex-detail-title">
         <h2 className="card-title" id="flex-detail-title">{flexCopy.detail.title}</h2>
-        <div className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
+        <div ref={marketTabsRef} className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
           {active.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}
         </div>
         {detail.data ? <section className="flex-risk-section" aria-labelledby="flex-risk-title">
