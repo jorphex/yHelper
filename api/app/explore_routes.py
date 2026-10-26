@@ -16,6 +16,7 @@ from app.analytics_service import (
 )
 from app.common import (
     _kong_source_freshness,
+    _locked_yvusd_filter_sql,
     _market_filter_sql,
     _market_group_sql,
     _rank_gate_filter_sql,
@@ -58,7 +59,7 @@ def discover(
         "momentum": f"COALESCE({momentum_sql}, -999999.0)",
     }
     base_filters = [
-        _user_visible_filter_sql("d", include_retired=False),
+        _user_visible_filter_sql("d", include_retired=False, include_locked=True),
         "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s",
         _market_filter_sql("d"),
     ]
@@ -72,13 +73,16 @@ def discover(
     if token_symbol:
         base_filters.append("LOWER(COALESCE(d.token_symbol, '')) = LOWER(%(token_symbol)s)")
         params["token_symbol"] = token_symbol
-    rank_filter = _rank_gate_filter_sql("d", max_vaults=max_vaults)
+    rank_filter = _rank_gate_filter_sql("d", max_vaults=max_vaults, include_locked=True)
     if rank_filter:
         base_filters.append(rank_filter)
         params["max_vaults"] = max_vaults
     base_where = " AND ".join(base_filters)
     eligible_where = f"{base_where} AND COALESCE(m.points_count, 0) >= %(min_points)s"
     selected_where = eligible_where
+    # Locked shares are already assets of the parent vault. Show the option,
+    # without counting those assets twice in aggregate TVL or yield weights.
+    owned_tvl = f"CASE WHEN {_locked_yvusd_filter_sql('d')} THEN 0.0 ELSE COALESCE(d.tvl_usd, 0.0) END"
     if chain_id is not None:
         selected_where += " AND d.chain_id = %(chain_id)s"
         params["chain_id"] = chain_id
@@ -120,15 +124,15 @@ def discover(
                 f"""
                 SELECT
                     COUNT(*) AS vaults,
-                    SUM(COALESCE(d.tvl_usd, 0.0)) AS total_tvl_usd,
+                    SUM({owned_tvl}) AS total_tvl_usd,
                     MAX({realized_apy_sql}) AS best_realized_apy_30d,
                     MIN({realized_apy_sql}) AS worst_realized_apy_30d,
                     MAX({realized_apy_sql}) - MIN({realized_apy_sql}) AS realized_spread_30d,
                     CASE
-                        WHEN SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE m.apy_30d IS NOT NULL) > 0
-                        THEN SUM(COALESCE(d.tvl_usd, 0.0) * {realized_apy_sql})
+                        WHEN SUM({owned_tvl}) FILTER (WHERE m.apy_30d IS NOT NULL) > 0
+                        THEN SUM(({owned_tvl}) * {realized_apy_sql})
                              FILTER (WHERE m.apy_30d IS NOT NULL)
-                             / SUM(COALESCE(d.tvl_usd, 0.0)) FILTER (WHERE m.apy_30d IS NOT NULL)
+                             / SUM({owned_tvl}) FILTER (WHERE m.apy_30d IS NOT NULL)
                         ELSE NULL
                     END AS tvl_weighted_realized_apy_30d
                 FROM vault_dim d

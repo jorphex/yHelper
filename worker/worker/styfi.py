@@ -20,6 +20,7 @@ from .config import (
 )
 from .db_state import _complete_run, _insert_run
 from .eth import _eth_call_address, _eth_call_string, _eth_call_uint
+from .styfi_apr import fetch_styfi_apr
 
 
 def _safe_int(value: object) -> int | None:
@@ -103,6 +104,7 @@ def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
     styfix_projected = styfix.get("projected") if isinstance(styfix.get("projected"), dict) else {}
     yfi = global_state.get("yfi") if isinstance(global_state.get("yfi"), dict) else {}
     return {
+        "apr": fetch_styfi_apr(payload),
         "yfi_price": {
             "status": yfi.get("priceStatus"),
             "stale": yfi.get("priceStale"),

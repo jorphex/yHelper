@@ -160,7 +160,7 @@ def _resolve_universe_gate(
     }
 
 
-def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None) -> str:
+def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None, include_locked: bool = False) -> str:
     if max_vaults is None or max_vaults <= 0:
         return ""
     return """
@@ -171,15 +171,19 @@ def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None) -> str:
         ORDER BY r.tvl_usd DESC NULLS LAST, r.chain_id, r.vault_address
         LIMIT %(max_vaults)s
     )
-    """.format(alias=alias, scope_sql=_user_visible_filter_sql("r", include_retired=False))
+    """.format(alias=alias, scope_sql=_user_visible_filter_sql("r", include_retired=False, include_locked=include_locked))
 
 
-def _user_visible_filter_sql(alias: str, *, include_retired: bool = False) -> str:
+def _locked_yvusd_filter_sql(alias: str) -> str:
+    return f"({alias}.chain_id = 1 AND {alias}.vault_address = '0xaaafea48472f77563961cdb53291dedfb46f9040')"
+
+
+def _user_visible_filter_sql(alias: str, *, include_retired: bool = False, include_locked: bool = False) -> str:
     excluded_ids_sql = ", ".join(str(chain_id) for chain_id in EXCLUDED_CHAIN_IDS)
     clauses = [
         f"{alias}.active = TRUE",
         f"{alias}.catalog_is_yearn = TRUE",
-        f"COALESCE({alias}.kind, '') = '{USER_VISIBLE_KIND}'",
+        f"(COALESCE({alias}.kind, '') = '{USER_VISIBLE_KIND}' OR {_locked_yvusd_filter_sql(alias)})" if include_locked else f"COALESCE({alias}.kind, '') = '{USER_VISIBLE_KIND}'",
         f"COALESCE({alias}.version, '') LIKE '{USER_VISIBLE_VERSION_PREFIX}%%'",
         f"COALESCE({alias}.chain_id, -1) NOT IN ({excluded_ids_sql})",
         f"{alias}.is_hidden = FALSE",

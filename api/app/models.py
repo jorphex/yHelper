@@ -492,6 +492,16 @@ class StyfiRewardToken(ApiModel):
 
 
 class StyfiCurrentRewardState(ApiModel):
+    apr_state: Literal["ready", "unavailable"] = "unavailable"
+    apr_timestamp: int | None = None
+    apr_block_number: int | None = None
+    apr_reward_epoch: int | None = None
+    styfi_base_apr: float | None = None
+    styfi_max_apr: float | None = None
+    styfi_estimated_max_apr: float | None = None
+    styfix_base_apr: float | None = None
+    styfix_estimated_apr: float | None = None
+    max_vote_boost_multiplier: float | None = None
     source_state: Literal["ready", "delayed", "unknown"] = "unknown"
     yfi_price_state: Literal["ready", "delayed", "unknown"] = "unknown"
     yfi_price_updated_at: int | None = None
@@ -502,7 +512,7 @@ class StyfiCurrentRewardState(ApiModel):
     reward_pps: float | None
     global_apr: float | None
     styfi_current_reward: float | None
-    styfi_current_apr: float | None
+    styfi_current_apr: float | None = Field(description="Published unboosted base APR. Use styfi_base_apr and styfi_max_apr for the verified current range.")
     styfi_projected_reward: float | None
     styfi_projected_apr: float | None
     styfix_current_reward: float | None

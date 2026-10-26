@@ -180,6 +180,8 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
     oracle_obj = oracle if isinstance(oracle, dict) else {}
     historical = performance_obj.get("historical")
     historical_obj = historical if isinstance(historical, dict) else {}
+    estimated = performance_obj.get("estimated")
+    estimated_obj = estimated if isinstance(estimated, dict) else {}
     raw_tvl = (
         _first_present(tvl_obj, ("close", "tvl", "tvlUsd", "usd", "totalValueLockedUSD"))
         if tvl_obj
@@ -202,8 +204,13 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
             numeric_parse_failures.append("est_apy")
         valid_apy_values = [value for value in parsed_apy_values if value is not None]
         est_apy = max(valid_apy_values) if valid_apy_values else None
+    elif "apy" in estimated_obj and estimated_obj["apy"] is not None:
+        raw_apy = estimated_obj["apy"]
+        est_apy = _to_float(raw_apy)
+        if est_apy is None and _has_raw_numeric_value(raw_apy):
+            numeric_parse_failures.append("est_apy")
     else:
-        raw_apr = _first_present(oracle_obj, ("apy", "netAPY", "netApy"))
+        raw_apr = _first_present(oracle_obj, ("netAPY", "netApy"))
         est_apy = _to_float(raw_apr)
         if est_apy is None and _has_raw_numeric_value(raw_apr):
             numeric_parse_failures.append("est_apy")

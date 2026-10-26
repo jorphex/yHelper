@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { StakingSourceNote } from "./components/source-notes";
 import { useHomeData } from "./hooks/use-home-data";
-import { formatPct, formatUsd, formatUtcDateTime } from "./lib/format";
+import { formatUsd, formatUtcDateTime } from "./lib/format";
+import { stakingAprRange } from "./lib/staking-apr";
 
 export default function HomePage() {
   const { data, isLoading } = useHomeData();
@@ -34,8 +35,8 @@ export default function HomePage() {
           <h2><Link href="/styfi">stYFI <span aria-hidden="true">↗</span></Link></h2>
           <p>Staking rewards and participation.</p>
           <div className="product-snapshot" aria-live="polite">
-            <span className="product-metric">{isLoading ? "Loading…" : stakingFresh ? formatPct(staking?.current_reward_state?.styfi_current_apr, 2) : "Check rewards"}</span>
-            <span>{stakingFresh ? `Current stYFI APR · Epoch ${staking?.current_reward_state?.epoch ?? staking?.summary?.reward_epoch ?? "unavailable"}` : isLoading ? "Staking rewards" : staking ? "Staking snapshot is delayed" : "Staking snapshot is unavailable"}</span>
+            <span className="product-metric">{isLoading ? "Loading…" : stakingFresh ? stakingAprRange(staking?.current_reward_state) : "Check rewards"}</span>
+            <span>{stakingFresh ? `stYFI APR range · Epoch ${staking?.current_reward_state?.epoch ?? staking?.summary?.reward_epoch ?? "unavailable"}` : isLoading ? "Staking rewards" : staking ? "Staking snapshot is delayed" : "Staking snapshot is unavailable"}</span>
             {stakingFresh && staking?.freshness?.latest_snapshot_at ? <time dateTime={staking.freshness.latest_snapshot_at}>Updated {formatUtcDateTime(staking.freshness.latest_snapshot_at)}</time> : null}
           </div>
           <StakingSourceNote state={staking?.current_reward_state} />

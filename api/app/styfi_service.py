@@ -240,6 +240,15 @@ def _styfi_current_reward_state(cur: psycopg.Cursor) -> dict[str, object] | None
     source_ts = _safe_int(meta.get("timestamp"))
     source_state = "unknown" if not source_ts or source_ts > now else "delayed" if now - source_ts > 3600 else "ready"
     price = state.get("yfi_price") if isinstance(state.get("yfi_price"), dict) else {}
+    apr = state.get("apr") if isinstance(state.get("apr"), dict) else {}
+    apr_timestamp = _safe_int(apr.get("timestamp"))
+    apr_ready = (
+        apr.get("state") == "ready" and apr_timestamp is not None
+        and 0 <= now - apr_timestamp <= 3600
+    )
+
+    def verified_apr(key: str) -> float | None:
+        return _to_float_or_none(apr.get(key)) if apr_ready else None
     price_ts = _safe_int(price.get("updated_at"))
     max_age = _safe_int(price.get("max_age_seconds"))
     price_state = "unknown"
@@ -259,10 +268,20 @@ def _styfi_current_reward_state(cur: psycopg.Cursor) -> dict[str, object] | None
         "global_apr": bps(global_rewards.get("apy_bps")),
         "styfi_current_reward": reward(styfi.get("current_rewards_raw")),
         "styfi_current_apr": bps(styfi.get("current_apr_bps")),
+        "apr_state": "ready" if apr_ready else "unavailable",
+        "apr_timestamp": apr_timestamp,
+        "apr_block_number": _safe_int(apr.get("block_number")),
+        "apr_reward_epoch": _safe_int(apr.get("reward_epoch")),
+        "styfi_base_apr": verified_apr("base_apr"),
+        "styfi_max_apr": verified_apr("max_apr"),
+        "styfi_estimated_max_apr": verified_apr("estimated_max_apr"),
+        "max_vote_boost_multiplier": verified_apr("max_boost_multiplier"),
         "styfi_projected_reward": reward(styfi.get("projected_rewards_raw")),
         "styfi_projected_apr": bps(styfi.get("projected_apr_bps")),
         "styfix_current_reward": reward(styfix.get("current_rewards_raw")),
-        "styfix_current_apr": bps(styfix.get("current_apr_bps")),
+        "styfix_base_apr": bps(styfix.get("current_apr_bps")),
+        "styfix_current_apr": verified_apr("styfix_current_apr"),
+        "styfix_estimated_apr": verified_apr("styfix_estimated_apr"),
         "styfix_projected_reward": reward(styfix.get("projected_rewards_raw")),
         "styfix_projected_apr": bps(styfix.get("projected_apr_bps")),
         "liquid_lockers_staked": _to_float_or_none(

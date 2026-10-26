@@ -9,6 +9,7 @@ import { TableWrap } from "../components/table-wrap";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { DataLoadError } from "../components/error-state";
 import { useStYfiData } from "../hooks/use-styfi-data";
+import { stakingAprRange, type StakingAprState } from "../lib/staking-apr";
 
 type StYfiSnapshotPoint = {
   observed_at?: string | null;
@@ -62,7 +63,7 @@ type StYfiResponse = {
     first_snapshot_at?: string | null;
     latest_snapshot_at?: string | null;
   };
-  current_reward_state?: StakingSourceState & {
+  current_reward_state?: StakingSourceState & StakingAprState & {
     epoch?: number | null;
     styfi_current_apr?: number | null;
     styfix_current_apr?: number | null;
@@ -181,8 +182,8 @@ function StYfiPageContent() {
         hint: `${formatToken(summary?.yfi_total_supply ?? null, "YFI", 0)} total supply`,
       },
       {
-        label: "stYFI APR",
-        value: formatPct(data?.current_reward_state?.styfi_current_apr ?? null, 2),
+        label: "stYFI APR range",
+        value: stakingAprRange(data?.current_reward_state),
         hint: Number.isFinite(data?.current_reward_state?.styfix_current_apr ?? null)
           ? `stYFIx ${formatPct(data?.current_reward_state?.styfix_current_apr ?? null, 2)} APR`
           : "Current reward rate",
@@ -218,17 +219,13 @@ function StYfiPageContent() {
       id: "styfi", 
       label: "stYFI", 
       value: data?.current_reward_state?.styfi_current_reward ?? null,
-      note: data?.current_reward_state?.styfi_current_apr 
-        ? `${formatPct(data.current_reward_state.styfi_current_apr, 2)} APR • ${percentShare(data.current_reward_state.styfi_current_reward, (data.current_reward_state.styfi_current_reward ?? 0) + (data.current_reward_state.styfix_current_reward ?? 0))}`
-        : percentShare(data?.current_reward_state?.styfi_current_reward ?? null, (data?.current_reward_state?.styfi_current_reward ?? 0) + (data?.current_reward_state?.styfix_current_reward ?? 0)),
+      note: percentShare(data?.current_reward_state?.styfi_current_reward ?? null, (data?.current_reward_state?.styfi_current_reward ?? 0) + (data?.current_reward_state?.styfix_current_reward ?? 0)),
     },
     { 
       id: "styfix", 
       label: "stYFIx", 
       value: data?.current_reward_state?.styfix_current_reward ?? null,
-      note: data?.current_reward_state?.styfix_current_apr 
-        ? `${formatPct(data.current_reward_state.styfix_current_apr, 2)} APR • ${percentShare(data.current_reward_state.styfix_current_reward, (data.current_reward_state.styfi_current_reward ?? 0) + (data.current_reward_state.styfix_current_reward ?? 0))}`
-        : percentShare(data?.current_reward_state?.styfix_current_reward ?? null, (data?.current_reward_state?.styfi_current_reward ?? 0) + (data?.current_reward_state?.styfix_current_reward ?? 0)),
+      note: percentShare(data?.current_reward_state?.styfix_current_reward ?? null, (data?.current_reward_state?.styfi_current_reward ?? 0) + (data?.current_reward_state?.styfix_current_reward ?? 0)),
     },
   ], [data?.current_reward_state]);
 
@@ -297,9 +294,9 @@ function StYfiPageContent() {
       </section>
       {/* Reward Split */}
       <section className="section section-lg">
-        <p className="section-note">APR: annualized reward rate; may change each epoch. Rewards in {rewardSymbol} shares.</p>
+        <p className="section-note">APR uses settled rewards; the range reflects voting participation. stYFIx includes Vote Boost. Rewards in {rewardSymbol} shares.</p>
         <BarList
-          title={`Current reward split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
+          title={`Base reward split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
           items={rewardBars}
           valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
           emptyText="Reward split is not available yet."

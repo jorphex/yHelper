@@ -16,7 +16,7 @@ def _vault(**overrides: object) -> dict[str, object]:
         "tvl": 123.45,
         "kind": "Multi Strategy",
         "apiVersion": "3.0.4",
-        "performance": {"oracle": {"apy": 0.05}},
+        "performance": {"oracle": {"apy": 0.06, "netAPY": 0.05}},
         "asset": {"address": "0xasset", "symbol": "USDC", "decimals": 6},
     }
     payload.update(overrides)
@@ -53,7 +53,7 @@ class KongSnapshotValidationTests(unittest.TestCase):
         )[0]
         self.assertEqual(row["est_apy"], 0.04)
 
-    def test_non_ybold_vault_retains_oracle_apy_semantics(self) -> None:
+    def test_non_ybold_vault_uses_net_oracle_apy(self) -> None:
         row = _normalize_kong_snapshot(
             [
                 _vault(
@@ -65,7 +65,7 @@ class KongSnapshotValidationTests(unittest.TestCase):
                 )
             ]
         )[0]
-        self.assertEqual(row["est_apy"], 0.05)
+        self.assertEqual(row["est_apy"], 0.04)
 
     def test_ybold_family_rejects_malformed_present_component(self) -> None:
         record = _vault(

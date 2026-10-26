@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { StakingSourceState } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
+import type { StakingAprState } from "../lib/staking-apr";
 
 type StYfiSnapshotPoint = {
   observed_at?: string | null;
@@ -69,7 +70,7 @@ type StYfiResponse = {
     symbol?: string | null;
     decimals?: number | null;
   };
-  current_reward_state?: StakingSourceState & {
+  current_reward_state?: StakingSourceState & StakingAprState & {
     source?: string | null;
     epoch?: number | null;
     timestamp?: number | null;
