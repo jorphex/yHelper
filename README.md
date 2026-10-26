@@ -95,6 +95,15 @@ YHELPER_TEST_URL=http://127.0.0.1:3020 npm --prefix web run test:ui -- flex-perf
 
 The API check uses `FLEX_TEST_DATABASE_URL` (or local `.env` connection settings), creates and removes an isolated schema, and writes cases/results under ignored `reports/flex-performance/`. It never changes production tables. Browser checks consume these generated cases and save desktop/mobile screenshots plus traces. The remaining UI suite can run independently of these generated fixtures.
 
+Rate ingestion and display checks use the same isolated database approach:
+
+```bash
+uv run --no-project --python 3.12 --with-requirements api/requirements.txt --with-requirements worker/requirements.txt --with httpx python api/tests/e2e_rates.py
+YHELPER_TEST_URL=http://127.0.0.1:3020 npm --prefix web run test:ui -- rates.spec.ts --trace on
+```
+
+These cover verified staking ranges and Vote Boost, unavailable sources, net vault estimates and locked-vault accounting. API evidence is written to ignored `reports/rate-fixes/api-results.json`; browser checks skip until it exists and produce screenshots and traces.
+
 ## Development and verification
 
 Frontend checks:

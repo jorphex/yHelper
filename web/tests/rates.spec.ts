@@ -4,6 +4,7 @@ import path from "node:path";
 
 // Produced by e2e_rates.py through HTTP sources, worker normalization, PostgreSQL and the API.
 const source = path.resolve(__dirname, "../../reports/rate-fixes/api-results.json");
+test.skip(!fs.existsSync(source), "Run api/tests/e2e_rates.py to generate the source/API evidence first.");
 
 for (const mode of ["valid", "stale_price"] as const) {
   test(`Staking displays a verified APR range and boosted stYFIx rate: ${mode}`, async ({ page }, testInfo) => {
