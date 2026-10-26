@@ -18,6 +18,8 @@ test("Flex P&L covers overview, address lookup, side selection and mobile reflow
   const panel = page.getByRole("region", { name: "Performance", exact: true });
   await expect(panel).toBeVisible();
   await expect(panel.getByText("Incomplete coverage", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Trove P&L · USD", { exact: true })).toBeVisible();
+  await expect(panel.getByText(/auction funding differences excluded/)).toBeVisible();
   await panel.getByLabel("Performance market", { exact: true }).selectOption({ label: "Fixture/WETH" });
   await expect(panel.getByTestId("performance-total")).toContainText("$1,000");
   await panel.getByLabel("Performance market", { exact: true }).selectOption("");
@@ -30,6 +32,7 @@ test("Flex P&L covers overview, address lookup, side selection and mobile reflow
   await panel.screenshot({ path: testInfo.outputPath("performance-desktop.png") });
   await panel.getByRole("button", { name: "Lending", exact: true }).click();
   await expect(panel.getByText("No lender positions in this period.")).toBeVisible();
+  await expect(panel.getByText(/auction funding differences excluded/)).toHaveCount(0);
   await panel.getByRole("button", { name: "Borrowing", exact: true }).click();
   await panel.getByLabel("Address", { exact: true }).fill("bad");
   await panel.getByRole("button", { name: "View P&L", exact: true }).click();
@@ -44,6 +47,64 @@ test("Flex P&L covers overview, address lookup, side selection and mobile reflow
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await panel.screenshot({ path: testInfo.outputPath("performance-mobile.png") });
   await testInfo.attach("performance-mobile", { path: testInfo.outputPath("performance-mobile.png"), contentType: "image/png" });
+});
+
+test("Flex sections own their market and period controls independently", async ({ page }, testInfo) => {
+  const evidence = JSON.parse(fs.readFileSync(source, "utf8"));
+  const performanceRequests: string[] = [];
+  await page.route("**/api/flex/performance?**", async route => {
+    const url = new URL(route.request().url());
+    performanceRequests.push(url.href);
+    await route.fulfill({ json: { ...evidence.overview, period: { ...evidence.overview.period, days: Number(url.searchParams.get("days")) } } });
+  });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto("/flex?days=7&pnl_days=30");
+  const markets = page.getByRole("region", { name: "Markets", exact: true });
+  const performance = page.getByRole("region", { name: "Performance", exact: true });
+  const detail = page.getByRole("region", { name: "Market detail", exact: true });
+  const performancePeriod = performance.getByRole("group", { name: "Performance period", exact: true });
+  const historyPeriod = detail.getByRole("group", { name: "History range", exact: true });
+  await expect(page.locator(".flex-page h2")).toHaveText(["Markets", "Performance", "Market detail", "Protocol activity"]);
+  await expect(markets).toContainText("Expected lender APR assumes all debt pays interest.");
+  await expect(detail.getByRole("heading", { name: "Market history", level: 3, exact: true })).toBeVisible();
+  await expect(detail.getByRole("heading", { name: "Utilization", level: 4, exact: true })).toBeVisible();
+  await expect(performancePeriod.getByRole("button", { name: "30-day performance", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(historyPeriod.getByRole("button", { name: "7 days", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await performancePeriod.getByRole("button", { name: "90-day performance", exact: true }).click();
+  await expect(page).toHaveURL(/pnl_days=90/);
+  await expect(historyPeriod.getByRole("button", { name: "7 days", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => new URL(performanceRequests.at(-1)!).searchParams.get("days")).toBe("90");
+  const requestCount = performanceRequests.length;
+  await historyPeriod.getByRole("button", { name: "30 days", exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("days")).toBe("30");
+  await expect(performancePeriod.getByRole("button", { name: "90-day performance", exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(performanceRequests).toHaveLength(requestCount);
+  const selectedMarket = new URL(page.url()).searchParams.get("market");
+  await performance.getByLabel("Performance market", { exact: true }).selectOption({ label: "Fixture/WETH" });
+  await expect(performance.getByTestId("performance-total")).toContainText("$1,000");
+  expect(new URL(page.url()).searchParams.get("market")).toBe(selectedMarket);
+  const detailLink = new URL((await performance.getByRole("link", { name: "Fixture/WETH", exact: true }).getAttribute("href"))!, page.url());
+  expect(detailLink.searchParams.get("days")).toBe("30");
+  expect(detailLink.searchParams.get("pnl_days")).toBe("90");
+  expect(detailLink.hash).toBe("#flex-detail-title");
+  const marketTabs = detail.getByRole("group", { name: "Choose a market", exact: true });
+  await marketTabs.getByRole("button").nth(1).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("market")).not.toBe(selectedMarket);
+  await expect(performance.getByTestId("performance-total")).toContainText("$1,000");
+  expect(performanceRequests).toHaveLength(requestCount);
+  await page.reload();
+  await expect(performancePeriod.getByRole("button", { name: "90-day performance", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(historyPeriod.getByRole("button", { name: "30 days", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await detail.evaluate(element => window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 220));
+  await page.screenshot({ path: testInfo.outputPath("section-ownership-desktop.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await detail.evaluate(element => window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 220));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const heading = await detail.getByRole("heading", { name: "Market detail", level: 2, exact: true }).boundingBox();
+  const tabs = await marketTabs.boundingBox();
+  expect(heading!.y + heading!.height).toBeLessThan(tabs!.y);
+  await page.screenshot({ path: testInfo.outputPath("section-ownership-mobile.png") });
+  await testInfo.attach("section-ownership-mobile", { path: testInfo.outputPath("section-ownership-mobile.png"), contentType: "image/png" });
 });
 
 test("Flex P&L source errors retain navigation and never invent zero profits", async ({ page }) => {

@@ -188,7 +188,7 @@ function HistoryChart({
   return (
     <section className="flex-chart-panel" aria-labelledby={`${chartId}-title`}>
       <div className="flex-chart-heading">
-        <div><h3 id={`${String(series[0].key)}-title`}>{title}</h3><p>{description}</p></div>
+        <div><h4 id={`${String(series[0].key)}-title`}>{title}</h4><p>{description}</p></div>
         {latest ? <div className="flex-chart-latest" aria-label={summary}>{series.map((item) => <span key={String(item.key)}><i style={{ borderTopColor: item.color, borderTopStyle: item.dashed ? "dashed" : "solid" }} />{item.label} <strong>{formatPct(Number(latest[item.key]) || 0)}</strong></span>)}</div> : null}
       </div>
       <div
@@ -482,6 +482,8 @@ function FlexPageContent() {
     ?? null;
   const rawDays = Number(searchParams.get("days") ?? 30);
   const days: HistoryDays = rawDays === 7 || rawDays === 90 ? rawDays : 30;
+  const rawPerformanceDays = Number(searchParams.get("pnl_days") ?? 30);
+  const performanceDays: HistoryDays = rawPerformanceDays === 7 || rawPerformanceDays === 90 ? rawPerformanceDays : 30;
   const history = useFlexHistory(selected?.addresses.market ?? null, days);
   const detail = useFlexMarketDetail(selected?.addresses.market ?? null);
   const redemptionPriority = useFlexRedemptionPriority(selected?.addresses.market ?? null);
@@ -511,15 +513,16 @@ function FlexPageContent() {
         </div>
       </section>
 
-      <section className="section section-lg">
+      <section className="section section-lg" aria-labelledby="flex-markets-title">
         {data?.freshness.indexed_through ? <p className="explanation">{data.freshness.data_state === "ready" ? "Updated" : "Updates delayed. Last indexed"} {dateTime.format(new Date(data.freshness.indexed_through))} UTC</p> : null}
         <div className="card-header"><div><h2 className="card-title" id="flex-markets-title">{flexCopy.markets.title}</h2><p className="card-description">{flexCopy.markets.description}</p></div></div>
         {isLoading && !data ? <TableWrap><table className="decision-table" aria-labelledby="flex-markets-title"><tbody><TableSkeleton rows={2} columns={8} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
+        <p className="section-note flex-market-note">Expected lender APR assumes all debt pays interest. Debt-weighted rate reflects existing loans.</p>
       </section>
 
-      <p className="section-note">Expected lender APR assumes all debt pays interest. Debt-weighted rate reflects existing loans.</p>
-      <FlexPerformance days={days} onDays={(value) => updateQuery({ days: value })} />
-      {selected ? <section className="section section-lg flex-history-section">
+      <FlexPerformance days={performanceDays} onDays={(value) => updateQuery({ pnl_days: value })} />
+      {selected ? <section className="section section-lg flex-detail-section" aria-labelledby="flex-detail-title">
+        <h2 className="card-title" id="flex-detail-title">{flexCopy.detail.title}</h2>
         <div className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
           {active.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}</button>)}
         </div>
@@ -539,7 +542,7 @@ function FlexPageContent() {
         <TroveHealthSection query={troveHealth} />
         <RedemptionPrioritySection query={redemptionPriority} />
         <div className="flex-history-heading-row">
-          <div><h2 className="card-title">{flexCopy.history.title}</h2></div>
+          <div><h3>{flexCopy.history.title}</h3></div>
           <div className="flex-range-tabs" role="group" aria-label={flexCopy.history.rangeLabel}>
             {([[7, flexCopy.history.ranges.seven], [30, flexCopy.history.ranges.thirty], [90, flexCopy.history.ranges.ninety]] as const).map(([value, label]) => <button key={value} type="button" className={`flex-range-tab ${days === value ? "is-active" : ""}`} aria-pressed={days === value} onClick={() => updateQuery({ days: value })}>{label}</button>)}
           </div>
@@ -547,7 +550,7 @@ function FlexPageContent() {
         {history.isLoading && !history.data ? <div className="flex-chart-grid-layout"><div className="skeleton flex-chart-skeleton" /><div className="skeleton flex-chart-skeleton" /></div> : history.data?.points.length ? <HistoryCharts points={history.data.points} /> : <p className="muted">{flexCopy.history.unavailable}</p>}
       </section> : null}
 
-      <section className="detail-section flex-activity-section" aria-labelledby="flex-activity-title"><div className="detail-body">
+      <section className="section section-lg flex-activity-section" aria-labelledby="flex-activity-title">
         <div className="card-header"><div><h2 className="card-title" id="flex-activity-title">{flexCopy.activity.title}</h2></div></div>
         <TableWrap className="flex-activity-wrap"><table className="decision-table flex-activity-table" aria-labelledby="flex-activity-title">
           <thead><tr><th>{flexCopy.activity.headers.time}</th><th>{flexCopy.activity.headers.event}</th><th>{flexCopy.activity.headers.market}</th><th className="numeric">{flexCopy.activity.headers.amount}</th></tr></thead>
@@ -560,7 +563,7 @@ function FlexPageContent() {
         </table></TableWrap>
         {!activity.isLoading && activityRows.length === 0 ? <p className="muted">{flexCopy.activity.empty}</p> : null}
         {activity.hasNextPage ? <button type="button" className="button button-ghost section-sm" disabled={activity.isFetchingNextPage} onClick={() => activity.fetchNextPage()}>{activity.isFetchingNextPage ? flexCopy.activity.loadingMore : flexCopy.activity.loadMore}</button> : null}
-      </div></section>
+      </section>
     </div>
   );
 }

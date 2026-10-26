@@ -23,10 +23,19 @@
   font-size: 12px;
 }
 
-.flex-history-section,
-.flex-activity-section {
+.flex-page h2.card-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  scroll-margin-top: var(--space-20);
+}
+
+.flex-page > .section + .section {
   padding-top: var(--space-12);
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--preview-rule);
+}
+
+.flex-market-note {
+  margin: var(--space-4) 0 0;
 }
 
 .flex-history-heading-row {
@@ -37,8 +46,15 @@
   margin-top: var(--space-12);
 }
 
+.flex-history-heading-row h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 700;
+}
+
 .flex-market-selector {
-  margin-top: 0;
+  margin-top: var(--space-5);
 }
 
 .flex-market-tabs,
@@ -96,9 +112,6 @@
   grid-template-columns: minmax(180px, 0.7fr) minmax(0, 2fr);
   gap: var(--space-8);
   margin-top: var(--space-8);
-  padding: var(--space-6) 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .flex-risk-section h3 {
@@ -413,10 +426,11 @@
   min-height: 60px;
 }
 
-.flex-chart-heading h3 {
+.flex-chart-heading h4 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 17px;
+  font-size: var(--text-lg);
+  font-weight: 700;
 }
 
 .flex-chart-heading p {
@@ -710,11 +724,6 @@
   }
 }
 
-.flex-performance {
-  border-top: 1px solid var(--border-subtle);
-  margin-top: var(--space-8);
-  padding-top: var(--space-12);
-}
 .flex-performance-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-5); }
 .flex-performance-form { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-top: var(--space-5); }
 .flex-performance-form label { font-size: 14px; color: var(--text-secondary); }

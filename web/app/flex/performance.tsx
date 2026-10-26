@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { TableWrap } from "../components/table-wrap";
 import { useFlexPerformance } from "../hooks/use-flex-data";
 
@@ -11,6 +12,7 @@ const value = (amount: number | null) => amount === null ? "Unavailable" : usd.f
 const pnl = (amount: number | null) => amount === null ? "Unavailable" : `${amount > 0 ? "+" : ""}${usd.format(amount)}`;
 
 export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (days: 7 | 30 | 90) => void }) {
+  const searchParams = useSearchParams();
   const [draft, setDraft] = useState("");
   const [address, setAddress] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -29,6 +31,11 @@ export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (
     end_value_usd: complete ? rows.reduce((sum, row) => sum + (row.end_value_usd || 0), 0) : null,
   } : source;
   const incomplete = performance?.pnl_usd === null;
+  function marketHref(marketAddress: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("market", marketAddress);
+    return `/flex?${next}#flex-detail-title`;
+  }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const candidate = draft.trim().toLowerCase();
@@ -67,21 +74,21 @@ export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (
     <div className="flex-range-tabs flex-performance-sides" role="group" aria-label="Performance side">
       {([['borrowers', 'Borrowing'], ['lenders', 'Lending']] as const).map(([key, label]) => <button type="button" key={key} className={`flex-range-tab ${side === key ? "is-active" : ""}`} aria-pressed={side === key} onClick={() => { setSide(key); setMarket(""); }}>{label}</button>)}
     </div>
-    {markets.length > 1 ? <label className="flex-performance-filter">Market<select aria-label="Performance market" value={market} onChange={event => setMarket(event.target.value)}><option value="">All markets</option>{markets.map(([address, label]) => <option key={address} value={address}>{label}</option>)}</select></label> : null}
+    {markets.length > 1 ? <label className="flex-performance-filter">P&amp;L market<select aria-label="Performance market" value={market} onChange={event => setMarket(event.target.value)}><option value="">All markets</option>{markets.map(([address, label]) => <option key={address} value={address}>{label}</option>)}</select></label> : null}
     <div aria-live="polite" aria-busy={query.isFetching && !editing}>
       {editing && !error ? <p className="muted">Submit to view this address.</p> : null}
       {!editing && query.isLoading ? <p className="muted">Calculating from indexed history…</p> : null}
       {!editing && query.isError ? <div className="flex-performance-unavailable"><p>Performance is temporarily unavailable.</p><button type="button" className="button button-ghost" onClick={() => query.refetch()}>Retry</button></div> : null}
       {data && performance ? <>
         <dl className="flex-performance-totals">
-          <div><dt>{side === "borrowers" ? "Borrower P&L" : address ? "Lender P&L" : "Lender pool P&L"}</dt><dd data-testid="performance-total">{incomplete ? "Incomplete coverage" : pnl(performance.pnl_usd)}</dd></div>
+          <div><dt>{side === "borrowers" ? "Trove P&L · USD" : address ? "Lender P&L · USD" : "Lender pool P&L · USD"}</dt><dd data-testid="performance-total">{incomplete ? "Incomplete coverage" : pnl(performance.pnl_usd)}</dd></div>
           <div><dt>{side === "borrowers" ? "Net equity" : "Reported value"}</dt><dd>{value(performance.end_value_usd)}</dd></div>
           <div><dt>Coverage</dt><dd>{performance.covered_positions}/{performance.positions} {side === "borrowers" ? performance.positions === 1 ? "trove" : "troves" : performance.positions === 1 ? "market" : "markets"}</dd></div>
         </dl>
         {performance.rows.length ? <TableWrap className="flex-performance-rows"><table className="decision-table flex-performance-table" aria-label={`${side === "borrowers" ? "Borrower" : "Lender"} performance`}>
           <thead><tr><th>Market / position</th><th className="numeric">{side === "borrowers" ? "Net equity" : "Value"}</th><th className="numeric">P&amp;L</th></tr></thead>
           <tbody>{performance.rows.map(row => <tr key={`${row.market_address}:${row.position_id || row.kind}`}>
-            <td data-label="Market / position"><Link className="report-link" href={`/flex?market=${row.market_address}`}>{row.market_label}</Link>
+            <td data-label="Market / position"><Link className="report-link" href={marketHref(row.market_address)}>{row.market_label}</Link>
               {row.position_id ? <span className="flex-performance-position" title={`Trove ${row.position_id}`}>Trove {row.position_id.length > 14 ? `${row.position_id.slice(0,6)}…${row.position_id.slice(-6)}` : row.position_id}</span> : null}
               {row.issue ? <span className="flex-performance-position">{row.issue}</span> : null}
             </td>
@@ -90,7 +97,7 @@ export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (
           </tr>)}</tbody>
         </table></TableWrap> : <p className="muted">{side === "borrowers" ? "No borrower positions in this period." : "No lender positions in this period."}</p>}
         <p className="section-note">{date.format(new Date(data.period.start_at))}–{date.format(new Date(data.period.end_at))} UTC{data.freshness.data_state === "delayed" ? " · Updates delayed" : ""}. USD change net of funding. Excludes gas and swap costs.</p>
-        {side === "lenders" ? <p className="section-note">{address ? "Reported share value; excludes unreported interest." : "Reported pool value includes fee-recipient shares; excludes unreported interest."}</p> : null}
+        <p className="section-note">{side === "borrowers" ? "Interest and fees included; auction funding differences excluded." : address ? "Reported share value; excludes unreported interest." : "Reported pool value includes fee-recipient shares; excludes unreported interest."}</p>
       </> : null}
     </div>
   </section>;
