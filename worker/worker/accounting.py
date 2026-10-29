@@ -171,7 +171,18 @@ def _store_protocol_tvl_snapshot(conn: psycopg.Connection, snapshot: ProtocolTvl
     return snapshot_id
 
 
-def _run_protocol_tvl_ingestion(conn: psycopg.Connection) -> tuple[int, int]:
+def _run_protocol_tvl_ingestion(
+    conn: psycopg.Connection,
+    *,
+    if_due: bool = False,
+) -> tuple[int, int] | None:
+    if if_due:
+        with conn.cursor() as cur:
+            cur.execute("SELECT MAX(observed_at) FROM protocol_tvl_snapshots")
+            latest = cur.fetchone()[0]
+        conn.commit()
+        if latest is not None and (datetime.now(UTC) - latest).total_seconds() < 3600:
+            return None
     started_at = datetime.now(UTC)
     run_id = _insert_run(conn, JOB_PROTOCOL_TVL, started_at)
     try:

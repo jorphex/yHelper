@@ -539,13 +539,18 @@ class HarvestWssManager:
             listener.stop()
 
 
-def _run_vault_harvests(conn: psycopg.Connection) -> int:
+def _run_vault_harvests(
+    conn: psycopg.Connection,
+    *,
+    targets: dict[int, dict[str, str]] | None = None,
+) -> int:
     started_at = datetime.now(UTC)
     run_id = _insert_run(conn, JOB_VAULT_HARVESTS, started_at)
     inserted_total = 0
     errors: list[str] = []
     try:
-        targets = _select_harvest_contracts(conn)
+        if targets is None:
+            targets = _select_harvest_contracts(conn)
         for chain_id, contracts in targets.items():
             try:
                 if not _rpc_url_for_chain(chain_id):

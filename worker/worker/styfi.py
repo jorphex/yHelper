@@ -155,7 +155,9 @@ def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
     }
 
 
-def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+def _fetch_styfi_snapshot_data(
+    cached_epochs: dict[int, datetime] | None = None,
+) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
     observed_at = datetime.now(UTC)
     reward_token_address = _eth_call_address(STYFI_CONTRACTS["reward_distributor"], "token()")
     reward_token_decimals = _eth_call_uint(reward_token_address, "decimals()")
@@ -199,6 +201,13 @@ def _fetch_styfi_snapshot_data() -> tuple[dict[str, object], list[dict[str, obje
     start_epoch = max(0, current_epoch - STYFI_EPOCH_LOOKBACK + 1)
     epochs: list[dict[str, object]] = []
     for epoch in range(start_epoch, current_epoch + 1):
+        fetched = (cached_epochs or {}).get(epoch)
+        if (
+            epoch < current_epoch - 1
+            and fetched is not None
+            and fetched.date() == observed_at.date()
+        ):
+            continue
         reward_total = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch_rewards(uint256)", ("uint256", epoch))
         epochs.append(
             {
@@ -356,7 +365,14 @@ def _run_styfi_snapshot(conn: psycopg.Connection) -> tuple[int, int, int]:
     started_at = datetime.now(UTC)
     run_id = _insert_run(conn, JOB_STYFI, started_at)
     try:
-        snapshot, epochs, sync_state = _fetch_styfi_snapshot_data()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT epoch, fetched_at FROM styfi_epoch_stats WHERE chain_id = %s",
+                (STYFI_CHAIN_ID,),
+            )
+            cached_epochs = {int(epoch): fetched for epoch, fetched in cur.fetchall()}
+        conn.commit()
+        snapshot, epochs, sync_state = _fetch_styfi_snapshot_data(cached_epochs)
         _upsert_styfi_snapshot(conn, snapshot)
         epoch_rows = _upsert_styfi_epoch_stats(conn, epochs)
         _upsert_styfi_sync_state(conn, sync_state)

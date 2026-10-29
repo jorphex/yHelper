@@ -954,6 +954,8 @@ ON CONFLICT (chain_id, vault_address) DO UPDATE SET
     active = TRUE,
     last_seen_at = NOW(),
     raw = EXCLUDED.raw
+WHERE (to_jsonb(vault_dim) - ARRAY['first_seen_at', 'last_seen_at'])
+      IS DISTINCT FROM (to_jsonb(EXCLUDED) - ARRAY['first_seen_at', 'last_seen_at'])
 """
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import psycopg
 
@@ -26,6 +26,8 @@ from .config import (
     KONG_TIMEOUT_SEC,
     PPS_RETENTION_DAYS,
     PRODUCT_ACTIVITY_RETENTION_DAYS,
+    STYFI_EPOCH_LENGTH_SEC,
+    STYFI_EPOCH_LOOKBACK,
     STYFI_RETENTION_DAYS,
     STYFI_SNAPSHOT_RETENTION_DAYS,
     UPSERT_SQL,
@@ -35,6 +37,8 @@ from .eth import _first_present, _normalize_vault, _parse_chain_id
 from .http import request
 
 LAST_CLEANUP_AT: datetime | None = None
+# A restart repairs history once; later ticks fetch a small overlapping tail.
+PPS_REPAIRS: dict[tuple[int, str], tuple[date, int]] = {}
 
 
 def _fetch_kong_snapshot() -> tuple[list[dict], dict[str, object]]:
@@ -106,7 +110,14 @@ def _store_snapshot(conn: psycopg.Connection, vaults: list[dict]) -> int:
 
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("UPDATE vault_dim SET active = FALSE WHERE active = TRUE")
+            cur.execute(
+                """UPDATE vault_dim SET active = FALSE
+                   WHERE active AND NOT EXISTS (
+                       SELECT 1 FROM unnest(%s::integer[], %s::text[]) AS incoming(chain_id, address)
+                       WHERE incoming.chain_id = vault_dim.chain_id AND incoming.address = vault_dim.vault_address
+                   )""",
+                ([row["chain_id"] for row in rows], [row["vault_address"] for row in rows]),
+            )
             cur.executemany(UPSERT_SQL, rows)
 
     return len(rows)
@@ -224,11 +235,46 @@ def _upsert_pps_points(conn: psycopg.Connection, chain_id: int, vault_address: s
             ON CONFLICT (chain_id, vault_address, ts) DO UPDATE SET
                 pps_raw = EXCLUDED.pps_raw,
                 fetched_at = NOW()
+            WHERE pps_timeseries.pps_raw IS DISTINCT FROM EXCLUDED.pps_raw
             """,
             rows,
         )
+        changed = cur.rowcount
     conn.commit()
-    return len(rows)
+    return changed
+
+
+def _refresh_pps(
+    conn: psycopg.Connection, chain_id: int, address: str
+) -> tuple[list[tuple[int, float]], int]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT ts, pps_raw FROM pps_timeseries WHERE chain_id = %s AND vault_address = %s
+               ORDER BY ts DESC LIMIT %s""",
+            (chain_id, address, KONG_PPS_LIMIT),
+        )
+        stored = [(int(ts), float(value)) for ts, value in cur.fetchall()]
+    conn.commit()
+    today = datetime.now(UTC).date()
+    repaired, count = PPS_REPAIRS.get((chain_id, address), (None, 0))
+    full = repaired != today or len(stored) < min(2, count)
+    points = (
+        _fetch_kong_pps(chain_id, address)
+        if full
+        else _fetch_kong_series(
+            chain_id=chain_id,
+            vault_address=address,
+            limit=KONG_PPS_LIMIT,
+            timestamp=_utc_midnight_epoch_days_ago(2),
+        )
+    )
+    changed = _upsert_pps_points(conn, chain_id, address, points)
+    if full:
+        PPS_REPAIRS[(chain_id, address)] = (today, len(points))
+    # Retain long-window anchors and let new/corrected upstream points win.
+    merged = dict(stored)
+    merged.update(points)
+    return sorted(merged.items())[-KONG_PPS_LIMIT:], changed
 
 
 def _apy_for_window(points: list[tuple[int, float]], days: int) -> float | None:
@@ -327,7 +373,9 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
     deleted_vault_harvests = 0
     with conn.cursor() as cur:
         if PPS_RETENTION_DAYS > 0:
-            cutoff_ts = int((datetime.now(UTC) - timedelta(days=PPS_RETENTION_DAYS)).timestamp())
+            cutoff_ts = int(
+                (datetime.now(UTC) - timedelta(days=PPS_RETENTION_DAYS)).timestamp()
+            )
             cur.execute("DELETE FROM pps_timeseries WHERE ts < %s", (cutoff_ts,))
             deleted_pps = cur.rowcount
         if STYFI_SNAPSHOT_RETENTION_DAYS > 0:
@@ -339,7 +387,12 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
         if STYFI_RETENTION_DAYS > 0:
             cur.execute(
                 "DELETE FROM styfi_epoch_stats WHERE epoch_start < NOW() - (%s * INTERVAL '1 day')",
-                (STYFI_RETENTION_DAYS,),
+                (
+                    max(
+                        STYFI_RETENTION_DAYS,
+                        STYFI_EPOCH_LOOKBACK * STYFI_EPOCH_LENGTH_SEC // 86400 + 1,
+                    ),
+                ),
             )
             deleted_styfi_epochs = cur.rowcount
         if INGESTION_RUN_RETENTION_DAYS > 0:
@@ -360,6 +413,17 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
                 (HARVEST_RETENTION_DAYS,),
             )
             deleted_vault_harvests = cur.rowcount
+        # Diagnostic payloads are disposable; event history and delivery identities are not.
+        cur.execute("""DELETE FROM flex_reconciliations WHERE checked_at < NOW() - INTERVAL '30 days'
+                       AND id <> (SELECT id FROM flex_reconciliations ORDER BY checked_at DESC, id DESC LIMIT 1)""")
+        diagnostics = {"flex_reconciliations": cur.rowcount}
+        cur.execute("""UPDATE notification_deliveries SET payload = '{}'::jsonb, last_error = NULL
+                       WHERE status = 'sent' AND delivered_at < NOW() - INTERVAL '30 days'
+                         AND (payload <> '{}'::jsonb OR last_error IS NOT NULL)""")
+        diagnostics["sent_notification_payloads"] = cur.rowcount
+        cur.execute("""DELETE FROM protocol_tvl_snapshots WHERE observed_at < NOW() - INTERVAL '30 days'
+                       AND id <> (SELECT id FROM protocol_tvl_snapshots ORDER BY observed_at DESC, id DESC LIMIT 1)""")
+        diagnostics["protocol_tvl_snapshots"] = cur.rowcount
     conn.commit()
     return {
         "pps_timeseries": deleted_pps,
@@ -368,6 +432,7 @@ def _cleanup_old_data(conn: psycopg.Connection) -> dict[str, int]:
         "ingestion_runs": deleted_runs,
         "product_interactions": deleted_product_interactions,
         "vault_harvests": deleted_vault_harvests,
+        **diagnostics,
     }
 
 
@@ -383,15 +448,7 @@ def _maybe_cleanup_old_data(conn: psycopg.Connection) -> None:
     result = _cleanup_old_data(conn)
     LAST_CLEANUP_AT = now
     if any(value > 0 for value in result.values()):
-        logging.info(
-            "DB cleanup removed rows: pps_timeseries=%s styfi_snapshots=%s styfi_epoch_stats=%s ingestion_runs=%s product_interactions=%s vault_harvests=%s",
-            result["pps_timeseries"],
-            result["styfi_snapshots"],
-            result["styfi_epoch_stats"],
-            result["ingestion_runs"],
-            result["product_interactions"],
-            result["vault_harvests"],
-        )
+        logging.info("DB cleanup changed rows: %s", result)
     else:
         logging.info("DB cleanup check completed; no rows removed")
 
@@ -419,16 +476,20 @@ def _run_kong_ingestion(conn: psycopg.Connection) -> tuple[int, int, int]:
     errors: list[str] = []
     try:
         targets = _select_kong_vaults(conn)
+        target_keys = set(targets)
+        for key in list(PPS_REPAIRS):
+            if key not in target_keys:
+                PPS_REPAIRS.pop(key)
         if not targets:
             _complete_run(conn, run_id, "success", 0, json.dumps({"note": "no eligible vaults"}))
             return run_id, 0, 0
         metric_payload: list[dict] = []
         for chain_id, vault_address in targets:
             try:
-                points = _fetch_kong_pps(chain_id, vault_address)
+                points, changed = _refresh_pps(conn, chain_id, vault_address)
                 if not points:
                     continue
-                pps_rows_stored += _upsert_pps_points(conn, chain_id, vault_address, points)
+                pps_rows_stored += changed
                 computed = _compute_metrics(chain_id, vault_address, points)
                 if computed:
                     metric_payload.append(computed)

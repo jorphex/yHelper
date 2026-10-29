@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import psycopg
 from eth_utils import keccak
+from psycopg.rows import dict_row
 from psycopg.types.json import Json
 
 from .config import (
@@ -55,6 +56,7 @@ from .redaction import redact
 WAD = 10**18
 FLEX_SOURCE = "ethereum_archive_rpc"
 LOGGER = logging.getLogger(__name__)
+CREATION_BLOCKS: dict[str, int] = {}
 
 
 def _topic(signature: str) -> str:
@@ -191,12 +193,14 @@ def _decode_data_value(name: str, word: str) -> str | bool:
 
 
 def _contract_creation_block(address: str, latest_block: int) -> int:
+    if address in CREATION_BLOCKS:
+        return CREATION_BLOCKS[address]
     rpc_url = _rpc_url_for_chain(FLEX_CHAIN_ID)
     if not rpc_url:
         raise ValueError("Ethereum RPC is not configured")
     low = 0
     high = latest_block
-    candidate = latest_block
+    candidate = None
     while low <= high:
         middle = (low + high) // 2
         code = _eth_rpc_to_url(rpc_url, "eth_getCode", [address, hex(middle)])
@@ -206,6 +210,9 @@ def _contract_creation_block(address: str, latest_block: int) -> int:
             high = middle - 1
         else:
             low = middle + 1
+    if candidate is None:
+        return latest_block
+    CREATION_BLOCKS[address] = candidate
     return candidate
 
 
@@ -227,9 +234,36 @@ def _safe_string(address: str, signature: str) -> str | None:
         return None
 
 
-def _discover_markets(conn: psycopg.Connection, finalized_block: int) -> list[dict[str, object]]:
+def _discover_markets(
+    conn: psycopg.Connection, finalized_block: int
+) -> list[dict[str, object]]:
+    contracts = sorted([FLEX_REGISTRY_ADDRESS, *FLEX_FACTORIES])
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            "SELECT * FROM flex_market_dim WHERE chain_id = %s AND factory_address = ANY(%s)",
+            (FLEX_CHAIN_ID, list(FLEX_FACTORIES)),
+        )
+        known = {str(row["market_address"]): row for row in cur.fetchall()}
+        cur.execute(
+            "SELECT cursor, payload FROM flex_sync_state WHERE stream_name = 'discovery'"
+        )
+        state = cur.fetchone()
+    conn.commit()
+    cursor = (
+        int(state["cursor"])
+        if state
+        and state["cursor"] is not None
+        and state["payload"].get("contracts") == contracts
+        else None
+    )
+    if not known:
+        cursor = None
     api_metadata = _live_api_metadata()
-    registry_creation = _contract_creation_block(FLEX_REGISTRY_ADDRESS, finalized_block)
+    registry_creation = (
+        max(0, cursor - FLEX_REPLAY_BLOCKS + 1)
+        if cursor is not None
+        else _contract_creation_block(FLEX_REGISTRY_ADDRESS, finalized_block)
+    )
     registry_logs = _eth_get_logs_for_chain(
         FLEX_CHAIN_ID,
         addresses=[FLEX_REGISTRY_ADDRESS],
@@ -237,16 +271,27 @@ def _discover_markets(conn: psycopg.Connection, finalized_block: int) -> list[di
         to_block=finalized_block,
         topics=[[ENDORSE_TOPIC, UNENDORSE_TOPIC]],
     )
-    endorsement: dict[str, str] = {}
+    endorsement = {
+        address: str(row["endorsement_status"]) for address, row in known.items()
+    }
     for log in registry_logs:
         topics = log.get("topics") if isinstance(log.get("topics"), list) else []
         market = _topic_address(topics, 1)
-        if market:
-            endorsement[market] = "endorsed" if str(topics[0]).lower() == ENDORSE_TOPIC else "unendorsed"
+        if not market or str(topics[0]).lower() not in {ENDORSE_TOPIC, UNENDORSE_TOPIC}:
+            raise ValueError(
+                "Incomplete Flex registry event; discovery cursor unchanged"
+            )
+        endorsement[market] = (
+            "endorsed" if str(topics[0]).lower() == ENDORSE_TOPIC else "unendorsed"
+        )
 
     discovered: list[dict[str, object]] = []
     for factory, version in FLEX_FACTORIES.items():
-        creation_block = _contract_creation_block(factory, finalized_block)
+        creation_block = (
+            max(0, cursor - FLEX_REPLAY_BLOCKS + 1)
+            if cursor is not None
+            else _contract_creation_block(factory, finalized_block)
+        )
         logs = _eth_get_logs_for_chain(
             FLEX_CHAIN_ID,
             addresses=[factory],
@@ -260,33 +305,26 @@ def _discover_markets(conn: psycopg.Connection, finalized_block: int) -> list[di
             block_number = _hex_to_int(str(log.get("blockNumber") or ""))
             data_words = _words(log.get("data"))
             if not market or block_number is None or len(data_words) < 4:
+                raise ValueError(
+                    "Incomplete Flex deployment event; discovery cursor unchanged"
+                )
+            if market in known:
                 continue
             block = _eth_get_block_for_chain(FLEX_CHAIN_ID, block_number)
             block_ts = _hex_to_int(str(block.get("timestamp") or ""))
             if block_ts is None:
-                continue
-            sorted_troves, dutch_desk, auction, lender = [_word_address(word) for word in data_words[:4]]
+                raise ValueError(
+                    "Missing Flex deployment timestamp; discovery cursor unchanged"
+                )
+            sorted_troves, dutch_desk, auction, lender = [
+                _word_address(word) for word in data_words[:4]
+            ]
             collateral = _read_address(market, "collateral_token()")
             borrow = _read_address(market, "borrow_token()")
-            oracle = _read_address(market, "price_oracle()")
             collateral_decimals = int(_eth_call_uint(collateral, "decimals()"))
             borrow_decimals = int(_eth_call_uint(borrow, "decimals()"))
             collateral_symbol = _safe_string(collateral, "symbol()") or collateral[:10]
             borrow_symbol = _safe_string(borrow, "symbol()") or borrow[:10]
-            meta = api_metadata.get(market, {})
-            display = meta.get("display") if isinstance(meta.get("display"), dict) else {}
-            label = str(display.get("label") or f"{collateral_symbol}/{borrow_symbol}")
-            params: dict[str, object] = {}
-            try:
-                params = _api_payload(
-                    FLEX_API_PARAMS_URL,
-                    {"chain_id": FLEX_CHAIN_ID, "trove_manager": market},
-                )
-            except FLEX_SOFT_ERRORS as exc:
-                LOGGER.debug("Flex market parameters unavailable for %s: %s", market, exc)
-            oracle_meta = params.get("oracle") if isinstance(params.get("oracle"), dict) else {}
-            status = endorsement.get(market, "unendorsed")
-            market_status = "unendorsed" if status == "unendorsed" else ("deprecated" if version == "1.0.0" else "active")
             row = {
                 "chain_id": FLEX_CHAIN_ID,
                 "market_address": market,
@@ -297,32 +335,78 @@ def _discover_markets(conn: psycopg.Connection, finalized_block: int) -> list[di
                 "deployment_block": block_number,
                 "deployment_time": datetime.fromtimestamp(block_ts, UTC),
                 "deployment_tx_hash": str(log.get("transactionHash") or "").lower(),
-                "endorsement_status": status,
-                "market_status": market_status,
                 "lender_address": lender,
                 "collateral_token_address": collateral,
-                "collateral_token_symbol": str(display.get("collateral_token_symbol") or collateral_symbol),
+                "collateral_token_symbol": collateral_symbol,
                 "collateral_token_decimals": collateral_decimals,
                 "borrow_token_address": borrow,
-                "borrow_token_symbol": str(display.get("borrow_token_symbol") or borrow_symbol),
+                "borrow_token_symbol": borrow_symbol,
                 "borrow_token_decimals": borrow_decimals,
                 "sorted_troves_address": sorted_troves,
                 "dutch_desk_address": dutch_desk,
                 "auction_address": auction,
-                "price_oracle_address": oracle,
-                "one_pct_raw": int(_eth_call_uint(market, "one_pct()")),
-                "min_debt_raw": _safe_uint(market, "min_debt()"),
-                "safe_collateral_ratio_raw": _safe_uint(market, "safe_collateral_ratio()"),
-                "minimum_collateral_ratio_raw": _safe_uint(market, "minimum_collateral_ratio()"),
-                "max_penalty_collateral_ratio_raw": _safe_uint(market, "max_penalty_collateral_ratio()"),
-                "min_liquidation_fee_raw": _safe_uint(market, "min_liquidation_fee()"),
-                "max_liquidation_fee_raw": _safe_uint(market, "max_liquidation_fee()"),
-                "min_annual_interest_rate_raw": _safe_uint(market, "min_annual_interest_rate()"),
-                "max_annual_interest_rate_raw": _safe_uint(market, "max_annual_interest_rate()"),
-                "oracle_description": str(oracle_meta.get("description") or "") or None,
-                "raw_metadata": Json({"label": label, "flex_api": meta, "params": params}),
+                "raw_metadata": {},
             }
             discovered.append(row)
+
+    # Stored deployment/token metadata is immutable. Refresh governance-controlled
+    # fields and labels without replaying each deployment and its token reads.
+    discovered = [*known.values(), *discovered]
+    for row in discovered:
+        market = str(row["market_address"])
+        meta = api_metadata.get(market) or (row.get("raw_metadata") or {}).get(
+            "flex_api", {}
+        )
+        display = meta.get("display") if isinstance(meta.get("display"), dict) else {}
+        params = (row.get("raw_metadata") or {}).get("params", {})
+        try:
+            params = _api_payload(
+                FLEX_API_PARAMS_URL,
+                {"chain_id": FLEX_CHAIN_ID, "trove_manager": market},
+            )
+        except FLEX_SOFT_ERRORS as exc:
+            LOGGER.debug("Flex market parameters unavailable for %s: %s", market, exc)
+        oracle_meta = (
+            params.get("oracle") if isinstance(params.get("oracle"), dict) else {}
+        )
+        status = endorsement.get(market, "unendorsed")
+        row.update(
+            endorsement_status=status,
+            market_status="unendorsed"
+            if status == "unendorsed"
+            else ("deprecated" if row["contract_version"] == "1.0.0" else "active"),
+            price_oracle_address=_read_address(market, "price_oracle()"),
+            one_pct_raw=int(_eth_call_uint(market, "one_pct()")),
+            oracle_description=str(oracle_meta.get("description") or "") or None,
+            collateral_token_symbol=str(
+                display.get("collateral_token_symbol") or row["collateral_token_symbol"]
+            ),
+            borrow_token_symbol=str(
+                display.get("borrow_token_symbol") or row["borrow_token_symbol"]
+            ),
+            raw_metadata=Json(
+                {
+                    "label": str(
+                        display.get("label")
+                        or (row.get("raw_metadata") or {}).get("label")
+                        or f"{row['collateral_token_symbol']}/{row['borrow_token_symbol']}"
+                    ),
+                    "flex_api": meta,
+                    "params": params,
+                }
+            ),
+        )
+        for field in (
+            "min_debt",
+            "safe_collateral_ratio",
+            "minimum_collateral_ratio",
+            "max_penalty_collateral_ratio",
+            "min_liquidation_fee",
+            "max_liquidation_fee",
+            "min_annual_interest_rate",
+            "max_annual_interest_rate",
+        ):
+            row[f"{field}_raw"] = _safe_uint(market, f"{field}()")
 
     with conn.cursor() as cur:
         for row in discovered:
@@ -384,6 +468,7 @@ def _discover_markets(conn: psycopg.Connection, finalized_block: int) -> list[di
                 """,
                 row,
             )
+    _set_sync_cursor(conn, "discovery", finalized_block, datetime.now(UTC), {"contracts": contracts})
     conn.commit()
     return discovered
 
@@ -706,23 +791,39 @@ def _snapshot_row(
     }
 
 
-def _nearest_block(target: datetime, previous: dict[str, object] | None, finalized_block: int) -> dict[str, object]:
+def _nearest_block(
+    target: datetime, previous: dict[str, object] | None, finalized_block: int
+) -> dict[str, object]:
     target_ts = int(target.timestamp())
     if previous is None:
-        candidate = min(finalized_block, _find_block_at_or_after(FLEX_CHAIN_ID, target_ts))
+        candidate = min(
+            finalized_block, _find_block_at_or_after(FLEX_CHAIN_ID, target_ts)
+        )
     else:
         previous_number = int(_hex_to_int(str(previous.get("number") or "")) or 0)
-        previous_ts = int(_hex_to_int(str(previous.get("timestamp") or "")) or target_ts)
-        candidate = min(finalized_block, max(previous_number + 1, previous_number + (target_ts - previous_ts) // 12))
+        previous_ts = int(
+            _hex_to_int(str(previous.get("timestamp") or "")) or target_ts
+        )
+        candidate = min(
+            finalized_block,
+            max(previous_number + 1, previous_number + (target_ts - previous_ts) // 12),
+        )
     block = _eth_get_block_for_chain(FLEX_CHAIN_ID, candidate)
     for _ in range(4):
         block_ts = int(_hex_to_int(str(block.get("timestamp") or "")) or target_ts)
         delta = target_ts - block_ts
-        if abs(delta) <= 24:
+        if 0 <= block_ts - target_ts <= 24:
             break
-        adjustment = math.floor(delta / 12) if delta > 0 else math.ceil(delta / 12)
+        adjustment = (
+            max(1, math.floor(delta / 12)) if delta > 0 else math.ceil(delta / 12)
+        )
         candidate = min(finalized_block, max(1, candidate + adjustment))
         block = _eth_get_block_for_chain(FLEX_CHAIN_ID, candidate)
+    if int(str(block["timestamp"]), 16) < target_ts:
+        block = _eth_get_block_for_chain(
+            FLEX_CHAIN_ID,
+            min(finalized_block, _find_block_at_or_after(FLEX_CHAIN_ID, target_ts)),
+        )
     return block
 
 
@@ -732,7 +833,9 @@ def _missing_hours(
     finalized_at: datetime,
     limit: int,
 ) -> list[datetime]:
-    start = (finalized_at - timedelta(days=FLEX_BACKFILL_DAYS)).replace(minute=0, second=0, microsecond=0)
+    start = (finalized_at - timedelta(days=FLEX_BACKFILL_DAYS)).replace(
+        minute=0, second=0, microsecond=0
+    )
     current = finalized_at.replace(minute=0, second=0, microsecond=0)
     with conn.cursor() as cur:
         cur.execute(
@@ -743,12 +846,15 @@ def _missing_hours(
     missing: list[datetime] = []
     hour = start
     while hour <= current:
-        eligible = [market for market in markets if market["deployment_time"] <= hour + timedelta(hours=1)]
-        if eligible and any((hour, str(market["market_address"])) not in existing for market in eligible):
+        eligible = [market for market in markets if market["deployment_time"] <= hour]
+        if eligible and any(
+            (hour, str(market["market_address"])) not in existing for market in eligible
+        ):
             missing.append(hour)
         hour += timedelta(seconds=FLEX_SNAPSHOT_INTERVAL_SEC)
-    missing = [hour for hour in missing if hour != current]
-    prioritized = [current, *missing]
+    prioritized = ([current] if current in missing else []) + [
+        hour for hour in missing if hour != current
+    ]
     return prioritized[:limit] if limit > 0 else prioritized
 
 
@@ -766,11 +872,27 @@ def _sync_snapshots(
         block = _nearest_block(hour, previous, finalized_block)
         previous = block
         block_number = int(_hex_to_int(str(block.get("number") or "")) or 0)
-        eligible = [market for market in markets if int(market["deployment_block"]) <= block_number]
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT market_address FROM flex_market_snapshots WHERE chain_id = %s AND sampled_hour = %s",
+                (FLEX_CHAIN_ID, hour),
+            )
+            existing = {str(row[0]) for row in cur.fetchall()}
+        conn.commit()
+        eligible = [
+            market
+            for market in markets
+            if market["deployment_time"] <= hour
+            and int(market["deployment_block"]) <= block_number
+            and str(market["market_address"]) not in existing
+        ]
         if not eligible:
             continue
         state = _batch_state(eligible, block_number)
-        rows = [_snapshot_row(market, state[str(market["market_address"])], hour, block) for market in eligible]
+        rows = [
+            _snapshot_row(market, state[str(market["market_address"])], hour, block)
+            for market in eligible
+        ]
         with conn.cursor() as cur:
             cur.executemany(
                 """

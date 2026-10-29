@@ -39,6 +39,14 @@ Docker Compose runs four services:
 
 The web service defaults to port `3010` and proxies `/api/*` and `/health` to the API when `NEXT_PUBLIC_API_BASE_URL=/api`. PostgreSQL and the API bind to loopback; the worker uses host networking for local chain endpoints.
 
+One worker owns ingestion and harvest WebSocket listeners. Normal jobs target 15-minute starts (`WORKER_INTERVAL_SEC=900`); an overrun waits one interval before retrying, without overlapping cycles. Schema setup runs at startup. Notification retries and alerts use a separate DB connection and poll independently, waiting at most a minute between passes. An in-flight identity guard prevents retries and live reports from concurrently sending the same notification. The default retry cooldown remains 120 seconds.
+
+Kong PPS refreshes an overlapping two-day tail, merges it with stored history for realized APY, and repairs full history on startup, onboarding and each UTC day. Unchanged PPS/catalog rows are not rewritten; catalog fetch freshness comes from ingestion metadata, while a row's `last_seen_at` changes when its stored catalog data changes. Flex discovery persists a replay cursor and reuses deployment/token metadata while refreshing endorsement, oracle and risk fields. Completed hourly snapshots are reused; genuine gaps are repaired without predeployment samples.
+
+stYFI refreshes the current and previous reward epochs each cycle and older epochs daily. Epoch cleanup retains at least the configured epoch lookback plus a day at the boundary, even when `STYFI_RETENTION_DAYS` is shorter. DefiLlama TVL refreshes hourly and is stale after two hours (or twice the worker interval if longer).
+
+Daily cleanup retains 30 days of Flex reconciliation and protocol TVL diagnostics, always preserving the latest record. Sent notification payloads older than 30 days are cleared; delivery identities and failed payloads remain for deduplication and retries. Flex events/snapshots and unlimited harvest history keep their existing policies. Docker logs rotate at 5 MiB with three files per service; this takes effect when containers are recreated.
+
 Public ingress is managed outside this Compose project: a shared edge serves the web app, and Tailscale exposes the private API.
 
 ## Run locally
@@ -113,6 +121,14 @@ uv run --no-project --python 3.12 --with-requirements worker/requirements.txt --
 ```
 
 Results and service logs are saved under ignored `reports/worker-resilience-fix/`. These checks cover repeated upstream failures, SQL timeout recovery, concurrent and stale heartbeats, reconnects after real closes, RPC/Telegram credential redaction and public responses containing legacy errors.
+
+Worker efficiency checks exercise real loopback HTTP/RPC sources, an isolated PostgreSQL schema and a worker subprocess:
+
+```sh
+uv run --no-project --python 3.12 --with-requirements worker/requirements.txt --with-requirements api/requirements.txt python worker/tests/e2e_efficiency.py
+```
+
+Results are saved to `reports/worker-efficiency-e2e/results.json`. Coverage includes unchanged/corrected catalog and PPS data, daily history repair, incremental discovery across restarts, partial deployment failures, hourly gap repair, epoch rollover, diagnostic retention and retries while ingestion is blocked. Outbound webhook delivery stays on loopback.
 
 Networking recovery checks use the same dependencies:
 

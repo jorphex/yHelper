@@ -1,7 +1,14 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "3"
+
 services:
   yhelper-postgres:
     image: postgres:16
     container_name: yhelper-postgres
+    logging: *default-logging
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-yhelper}
@@ -23,6 +30,7 @@ services:
     build:
       context: ./api
     container_name: yhelper-api
+    logging: *default-logging
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://yhelper:change_me@yhelper-postgres:5432/yhelper}
@@ -65,6 +73,7 @@ services:
     build:
       context: ./worker
     container_name: yhelper-worker
+    logging: *default-logging
     restart: unless-stopped
     environment:
       DATABASE_URL: ${WORKER_DATABASE_URL:-postgresql://yhelper:change_me@127.0.0.1:5432/yhelper}
@@ -158,6 +167,7 @@ services:
     build:
       context: ./web
     container_name: yhelper-web
+    logging: *default-logging
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}

@@ -6,7 +6,12 @@ from typing import Any
 import psycopg
 
 from app.common import _seconds_since, _to_float_or_none, _user_visible_filter_sql
-from app.config import EXCLUDED_CHAIN_IDS, USER_VISIBLE_KIND, USER_VISIBLE_VERSION_PREFIX, WORKER_INTERVAL_SEC
+from app.config import (
+    EXCLUDED_CHAIN_IDS,
+    USER_VISIBLE_KIND,
+    USER_VISIBLE_VERSION_PREFIX,
+    WORKER_INTERVAL_SEC,
+)
 
 
 def _scope_row(row: dict[str, Any] | None, *, criteria: dict[str, Any]) -> dict[str, Any]:
@@ -168,7 +173,7 @@ def _latest_protocol_tvl_snapshot(
     ]
     fetched_at = row["observed_at"]
     age_seconds = _seconds_since(fetched_at, now or datetime.now(UTC))
-    stale_after_seconds = WORKER_INTERVAL_SEC * 2
+    stale_after_seconds = max(WORKER_INTERVAL_SEC, 3600) * 2
     return {
         "tvl_usd": _to_float_or_none(row["parent_tvl_usd"]),
         "fetched_at": fetched_at.isoformat(),

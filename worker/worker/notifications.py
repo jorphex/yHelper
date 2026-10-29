@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from threading import Lock
 
 import psycopg
 import requests
@@ -207,6 +208,11 @@ def _send_discord_payload(webhook_url: str, payload: dict[str, object]) -> None:
     response.raise_for_status()
 
 
+# Keep competing ingestion/retry attempts from sending the same delivery.
+DELIVERY_LOCK = Lock()
+DELIVERIES_IN_FLIGHT: set[tuple[str, int, str, int, str]] = set()
+
+
 def _deliver_discord_notification(
     conn: psycopg.Connection,
     *,
@@ -217,55 +223,64 @@ def _deliver_discord_notification(
     destination_key: str,
     payload: dict[str, object],
 ) -> bool:
-    existing = _get_notification_delivery(
-        conn,
-        source_type=source_type,
-        chain_id=chain_id,
-        tx_hash=tx_hash,
-        log_index=log_index,
-        destination_key=destination_key,
-    )
-    if existing and existing.get("status") == "sent":
-        return False
-    webhook_url = _notification_webhook_url(destination_key)
-    if not webhook_url:
-        return False
+    identity = (source_type, chain_id, tx_hash, log_index, destination_key)
+    with DELIVERY_LOCK:
+        if identity in DELIVERIES_IN_FLIGHT:
+            return False
+        DELIVERIES_IN_FLIGHT.add(identity)
     try:
-        _send_discord_payload(webhook_url, payload)
-        _upsert_notification_delivery(
+        existing = _get_notification_delivery(
             conn,
             source_type=source_type,
             chain_id=chain_id,
             tx_hash=tx_hash,
             log_index=log_index,
             destination_key=destination_key,
-            status="sent",
-            payload=payload,
-            error=None,
         )
-        return True
-    except Exception as exc:
-        _upsert_notification_delivery(
-            conn,
-            source_type=source_type,
-            chain_id=chain_id,
-            tx_hash=tx_hash,
-            log_index=log_index,
-            destination_key=destination_key,
-            status="failed",
-            payload=payload,
-            error=str(exc),
-        )
-        logging.warning(
-            "Discord delivery failed: source=%s chain=%s tx=%s log_index=%s destination=%s error=%s",
-            source_type,
-            chain_id,
-            tx_hash,
-            log_index,
-            destination_key,
-            exc,
-        )
-        return False
+        if existing and existing.get("status") == "sent":
+            return False
+        webhook_url = _notification_webhook_url(destination_key)
+        if not webhook_url:
+            return False
+        try:
+            _send_discord_payload(webhook_url, payload)
+            _upsert_notification_delivery(
+                conn,
+                source_type=source_type,
+                chain_id=chain_id,
+                tx_hash=tx_hash,
+                log_index=log_index,
+                destination_key=destination_key,
+                status="sent",
+                payload=payload,
+                error=None,
+            )
+            return True
+        except Exception as exc:
+            _upsert_notification_delivery(
+                conn,
+                source_type=source_type,
+                chain_id=chain_id,
+                tx_hash=tx_hash,
+                log_index=log_index,
+                destination_key=destination_key,
+                status="failed",
+                payload=payload,
+                error=str(exc),
+            )
+            logging.warning(
+                "Discord delivery failed: source=%s chain=%s tx=%s log_index=%s destination=%s error=%s",
+                source_type,
+                chain_id,
+                tx_hash,
+                log_index,
+                destination_key,
+                exc,
+            )
+            return False
+    finally:
+        with DELIVERY_LOCK:
+            DELIVERIES_IN_FLIGHT.remove(identity)
 
 
 def _harvest_vault_meta(conn: psycopg.Connection, *, chain_id: int, vault_address: str) -> dict[str, object]:
