@@ -15,12 +15,12 @@ from collections import OrderedDict, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal, localcontext
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
+import httpx
 from fastapi import HTTPException
 
 from app.flex_service import _read_cursor
+from app.transport import fetch
 
 WAD = 10**18
 YEAR = 365 * 86400
@@ -44,6 +44,7 @@ CACHE: OrderedDict[tuple, tuple[float, dict]] = OrderedDict()
 PENDING = {}
 LOCK = threading.Lock()
 EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="flex-performance")
+ARCHIVE_TIMEOUT_SEC = 60
 
 
 class CoverageError(ValueError):
@@ -55,7 +56,7 @@ class Archive:
         self.url = os.getenv("FLEX_PERFORMANCE_RPC_URL") or os.getenv("ETH_RPC_URL")
         if not self.url:
             raise HTTPException(503, "Performance is temporarily unavailable.")
-        self.deadline = time.monotonic() + 60
+        self.deadline = time.monotonic() + ARCHIVE_TIMEOUT_SEC
         self.cache = {}
         self.failed = set()
         self.calls = 0
@@ -70,19 +71,8 @@ class Archive:
         if remaining <= 0 or self.calls >= 1200:
             raise CoverageError("Historical lookup limit reached.")
         self.calls += 1
-        request = Request(
-            self.url,
-            data=json.dumps(
-                {"jsonrpc": "2.0", "id": self.calls, "method": method, "params": params}
-            ).encode(),
-            headers={"Content-Type": "application/json"},
-        )
         try:
-            with urlopen(request, timeout=min(12, remaining)) as response:
-                raw = response.read(4 * 1024 * 1024 + 1)
-            if len(raw) > 4 * 1024 * 1024:
-                raise CoverageError("Historical response is too large.")
-            data = json.loads(raw)
+            data = self._request({"jsonrpc": "2.0", "id": self.calls, "method": method, "params": params})
             if (
                 not isinstance(data, dict)
                 or data.get("id") != self.calls
@@ -92,7 +82,7 @@ class Archive:
                 raise CoverageError("Historical RPC data is unavailable.")
             self.cache[key] = data["result"]
             return data["result"]
-        except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
+        except (httpx.HTTPError, TimeoutError, OSError, ValueError) as exc:
             raise CoverageError("Historical RPC data is unavailable.") from exc
 
     def warm(self, calls):
@@ -121,17 +111,8 @@ class Archive:
                         "params": params,
                     }
                 )
-            request = Request(
-                self.url,
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"},
-            )
             try:
-                with urlopen(request, timeout=min(12, remaining)) as response:
-                    raw = response.read(4 * 1024 * 1024 + 1)
-                if len(raw) > 4 * 1024 * 1024:
-                    raise CoverageError("Historical response is too large.")
-                results = json.loads(raw)
+                results = self._request(payload)
                 if not isinstance(results, list):
                     raise CoverageError("Historical RPC batch is unavailable.")
                 seen = set()
@@ -147,8 +128,14 @@ class Archive:
                     else:
                         self.cache[key] = result["result"]
                 self.failed.update(set(ids.values()) - seen)
-            except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
+            except (httpx.HTTPError, TimeoutError, OSError, ValueError) as exc:
                 raise CoverageError("Historical RPC data is unavailable.") from exc
+
+    def _request(self, payload):
+        reply = fetch("POST", self.url, json=payload, deadline=self.deadline, timeout=12, max_bytes=4 * 1024 * 1024)
+        if reply.status >= 400:
+            raise CoverageError("Historical RPC data is unavailable.")
+        return json.loads(reply.body)
 
     def block(self, block):
         result = self.rpc("eth_getBlockByNumber", [hex(block), False])

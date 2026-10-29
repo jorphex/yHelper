@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import random
-import threading
 import time
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
+import httpx
 import requests
 
 from .config import ETH_RPC_MAX_ATTEMPTS, ETH_RPC_RETRY_SLEEP_SEC
+from .transport import fetch
 
-_LOCAL = threading.local()
 _BUDGET_SEC = 65
 _MAX_DELAY_SEC = 30
+_MAX_RESPONSE_BYTES = 64 * 1024 * 1024
 
 
 class RpcError(ValueError):
@@ -106,8 +107,6 @@ def _retry_after(response) -> float | None:
 
 
 def request(method: str, url: str, *, timeout: float, rpc: bool = False, **kwargs):
-    if not hasattr(_LOCAL, "session"):
-        _LOCAL.session = requests.Session()
     deadline = time.monotonic() + _BUDGET_SEC
     for attempt in range(ETH_RPC_MAX_ATTEMPTS):
         response = None
@@ -115,9 +114,21 @@ def request(method: str, url: str, *, timeout: float, rpc: bool = False, **kwarg
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise requests.Timeout("Upstream request deadline exceeded")
-            response = _LOCAL.session.request(
-                method, url, timeout=min(timeout, remaining), **kwargs
-            )
+            try:
+                reply = fetch(method, url, deadline=deadline, timeout=timeout, max_bytes=_MAX_RESPONSE_BYTES, **kwargs)
+            except (TimeoutError, httpx.TimeoutException) as exc:
+                raise requests.Timeout("Upstream request timed out") from exc
+            except httpx.HTTPError as exc:
+                raise requests.ConnectionError("Upstream connection failed") from exc
+            # Preserve the Requests response/error contract used by worker jobs.
+            response = requests.Response()
+            response.status_code = reply.status
+            response.headers = requests.structures.CaseInsensitiveDict(reply.headers)
+            response._content = reply.body
+            response._content_consumed = True
+            response.url = reply.url
+            response.reason = reply.reason
+            response.request = requests.Request(method, reply.url).prepare()
             response.raise_for_status()
             if rpc:
                 payload = response.json()
