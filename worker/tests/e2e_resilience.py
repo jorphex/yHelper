@@ -289,6 +289,17 @@ def main():
             "real_close_reconnected": True,
         }
 
+        with (OUT / "edges.log").open("w") as log:
+            subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("e2e_resilience_edges.py")), str(OUT)],
+                env=env,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=30,
+                check=True,
+            )
+        evidence["edge_cases"] = json.loads((OUT / "edges.json").read_text())
+
         legacy = f"HTTPSConnectionPool error url: /v2/{SECRET}; https://user:password@example.test/v3/{SECRET}?api_key={SECRET}"
         with psycopg.connect(scoped, autocommit=True) as conn:
             conn.execute(

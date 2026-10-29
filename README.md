@@ -112,7 +112,7 @@ Worker recovery and diagnostic privacy checks use real local HTTP/WebSocket serv
 uv run --no-project --python 3.12 --with-requirements worker/requirements.txt --with-requirements api/requirements.txt --with httpx python worker/tests/e2e_resilience.py
 ```
 
-Results and service logs are saved under ignored `reports/worker-resilience-fix/`. These checks cover repeated upstream failures, ping/pong traffic, reconnects after real closes, persisted error redaction and public responses containing legacy errors.
+Results and service logs are saved under ignored `reports/worker-resilience-fix/`. These checks cover repeated upstream failures, SQL timeout recovery, concurrent and stale heartbeats, reconnects after real closes, RPC/Telegram credential redaction and public responses containing legacy errors.
 
 Frontend checks:
 

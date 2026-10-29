@@ -542,9 +542,9 @@ def _run_vault_harvests(conn: psycopg.Connection) -> int:
                 if not _rpc_url_for_chain(chain_id):
                     errors.append(f"{chain_id}:missing_rpc")
                     continue
-                now = datetime.now(UTC)
                 latest_block = _eth_block_number_for_chain(chain_id)
                 cursor, sync_payload, _ = _harvest_sync_state(conn, chain_id)
+                now = datetime.now(UTC)
                 notifications_primed = bool(sync_payload.get("notifications_primed")) if isinstance(sync_payload, dict) else False
                 wss_url = _wss_url_for_chain(chain_id) if HARVEST_WSS_ENABLED else None
                 wss_healthy = bool(wss_url) and _harvest_wss_is_healthy(sync_payload, now)

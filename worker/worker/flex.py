@@ -949,6 +949,7 @@ def _run_flex_sync(conn: psycopg.Connection, *, max_snapshot_hours: int | None =
         _complete_run(conn, run_id, "success", records, json.dumps(result, sort_keys=True))
         return result
     except Exception as exc:
+        conn.rollback()
         _complete_run(conn, run_id, "failed", 0, json.dumps({"error": str(exc)[:1000]}))
         raise
 
