@@ -958,6 +958,7 @@ ON CONFLICT (chain_id, vault_address) DO UPDATE SET
 
 
 def configure_logging() -> None:
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     handler = logging.StreamHandler()
     handler.setFormatter(RedactingFormatter("%(asctime)s %(levelname)s [yhelper-worker] %(message)s"))
     logging.basicConfig(
