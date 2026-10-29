@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import math
-import select
 import threading
 import time
 from datetime import UTC, datetime, timedelta
@@ -42,6 +41,7 @@ from .eth import (
     _wss_url_for_chain,
 )
 from .notifications import _notify_harvest_rows
+from .redaction import redact
 
 
 def _harvest_block_span_for_chain(chain_id: int) -> int:
@@ -129,7 +129,7 @@ def _upsert_harvest_sync_state(
                 "chain_id": chain_id,
                 "cursor": cursor,
                 "observed_at": observed_at,
-                "payload": Json(payload),
+                "payload": Json(redact(payload)),
             },
         )
     conn.commit()
@@ -246,10 +246,18 @@ def _upsert_vault_harvests(conn: psycopg.Connection, rows: list[dict[str, object
     return inserted
 
 
-def _harvest_wss_is_healthy(payload: dict[str, object], _now: datetime) -> bool:
+def _harvest_wss_is_healthy(payload: dict[str, object], now: datetime) -> bool:
     if not HARVEST_WSS_ENABLED:
         return False
     if payload.get("wss_connected") is not True:
+        return False
+    try:
+        heartbeat = datetime.fromisoformat(payload.get("wss_heartbeat_at", ""))
+        if heartbeat.tzinfo is None:
+            heartbeat = heartbeat.replace(tzinfo=UTC)
+        if not 0 <= (now - heartbeat).total_seconds() <= 3 * HARVEST_WSS_HEARTBEAT_SEC:
+            return False
+    except (TypeError, ValueError):
         return False
     connected_raw = payload.get("wss_connected_at")
     error_raw = payload.get("wss_last_error_at")
@@ -341,18 +349,21 @@ class HarvestWssListener(threading.Thread):
                     backoff = 1.0
                     continue
                 logging.warning("Harvest WSS listener reconnect: chain=%s error=%s", self.chain_id, exc)
-                with _connect() as conn:
-                    _upsert_harvest_sync_state(
-                        conn,
-                        chain_id=self.chain_id,
-                        cursor=None,
-                        observed_at=datetime.now(UTC),
-                        payload={
-                            "wss_connected": False,
-                            "wss_last_error": str(exc),
-                            "wss_last_error_at": datetime.now(UTC).isoformat(),
-                        },
-                    )
+                try:
+                    with _connect() as conn:
+                        _upsert_harvest_sync_state(
+                            conn,
+                            chain_id=self.chain_id,
+                            cursor=None,
+                            observed_at=datetime.now(UTC),
+                            payload={
+                                "wss_connected": False,
+                                "wss_last_error": str(exc),
+                                "wss_last_error_at": datetime.now(UTC).isoformat(),
+                            },
+                        )
+                except Exception:
+                    logging.exception("Harvest WSS failure state unavailable: chain=%s", self.chain_id)
                 time.sleep(min(backoff, 30.0))
                 backoff = min(backoff * 2, 30.0)
 
@@ -393,28 +404,30 @@ class HarvestWssListener(threading.Thread):
                         "wss_last_error": None,
                     },
                 )
+                ws.settimeout(HARVEST_WSS_HEARTBEAT_SEC)
+                awaiting_heartbeat = False
                 while not self._stop_event.is_set():
                     if self._restart.is_set():
                         self._restart.clear()
                         raise RuntimeError("contract_set_changed")
-                    readable, _, _ = select.select([ws.sock], [], [], HARVEST_WSS_HEARTBEAT_SEC)
-                    if not readable:
-                        heartbeat_at = datetime.now(UTC)
-                        _upsert_harvest_sync_state(
-                            conn,
-                            chain_id=self.chain_id,
-                            cursor=None,
-                            observed_at=heartbeat_at,
-                            payload={
-                                "wss_connected": True,
-                                "wss_heartbeat_at": heartbeat_at.isoformat(),
-                            },
-                        )
+                    try:
+                        opcode, frame = ws.recv_data_frame(control_frame=True)
+                    except websocket.WebSocketTimeoutException:
+                        if awaiting_heartbeat:
+                            raise RuntimeError("harvest_wss_heartbeat_timeout") from None
+                        ws.ping()
+                        awaiting_heartbeat = True
                         continue
-                    raw_message = ws.recv()
-                    if not raw_message:
-                        raise RuntimeError("empty_wss_message")
-                    self._handle_wss_message(conn, contracts, raw_message)
+                    if opcode == websocket.ABNF.OPCODE_CLOSE:
+                        raise RuntimeError("harvest_wss_peer_closed")
+                    awaiting_heartbeat = False
+                    heartbeat_at = datetime.now(UTC)
+                    _upsert_harvest_sync_state(
+                        conn, chain_id=self.chain_id, cursor=None, observed_at=heartbeat_at,
+                        payload={"wss_connected": True, "wss_heartbeat_at": heartbeat_at.isoformat()},
+                    )
+                    if opcode in (websocket.ABNF.OPCODE_TEXT, websocket.ABNF.OPCODE_BINARY):
+                        self._handle_wss_message(conn, contracts, frame.data)
         finally:
             try:
                 ws.close()

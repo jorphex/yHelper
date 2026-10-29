@@ -5,6 +5,8 @@ import os
 
 from eth_utils import keccak
 
+from .redaction import RedactingFormatter
+
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://yhelper:change_me@yhelper-postgres:5432/yhelper")
 KONG_GQL_URL = os.getenv("KONG_GQL_URL", "https://kong.yearn.fi/api/gql")
 KONG_REST_VAULTS_URL = os.getenv(
@@ -956,7 +958,10 @@ ON CONFLICT (chain_id, vault_address) DO UPDATE SET
 
 
 def configure_logging() -> None:
+    handler = logging.StreamHandler()
+    handler.setFormatter(RedactingFormatter("%(asctime)s %(levelname)s [yhelper-worker] %(message)s"))
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)s [yhelper-worker] %(message)s",
+        handlers=[handler],
+        force=True,
     )

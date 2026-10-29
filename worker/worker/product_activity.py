@@ -45,6 +45,7 @@ from .eth import (
     _topic_address,
 )
 from .notifications import _notify_styfi_activity_rows
+from .redaction import redact
 
 
 def _product_activity_block_span_for_chain(chain_id: int) -> int:
@@ -306,7 +307,7 @@ def _upsert_product_activity_sync_state(
                 "chain_id": chain_id,
                 "cursor": cursor,
                 "observed_at": observed_at,
-                "payload": Json(payload),
+                "payload": Json(redact(payload)),
             },
         )
     conn.commit()

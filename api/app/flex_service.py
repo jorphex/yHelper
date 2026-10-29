@@ -9,6 +9,7 @@ from typing import Literal
 import psycopg
 from psycopg.rows import dict_row
 
+from app.common import _public_error
 from app.config import DATABASE_URL
 
 WAD = Decimal(10**18)
@@ -357,7 +358,7 @@ def _redemption_priority_response(
     )
     source_age = _age_seconds(source_block_time if isinstance(source_block_time, datetime) else None, now)
     fetched_age = _age_seconds(fetched_at if isinstance(fetched_at, datetime) else None, now)
-    last_error = str(row["last_error"]) if row.get("last_error") else None
+    last_error = _public_error(row.get("last_error"))
     has_sample = (
         row.get("source_block_number") is not None
         and isinstance(source_block_time, datetime)
@@ -479,7 +480,7 @@ def _trove_health_response(
         now,
     )
     fetched_age = _age_seconds(fetched_at if isinstance(fetched_at, datetime) else None, now)
-    last_error = str(row["last_error"]) if row.get("last_error") else None
+    last_error = _public_error(row.get("last_error"))
     has_sample = (
         row.get("source_block_number") is not None
         and isinstance(source_block_time, datetime)

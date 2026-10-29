@@ -61,7 +61,11 @@ def run_once() -> None:
         else:
             logging.info("Skipping yLocker reward sync because YLOCKER_SYNC_ENABLED=0")
         if FLEX_SYNC_ENABLED:
-            _run_flex_sync(conn)
+            try:
+                _run_flex_sync(conn)
+            except Exception:
+                conn.rollback()
+                logging.exception("Flex sync failed; continuing worker cycle")
         else:
             logging.info("Skipping Flex market sync because FLEX_SYNC_ENABLED=0")
         _retry_failed_discord_notifications(conn)
@@ -84,7 +88,10 @@ def main() -> None:
             HARVEST_WSS_MANAGER = HarvestWssManager()
             HARVEST_WSS_MANAGER.refresh(_select_harvest_contracts(conn))
     while True:
-        run_once()
+        try:
+            run_once()
+        except Exception:
+            logging.exception("Worker cycle failed; retrying after %ss", interval)
         time.sleep(interval)
 
 

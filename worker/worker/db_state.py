@@ -6,7 +6,16 @@ from datetime import UTC, datetime
 
 import psycopg
 
-from .config import DDL, JOB_KONG_SNAPSHOT, RUNNING_STALE_SECONDS, SNAPSHOT_MIN_ACTIVE_RATIO, SNAPSHOT_MIN_DROP_COUNT
+from .config import (
+    DDL,
+    JOB_KONG_SNAPSHOT,
+    RUNNING_STALE_SECONDS,
+    SNAPSHOT_MIN_ACTIVE_RATIO,
+    SNAPSHOT_MIN_DROP_COUNT,
+)
+from .redaction import redact
+
+
 def _ensure_schema(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute(DDL)
@@ -248,7 +257,7 @@ def _complete_run(conn: psycopg.Connection, run_id: int, status: str, records: i
             SET ended_at = %s, status = %s, records = %s, error_summary = %s
             WHERE id = %s
             """,
-            (datetime.now(UTC), status, records, error_summary, run_id),
+            (datetime.now(UTC), status, records, redact(error_summary), run_id),
         )
     conn.commit()
 

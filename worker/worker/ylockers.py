@@ -27,6 +27,7 @@ from .eth import (
     _hex_to_int,
     _topic_address,
 )
+from .redaction import redact
 
 WEEK_SECONDS = 7 * 24 * 60 * 60
 
@@ -73,7 +74,7 @@ def _upsert_sync_state(
                 distributor,
                 cursor,
                 observed_at,
-                Json(payload),
+                Json(redact(payload)),
             ),
         )
 

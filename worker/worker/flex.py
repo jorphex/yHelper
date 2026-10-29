@@ -13,6 +13,7 @@ from psycopg.types.json import Json
 from .config import (
     FLEX_BACKFILL_DAYS,
     FLEX_BLOCK_SPAN,
+    FLEX_BORROW_USD_FEEDS,
     FLEX_CHAIN_ID,
     FLEX_FACTORIES,
     FLEX_IMPLEMENTATIONS,
@@ -20,7 +21,6 @@ from .config import (
     FLEX_REGISTRY_ADDRESS,
     FLEX_REPLAY_BLOCKS,
     FLEX_SNAPSHOT_INTERVAL_SEC,
-    FLEX_BORROW_USD_FEEDS,
     JOB_FLEX_SYNC,
 )
 from .db_state import _complete_run, _ensure_schema, _insert_run
@@ -50,6 +50,7 @@ from .flex_api import (
     _sync_redemption_priorities,
     _sync_trove_health,
 )
+from .redaction import redact
 
 WAD = 10**18
 FLEX_SOURCE = "ethereum_archive_rpc"
@@ -412,7 +413,7 @@ def _set_sync_cursor(
                 payload = EXCLUDED.payload,
                 updated_at = NOW()
             """,
-            (stream, FLEX_CHAIN_ID, cursor, observed_at, Json(payload)),
+            (stream, FLEX_CHAIN_ID, cursor, observed_at, Json(redact(payload))),
         )
 
 
@@ -902,7 +903,7 @@ def _reconcile(conn: psycopg.Connection, finalized_block: int) -> str:
                 verdict, market_results, source_url
             ) VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
-            (checked_at, api_block, api_time, finalized_block, verdict, Json(results), FLEX_API_MARKETS_URL),
+            (checked_at, api_block, api_time, finalized_block, verdict, Json(redact(results)), FLEX_API_MARKETS_URL),
         )
     conn.commit()
     return verdict

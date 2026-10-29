@@ -20,8 +20,14 @@ from app.config import (
     USER_VISIBLE_VERSION_PREFIX,
 )
 
-
 MARKET_VALUES = ("all", "stablecoins", "eth", "bitcoin", "other")
+
+
+def _public_error(value: object) -> str | None:
+    """Keep raw upstream exceptions in server diagnostics, not public responses."""
+    return "Upstream request failed." if value else None
+
+
 STABLE_MARKET_SYMBOLS = (
     "usdc",
     "vbusdc",

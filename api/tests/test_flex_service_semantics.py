@@ -139,7 +139,7 @@ class FlexServiceSemanticsTests(unittest.TestCase):
         freshness = response["freshness"]
         assert isinstance(freshness, dict)
         self.assertEqual(freshness["data_state"], "delayed")
-        self.assertEqual(freshness["last_error"], "upstream unavailable")
+        self.assertEqual(freshness["last_error"], "Upstream request failed.")
         self.assertIsNotNone(response["total_debt_raw"])
         self.assertEqual(len(response["points"]), 2)  # type: ignore[arg-type]
 

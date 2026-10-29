@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import psycopg
 
-from app.common import _safe_int, _to_float_or_none
+from app.common import _public_error, _safe_int, _to_float_or_none
 from app.config import (
     STYFI_CHAIN_ID,
     STYFI_INTERNAL_ACTIVITY_ACCOUNTS,
@@ -438,7 +438,7 @@ def _styfi_last_run(cur: psycopg.Cursor) -> dict[str, object] | None:
         "started_at": row["started_at"].isoformat() if row.get("started_at") else None,
         "ended_at": row["ended_at"].isoformat() if row.get("ended_at") else None,
         "records": int(row.get("records") or 0),
-        "error_summary": row.get("error_summary"),
+        "error_summary": _public_error(row.get("error_summary")) if row["status"] not in {"success", "running"} else None,
     }
 
 

@@ -8,6 +8,7 @@ import requests
 from psycopg.types.json import Json
 
 from .config import FLEX_API_URL, FLEX_CHAIN_ID
+from .redaction import redact
 
 FLEX_API_MARKETS_URL = f"{FLEX_API_URL}/v1/ui/markets"
 FLEX_API_PARAMS_URL = f"{FLEX_API_URL}/v1/ui/params"
@@ -181,7 +182,7 @@ def _record_redemption_priority_failure(
                 attempted_at = EXCLUDED.attempted_at,
                 last_error = EXCLUDED.last_error
             """,
-            (FLEX_CHAIN_ID, market_address, source_url, attempted_at, error[:500]),
+            (FLEX_CHAIN_ID, market_address, source_url, attempted_at, redact(error)[:500]),
         )
 
 
@@ -449,7 +450,7 @@ def _record_trove_health_failure(
                     str(market["market_address"]).lower(),
                     source_url,
                     attempted_at,
-                    error[:500],
+                    redact(error)[:500],
                 )
                 for market in markets
             ],

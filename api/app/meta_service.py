@@ -7,6 +7,7 @@ from psycopg.rows import dict_row
 
 from app.common import (
     _kong_source_freshness,
+    _public_error,
     _seconds_since,
     _to_float_or_none,
     _user_visible_filter_sql,
@@ -287,7 +288,10 @@ def _freshness_snapshot(
                     else None,
                     "last_notified_at": row.get("last_notified_at").isoformat() if row.get("last_notified_at") else None,
                     "notify_channels": row.get("notify_channels") or [],
-                    "last_notify_result": row.get("last_notify_result"),
+                    "last_notify_result": {
+                        **row["last_notify_result"],
+                        "errors": [_public_error(error) for error in row["last_notify_result"].get("errors", [])],
+                    } if isinstance(row.get("last_notify_result"), dict) else None,
                 }
             result["alerts"] = alerts
         result["kong_source"] = _kong_source_freshness(cur)

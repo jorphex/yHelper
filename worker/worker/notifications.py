@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from decimal import Decimal, InvalidOperation
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 
 import psycopg
 import requests
@@ -38,6 +38,7 @@ from .eth import (
     _to_int_or_none,
     _yearn_vault_url,
 )
+from .redaction import redact
 
 
 def _discord_timestamp(dt: datetime) -> str:
@@ -194,7 +195,7 @@ def _upsert_notification_delivery(
                 "log_index": log_index,
                 "destination_key": destination_key,
                 "status": status,
-                "error": error,
+                "error": redact(error),
                 "payload": Json(payload),
             },
         )
@@ -704,7 +705,7 @@ def _upsert_alert_state(
                 "last_recovered_at": last_recovered_at,
                 "last_notified_at": last_notified_at,
                 "notify_channels": notify_channels,
-                "last_notify_result": Json(notify_result),
+                "last_notify_result": Json(redact(notify_result)),
             },
         )
     conn.commit()
