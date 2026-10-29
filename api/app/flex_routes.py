@@ -49,13 +49,13 @@ def _address(value: str) -> str:
     response_model=FlexPerformanceResponse,
     summary="Get flow-adjusted borrower and lender performance",
 )
-def flex_performance(
+async def flex_performance(
     response: Response,
     address: str | None = None,
     days: HistoryDays = HistoryDays.thirty,
 ) -> dict[str, object]:
     response.headers["Cache-Control"] = "no-store"
-    return performance_response(_address(address) if address is not None else None, int(days))
+    return await performance_response(_address(address) if address is not None else None, int(days))
 
 
 @router.get(

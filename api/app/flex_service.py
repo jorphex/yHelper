@@ -10,7 +10,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from app.common import _public_error
-from app.config import DATABASE_URL
+from app.db import connect
 
 WAD = Decimal(10**18)
 FLEX_CHAIN_ID = 1
@@ -20,7 +20,7 @@ RATE_SCALE_FALLBACK = Decimal(10**6)
 
 @contextmanager
 def _read_cursor() -> Iterator[psycopg.Cursor]:
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn, conn.cursor() as cur:
+    with connect(row_factory=dict_row) as conn, conn.cursor() as cur:
         yield cur
 
 

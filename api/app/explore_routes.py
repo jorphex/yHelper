@@ -23,7 +23,8 @@ from app.common import (
     _resolve_universe_gate,
     _user_visible_filter_sql,
 )
-from app.config import APY_MAX, APY_MIN, DATABASE_URL
+from app.config import APY_MAX, APY_MIN
+from app.db import connect
 from app.models import ChangesResponse, CompositionResponse, DiscoverResponse
 
 router = APIRouter()
@@ -92,7 +93,7 @@ def discover(
         selected_where += " AND d.chain_id = %(chain_id)s"
         params["chain_id"] = chain_id
 
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+    with connect(row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 f"""
@@ -241,7 +242,7 @@ def composition(
         )
         return cur.fetchall()
 
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+    with connect(row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 filtered_cte + " SELECT COUNT(*) AS vaults, SUM(tvl_usd) AS total_tvl_usd FROM filtered",
@@ -311,7 +312,7 @@ def changes(
     base_cte = _changes_base_cte(max_vaults=max_vaults, filter_market=True)
     comparable = "n.apy_window_raw IS NOT NULL AND n.apy_prev_window_raw IS NOT NULL"
 
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+    with connect(row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 base_cte

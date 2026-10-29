@@ -1,8 +1,9 @@
 "use client";
 
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient, type QueryFunctionContext } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { apiUrl } from "../lib/api";
+import { fetchJson } from "../lib/fetch-json";
 
 export type FlexStatus = "active" | "deprecated" | "unendorsed";
 
@@ -198,12 +199,6 @@ type FlexActivityResponse = {
   rows: FlexActivityRow[];
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Flex request failed (${response.status})`);
-  return response.json() as Promise<T>;
-}
-
 export type FlexPerformanceRow = {
   market_address: string;
   market_label: string;
@@ -238,7 +233,7 @@ export const FLEX_PERIODS = [7, 30, 90] as const;
 function performanceOptions(address: string | null, days: 7 | 30 | 90) {
   return {
     queryKey: ["flex-performance", address, days],
-    queryFn: () => fetchJson<FlexPerformanceResponse>(apiUrl("/flex/performance", { address, days })),
+    queryFn: ({ signal }: QueryFunctionContext) => fetchJson<FlexPerformanceResponse>(apiUrl("/flex/performance", { address, days }), { signal, timeoutMs: 75_000 }),
     staleTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -261,7 +256,10 @@ export function useFlexPerformance(address: string | null, days: 7 | 30 | 90, en
         if (period !== days) await client.prefetchQuery(performanceOptions(address, period));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      void client.cancelQueries({ queryKey: ["flex-performance", address], type: "inactive" });
+    };
   }, [client, address, days, enabled, query.isSuccess, query.isPlaceholderData]);
   return query;
 }
@@ -274,7 +272,7 @@ export function useFlexMarketPreload(markets: FlexMarket[]) {
     for (const address of addresses.split(",")) {
       for (const days of FLEX_PERIODS) void client.prefetchQuery({
         queryKey: ["flex-history", address, days],
-        queryFn: () => fetchJson<FlexHistoryResponse>(apiUrl(`/flex/markets/${address}/history`, { days, interval: "day" })),
+        queryFn: ({ signal }) => fetchJson<FlexHistoryResponse>(apiUrl(`/flex/markets/${address}/history`, { days, interval: "day" }), { signal }),
         staleTime: 60_000,
       });
       for (const [key, path] of [
@@ -283,17 +281,22 @@ export function useFlexMarketPreload(markets: FlexMarket[]) {
         ["flex-trove-health", "/trove-health"],
       ]) void client.prefetchQuery({
         queryKey: [key, address],
-        queryFn: () => fetchJson(apiUrl(`/flex/markets/${address}${path}`)),
+        queryFn: ({ signal }) => fetchJson(apiUrl(`/flex/markets/${address}${path}`), { signal }),
         staleTime: 60_000,
       });
     }
+    return () => {
+      const targets = new Set(addresses.split(","));
+      const keys = new Set(["flex-history", "flex-market-detail", "flex-redemption-priority", "flex-trove-health"]);
+      void client.cancelQueries({ predicate: query => !query.isActive() && typeof query.queryKey[0] === "string" && keys.has(query.queryKey[0]) && typeof query.queryKey[1] === "string" && targets.has(query.queryKey[1]) });
+    };
   }, [client, addresses]);
 }
 
 export function useFlexMarkets() {
   return useQuery({
     queryKey: ["flex-markets", "all"],
-    queryFn: () => fetchJson<FlexMarketsResponse>(apiUrl("/flex/markets", { status: "all" })),
+    queryFn: ({ signal }) => fetchJson<FlexMarketsResponse>(apiUrl("/flex/markets", { status: "all" }), { signal }),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
   });
@@ -302,10 +305,10 @@ export function useFlexMarkets() {
 export function useFlexHistory(marketAddress: string | null, days: 7 | 30 | 90) {
   return useQuery({
     queryKey: ["flex-history", marketAddress, days],
-    queryFn: () => fetchJson<FlexHistoryResponse>(apiUrl(`/flex/markets/${marketAddress}/history`, {
+    queryFn: ({ signal }) => fetchJson<FlexHistoryResponse>(apiUrl(`/flex/markets/${marketAddress}/history`, {
       days,
       interval: "day",
-    })),
+    }), { signal }),
     enabled: Boolean(marketAddress),
     staleTime: 60_000,
     placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === marketAddress ? previous : undefined,
@@ -315,7 +318,7 @@ export function useFlexHistory(marketAddress: string | null, days: 7 | 30 | 90) 
 export function useFlexMarketDetail(marketAddress: string | null) {
   return useQuery({
     queryKey: ["flex-market-detail", marketAddress],
-    queryFn: () => fetchJson<FlexMarketDetailResponse>(apiUrl(`/flex/markets/${marketAddress}`)),
+    queryFn: ({ signal }) => fetchJson<FlexMarketDetailResponse>(apiUrl(`/flex/markets/${marketAddress}`), { signal }),
     enabled: Boolean(marketAddress),
     staleTime: 60_000,
   });
@@ -324,7 +327,7 @@ export function useFlexMarketDetail(marketAddress: string | null) {
 export function useFlexRedemptionPriority(marketAddress: string | null) {
   return useQuery({
     queryKey: ["flex-redemption-priority", marketAddress],
-    queryFn: () => fetchJson<FlexRedemptionPriorityResponse>(apiUrl(`/flex/markets/${marketAddress}/redemption-priority`)),
+    queryFn: ({ signal }) => fetchJson<FlexRedemptionPriorityResponse>(apiUrl(`/flex/markets/${marketAddress}/redemption-priority`), { signal }),
     enabled: Boolean(marketAddress),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
@@ -334,7 +337,7 @@ export function useFlexRedemptionPriority(marketAddress: string | null) {
 export function useFlexTroveHealth(marketAddress: string | null) {
   return useQuery({
     queryKey: ["flex-trove-health", marketAddress],
-    queryFn: () => fetchJson<FlexTroveHealthResponse>(apiUrl(`/flex/markets/${marketAddress}/trove-health`)),
+    queryFn: ({ signal }) => fetchJson<FlexTroveHealthResponse>(apiUrl(`/flex/markets/${marketAddress}/trove-health`), { signal }),
     enabled: Boolean(marketAddress),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
@@ -344,10 +347,10 @@ export function useFlexTroveHealth(marketAddress: string | null) {
 export function useFlexActivity() {
   return useInfiniteQuery({
     queryKey: ["flex-activity"],
-    queryFn: ({ pageParam }) => fetchJson<FlexActivityResponse>(apiUrl("/flex/activity", {
+    queryFn: ({ pageParam, signal }) => fetchJson<FlexActivityResponse>(apiUrl("/flex/activity", {
       limit: 12,
       cursor: pageParam || undefined,
-    })),
+    }), { signal }),
     initialPageParam: "",
     getNextPageParam: (lastPage) => lastPage.pagination.next_cursor ?? undefined,
     staleTime: 60_000,

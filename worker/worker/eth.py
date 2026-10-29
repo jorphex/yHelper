@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import time
 from functools import lru_cache
 from urllib.parse import urlparse
 
@@ -14,15 +13,14 @@ from .config import (
     CHAIN_LABELS,
     CHAIN_RPC_URLS,
     CHAIN_WSS_URLS,
-    DATABASE_URL,
     ETH_CALL_TIMEOUT_SEC,
-    ETH_RPC_MAX_ATTEMPTS,
-    ETH_RPC_RETRY_SLEEP_SEC,
     ETH_RPC_URL,
     ETH_TX_BATCH_SIZE,
     EXPLORER_BASE_URLS,
     KONG_GQL_URL,
 )
+from .db import connect
+from .http import is_transient, request
 
 
 def _to_float(value: object) -> float | None:
@@ -249,12 +247,12 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
 
 
 def _connect() -> psycopg.Connection:
-    return psycopg.connect(DATABASE_URL)
+    return connect()
 
 
 def _post_kong_gql_json(query: str, variables: dict[str, object] | None = None) -> dict[str, object]:
-    response = requests.post(
-        KONG_GQL_URL,
+    response = request(
+        "POST", KONG_GQL_URL,
         json={"query": query, "variables": variables or {}},
         timeout=30,
         headers={"Content-Type": "application/json"},
@@ -299,40 +297,18 @@ def _wss_url_for_chain(chain_id: int) -> str | None:
 
 
 def _eth_rpc_to_url(rpc_url: str, method: str, params: list[object]) -> object:
-    last_error: Exception | None = None
-    for attempt in range(1, ETH_RPC_MAX_ATTEMPTS + 1):
-        try:
-            response = requests.post(
-                rpc_url,
-                json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-                timeout=ETH_CALL_TIMEOUT_SEC,
-            )
-            if response.status_code >= 500 or response.status_code == 429:
-                response.raise_for_status()
-            if response.status_code >= 400:
-                response.raise_for_status()
-            payload = response.json()
-            if payload.get("error"):
-                raise ValueError(f"Ethereum RPC error: {payload['error']}")
-            return payload.get("result")
-        except (requests.RequestException, ValueError) as exc:
-            last_error = exc
-            is_retryable = isinstance(exc, requests.RequestException) and (
-                getattr(exc.response, "status_code", None) in {429}
-                or getattr(exc.response, "status_code", 0) >= 500
-                or exc.response is None
-            )
-            if attempt >= ETH_RPC_MAX_ATTEMPTS or not is_retryable:
-                raise
-            time.sleep(ETH_RPC_RETRY_SLEEP_SEC * attempt)
-    if last_error is not None:
-        raise last_error
-    raise RuntimeError(f"Ethereum RPC call failed without error for method {method}")
+    response = request(
+        "POST", rpc_url, timeout=ETH_CALL_TIMEOUT_SEC, rpc=True,
+        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+    )
+    payload = response.json()
+    if not isinstance(payload, dict) or payload.get("id") != 1 or "result" not in payload:
+        raise ValueError("Malformed Ethereum RPC response")
+    return payload["result"]
 
 
 def _eth_rpc_batch_to_url(
-    rpc_url: str,
-    calls: list[tuple[str, list[object]]],
+    rpc_url: str, calls: list[tuple[str, list[object]]],
 ) -> list[object]:
     if not calls:
         return []
@@ -340,40 +316,19 @@ def _eth_rpc_batch_to_url(
         {"jsonrpc": "2.0", "id": index, "method": method, "params": params}
         for index, (method, params) in enumerate(calls, start=1)
     ]
-    last_error: Exception | None = None
-    for attempt in range(1, ETH_RPC_MAX_ATTEMPTS + 1):
-        try:
-            response = requests.post(rpc_url, json=payload, timeout=ETH_CALL_TIMEOUT_SEC)
-            if response.status_code >= 500 or response.status_code == 429:
-                response.raise_for_status()
-            if response.status_code >= 400:
-                response.raise_for_status()
-            body = response.json()
-            if not isinstance(body, list):
-                raise TypeError(f"Unexpected Ethereum RPC batch response: {body!r}")
-            rows = {int(row.get("id") or 0): row for row in body if isinstance(row, dict)}
-            results: list[object] = []
-            for index in range(1, len(calls) + 1):
-                row = rows.get(index)
-                if row is None:
-                    raise ValueError(f"Missing Ethereum RPC batch response id={index}")
-                if row.get("error"):
-                    raise ValueError(f"Ethereum RPC batch error id={index}: {row['error']}")
-                results.append(row.get("result"))
-            return results
-        except (requests.RequestException, ValueError) as exc:
-            last_error = exc
-            is_retryable = isinstance(exc, requests.RequestException) and (
-                getattr(exc.response, "status_code", None) in {429}
-                or getattr(exc.response, "status_code", 0) >= 500
-                or exc.response is None
-            )
-            if attempt >= ETH_RPC_MAX_ATTEMPTS or not is_retryable:
-                raise
-            time.sleep(ETH_RPC_RETRY_SLEEP_SEC * attempt)
-    if last_error is not None:
-        raise last_error
-    raise RuntimeError("Ethereum RPC batch failed without error")
+    body = request("POST", rpc_url, json=payload, timeout=ETH_CALL_TIMEOUT_SEC, rpc=True).json()
+    if not isinstance(body, list):
+        raise ValueError("Unexpected Ethereum RPC batch response")
+    rows = {row.get("id"): row for row in body if isinstance(row, dict)}
+    if len(rows) != len(calls) or len(body) != len(calls):
+        raise ValueError("Incomplete Ethereum RPC batch response")
+    results = []
+    for index in range(1, len(calls) + 1):
+        row = rows.get(index)
+        if row is None or "result" not in row:
+            raise ValueError(f"Missing Ethereum RPC batch response id={index}")
+        results.append(row["result"])
+    return results
 
 
 def _eth_rpc(method: str, params: list[object]) -> object:
@@ -587,46 +542,28 @@ def _eth_get_transactions_for_chain(chain_id: int, tx_hashes: list[str]) -> dict
             {"jsonrpc": "2.0", "id": idx, "method": "eth_getTransactionByHash", "params": [tx_hash]}
             for idx, tx_hash in enumerate(batch_tx_hashes, start=1)
         ]
-        last_error: Exception | None = None
-        payload: object | None = None
         try:
-            for attempt in range(1, ETH_RPC_MAX_ATTEMPTS + 1):
-                try:
-                    response = requests.post(rpc_url, json=batch_payload, timeout=ETH_CALL_TIMEOUT_SEC)
-                    if response.status_code >= 500 or response.status_code == 429:
-                        response.raise_for_status()
-                    if response.status_code >= 400:
-                        response.raise_for_status()
-                    payload = response.json()
-                    break
-                except requests.RequestException as exc:
-                    last_error = exc
-                    is_retryable = (
-                        getattr(exc.response, "status_code", None) in {429}
-                        or getattr(exc.response, "status_code", 0) >= 500
-                        or exc.response is None
-                    )
-                    if attempt >= ETH_RPC_MAX_ATTEMPTS or not is_retryable:
-                        raise
-                    time.sleep(ETH_RPC_RETRY_SLEEP_SEC * attempt)
-            if payload is None:
-                if last_error is not None:
-                    raise last_error
-                raise RuntimeError(f"Missing batched eth_getTransactionByHash payload for chain {chain_id}")
+            payload = request(
+                "POST", rpc_url, json=batch_payload, timeout=ETH_CALL_TIMEOUT_SEC, rpc=True,
+            ).json()
             if not isinstance(payload, list):
-                raise ValueError(f"Unexpected batched eth_getTransactionByHash result for chain {chain_id}: {payload!r}")
+                raise ValueError("Unexpected transaction batch response")
             by_id = {idx: tx_hash for idx, tx_hash in enumerate(batch_tx_hashes, start=1)}
             for row in payload:
                 if not isinstance(row, dict):
                     continue
-                if row.get("error"):
-                    raise ValueError(f"Ethereum RPC batch error on chain {chain_id}: {row['error']}")
-                tx_hash = by_id.get(int(row.get("id") or 0))
+                tx_hash = by_id.get(row.get("id"))
                 result = row.get("result")
                 if tx_hash and isinstance(result, dict):
                     transactions[tx_hash] = result
-        except (requests.RequestException, ValueError):
+            if any(tx_hash not in transactions for tx_hash in batch_tx_hashes):
+                raise ValueError("Incomplete transaction batch response")
+        except (requests.RequestException, ValueError) as exc:
+            if is_transient(exc):
+                raise
             for tx_hash in batch_tx_hashes:
+                if tx_hash in transactions:
+                    continue
                 result = _eth_get_transaction_for_chain(chain_id, tx_hash)
                 if isinstance(result, dict):
                     transactions[tx_hash] = result

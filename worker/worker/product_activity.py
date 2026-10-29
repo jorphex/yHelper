@@ -44,6 +44,7 @@ from .eth import (
     _to_int_or_none,
     _topic_address,
 )
+from .http import is_log_range_error
 from .notifications import _notify_styfi_activity_rows
 from .redaction import redact
 
@@ -516,7 +517,8 @@ def _run_product_activity(conn: psycopg.Connection) -> tuple[int, int]:
                                         if chain_id == STYFI_CHAIN_ID and cursor is not None:
                                             _notify_styfi_activity_rows(conn, claim_rows)
                     except Exception as window_exc:
-                        if block_span <= 1:
+                        conn.rollback()
+                        if block_span <= 1 or not is_log_range_error(window_exc):
                             raise
                         next_block_span = max(1, block_span // 2)
                         logging.warning(
@@ -553,6 +555,7 @@ def _run_product_activity(conn: psycopg.Connection) -> tuple[int, int]:
                 )
                 inserted_total += chain_inserted
             except Exception as chain_exc:
+                conn.rollback()
                 errors.append(f"{chain_id}:{chain_exc}")
                 _upsert_product_activity_sync_state(
                     conn,

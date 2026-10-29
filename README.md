@@ -114,6 +114,18 @@ uv run --no-project --python 3.12 --with-requirements worker/requirements.txt --
 
 Results and service logs are saved under ignored `reports/worker-resilience-fix/`. These checks cover repeated upstream failures, SQL timeout recovery, concurrent and stale heartbeats, reconnects after real closes, RPC/Telegram credential redaction and public responses containing legacy errors.
 
+Networking recovery checks use the same dependencies:
+
+```bash
+uv run --no-project --python 3.12 --with-requirements worker/requirements.txt --with-requirements api/requirements.txt --with httpx python worker/tests/e2e_networking.py
+```
+
+Evidence is saved under `reports/network-resilience-fix/`. These checks cover contiguous harvest catchup, SQL failure recovery and deadlines, subscription acknowledgement deadlines, throttling and API responsiveness under duplicate slow archive requests. Browser cancellation/deadline checks are in `web/tests/network-resilience.spec.ts` and produce screenshots and traces.
+
+Application DB connections default to a 5-second connection timeout. API/worker statement budgets are 15/60 seconds, lock budgets 2/5 seconds, and idle transaction budgets 90/300 seconds. Compose exposes `DB_CONNECT_TIMEOUT_SEC` and separate `API_DB_*` / `WORKER_DB_*` settings for `STATEMENT_TIMEOUT_MS`, `LOCK_TIMEOUT_MS` and `IDLE_TRANSACTION_TIMEOUT_MS`. Direct application processes use the corresponding `DB_*` names. Values must be positive; existing DSN search-path options are preserved.
+
+Read-only worker HTTP/RPC calls use at most three attempts within a 65-second retry budget, honor server retry delays up to that budget, and use jitter. Exhausted transport/throttling errors do not trigger smaller log-window retries or transaction fan-out. Notification delivery keeps its existing persisted retry policy. Harvest catchup resumes from its contiguous cursor with a bounded overlap and checkpoints completed windows; WebSocket observations never advance that cursor. Archive calculations use two dedicated threads with asynchronous shared-result waits. Browser data requests have a 25-second deadline (75 seconds for archive performance), and leaving a screen cancels inactive work.
+
 Frontend checks:
 
 ```bash

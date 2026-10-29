@@ -11,12 +11,11 @@ from app.common import _chain_label, _to_float_or_none
 from app.config import (
     APY_MAX,
     APY_MIN,
-    DATABASE_URL,
     UNIVERSE_CORE_MAX_VAULTS,
     UNIVERSE_CORE_MIN_POINTS,
     UNIVERSE_CORE_MIN_TVL_USD,
 )
-
+from app.db import connect
 
 PULSE_DELTA_THRESHOLD = 0.0015
 PULSE_FRESHNESS_SECONDS = 48 * 3600
@@ -183,7 +182,7 @@ def _build_overview_pulse(snapshot: dict[str, object]) -> dict[str, object]:
 
 def _overview_pulse_response() -> JSONResponse:
     try:
-        with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with connect(row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 payload = _build_overview_pulse(_overview_pulse_snapshot(cur))
     except Exception:

@@ -8,6 +8,7 @@ import requests
 from psycopg.types.json import Json
 
 from .config import FLEX_API_URL, FLEX_CHAIN_ID
+from .http import request
 from .redaction import redact
 
 FLEX_API_MARKETS_URL = f"{FLEX_API_URL}/v1/ui/markets"
@@ -21,7 +22,7 @@ NEAR_MAX_LTV_WAD = WAD // 100
 
 
 def _api_payload(path: str, params: dict[str, object]) -> dict[str, object]:
-    response = requests.get(path, params=params, timeout=20)
+    response = request("GET", path, params=params, timeout=20)
     response.raise_for_status()
     payload = response.json()
     if not isinstance(payload, dict):

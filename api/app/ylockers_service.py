@@ -6,7 +6,8 @@ from decimal import Decimal
 import psycopg
 from psycopg.rows import dict_row
 
-from app.config import DATABASE_URL, YLOCKER_PRODUCTS, YLOCKER_REWARD_TOKEN
+from app.config import YLOCKER_PRODUCTS, YLOCKER_REWARD_TOKEN
+from app.db import connect
 
 WEEK_SECONDS = 7 * 24 * 60 * 60
 FRESHNESS_SECONDS = 45 * 60
@@ -309,7 +310,7 @@ def ylocker_rewards_response(
     include_events: bool,
     now: datetime | None = None,
 ) -> dict[str, object]:
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+    with connect(row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             return _build_response(
                 cur,

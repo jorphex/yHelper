@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
+import { fetchJson } from "../lib/fetch-json";
 
 export type YlockerProduct = "ycrv" | "yyb";
 
@@ -66,20 +67,18 @@ export type YlockerRewardsResponse = {
   reporting_weeks: YlockerReportingWeek[];
 };
 
-export async function fetchYlockerRewards(): Promise<YlockerRewardsResponse> {
-  const response = await fetch(apiUrl("/ylockers/rewards", {
+export async function fetchYlockerRewards(signal?: AbortSignal): Promise<YlockerRewardsResponse> {
+  return fetchJson<YlockerRewardsResponse>(apiUrl("/ylockers/rewards", {
     product: "all",
     limit: 12,
     include_events: true,
-  }), { cache: "no-store" });
-  if (!response.ok) throw new Error(`Could not load rewards (${response.status})`);
-  return response.json() as Promise<YlockerRewardsResponse>;
+  }), { signal });
 }
 
 export function useYlockerRewards() {
   return useQuery({
     queryKey: ["ylocker-rewards", "all", 12, true],
-    queryFn: fetchYlockerRewards,
+    queryFn: ({ signal }) => fetchYlockerRewards(signal),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
   });

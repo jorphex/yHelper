@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import os
 
-import psycopg
-
 
 def _parse_origins(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
@@ -120,7 +118,9 @@ _validate_data_policy_config()
 
 
 def _ensure_schema_columns() -> None:
-    with psycopg.connect(DATABASE_URL) as conn:
+    from app.db import connect
+
+    with connect() as conn:
         with conn.cursor() as cur:
             cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS token_decimals INTEGER")
             cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS origin TEXT")

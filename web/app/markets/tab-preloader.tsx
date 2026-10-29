@@ -21,26 +21,32 @@ export function MarketsTabPreloader() {
   const chain = searchParams.get("chain");
 
   useEffect(() => {
+    const keys: unknown[][] = [];
     for (const window of WINDOWS) {
       const request = { universe, market, minTvl, minPoints, window, staleThreshold: "auto" as const };
+      const queryKey = ["changes", request];
+      keys.push(queryKey);
       queryClient.prefetchQuery({
-        queryKey: ["changes", request],
-        queryFn: () => fetchChangesData(request),
+        queryKey,
+        queryFn: ({ signal }) => fetchChangesData(request, signal),
         staleTime: 30_000,
       });
     }
     const discoverRequest = { universe, market, minTvl, minPoints, limit: 250, sort: "tvl", dir: "desc", chain, allRows: true };
+    keys.push(["discover", discoverRequest]);
     queryClient.prefetchQuery({
       queryKey: ["discover", discoverRequest],
-      queryFn: () => fetchDiscoverData(discoverRequest),
+      queryFn: ({ signal }) => fetchDiscoverData(discoverRequest, signal),
       staleTime: 30_000,
     });
     const compositionRequest = { universe, market, minTvl };
+    keys.push(["composition", compositionRequest]);
     queryClient.prefetchQuery({
       queryKey: ["composition", compositionRequest],
-      queryFn: () => fetchCompositionData(compositionRequest),
+      queryFn: ({ signal }) => fetchCompositionData(compositionRequest, signal),
       staleTime: 30_000,
     });
+    return () => { for (const queryKey of keys) void queryClient.cancelQueries({ queryKey, exact: true, type: "inactive" }); };
   }, [queryClient, universe, market, minTvl, minPoints, chain]);
 
   return null;

@@ -2,17 +2,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-import psycopg
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
 from app.config import (
-    DATABASE_URL,
     STYFI_CHAIN_ID,
     STYFI_EPOCH_LOOKBACK,
     STYFI_RETENTION_DAYS,
     STYFI_SNAPSHOT_RETENTION_DAYS,
 )
+from app.db import connect
 from app.models import ReportsResponse, StyfiResponse
 from app.product_service import (
     _recent_reports,
@@ -41,7 +40,7 @@ def _reports_response(
     meaningful_only: bool,
 ) -> dict[str, object]:
     normalized_vault = vault_address.lower() if vault_address else None
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+    with connect(row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             trailing_24h = _report_trailing_24h(
                 cur, chain_id=chain_id, vault_address=normalized_vault, meaningful_only=meaningful_only
@@ -94,7 +93,7 @@ def styfi(
     epoch_limit: int = Query(default=STYFI_EPOCH_LOOKBACK, ge=3, le=max(STYFI_EPOCH_LOOKBACK, 24)),
     include_history: bool = Query(default=True),
 ) -> dict[str, object]:
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+    with connect(row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             reward_token = _styfi_reward_token(cur)
             reward_scale = float(10 ** int(reward_token.get("decimals") or 0))

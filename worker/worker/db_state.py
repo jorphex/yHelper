@@ -5,6 +5,7 @@ import math
 from datetime import UTC, datetime
 
 import psycopg
+from psycopg.pq import TransactionStatus
 
 from .config import (
     DDL,
@@ -250,6 +251,8 @@ def _mark_boot_orphaned_runs(conn: psycopg.Connection) -> int:
 
 
 def _complete_run(conn: psycopg.Connection, run_id: int, status: str, records: int, error_summary: str | None = None) -> None:
+    if status != "success" and conn.info.transaction_status == TransactionStatus.INERROR:
+        conn.rollback()
     with conn.cursor() as cur:
         cur.execute(
             """

@@ -5,7 +5,6 @@ import logging
 from datetime import UTC, datetime
 
 import psycopg
-import requests
 from psycopg.types.json import Json
 
 from .config import (
@@ -20,6 +19,7 @@ from .config import (
 )
 from .db_state import _complete_run, _insert_run
 from .eth import _eth_call_address, _eth_call_string, _eth_call_uint
+from .http import request
 from .styfi_apr import fetch_styfi_apr
 
 
@@ -81,7 +81,8 @@ def _styfi_component_reward(epoch: int, component_address: str) -> int:
 def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
     if not STYFI_SITE_GLOBAL_DATA_URL:
         return None
-    response = requests.get(
+    response = request(
+        "GET",
         STYFI_SITE_GLOBAL_DATA_URL,
         headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
         timeout=ETH_CALL_TIMEOUT_SEC,

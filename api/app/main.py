@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
+import psycopg
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.activity_routes import router as activity_router
 from app.assets_routes import router as assets_router
@@ -22,6 +25,17 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="yHelper API", version="1.0.0", lifespan=lifespan)
+
+
+@app.exception_handler(psycopg.OperationalError)
+async def database_unavailable(_request, exc):
+    logging.warning("Database request unavailable (%s)", type(exc).__name__)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Data is temporarily unavailable."},
+        headers={"Retry-After": "5", "Cache-Control": "no-store"},
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

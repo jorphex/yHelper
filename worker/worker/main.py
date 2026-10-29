@@ -32,6 +32,15 @@ from .ylockers import _run_ylocker_rewards
 HARVEST_WSS_MANAGER: HarvestWssManager | None = None
 
 
+def _run_job(conn, name, function):
+    try:
+        return function(conn)
+    except Exception:
+        conn.rollback()
+        logging.exception("%s failed; continuing worker cycle", name)
+        return None
+
+
 def run_once() -> None:
     global HARVEST_WSS_MANAGER
     logging.info("Tick at %s", datetime.now(UTC).isoformat())
@@ -41,36 +50,33 @@ def run_once() -> None:
         abandoned = _mark_stale_running_runs(conn)
         if abandoned > 0:
             logging.warning("Marked %s stale running ingestion rows as abandoned", abandoned)
-        _, stored = _run_kong_snapshot_ingestion(conn)
-        _run_protocol_tvl_ingestion(conn)
+        snapshot = _run_job(conn, "Kong snapshot", _run_kong_snapshot_ingestion)
+        stored = snapshot[1] if snapshot else 0
+        _run_job(conn, "Protocol TVL", _run_protocol_tvl_ingestion)
         if stored > 0:
-            _run_kong_ingestion(conn)
+            _run_job(conn, "Kong PPS", _run_kong_ingestion)
         else:
             logging.warning("Skipping Kong PPS ingestion because Kong snapshot stored 0 records")
         if STYFI_SYNC_ENABLED:
-            _run_styfi_snapshot(conn)
+            _run_job(conn, "stYFI snapshot", _run_styfi_snapshot)
         else:
             logging.info("Skipping stYFI snapshot because STYFI_SYNC_ENABLED=0")
-        _run_product_activity(conn)
-        _backfill_styfi_activity_amounts(conn)
+        _run_job(conn, "Product activity", _run_product_activity)
+        _run_job(conn, "stYFI activity backfill", _backfill_styfi_activity_amounts)
         if HARVEST_WSS_MANAGER is not None:
-            HARVEST_WSS_MANAGER.refresh(_select_harvest_contracts(conn))
-        _run_vault_harvests(conn)
+            _run_job(conn, "Harvest subscriptions", lambda connection: HARVEST_WSS_MANAGER.refresh(_select_harvest_contracts(connection)))
+        _run_job(conn, "Vault harvests", _run_vault_harvests)
         if YLOCKER_SYNC_ENABLED:
-            _run_ylocker_rewards(conn)
+            _run_job(conn, "yLocker rewards", _run_ylocker_rewards)
         else:
             logging.info("Skipping yLocker reward sync because YLOCKER_SYNC_ENABLED=0")
         if FLEX_SYNC_ENABLED:
-            try:
-                _run_flex_sync(conn)
-            except Exception:
-                conn.rollback()
-                logging.exception("Flex sync failed; continuing worker cycle")
+            _run_job(conn, "Flex sync", _run_flex_sync)
         else:
             logging.info("Skipping Flex market sync because FLEX_SYNC_ENABLED=0")
-        _retry_failed_discord_notifications(conn)
-        _evaluate_alerts(conn)
-        _maybe_cleanup_old_data(conn)
+        _run_job(conn, "Notification retries", _retry_failed_discord_notifications)
+        _run_job(conn, "Alerts", _evaluate_alerts)
+        _run_job(conn, "Cleanup", _maybe_cleanup_old_data)
 
 
 def main() -> None:

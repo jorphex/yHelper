@@ -74,7 +74,7 @@ class _Connection:
 class DiscoverContractTests(unittest.TestCase):
     def test_exact_token_filter_normalizes_whitespace_and_case(self) -> None:
         cursor = _Cursor()
-        with patch("app.explore_routes.psycopg.connect", return_value=_Connection(cursor)):
+        with patch("app.explore_routes.connect", return_value=_Connection(cursor)):
             payload = discover(
                 token_symbol=" usdc ",
                 limit=1,

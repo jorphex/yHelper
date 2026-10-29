@@ -3,17 +3,22 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal
 
-import psycopg
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
 from app.accounting_service import _protocol_context_snapshot
-from app.config import DATABASE_URL, DEFAULT_MIN_POINTS, DEFAULT_MIN_TVL_USD
+from app.config import DEFAULT_MIN_POINTS, DEFAULT_MIN_TVL_USD
+from app.db import connect
 from app.meta_service import (
     _coverage_snapshot,
     _freshness_snapshot,
 )
-from app.models import CoverageResponse, FreshnessResponse, HealthResponse, ProtocolContextResponse
+from app.models import (
+    CoverageResponse,
+    FreshnessResponse,
+    HealthResponse,
+    ProtocolContextResponse,
+)
 
 router = APIRouter()
 
@@ -35,7 +40,7 @@ def meta_freshness(
     min_tvl_usd: float = Query(default=DEFAULT_MIN_TVL_USD, ge=0.0),
 ) -> dict[str, object]:
     threshold_seconds = {"24h": 24 * 3600, "7d": 7 * 24 * 3600, "30d": 30 * 24 * 3600}[threshold]
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect() as conn:
         snapshot = _freshness_snapshot(
             conn,
             stale_threshold_seconds=threshold_seconds,
@@ -52,7 +57,7 @@ def meta_coverage(
     min_points: int = Query(default=DEFAULT_MIN_POINTS, ge=0),
     split_limit: int = Query(default=8, ge=1, le=25),
 ) -> dict[str, object]:
-    with psycopg.connect(DATABASE_URL) as conn:
+    with connect() as conn:
         return _coverage_snapshot(conn, min_tvl_usd=min_tvl_usd, min_points=min_points, split_limit=split_limit)
 
 
@@ -67,7 +72,7 @@ def meta_coverage(
 )
 def meta_protocol_context() -> dict[str, object]:
     try:
-        with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        with connect(row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 return _protocol_context_snapshot(cur)
     except Exception:

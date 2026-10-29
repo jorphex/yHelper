@@ -8,7 +8,6 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import psycopg
-import requests
 from psycopg.types.json import Json
 
 from .config import (
@@ -18,6 +17,7 @@ from .config import (
     KONG_TIMEOUT_SEC,
 )
 from .db_state import _complete_run, _insert_run
+from .http import request
 
 YEARN_PARENT_PROTOCOL = "parent#yearn"
 REQUIRED_YEARN_COMPONENTS = frozenset({"yearn-finance", "yearn-curating"})
@@ -100,7 +100,8 @@ def _parse_yearn_components(payload: Any) -> tuple[ProtocolTvlComponent, ...]:
 
 
 def _fetch_json(url: str) -> Any:
-    response = requests.get(
+    response = request(
+        "GET",
         url,
         timeout=KONG_TIMEOUT_SEC,
         headers={"Accept": "application/json", "User-Agent": "yHelper/0.1"},

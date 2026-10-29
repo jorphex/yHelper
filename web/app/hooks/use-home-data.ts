@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
+import { fetchJson } from "../lib/fetch-json";
 import type { StakingSourceState } from "../components/source-notes";
 import type { StakingAprState } from "../lib/staking-apr";
 import type { FlexMarketsResponse } from "./use-flex-data";
@@ -14,24 +15,23 @@ type HomeStaking = {
 };
 
 // Keep each destination usable when another product's source is unavailable.
-async function optionalJson<T>(url: string): Promise<T | null> {
+async function optionalJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
   try {
-    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8_000) });
-    return response.ok ? await response.json() as T : null;
+    return await fetchJson<T>(url, { signal, timeoutMs: 8_000 });
   } catch {
     return null;
   }
 }
 
-export async function fetchHomeData() {
+export async function fetchHomeData(signal?: AbortSignal) {
   const [styfi, flex, rewards] = await Promise.all([
-    optionalJson<HomeStaking>(apiUrl("/styfi", { days: 30, epoch_limit: 3, include_history: false })),
-    optionalJson<FlexMarketsResponse>(apiUrl("/flex/markets", { status: "active" })),
-    optionalJson<YlockerRewardsResponse>(apiUrl("/ylockers/rewards", { limit: 2, include_events: false })),
+    optionalJson<HomeStaking>(apiUrl("/styfi", { days: 30, epoch_limit: 3, include_history: false }), signal),
+    optionalJson<FlexMarketsResponse>(apiUrl("/flex/markets", { status: "active" }), signal),
+    optionalJson<YlockerRewardsResponse>(apiUrl("/ylockers/rewards", { limit: 2, include_events: false }), signal),
   ]);
   return { styfi, flex, rewards };
 }
 
 export function useHomeData() {
-  return useQuery({ queryKey: ["home-products"], queryFn: fetchHomeData, refetchInterval: 60_000, staleTime: 30_000 });
+  return useQuery({ queryKey: ["home-products"], queryFn: ({ signal }) => fetchHomeData(signal), refetchInterval: 60_000, staleTime: 30_000 });
 }

@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from typing import Literal
 
-import psycopg
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
 from app.analytics_service import _bounded_momentum_sql, _bounded_realized_apy_sql
-from app.common import _rank_gate_filter_sql, _resolve_universe_gate, _user_visible_filter_sql
-from app.config import APY_MAX, APY_MIN, DATABASE_URL
+from app.common import (
+    _rank_gate_filter_sql,
+    _resolve_universe_gate,
+    _user_visible_filter_sql,
+)
+from app.config import APY_MAX, APY_MIN
+from app.db import connect
 from app.models import AssetVaultsResponse
 
 router = APIRouter()
@@ -59,7 +63,7 @@ def _asset_vaults_response(
               {rank_clause}
         )
     """
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+    with connect(row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 filtered_cte

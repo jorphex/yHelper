@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { SourceFreshness } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
+import { fetchJson } from "../lib/fetch-json";
 import { MarketKind, UniverseKind } from "../lib/universe";
 
 type WindowKey = "24h" | "7d" | "30d";
@@ -55,7 +56,7 @@ interface UseChangesDataParams {
   staleThreshold: StaleThresholdKey;
 }
 
-export async function fetchChangesData(params: UseChangesDataParams): Promise<ChangesResponse> {
+export async function fetchChangesData(params: UseChangesDataParams, signal?: AbortSignal): Promise<ChangesResponse> {
   const searchParams = new URLSearchParams({
     window: params.window,
     stale_threshold: params.staleThreshold,
@@ -66,15 +67,13 @@ export async function fetchChangesData(params: UseChangesDataParams): Promise<Ch
     market: params.market,
   });
 
-  const res = await fetch(apiUrl("/changes", searchParams), { cache: "no-store" });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json() as Promise<ChangesResponse>;
+  return fetchJson<ChangesResponse>(apiUrl("/changes", searchParams), { signal });
 }
 
 export function useChangesData(params: UseChangesDataParams) {
   return useQuery({
     queryKey: ["changes", params],
-    queryFn: () => fetchChangesData(params),
+    queryFn: ({ signal }) => fetchChangesData(params, signal),
     staleTime: 30_000,
     gcTime: 30 * 60_000,
   });

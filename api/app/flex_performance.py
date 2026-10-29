@@ -6,12 +6,13 @@ values are reported ERC-4626 assets, not a projection of unreported interest.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import threading
 import time
 from collections import OrderedDict, defaultdict
-from concurrent.futures import Future
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal, localcontext
 from urllib.error import HTTPError, URLError
@@ -40,8 +41,9 @@ SELECTORS = {
     "debt": "0x0ff8afc1",
 }
 CACHE: OrderedDict[tuple, tuple[float, dict]] = OrderedDict()
-PENDING: dict[tuple, Future] = {}
+PENDING = {}
 LOCK = threading.Lock()
+EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="flex-performance")
 
 
 class CoverageError(ValueError):
@@ -754,7 +756,7 @@ def build_performance(address, days):
     }
 
 
-def performance_response(address, days):
+async def performance_response(address, days):
     key = (address, days)
     with LOCK:
         cached = CACHE.get(key)
@@ -762,21 +764,24 @@ def performance_response(address, days):
             CACHE.move_to_end(key)
             return cached[1]
         future = PENDING.get(key)
-        creator = future is None
-        if creator:
+        if future is None:
             if len(PENDING) >= 2:
                 raise HTTPException(
                     503,
                     "Performance is temporarily unavailable.",
                     headers={"Retry-After": "5"},
                 )
-            future = Future()
+            future = EXECUTOR.submit(_calculate_performance, key, address, days)
             PENDING[key] = future
-    if not creator:
-        try:
-            return future.result(timeout=65)
-        except TimeoutError as exc:
-            raise HTTPException(503, "Performance is temporarily unavailable.") from exc
+    try:
+        # Waiters use the event loop, leaving ordinary API request threads free.
+        # Cancelling one viewer must not cancel a calculation shared by others.
+        return await asyncio.wait_for(asyncio.shield(asyncio.wrap_future(future)), timeout=65)
+    except TimeoutError as exc:
+        raise HTTPException(503, "Performance is temporarily unavailable.") from exc
+
+
+def _calculate_performance(key, address, days):
     try:
         with localcontext() as context:
             context.prec = 90
@@ -793,15 +798,10 @@ def performance_response(address, days):
             CACHE[key] = (time.monotonic() + ttl, payload)
             while len(CACHE) > 64:
                 CACHE.popitem(last=False)
-        future.set_result(payload)
         return payload
     except (CoverageError, ValueError, KeyError, TypeError, IndexError) as exc:
         error = HTTPException(502, "Performance history is temporarily unavailable.")
-        future.set_exception(error)
         raise error from exc
-    except Exception as exc:
-        future.set_exception(exc)
-        raise
     finally:
         with LOCK:
             PENDING.pop(key, None)

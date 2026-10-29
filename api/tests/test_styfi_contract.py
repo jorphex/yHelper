@@ -42,7 +42,7 @@ class StyfiContractTests(unittest.TestCase):
     )
     @patch("app.activity_routes._styfi_current_reward_state", return_value={})
     @patch("app.activity_routes._styfi_reward_token", return_value={"decimals": 18})
-    @patch("app.activity_routes.psycopg.connect", return_value=FakeConnection())
+    @patch("app.activity_routes.connect", return_value=FakeConnection())
     def test_summary_mode_skips_all_history_queries(
         self,
         _connect: object,

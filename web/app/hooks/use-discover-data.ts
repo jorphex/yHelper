@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { SourceFreshness } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
+import { fetchJson } from "../lib/fetch-json";
 import { MarketKind, UniverseKind } from "../lib/universe";
 
 type DiscoverRow = {
@@ -47,7 +48,7 @@ interface UseDiscoverDataParams {
   allRows?: boolean;
 }
 
-export async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<DiscoverResponse> {
+export async function fetchDiscoverData(params: UseDiscoverDataParams, signal?: AbortSignal): Promise<DiscoverResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
@@ -58,15 +59,11 @@ export async function fetchDiscoverData(params: UseDiscoverDataParams): Promise<
     market: params.market,
   });
   if (params.chain) searchParams.set("chain_id", params.chain);
-  const res = await fetch(apiUrl("/discover", searchParams), { cache: "no-store" });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  const data = await res.json() as DiscoverResponse;
+  const data = await fetchJson<DiscoverResponse>(apiUrl("/discover", searchParams), { signal });
   if (params.allRows) {
     while (data.rows.length < data.pagination.total) {
       searchParams.set("offset", String(data.rows.length));
-      const next = await fetch(apiUrl("/discover", searchParams), { cache: "no-store" });
-      if (!next.ok) throw new Error(`API error: ${next.status}`);
-      const page = await next.json() as DiscoverResponse;
+      const page = await fetchJson<DiscoverResponse>(apiUrl("/discover", searchParams), { signal });
       if (!page.rows.length) break;
       data.rows.push(...page.rows);
     }
@@ -78,7 +75,7 @@ export function useDiscoverData(params: UseDiscoverDataParams) {
   const { enabled = true, ...request } = params;
   return useQuery({
     queryKey: ["discover", request],
-    queryFn: () => fetchDiscoverData(request),
+    queryFn: ({ signal }) => fetchDiscoverData(request, signal),
     enabled,
     staleTime: 30_000,
     gcTime: 30 * 60_000,

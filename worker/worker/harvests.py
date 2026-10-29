@@ -40,6 +40,7 @@ from .eth import (
     _topic_address,
     _wss_url_for_chain,
 )
+from .http import is_log_range_error
 from .notifications import _notify_harvest_rows
 from .redaction import redact
 
@@ -294,20 +295,13 @@ def _harvest_http_start_block(
     *,
     chain_id: int,
     cursor: int | None,
-    latest_block: int,
-    payload: dict[str, object],
 ) -> int:
     if cursor is None:
         backfill_start = int((datetime.now(UTC) - timedelta(days=HARVEST_BACKFILL_DAYS)).timestamp())
         return _find_block_at_or_after(chain_id, backfill_start)
-    default_start = cursor + 1
-    last_seen_value = payload.get("wss_last_seen_block")
-    last_seen_block = int(last_seen_value) if isinstance(last_seen_value, int) else None
-    if last_seen_block is None and isinstance(last_seen_value, str) and last_seen_value.isdigit():
-        last_seen_block = int(last_seen_value)
-    replay_anchor = last_seen_block if last_seen_block is not None else latest_block
-    replay_start = max(0, replay_anchor - HARVEST_WSS_REPLAY_BLOCKS)
-    return max(default_start, replay_start)
+    # Only the HTTP cursor proves contiguous coverage. A recent WSS report does
+    # not prove that earlier reports survived a disconnect. Replay behind it.
+    return max(0, cursor + 1 - HARVEST_WSS_REPLAY_BLOCKS)
 
 
 class HarvestWssListener(threading.Thread):
@@ -337,7 +331,7 @@ class HarvestWssListener(threading.Thread):
             with self._lock:
                 contracts = dict(self._contracts)
             if not wss_url or not contracts:
-                time.sleep(1)
+                self._stop_event.wait(1)
                 continue
             try:
                 self._run_session(wss_url=wss_url, contracts=contracts)
@@ -364,7 +358,7 @@ class HarvestWssListener(threading.Thread):
                         )
                 except Exception:
                     logging.exception("Harvest WSS failure state unavailable: chain=%s", self.chain_id)
-                time.sleep(min(backoff, 30.0))
+                self._stop_event.wait(min(backoff, 30.0))
                 backoff = min(backoff * 2, 30.0)
 
     def _run_session(self, *, wss_url: str, contracts: dict[str, str]) -> None:
@@ -441,16 +435,31 @@ class HarvestWssListener(threading.Thread):
         contracts: dict[str, str],
         expected_id: int,
     ) -> None:
+        deadline = time.monotonic() + HARVEST_WSS_CONNECT_TIMEOUT_SEC
         while not self._stop_event.is_set():
-            raw_message = ws.recv()
-            if not raw_message:
-                raise RuntimeError("empty_wss_message")
+            if self._restart.is_set():
+                self._restart.clear()
+                raise RuntimeError("contract_set_changed")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("harvest_wss_subscribe_timeout")
+            ws.settimeout(min(remaining, 1.0))
+            try:
+                opcode, frame = ws.recv_data_frame(control_frame=True)
+            except websocket.WebSocketTimeoutException:
+                continue
+            if opcode == websocket.ABNF.OPCODE_CLOSE:
+                raise RuntimeError("harvest_wss_peer_closed")
+            if opcode not in (websocket.ABNF.OPCODE_TEXT, websocket.ABNF.OPCODE_BINARY):
+                continue
+            raw_message = frame.data
             message = json.loads(raw_message)
             if isinstance(message, dict) and message.get("id") == expected_id:
                 if message.get("error"):
                     raise RuntimeError(f"harvest_wss_subscribe_error:{message['error']}")
                 return
             self._handle_wss_payload(conn, contracts, message)
+        raise RuntimeError("harvest_wss_stopped")
 
     def _handle_wss_message(
         self,
@@ -565,8 +574,6 @@ def _run_vault_harvests(conn: psycopg.Connection) -> int:
                 start_block = _harvest_http_start_block(
                     chain_id=chain_id,
                     cursor=cursor,
-                    latest_block=latest_block,
-                    payload=sync_payload,
                 )
                 if start_block > latest_block:
                     _upsert_harvest_sync_state(
@@ -626,7 +633,8 @@ def _run_vault_harvests(conn: psycopg.Connection) -> int:
                             if cursor is not None and notifications_primed and rows:
                                 _notify_harvest_rows(conn, rows)
                     except Exception as window_exc:
-                        if block_span <= 1:
+                        conn.rollback()
+                        if block_span <= 1 or not is_log_range_error(window_exc):
                             raise
                         next_block_span = max(1, block_span // 2)
                         logging.warning(
@@ -640,6 +648,11 @@ def _run_vault_harvests(conn: psycopg.Connection) -> int:
                         )
                         block_span = next_block_span
                         continue
+                    _upsert_harvest_sync_state(
+                        conn, chain_id=chain_id, cursor=max(cursor or 0, end_block),
+                        observed_at=datetime.now(UTC),
+                        payload={"status": "catching_up", "contracts": len(contracts)},
+                    )
                     current_block = end_block + 1
                     if block_span < max_block_span:
                         block_span = min(max_block_span, block_span + math.ceil((max_block_span - block_span) / 2))
@@ -663,6 +676,7 @@ def _run_vault_harvests(conn: psycopg.Connection) -> int:
                 )
                 inserted_total += chain_inserted
             except Exception as chain_exc:
+                conn.rollback()
                 errors.append(f"{chain_id}:{chain_exc}")
                 _upsert_harvest_sync_state(
                     conn,

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { StakingSourceState } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
+import { fetchJson } from "../lib/fetch-json";
 import type { StakingAprState } from "../lib/staking-apr";
 
 type StYfiSnapshotPoint = {
@@ -129,20 +130,18 @@ interface UseStYfiDataParams {
   epochLimit?: number;
 }
 
-export async function fetchStYfiData(params: UseStYfiDataParams): Promise<StYfiResponse> {
+export async function fetchStYfiData(params: UseStYfiDataParams, signal?: AbortSignal): Promise<StYfiResponse> {
   const searchParams = new URLSearchParams();
   if (params.days) searchParams.set("days", String(params.days));
   if (params.epochLimit) searchParams.set("epoch_limit", String(params.epochLimit));
 
-  const res = await fetch(apiUrl("/styfi", searchParams), { cache: "no-store" });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json() as Promise<StYfiResponse>;
+  return fetchJson<StYfiResponse>(apiUrl("/styfi", searchParams), { signal });
 }
 
 export function useStYfiData(params: UseStYfiDataParams = {}) {
   return useQuery({
     queryKey: ["styfi", params],
-    queryFn: () => fetchStYfiData(params),
+    queryFn: ({ signal }) => fetchStYfiData(params, signal),
     staleTime: 30_000,
     gcTime: 30 * 60_000,
   });

@@ -6,7 +6,6 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import psycopg
-import requests
 
 from .config import (
     DB_CLEANUP_ENABLED,
@@ -33,12 +32,14 @@ from .config import (
 )
 from .db_state import _assert_snapshot_size_guard, _complete_run, _insert_run
 from .eth import _first_present, _normalize_vault, _parse_chain_id
+from .http import request
 
 LAST_CLEANUP_AT: datetime | None = None
 
 
 def _fetch_kong_snapshot() -> tuple[list[dict], dict[str, object]]:
-    response = requests.get(
+    response = request(
+        "GET",
         KONG_REST_VAULTS_URL,
         timeout=KONG_TIMEOUT_SEC,
         headers={"Accept": "application/json", "User-Agent": "yHelper/0.1"},
@@ -147,7 +148,8 @@ def _fetch_kong_series(
         "limit": limit,
         "timestamp": timestamp,
     }
-    response = requests.post(
+    response = request(
+        "POST",
         KONG_GQL_URL,
         json={"query": KONG_PPS_QUERY, "variables": variables},
         timeout=KONG_TIMEOUT_SEC,
@@ -431,6 +433,7 @@ def _run_kong_ingestion(conn: psycopg.Connection) -> tuple[int, int, int]:
                 if computed:
                     metric_payload.append(computed)
             except Exception as exc:
+                conn.rollback()
                 if len(errors) < 10:
                     errors.append(f"{chain_id}:{vault_address}:{exc}")
             if KONG_SLEEP_BETWEEN_REQ_MS > 0:

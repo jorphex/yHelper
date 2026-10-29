@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiUrl } from "../lib/api";
+import { fetchJson } from "../lib/fetch-json";
 
 const REPORT_REFRESH_MS = 60_000;
 
@@ -42,8 +43,8 @@ export type ReportQuery = {
   meaningfulOnly?: boolean;
 };
 
-export async function fetchReportData(query: ReportQuery): Promise<ReportResponse> {
-  const res = await fetch(
+export async function fetchReportData(query: ReportQuery, signal?: AbortSignal): Promise<ReportResponse> {
+  return fetchJson<ReportResponse>(
     apiUrl("/reports", {
       days: query.days ?? 90,
       chain_id: query.chainId ?? undefined,
@@ -51,16 +52,14 @@ export async function fetchReportData(query: ReportQuery): Promise<ReportRespons
       limit: query.limit ?? 50,
       meaningful_only: query.meaningfulOnly ?? false,
     }),
-    { cache: "no-store" },
+    { signal },
   );
-  if (!res.ok) throw new Error(`Reports API request failed with ${res.status}`);
-  return (await res.json()) as ReportResponse;
 }
 
 export function useReportData(query: ReportQuery) {
   return useQuery({
     queryKey: ["reports", query.days ?? 90, query.chainId ?? null, query.vaultAddress ?? null, query.limit ?? 50, query.meaningfulOnly ?? false],
-    queryFn: () => fetchReportData(query),
+    queryFn: ({ signal }) => fetchReportData(query, signal),
     refetchInterval: REPORT_REFRESH_MS,
     staleTime: 30_000,
   });
