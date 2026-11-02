@@ -37,7 +37,7 @@ test("Vault search includes later API pages and keeps its query in the URL", asy
   const input = page.getByRole("searchbox", { name: "Find by vault name, asset, or address" });
   await input.pressSequentially("Needle", { delay: 75 });
   await expect(page.getByRole("table", { name: "Vault comparison" }).locator("tbody tr")).toHaveCount(1);
-  await expect(page.getByRole("link", { name: "Open Needle on Yearn" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View Needle performance" })).toBeVisible();
   await expect(page).toHaveURL(/q=Needle/);
   await page.reload();
   await expect(input).toHaveValue("Needle");

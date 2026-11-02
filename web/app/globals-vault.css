@@ -1,0 +1,72 @@
+.vault-detail { max-width: 1160px; margin: 0 auto; }
+.vault-back { display: inline-flex; align-items: center; min-height: 40px; margin-bottom: 18px; color: var(--text-secondary); font-size: 14px; text-decoration: none; }
+.vault-back:hover { color: var(--text-primary); }
+.vault-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
+.vault-heading .page-title { margin: 0; overflow-wrap: anywhere; }
+.vault-eyebrow { margin: 0 0 9px; color: var(--text-secondary); font-size: 13px; }
+.vault-subtitle { margin: 8px 0 0; color: var(--text-secondary); font-size: 15px; }
+.vault-yearn-link { flex-shrink: 0; gap: 10px; white-space: nowrap; }
+.vault-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin: 0 0 40px; padding-bottom: 28px; border-bottom: 1px solid var(--border-soft); }
+.vault-metrics dt { margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; }
+.vault-metrics dd { margin: 0; font-family: var(--font-data); font-size: clamp(20px, 2.3vw, 28px); line-height: 1.2; font-weight: 400; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.vault-metric-date { color: var(--text-tertiary); font-size: 11px; white-space: nowrap; }
+.vault-tvl-compact { display: none; }
+.vault-performance-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
+.vault-performance-heading h2 { margin: 0; font-size: 23px; font-weight: 700; letter-spacing: -.025em; }
+.vault-periods { display: inline-flex; align-items: center; gap: 4px; }
+.vault-periods button { min-width: 44px; min-height: 40px; padding: 8px 12px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.vault-periods button:hover { color: var(--text-primary); background: var(--bg-surface); }
+.vault-periods button[aria-pressed="true"] { border-color: var(--border-medium); color: var(--text-primary); background: var(--bg-surface); }
+.vault-chart { margin: 0; }
+.vault-chart-readout { display: grid; grid-template-columns: 1fr 1fr 1.2fr 1.2fr; gap: 16px; min-height: 53px; margin-bottom: 14px; align-items: center; }
+.vault-chart-date { color: var(--text-secondary); font-size: 14px; }
+.vault-chart-date > span { margin-left: 5px; font-size: 10px; color: var(--text-tertiary); }
+.vault-chart-label { display: block; margin-bottom: 5px; font-size: 11px; color: var(--text-secondary); }
+.vault-chart-readout strong { font-family: var(--font-data); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.vault-chart-interactive { width: 100%; touch-action: pan-y; outline-offset: 6px; border-radius: 3px; cursor: crosshair; }
+.vault-chart-interactive svg { display: block; width: 100%; overflow: visible; }
+.vault-chart-grid { stroke: var(--border-soft); stroke-width: 1; }
+.vault-axis-label { fill: var(--text-secondary); font-family: var(--font-sans); font-size: 11px; }
+.vault-axis-tick { fill: var(--text-tertiary); font-family: var(--font-data); font-size: 10px; font-variant-numeric: tabular-nums; }
+.apy-color { color: var(--viz-line-1); fill: var(--viz-line-1); }
+.pps-color { color: var(--viz-line-2); fill: var(--viz-line-2); }
+.vault-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.vault-line-apy { stroke: var(--viz-line-1); }
+.vault-line-pps { stroke: var(--viz-line-2); stroke-dasharray: 5 3; }
+.vault-tvl-bar { fill: #879aa6; opacity: .5; }
+.vault-chart-cursor { stroke: var(--text-tertiary); stroke-width: 1; stroke-dasharray: 3 4; opacity: .6; pointer-events: none; }
+.vault-marker-apy { fill: var(--viz-line-1); stroke: var(--bg-base); stroke-width: 2; }
+.vault-marker-pps { fill: var(--viz-line-2); stroke: var(--bg-base); stroke-width: 2; }
+.vault-chart-caption { margin-top: 14px; color: var(--text-tertiary); font-size: 11px; }
+.vault-history-note { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 12px; }
+.vault-history-note a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.vault-history-note > [role="status"] { flex-basis: 100%; }
+.vault-text-button { border: 0; padding: 4px 6px; color: var(--text-primary); background: transparent; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.vault-text-button:disabled { color: var(--text-tertiary); cursor: default; text-decoration: none; }
+.vault-history-empty { min-height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 14px; color: var(--text-secondary); }
+.vault-history-empty h2, .vault-history-empty p { margin: 0; }
+.vault-chart-loading { display: grid; align-content: space-around; min-height: 440px; gap: 25px; }
+.vault-chart-loading > .skeleton { display: block; width: 100%; height: 1px; background: var(--border-soft); }
+@media (max-width: 1024px) {
+  .vault-back { margin-left: 48px; }
+}
+@media (max-width: 600px) {
+  .vault-back { margin-bottom: 12px; }
+  .vault-heading { align-items: flex-start; flex-wrap: wrap; gap: 18px; margin-bottom: 26px; }
+  .vault-yearn-link { min-height: 40px; padding: 8px 14px; font-size: 13px; }
+  .vault-metrics { gap: 10px; margin-bottom: 28px; padding-bottom: 23px; }
+  .vault-metrics dt { font-size: 11px; min-height: 29px; line-height: 1.4; margin-bottom: 7px; }
+  .vault-metrics dd { font-size: 19px; letter-spacing: -.05em; white-space: nowrap; }
+  .vault-metric-date { display: block; font-size: 10px; }
+  .vault-tvl-full { display: none; }
+  .vault-tvl-compact { display: inline; }
+  .vault-performance-heading { margin-bottom: 18px; gap: 10px; }
+  .vault-performance-heading h2 { font-size: 21px; }
+  .vault-periods button { padding: 8px 10px; }
+  .vault-chart-readout { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; margin-bottom: 18px; }
+  .vault-chart-date { grid-column: 1 / -1; font-size: 12px; }
+  .vault-chart-label { font-size: 10px; }
+  .vault-chart-readout strong { font-size: 12px; }
+  .vault-chart-loading { min-height: 380px; }
+  .vault-history-note { margin-top: 18px; font-size: 11px; }
+}

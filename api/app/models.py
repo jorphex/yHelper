@@ -84,6 +84,34 @@ class SourceFreshness(ApiModel):
     stale_after_seconds: int
 
 
+class VaultHistoryIdentity(ApiModel):
+    chain_id: int
+    vault_address: str
+    symbol: str | None
+    name: str | None
+    token_symbol: str | None
+    est_apy: float | None
+
+
+class VaultHistoryPoint(ApiModel):
+    timestamp: int
+    pps: float | None
+    apy_7d: float | None
+    tvl_usd: float | None
+
+
+class VaultHistoryResponse(ApiModel):
+    vault: VaultHistoryIdentity
+    points: list[VaultHistoryPoint]
+    source_freshness: SourceFreshness
+    history_state: Literal["ready", "partial", "delayed", "unavailable"]
+    history_delayed: bool
+    retry_after_seconds: int = Field(ge=0, le=15)
+    pps_source: Literal["kong", "stored", "cached", "unavailable"]
+    tvl_source: Literal["kong", "cached", "unavailable"]
+    fetched_at: str
+
+
 class DiscoverResponse(ApiModel):
     source_freshness: SourceFreshness | None = None
     filters: DiscoverFilters

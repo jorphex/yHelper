@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { TableWrap } from "../components/table-wrap";
 import { VaultLink } from "../components/vault-link";
@@ -17,6 +18,8 @@ function compactAge(seconds: number | null): string | null {
 }
 
 export function MoverTable({ title, rows, universe, market, window, compact, direction }: { title: string; rows: ChangeRow[]; universe: UniverseKind; market: MarketKind; window: WindowKey; compact: boolean; direction: "strengthening" | "weakening" }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [sort, setSort] = useState<SortState<MoverSortKey>>({ key: "delta", direction: direction === "weakening" ? "asc" : "desc" });
   const [expanded, setExpanded] = useState(false);
   const sortedRows = sortRows(rows, sort, {
@@ -42,7 +45,7 @@ export function MoverTable({ title, rows, universe, market, window, compact, dir
       </tr></thead><tbody>
         {sortedRows.length === 0 ? <tr><td colSpan={6} className="muted">No {title.toLowerCase()} in this window.</td></tr> : visibleRows.map((row) => {
           const metricAge = compactAge(row.age_seconds);
-          return <tr key={`${title}:${row.chain_id}:${row.vault_address}`}><td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} />{metricAge ? <div className="market-row-meta">PPS {metricAge}</div> : null}<div className="mobile-only muted">{compactChainLabel(row.chain_id, compact)}</div></td><td className="mobile-secondary-column"><Link className="market-link-secondary" href={`/markets?view=vaults&chain=${row.chain_id}&universe=${universe}&market=${market}`}>{compactChainLabel(row.chain_id, compact)}</Link></td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.realized_apy_window)}</td><td className="numeric mobile-secondary-column">{formatPct(row.realized_apy_prev_window)}</td><td className={`numeric ${(row.delta_apy ?? 0) > 0 ? "text-positive" : "text-negative"}`}>{deltaArrow(row.delta_apy)} {formatPercentagePoints(row.delta_apy)}</td></tr>;
+          return <tr key={`${title}:${row.chain_id}:${row.vault_address}`}><td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} returnTo={`${pathname}?${searchParams.toString()}`} />{metricAge ? <div className="market-row-meta">PPS {metricAge}</div> : null}<div className="mobile-only muted">{compactChainLabel(row.chain_id, compact)}</div></td><td className="mobile-secondary-column"><Link className="market-link-secondary" href={`/markets?view=vaults&chain=${row.chain_id}&universe=${universe}&market=${market}`}>{compactChainLabel(row.chain_id, compact)}</Link></td><td className="numeric">{formatUsd(row.tvl_usd)}</td><td className="numeric">{formatPct(row.realized_apy_window)}</td><td className="numeric mobile-secondary-column">{formatPct(row.realized_apy_prev_window)}</td><td className={`numeric ${(row.delta_apy ?? 0) > 0 ? "text-positive" : "text-negative"}`}>{deltaArrow(row.delta_apy)} {formatPercentagePoints(row.delta_apy)}</td></tr>;
         })}
       </tbody></table></TableWrap>
       {sortedRows.length > 5 ? <button className="button button-ghost section-sm" onClick={() => setExpanded((value) => !value)}>{expanded ? "Show fewer" : `Show all ${sortedRows.length}`}</button> : null}

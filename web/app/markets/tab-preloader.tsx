@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { fetchChangesData } from "../hooks/use-changes-data";
 import { fetchCompositionData } from "../hooks/use-composition-data";
 import { fetchDiscoverData } from "../hooks/use-discover-data";
@@ -13,6 +13,7 @@ const WINDOWS = ["24h", "7d", "30d"] as const;
 
 /** Warm API data for sibling views and comparison windows. */
 export function MarketsTabPreloader() {
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const universe = queryChoice(searchParams, "universe", UNIVERSE_VALUES, "core");
@@ -21,6 +22,7 @@ export function MarketsTabPreloader() {
   const chain = searchParams.get("chain");
 
   useEffect(() => {
+    if (pathname !== "/markets") return;
     const keys: unknown[][] = [];
     for (const window of WINDOWS) {
       const request = { universe, market, minTvl, minPoints, window, staleThreshold: "auto" as const };
@@ -47,7 +49,7 @@ export function MarketsTabPreloader() {
       staleTime: 30_000,
     });
     return () => { for (const queryKey of keys) void queryClient.cancelQueries({ queryKey, exact: true, type: "inactive" }); };
-  }, [queryClient, universe, market, minTvl, minPoints, chain]);
+  }, [queryClient, universe, market, minTvl, minPoints, chain, pathname]);
 
   return null;
 }

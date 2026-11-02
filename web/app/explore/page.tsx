@@ -196,7 +196,7 @@ function ExplorePageContent() {
                 </tr></thead>
                 <tbody>{isLoading ? <TableSkeleton rows={7} columns={8} /> : visibleRows.map((row) => (
                   <tr key={`${row.chain_id}:${row.vault_address}`}>
-                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} /><Link className="vault-report-link" href={`/reports?view=vaults&vault_address=${row.vault_address}&chain_id=${row.chain_id}`}>Reports</Link><RiskAssessmentLink chainId={row.chain_id} address={row.vault_address} label={row.symbol ?? row.vault_address} /><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
+                    <td><VaultLink chainId={row.chain_id} vaultAddress={row.vault_address} symbol={row.symbol} returnTo={`${pathname}?${searchParams.toString()}`} /><Link className="vault-report-link" href={`/reports?view=vaults&vault_address=${row.vault_address}&chain_id=${row.chain_id}`}>Reports</Link><RiskAssessmentLink chainId={row.chain_id} address={row.vault_address} label={row.symbol ?? row.vault_address} /><div className="mobile-only muted">{marketLabel(row.market as MarketKind)} · {chainLabel(row.chain_id)}</div></td>
                     <td className="mobile-secondary-column">{row.token_symbol || "Unknown"}</td>
                     <td className="mobile-secondary-column">{marketLabel(row.market as MarketKind)}</td>
                     <td className="mobile-secondary-column"><Link className="market-link-secondary" href={`/markets?view=vaults&market=${query.market}&universe=${query.universe}&chain=${row.chain_id}`}>{chainLabel(row.chain_id)}</Link></td>

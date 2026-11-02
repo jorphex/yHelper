@@ -24,6 +24,10 @@ yLocker history follows deposits from Yearn's designated distributors to yCRV an
 
 TVL has distinct meanings in the product. DefiLlama parent TVL is used for Yearn website parity; Kong vault TVL is product-catalog context and may overlap; filtered analytics TVL describes only the selected vault set. These figures are not interchangeable.
 
+Vault names in research open `/markets/vault/{chainId}/{address}`. The detail view shows rolling 7-day realized APY and humanized PPS above daily TVL bars, with one history request for all three periods. Returning restores the originating list filters; the header links directly to Yearn. Daily chart observations and their dates are separate from the catalog's current estimated APY.
+
+`GET /api/vaults/{chain_id}/{vault_address}/history` reads indexed Yearn vault metadata and up to 90 days of daily Kong history, plus the warmup needed for full 7-day APY windows. TVL uses `tvl-c` / `tvl`, PPS uses `pps` / `humanized`, and APY follows the existing 365-day bounded policy. Missing dates stay missing. Upstream failure can use stored PPS and retain previously cached observations, with explicit source flags; TVL is never reconstructed from today's balance. Observation age is flagged independently of partial coverage, and realized APY and TVL headlines are dated. Requests coalesce into at most two dedicated jobs, with a bounded five-minute cache and 15-second caching for degraded results. Responses expose the remaining retry cooldown. No new ingestion or schema migration is required.
+
 Vault analytics use a maintained Yearn-focused universe.
 
 ## Architecture
@@ -129,6 +133,14 @@ uv run --no-project --python 3.12 --with-requirements worker/requirements.txt --
 ```
 
 Results are saved to `reports/worker-efficiency-e2e/results.json`. Coverage includes unchanged/corrected catalog and PPS data, daily history repair, incremental discovery across restarts, partial deployment failures, hourly gap repair, epoch rollover, diagnostic retention and retries while ingestion is blocked. Outbound webhook delivery stays on loopback.
+
+Vault-history API verification uses real loopback HTTP, an API subprocess and a disposable PostgreSQL schema:
+
+```sh
+uv run --no-project --python 3.12 --with-requirements worker/requirements.txt --with-requirements api/requirements.txt python api/tests/e2e_vault_history.py
+```
+
+Results are in `reports/vault-detail/api-results.json`. Browser navigation, chart inspection, responsive layout and period-cache checks are in `web/tests/vault-history.spec.ts`. Run against a production web build using `YHELPER_TEST_URL`; `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects an existing Chromium installation.
 
 Networking recovery checks use the same dependencies:
 

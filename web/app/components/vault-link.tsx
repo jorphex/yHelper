@@ -1,4 +1,6 @@
 import { shortVaultLabel, yearnVaultUrl } from "../lib/format";
+import Link from "next/link";
+import { vaultDetailUrl } from "../lib/vault-navigation";
 
 function ExternalArrow() {
   return (
@@ -20,11 +22,17 @@ export function VaultLink({
   chainId,
   vaultAddress,
   symbol,
+  returnTo,
 }: {
   chainId: number;
   vaultAddress: string;
   symbol: string | null | undefined;
+  returnTo?: string;
 }) {
+  if (returnTo) {
+    return <Link href={vaultDetailUrl(chainId, vaultAddress, returnTo)} className="vault-link" title={vaultAddress}
+      aria-label={`View ${shortVaultLabel(symbol, vaultAddress)} performance`}>{shortVaultLabel(symbol, vaultAddress)}</Link>;
+  }
   return (
     <a
       href={yearnVaultUrl(chainId, vaultAddress)}

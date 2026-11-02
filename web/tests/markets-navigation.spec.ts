@@ -39,7 +39,7 @@ test("Composition reports its own error and retains navigation to healthy cached
   await expect(page.getByRole("heading", { name: "Data unavailable", exact: true })).toBeVisible({ timeout: 8000 });
   await expect(page.getByText("Tracked TVL", { exact: true })).toHaveCount(0);
   await page.getByRole("navigation", { name: "Vault research views" }).getByRole("link", { name: "Find a vault", exact: true }).click();
-  await expect(page.getByRole("link", { name: "Open Review vault on Yearn" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View Review vault performance" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("navigate-after-source-error.png") });
 });
 

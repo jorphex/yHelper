@@ -4,6 +4,7 @@ import "./globals-fixes.css";
 import "./globals-ylockers.css";
 import "./globals-flex.css";
 import "./globals-product.css";
+import "./globals-vault.css";
 import type { Metadata, Viewport } from "next";
 import { ReactNode, Suspense } from "react";
 import { Sidebar } from "./components/sidebar";
