@@ -556,7 +556,6 @@ def _run_vault_harvests(
                 if not _rpc_url_for_chain(chain_id):
                     errors.append(f"{chain_id}:missing_rpc")
                     continue
-                latest_block = _eth_block_number_for_chain(chain_id)
                 cursor, sync_payload, _ = _harvest_sync_state(conn, chain_id)
                 now = datetime.now(UTC)
                 notifications_primed = bool(sync_payload.get("notifications_primed")) if isinstance(sync_payload, dict) else False
@@ -576,6 +575,7 @@ def _run_vault_harvests(
                         },
                     )
                     continue
+                latest_block = _eth_block_number_for_chain(chain_id)
                 start_block = _harvest_http_start_block(
                     chain_id=chain_id,
                     cursor=cursor,

@@ -18,9 +18,10 @@ from .config import (
     configure_logging,
 )
 from .db_state import _ensure_schema, _mark_boot_orphaned_runs, _mark_stale_running_runs
-from .eth import _connect
+from .eth import _connect, finalized_scope
 from .flex import _run_flex_sync
 from .harvests import HarvestWssManager, _run_vault_harvests, _select_harvest_contracts
+from .http import rpc_metrics
 from .kong import (
     _maybe_cleanup_old_data,
     _run_kong_ingestion,
@@ -37,7 +38,8 @@ LOGGER = logging.getLogger(__name__)
 
 def _run_job(conn, name, function):
     try:
-        return function(conn)
+        with rpc_metrics(name):
+            return function(conn)
     except Exception:
         conn.rollback()
         LOGGER.exception("%s failed; continuing worker cycle", name)
@@ -47,7 +49,7 @@ def _run_job(conn, name, function):
 def run_once() -> None:
     LOGGER.info("Tick at %s", datetime.now(UTC).isoformat())
     LOGGER.info("Fetching Kong vault snapshot: %s", KONG_REST_VAULTS_URL)
-    with _connect() as conn:
+    with _connect() as conn, finalized_scope():
         abandoned = _mark_stale_running_runs(conn)
         if abandoned > 0:
             LOGGER.warning(

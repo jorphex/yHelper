@@ -19,7 +19,7 @@ from .config import (
 )
 from .db_state import _complete_run, _insert_run
 from .eth import _eth_call_address, _eth_call_string, _eth_call_uint
-from .http import request
+from .http import request, rpc_cache_hit
 from .styfi_apr import fetch_styfi_apr
 
 
@@ -157,13 +157,53 @@ def _fetch_styfi_site_reward_state() -> dict[str, object] | None:
 
 def _fetch_styfi_snapshot_data(
     cached_epochs: dict[int, datetime] | None = None,
+    cached_state: dict | None = None,
 ) -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
     observed_at = datetime.now(UTC)
-    reward_token_address = _eth_call_address(STYFI_CONTRACTS["reward_distributor"], "token()")
-    reward_token_decimals = _eth_call_uint(reward_token_address, "decimals()")
-    reward_token_symbol = _eth_call_string(reward_token_address, "symbol()")
+    # RewardDistributor declares token/genesis immutable. Token display metadata
+    # still refreshes hourly; financial balances and APR reads remain live.
+    state = (
+        cached_state
+        if isinstance(cached_state, dict)
+        and cached_state.get("contracts") == STYFI_CONTRACTS
+        else {}
+    )
+    token = (
+        state.get("reward_token") if isinstance(state.get("reward_token"), dict) else {}
+    )
+    reward_token_address = token.get("address")
+    if (
+        not isinstance(reward_token_address, str)
+        or len(reward_token_address) != 42
+        or not reward_token_address.startswith("0x")
+    ):
+        reward_token_address = _eth_call_address(
+            STYFI_CONTRACTS["reward_distributor"], "token()"
+        )
+    else:
+        rpc_cache_hit()
+    metadata_time = _safe_int(state.get("metadata_updated_at")) or 0
+    reward_token_decimals = _safe_int(token.get("decimals"))
+    reward_token_symbol = token.get("symbol")
+    if not (
+        0 <= observed_at.timestamp() - metadata_time < 3600
+        and reward_token_decimals is not None
+        and 0 <= reward_token_decimals <= 36
+        and isinstance(reward_token_symbol, str)
+        and reward_token_symbol
+    ):
+        reward_token_decimals = _eth_call_uint(reward_token_address, "decimals()")
+        reward_token_symbol = _eth_call_string(reward_token_address, "symbol()")
+        metadata_time = int(observed_at.timestamp())
+    else:
+        rpc_cache_hit()
+        rpc_cache_hit()
     current_epoch = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch()")
-    genesis = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "genesis()")
+    genesis = _safe_int(state.get("genesis"))
+    if genesis is None or genesis <= 0:
+        genesis = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "genesis()")
+    else:
+        rpc_cache_hit()
     yfi_total_supply = _eth_call_uint(STYFI_CONTRACTS["yfi"], "totalSupply()")
     styfi_total_assets = _eth_call_uint(STYFI_CONTRACTS["styfi"], "totalAssets()")
     styfi_total_supply = _eth_call_uint(STYFI_CONTRACTS["styfi"], "totalSupply()")
@@ -231,6 +271,7 @@ def _fetch_styfi_snapshot_data(
         "observed_at": observed_at,
         "payload": {
             "genesis": genesis,
+            "metadata_updated_at": metadata_time,
             "epoch_lookback": STYFI_EPOCH_LOOKBACK,
             "contracts": STYFI_CONTRACTS,
             "reward_token": {
@@ -371,8 +412,10 @@ def _run_styfi_snapshot(conn: psycopg.Connection) -> tuple[int, int, int]:
                 (STYFI_CHAIN_ID,),
             )
             cached_epochs = {int(epoch): fetched for epoch, fetched in cur.fetchall()}
+            cur.execute("SELECT payload FROM styfi_sync_state WHERE stream_name = %s AND chain_id = %s", (STYFI_STREAM_STATE, STYFI_CHAIN_ID))
+            previous = cur.fetchone()
         conn.commit()
-        snapshot, epochs, sync_state = _fetch_styfi_snapshot_data(cached_epochs)
+        snapshot, epochs, sync_state = _fetch_styfi_snapshot_data(cached_epochs, previous[0] if previous else None)
         _upsert_styfi_snapshot(conn, snapshot)
         epoch_rows = _upsert_styfi_epoch_stats(conn, epochs)
         _upsert_styfi_sync_state(conn, sync_state)

@@ -3,6 +3,9 @@
 Scenarios exercise unchanged/corrected data, cold and warm history, deployment boundaries,
 partial gap repair, discovery restart/replay, epoch corrections, safe cleanup,
 and notification delivery while the ingestion HTTP request is blocked.
+Immutable market parameters must survive cycles/restarts without repeated reads;
+new identities and missing required values must refresh, unsupported legacy
+getters must stay nullable, and failed required reads must remain retryable.
 Artifacts: reports/worker-efficiency-e2e/results.json and scheduler.log.
 Run using uv with worker/requirements.txt and api/requirements.txt.
 """
@@ -41,6 +44,7 @@ LENDER, ORACLE = ("0x" + digit * 40 for digit in ("2", "3"))
 DEPLOYMENTS = [151, 751, 1251]
 HEAD, EPOCH, LATEST_CORRECTION, OLD_CORRECTION = 1200, 19, 0, 0
 RISK, UNENDORSE, FAIL_HISTORY, BAD_DEPLOYMENT = 100, False, False, False
+BAD_PARAMETER = None
 COUNTS, SCANS = Counter(), []
 ENTERED, RELEASE = threading.Event(), threading.Event()
 SLOW = False
@@ -133,7 +137,7 @@ class Upstream(BaseHTTPRequestHandler):
                 RELEASE.wait(20)
             return self.send(VAULTS)
         if path.endswith("/params"):
-            return self.send({"oracle": {"description": "fixture"}})
+            return self.send({"oracle": {"description": f"fixture {RISK}"}})
         if path.endswith("/markets"):
             return self.send({"rows": []})
         if path == "/tvl":
@@ -266,6 +270,18 @@ class Upstream(BaseHTTPRequestHandler):
             call = params[0]
             signature = SIGNATURES[call["data"][2:10]]
             COUNTS[signature] += 1
+            bad_signature = BAD_PARAMETER[0] if isinstance(BAD_PARAMETER, tuple) else BAD_PARAMETER
+            if signature == bad_signature:
+                if signature == "min_debt()":
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request["id"],
+                        "error": {"code": -32601, "message": "method not found"},
+                    }
+                return {
+                    "jsonrpc": "2.0", "id": request["id"],
+                    "result": BAD_PARAMETER[1] if isinstance(BAD_PARAMETER, tuple) else "0x",
+                }
             timestamp = (
                 BASE + (HEAD if params[1] == "latest" else int(params[1], 16)) * 12
             )
@@ -303,6 +319,7 @@ class Upstream(BaseHTTPRequestHandler):
 
 
 def main():
+    global BAD_PARAMETER
     global HEAD, RISK, UNENDORSE, BAD_DEPLOYMENT
     global LATEST_CORRECTION, OLD_CORRECTION, FAIL_HISTORY, EPOCH, SLOW
     sys.path.insert(0, str(ROOT / "worker"))
@@ -460,13 +477,70 @@ def main():
             RISK, UNENDORSE = 123, True
             markets = flex._discover_markets(conn, HEAD)
             assert (
-                COUNTS["eth_getCode"] == COUNTS["decimals()"] == COUNTS["symbol()"] == 0
+                COUNTS["eth_getCode"] == COUNTS["eth_call"] == 0
             )
             assert all(high - low < 150 for low, high in SCANS)
             assert (
-                markets[0]["min_debt_raw"] == 123
+                markets[0]["min_debt_raw"] == 100
                 and markets[0]["market_status"] == "unendorsed"
+                and markets[0]["oracle_description"] == "fixture 123"
             )
+            conn.execute(
+                "UPDATE flex_market_dim SET raw_metadata = raw_metadata - 'parameter_identity' WHERE market_address=%s",
+                (MARKETS[0],),
+            )
+            BAD_PARAMETER = "min_debt()"
+            assert flex._discover_markets(conn, HEAD)[0]["min_debt_raw"] is None
+            COUNTS.clear()
+            assert flex._discover_markets(conn, HEAD)[0]["min_debt_raw"] is None
+            assert COUNTS["eth_call"] == 0, "Unsupported getters must not repeat"
+            conn.execute(
+                "UPDATE flex_market_dim SET raw_metadata = raw_metadata - 'parameter_identity' WHERE market_address=%s",
+                (MARKETS[0],),
+            )
+            for BAD_PARAMETER in (
+                "one_pct()",
+                ("price_oracle()", "0x" + "g" * 64),
+                ("price_oracle()", "0x" + "0" * 64),
+                ("one_pct()", "0x" + "0" * 64),
+            ):
+                try:
+                    flex._discover_markets(conn, HEAD)
+                except ValueError:
+                    conn.rollback()
+                else:
+                    raise AssertionError("Invalid required parameters must fail closed")
+            BAD_PARAMETER = None
+            markets = flex._discover_markets(conn, HEAD)
+            assert markets[0]["one_pct_raw"] == 10000
+            assert markets[0]["min_debt_raw"] == 123
+            conn.execute(
+                "UPDATE flex_market_dim SET raw_metadata = raw_metadata - 'parameter_identity' WHERE market_address=%s",
+                (MARKETS[0],),
+            )
+            BAD_PARAMETER = "safe_collateral_ratio()"
+            assert flex._discover_markets(conn, HEAD)[0]["safe_collateral_ratio_raw"] is None
+            BAD_PARAMETER = None
+            markets = flex._discover_markets(conn, HEAD)
+            assert markets[0]["safe_collateral_ratio_raw"] == 10**18, (
+                "Malformed optional reads must retry instead of poisoning metadata"
+            )
+            version = markets[0]["contract_version"]
+            implementation = flex.FLEX_IMPLEMENTATIONS[version]
+            try:
+                flex.FLEX_IMPLEMENTATIONS[version] = "0x" + "a" * 40
+                COUNTS.clear()
+                markets = flex._discover_markets(conn, HEAD)
+                assert COUNTS["price_oracle()"] == 2, (
+                    "A changed configured identity must refresh parameters"
+                )
+                assert all(
+                    market["implementation_address"] == "0x" + "a" * 40
+                    for market in markets
+                )
+            finally:
+                flex.FLEX_IMPLEMENTATIONS[version] = implementation
+            markets = flex._discover_markets(conn, HEAD)
             assert flex._sync_snapshots(conn, markets, HEAD, HOUR, 48) == 6
             before = conn.execute(
                 "SELECT SUM(xmin::text::bigint) FROM flex_market_snapshots"
@@ -507,8 +581,15 @@ def main():
                     raise AssertionError("partial discovery was accepted")
                 assert flex._sync_cursor(conn, "discovery") == 1200
             BAD_DEPLOYMENT = False
+            COUNTS.clear()
+            BAD_PARAMETER = "min_debt()"
             markets = flex._discover_markets(conn, HEAD)
+            BAD_PARAMETER = None
             assert len(markets) == 3
+            assert markets[-1]["min_debt_raw"] is None
+            assert COUNTS["min_debt()"] == COUNTS["price_oracle()"] == 1, (
+                "Only the newly discovered market needs deployment parameters"
+            )
             COUNTS.clear()
             SCANS.clear()
             subprocess.run(
@@ -517,11 +598,11 @@ def main():
                 check=True,
                 timeout=20,
             )
-            assert COUNTS["eth_getCode"] == 0 and all(
+            assert COUNTS["eth_getCode"] == COUNTS["eth_call"] == 0 and all(
                 high - low < 150 for low, high in SCANS
             )
             evidence["flex"] = (
-                "warm/restarted discovery avoids creation/token reads; incremental lifecycle catches new markets, unendorsement and risk updates; six valid hourly samples, zero warm RPCs, one-row gap repair"
+                "warm/restarted discovery performs zero deployment-parameter RPCs; new markets and invalidated/missing metadata refresh; unsupported getters remain nullable; required failures retry; endorsement/API labels stay fresh; six hourly samples and one-row gap repair"
             )
 
             styfi._run_styfi_snapshot(conn)
@@ -535,6 +616,15 @@ def main():
                 COUNTS["epoch_rewards(uint256)"] == 2
                 and COUNTS["rewards(address,uint256)"] == 8
             )
+            assert COUNTS["token()"] == COUNTS["genesis()"] == COUNTS["decimals()"] == COUNTS["symbol()"] == 0, "Warm metadata must be reused"
+            conn.execute("UPDATE styfi_sync_state SET payload=jsonb_set(payload,'{metadata_updated_at}','0')")
+            COUNTS.clear()
+            styfi._run_styfi_snapshot(conn)
+            assert COUNTS["token()"] == COUNTS["genesis()"] == 0 and COUNTS["decimals()"] == COUNTS["symbol()"] == 1, "Only expired display metadata should refresh"
+            conn.execute("UPDATE styfi_sync_state SET payload=jsonb_set(payload,'{contracts,reward_distributor}',to_jsonb('changed'::text))")
+            COUNTS.clear()
+            styfi._run_styfi_snapshot(conn)
+            assert COUNTS["token()"] == COUNTS["genesis()"] == 1, "Changed contract identity must invalidate metadata"
             conn.execute(
                 "UPDATE styfi_epoch_stats SET fetched_at=NOW()-INTERVAL '2 days',reward_total_raw=1 WHERE epoch=8"
             )

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import lru_cache
 from urllib.parse import urlparse
 
@@ -20,7 +22,18 @@ from .config import (
     KONG_GQL_URL,
 )
 from .db import connect
-from .http import is_transient, request
+from .http import is_transient, request, rpc_cache_hit
+
+_FINALIZED = ContextVar("finalized_blocks", default=None)
+
+
+@contextmanager
+def finalized_scope():
+    token = _FINALIZED.set({})
+    try:
+        yield
+    finally:
+        _FINALIZED.reset(token)
 
 
 def _to_float(value: object) -> float | None:
@@ -309,6 +322,7 @@ def _eth_rpc_to_url(rpc_url: str, method: str, params: list[object]) -> object:
 
 def _eth_rpc_batch_to_url(
     rpc_url: str, calls: list[tuple[str, list[object]]],
+    *, allow_errors: bool = False,
 ) -> list[object]:
     if not calls:
         return []
@@ -316,7 +330,10 @@ def _eth_rpc_batch_to_url(
         {"jsonrpc": "2.0", "id": index, "method": method, "params": params}
         for index, (method, params) in enumerate(calls, start=1)
     ]
-    body = request("POST", rpc_url, json=payload, timeout=ETH_CALL_TIMEOUT_SEC, rpc=True).json()
+    body = request(
+        "POST", rpc_url, json=payload, timeout=ETH_CALL_TIMEOUT_SEC,
+        rpc=True, allow_rpc_errors=allow_errors,
+    ).json()
     if not isinstance(body, list):
         raise ValueError("Unexpected Ethereum RPC batch response")
     rows = {row.get("id"): row for row in body if isinstance(row, dict)}
@@ -325,6 +342,9 @@ def _eth_rpc_batch_to_url(
     results = []
     for index in range(1, len(calls) + 1):
         row = rows.get(index)
+        if row is not None and row.get("error") and allow_errors:
+            results.append(None)
+            continue
         if row is None or "result" not in row:
             raise ValueError(f"Missing Ethereum RPC batch response id={index}")
         results.append(row["result"])
@@ -493,9 +513,38 @@ def _eth_finalized_block_for_chain(chain_id: int) -> dict[str, object]:
     rpc_url = _rpc_url_for_chain(chain_id)
     if not rpc_url:
         raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    cache = _FINALIZED.get()
+    key = (chain_id, rpc_url)
+    if cache is not None and key in cache:
+        rpc_cache_hit()
+        return cache[key]
     payload = _eth_rpc_to_url(rpc_url, "eth_getBlockByNumber", ["finalized", False])
     if not isinstance(payload, dict):
-        raise ValueError(f"Unexpected finalized block result for chain {chain_id}: {payload!r}")
+        raise ValueError(
+            f"Unexpected finalized block result for chain {chain_id}: {payload!r}"
+        )
+    try:
+        for field in ("number", "timestamp"):
+            value = payload[field]
+            if (
+                not isinstance(value, str)
+                or not value.startswith("0x")
+                or int(value, 16) < 0
+            ):
+                raise ValueError("Malformed finalized block metadata")
+        block_hash = payload["hash"]
+        if (
+            not isinstance(block_hash, str)
+            or not block_hash.startswith("0x")
+            or len(block_hash) != 66
+        ):
+            raise ValueError("Malformed finalized block hash")
+        if len(bytes.fromhex(block_hash[2:])) != 32:
+            raise ValueError("Malformed finalized block hash")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"Malformed finalized block for chain {chain_id}") from exc
+    if cache is not None:
+        cache[key] = payload
     return payload
 
 

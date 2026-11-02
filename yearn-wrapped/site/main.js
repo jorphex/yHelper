@@ -213,9 +213,32 @@ const ENS_RE = /^[a-zA-Z0-9._-]+\.[a-z]{2,}$/i;
 const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 let ethersPromise = null;
-async function resolveEns(name) {
+const ensCache = new Map();
+const ensPending = new Map();
+function cachedEns(name) {
+  const cached = ensCache.get(name.toLowerCase());
+  return cached && cached.expires > Date.now() ? cached.address : null;
+}
+function resolveEns(name) {
+  const key = name.toLowerCase();
+  const cached = cachedEns(key);
+  if (cached) return Promise.resolve(cached);
+  if (ensPending.has(key)) return ensPending.get(key);
+  const pending = lookupEns(name).then(address => {
+    ensCache.delete(key);
+    ensCache.set(key, { address, expires: Date.now() + 5 * 60_000 });
+    if (ensCache.size > 32) ensCache.delete(ensCache.keys().next().value);
+    return address;
+  }).finally(() => ensPending.delete(key));
+  ensPending.set(key, pending);
+  return pending;
+}
+async function lookupEns(name) {
   if (!ethersPromise) {
-    ethersPromise = import("https://esm.sh/ethers@6.13.4");
+    ethersPromise = import("https://esm.sh/ethers@6.13.4").catch(error => {
+      ethersPromise = null;
+      throw error;
+    });
   }
   const ethers = await ethersPromise;
   const rpcs = [
@@ -224,16 +247,20 @@ async function resolveEns(name) {
   ];
   let lastErr = null;
   for (const rpc of rpcs) {
+    let provider, timer;
     try {
-      const provider = new ethers.JsonRpcProvider(rpc);
+      provider = new ethers.JsonRpcProvider(rpc);
       const addr = await Promise.race([
         provider.resolveName(name),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000)),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("timeout")), 6000); }),
       ]);
-      if (addr) return addr;
+      if (addr && ADDR_RE.test(addr)) return addr;
       lastErr = new Error("not found");
     } catch (err) {
       lastErr = err;
+    } finally {
+      clearTimeout(timer);
+      provider?.destroy();
     }
   }
   throw lastErr;
@@ -251,7 +278,7 @@ async function handleSubmit(event) {
 
   if (ENS_RE.test(value)) {
     // Typing an ENS name already resolved it, so this is the fast path.
-    if (resolvedEns && resolvedEns.name === value) {
+    if (resolvedEns && resolvedEns.name === value && cachedEns(value)) {
       goReplay(resolvedEns.addr);
       return;
     }
@@ -301,7 +328,7 @@ function validate() {
   }
 
   if (ENS_RE.test(value)) {
-    if (resolvedEns && resolvedEns.name === value) {
+    if (resolvedEns && resolvedEns.name === value && cachedEns(value)) {
       setReady(resolvedEns.addr, `<span class="ok">●</span> ${value} → ${shortAddress(resolvedEns.addr)} · replay ready`);
       return;
     }

@@ -27,6 +27,7 @@ from .eth import (
     _hex_to_int,
     _topic_address,
 )
+from .http import rpc_cache_hit
 from .redaction import redact
 
 WEEK_SECONDS = 7 * 24 * 60 * 60
@@ -198,7 +199,7 @@ def _sync_product(
 ) -> int:
     distributor = str(config["distributor"]).lower()
     official_depositors = {str(value).lower() for value in config["official_depositors"]}
-    cursor, _ = _sync_state(conn, product)
+    cursor, state = _sync_state(conn, product)
     if cursor is None:
         backfill_start = int((datetime.now(UTC) - timedelta(days=YLOCKER_BACKFILL_DAYS)).timestamp())
         from_block = _find_block_at_or_after(YLOCKER_CHAIN_ID, backfill_start)
@@ -216,7 +217,16 @@ def _sync_product(
         conn.commit()
         return 0
 
-    start_time = _eth_call_uint_for_chain(YLOCKER_CHAIN_ID, distributor, "START_TIME()")
+    start_time = (
+        state.get("start_time")
+        if state.get("metadata_distributor") == distributor
+        and state.get("metadata_chain_id") == YLOCKER_CHAIN_ID
+        else None
+    )
+    if not isinstance(start_time, int) or isinstance(start_time, bool) or start_time <= 0:
+        start_time = _eth_call_uint_for_chain(YLOCKER_CHAIN_ID, distributor, "START_TIME()")
+    else:
+        rpc_cache_hit()
     inserted = 0
     block_cache: dict[int, dict[str, object]] = {}
     pps_cache: dict[int, int] = {}
@@ -281,6 +291,8 @@ def _sync_product(
             "to_block": finalized_block,
             "events_seen": inserted,
             "start_time": start_time,
+            "metadata_distributor": distributor,
+            "metadata_chain_id": YLOCKER_CHAIN_ID,
         },
     )
     conn.commit()

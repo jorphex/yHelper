@@ -220,13 +220,6 @@ def _read_address(address: str, signature: str) -> str:
     return _eth_call_address(address, signature).lower()
 
 
-def _safe_uint(address: str, signature: str) -> int | None:
-    try:
-        return _eth_call_uint(address, signature)
-    except FLEX_SOFT_ERRORS:
-        return None
-
-
 def _safe_string(address: str, signature: str) -> str | None:
     try:
         return _eth_call_string(address, signature).strip()
@@ -349,9 +342,15 @@ def _discover_markets(
             }
             discovered.append(row)
 
-    # Stored deployment/token metadata is immutable. Refresh governance-controlled
-    # fields and labels without replaying each deployment and its token reads.
+    # Reuse deployment-only data; endorsement and API labels still refresh.
     discovered = [*known.values(), *discovered]
+    for row in discovered:
+        version = FLEX_FACTORIES[str(row["factory_address"])]
+        row.update(
+            contract_version=version,
+            implementation_address=FLEX_IMPLEMENTATIONS[version],
+        )
+    parameters = _market_parameters(discovered, finalized_block)
     for row in discovered:
         market = str(row["market_address"])
         meta = api_metadata.get(market) or (row.get("raw_metadata") or {}).get(
@@ -375,8 +374,7 @@ def _discover_markets(
             market_status="unendorsed"
             if status == "unendorsed"
             else ("deprecated" if row["contract_version"] == "1.0.0" else "active"),
-            price_oracle_address=_read_address(market, "price_oracle()"),
-            one_pct_raw=int(_eth_call_uint(market, "one_pct()")),
+            **parameters[market],
             oracle_description=str(oracle_meta.get("description") or "") or None,
             collateral_token_symbol=str(
                 display.get("collateral_token_symbol") or row["collateral_token_symbol"]
@@ -393,21 +391,10 @@ def _discover_markets(
                     ),
                     "flex_api": meta,
                     "params": params,
+                    "parameter_identity": parameters[market]["parameter_identity"],
                 }
             ),
         )
-        for field in (
-            "min_debt",
-            "safe_collateral_ratio",
-            "minimum_collateral_ratio",
-            "max_penalty_collateral_ratio",
-            "min_liquidation_fee",
-            "max_liquidation_fee",
-            "min_annual_interest_rate",
-            "max_annual_interest_rate",
-        ):
-            row[f"{field}_raw"] = _safe_uint(market, f"{field}()")
-
     with conn.cursor() as cur:
         for row in discovered:
             cur.execute(
@@ -471,6 +458,95 @@ def _discover_markets(
     _set_sync_cursor(conn, "discovery", finalized_block, datetime.now(UTC), {"contracts": contracts})
     conn.commit()
     return discovered
+
+
+def _market_parameters(markets, block_number):
+    fields = (
+        "price_oracle",
+        "one_pct",
+        "min_debt",
+        "safe_collateral_ratio",
+        "minimum_collateral_ratio",
+        "max_penalty_collateral_ratio",
+        "min_liquidation_fee",
+        "max_liquidation_fee",
+        "min_annual_interest_rate",
+        "max_annual_interest_rate",
+    )
+    columns = [
+        "price_oracle_address" if field == "price_oracle" else f"{field}_raw"
+        for field in fields
+    ]
+    parameters, keys = {}, []
+    for market in markets:
+        address = str(market["market_address"])
+        identity = {
+            key: market[key]
+            for key in (
+                "chain_id", "market_address", "factory_address", "contract_version",
+                "implementation_address", "deployment_block",
+            )
+        }
+        stored = {column: market.get(column) for column in columns}
+        complete = (
+            (market.get("raw_metadata") or {}).get("parameter_identity") == identity
+            and all(column in market for column in columns)
+            and stored["price_oracle_address"] is not None
+            and stored["one_pct_raw"] is not None
+        )
+        parameters[address] = {"parameter_identity": identity}
+        if complete:
+            parameters[address].update(stored)
+        else:
+            keys.extend((address, field) for field in fields)
+    calls = [
+        (
+            "eth_call",
+            [{"to": market, "data": _call_data(f"{field}()")}, hex(block_number)],
+        )
+        for market, field in keys
+    ]
+    results = []
+    for offset in range(0, len(calls), 40):
+        results.extend(
+            _eth_rpc_batch_to_url(
+                _rpc_url_for_chain(FLEX_CHAIN_ID),
+                calls[offset : offset + 40],
+                allow_errors=True,
+            )
+        )
+    for (market, field), result in zip(keys, results):
+        if field == "price_oracle":
+            if (
+                not isinstance(result, str)
+                or len(_words(result)) != 1
+                or not 0 < int(result, 16) < 2**160
+            ):
+                raise ValueError("Flex price oracle read is unavailable")
+            parameters[market]["price_oracle_address"] = _word_address(
+                _words(result)[0]
+            )
+        else:
+            if field == "one_pct" and not isinstance(result, str):
+                raise ValueError("Flex rate precision read is unavailable")
+            try:
+                if result is not None and (
+                    not isinstance(result, str)
+                    or not result.startswith("0x")
+                    or len(result) != 66
+                ):
+                    raise ValueError("Malformed Flex parameter result")
+                value = _eth_decode_uint256(result) if result is not None else None
+                if field == "one_pct" and value <= 0:
+                    raise ValueError("Flex rate precision must be positive")
+            except (TypeError, ValueError):
+                if field == "one_pct":
+                    raise
+                value = None
+                # A malformed reply is retryable, unlike an unsupported getter.
+                parameters[market]["parameter_identity"] = None
+            parameters[market][f"{field}_raw"] = value
+    return parameters
 
 
 def _sync_cursor(conn: psycopg.Connection, stream: str) -> int | None:

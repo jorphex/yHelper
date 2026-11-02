@@ -18,6 +18,7 @@ import threading
 import time
 import uuid
 from collections import Counter
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -214,6 +215,16 @@ try:
         "report_found": bool(reports),
         "job_statuses": [row[0] for row in states],
     }
+    with psycopg.connect(scoped) as conn:
+        stamp = datetime.now(UTC).isoformat()
+        conn.execute("UPDATE vault_harvest_sync_state SET payload=payload || %s", (Jsonb({"wss_connected": True, "wss_heartbeat_at": stamp, "last_http_reconcile_at": stamp}),))
+        conn.commit()
+        harvests.HARVEST_WSS_ENABLED = True
+        before = counts["/history"]
+        harvests._run_vault_harvests(conn)
+        assert counts["/history"] == before, "Healthy WSS skip must make no head RPC"
+        harvests.HARVEST_WSS_ENABLED = False
+    evidence["healthy_wss_skip"] = {"head_rpc_operations": 0}
 
     rpc_result = None
     rpc_error = None

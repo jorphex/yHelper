@@ -2,6 +2,7 @@
 
 Creates a disposable schema, never changes production tables. Results are written
 under reports/flex-performance/. The RPC fixture uses known, independent amounts.
+Older transfer activity must not exhaust the response cap before period filtering.
 """
 
 from __future__ import annotations
@@ -61,13 +62,16 @@ OWNER = {
             "unmatched_bad_debt",
             "post_close",
             "liquidation_excess_collateral",
+            "roundtrip",
         ),
         101,
     )
 }
 EVENTS, TRANSFERS = [], []
 CALLS = 0
+RPC_READS = []
 BAD_PRICE = False
+BLOCK_HASH = "0x" + "a" * 64
 
 
 def timestamp(block):
@@ -318,6 +322,7 @@ class RPC(BaseHTTPRequestHandler):
             global CALLS
             CALLS += 1
             method, params = call["method"], call.get("params", [])
+            RPC_READS.append((method, params))
             result = None
             if method == "eth_chainId":
                 result = "0x1"
@@ -326,7 +331,7 @@ class RPC(BaseHTTPRequestHandler):
                 result = {
                     "number": hex(block),
                     "timestamp": hex(timestamp(block)),
-                    "hash": "0x" + "a" * 64,
+                    "hash": BLOCK_HASH,
                 }
             elif method == "eth_getLogs":
                 q = params[0]
@@ -466,9 +471,20 @@ def dsn():
 
 
 def main():
-    global BAD_PRICE
+    global BAD_PRICE, BLOCK_HASH
     schema = "flex_pnl_e2e_" + uuid.uuid4().hex[:12]
     base_dsn = dsn()
+    # Endpoint balances are zero, but an in-period round trip still has P&L.
+    # Earlier activity would exceed the response cap if a window overscans.
+    for sender, receiver, block, number in (
+        ("0x" + "f" * 40, OWNER["roundtrip"], 950, 9601),
+        (OWNER["roundtrip"], "0x" + "e" * 40, 970, 9602),
+        ("0x" + "f" * 40, OWNER["roundtrip"], 1200, 9603),
+        (OWNER["roundtrip"], "0x" + "e" * 40, 1800, 9604),
+    ):
+        transfer(sender, receiver, 10 * U, block, number)
+    for index in range(6000):
+        transfer(OWNER["roundtrip"], OWNER["roundtrip"], U, 950, 10000 + index)
     parts = urlsplit(base_dsn)
     query = parse_qs(parts.query)
     query["options"] = [f"-csearch_path={schema}"]
@@ -617,9 +633,13 @@ def main():
                     f"Expected validation, got {invalid.status_code}"
                 )
                 results = {}
-                for name in OWNER:
+                empty = client.get(endpoint, params={"address": OWNER["empty"], "days": 30})
+                assert empty.status_code == 200
+                assert not any(method == "eth_call" and params[0]["data"][:10] in ("0x7015186c", "0xfeaf968c", "0x313ce567") for method, params in RPC_READS), "Empty wallet must not preload prices"
+                assert any(method == "eth_getLogs" for method, _ in RPC_READS), "Zero balances must not skip transfer history"
+                for name, address in OWNER.items():
                     response = client.get(
-                        endpoint, params={"address": OWNER[name], "days": 30}
+                        endpoint, params={"address": address, "days": 30}
                     )
                     assert response.status_code == 200, (
                         name,
@@ -667,6 +687,7 @@ def main():
                 assert 1.32 < pnl("transfer", "lenders") < 1.35, (
                     "Peer share transfers need fair-value funding"
                 )
+                assert 1.32 < pnl("roundtrip", "lenders") < 1.35, "Transfers outside the reporting period must not affect funding"
                 assert pnl("auction", "lenders") is None, (
                     "Auction settlement must not masquerade as an ERC-4626 cash withdrawal"
                 )
@@ -692,6 +713,11 @@ def main():
                     "Incomplete position must invalidate the combined total"
                 )
                 BAD_PRICE = True
+                # A changed historical answer needs a changed chain anchor;
+                # otherwise correctly cached finalized reads remain valid.
+                BLOCK_HASH = "0x" + "b" * 64
+                with psycopg.connect(scoped, autocommit=True) as conn:
+                    conn.execute("UPDATE flex_market_snapshots SET block_hash=%s", (BLOCK_HASH,))
                 bad = client.get(
                     endpoint, params={"address": OWNER["simple"], "days": 7}
                 )
@@ -699,6 +725,16 @@ def main():
                 if bad.status_code == 200:
                     assert bad.json()["borrowers"]["pnl_usd"] is None
                 BAD_PRICE = False
+                BLOCK_HASH = "0x" + "a" * 64
+                with psycopg.connect(scoped, autocommit=True) as conn:
+                    conn.execute("UPDATE flex_market_snapshots SET block_hash=%s", (BLOCK_HASH,))
+                BLOCK_HASH = "0x" + "c" * 64
+                failed_params = {"address": "0x" + "d" * 40, "days": 90}
+                assert client.get(endpoint, params=failed_params).status_code == 502
+                after_failure = CALLS
+                assert client.get(endpoint, params=failed_params).status_code == 502
+                assert CALLS == after_failure, "Failed calculations need a short retry cooldown"
+                BLOCK_HASH = "0x" + "a" * 64
                 with psycopg.connect(scoped, autocommit=True) as conn:
                     conn.execute("UPDATE flex_sync_state SET cursor=1900")
                 lag = client.get(

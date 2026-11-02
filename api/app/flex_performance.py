@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import threading
 import time
@@ -19,6 +20,7 @@ from decimal import Decimal, localcontext
 import httpx
 from fastapi import HTTPException
 
+from app.archive_cache import HistoricalCache
 from app.flex_service import _read_cursor
 from app.transport import fetch
 
@@ -40,11 +42,14 @@ SELECTORS = {
     "trove": "0x87553b7e",
     "debt": "0x0ff8afc1",
 }
-CACHE: OrderedDict[tuple, tuple[float, dict]] = OrderedDict()
+CACHE: OrderedDict[tuple, tuple[float, dict | HTTPException]] = OrderedDict()
 PENDING = {}
 LOCK = threading.Lock()
 EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="flex-performance")
 ARCHIVE_TIMEOUT_SEC = 60
+MAX_ARCHIVE_CALLS = 1600
+SHARED = HistoricalCache()
+LOGGER = logging.getLogger("uvicorn.error.flex_rpc")
 
 
 class CoverageError(ValueError):
@@ -60,6 +65,141 @@ class Archive:
         self.cache = {}
         self.failed = set()
         self.calls = 0
+        self.requests = 0
+        self.cache_hits = 0
+        self.methods = defaultdict(int)
+        self.anchor = None
+
+    def bind(self, end, expected_hash):
+        # Chain identity and the indexed anchor are always fresh for a build.
+        if self.rpc("eth_chainId", []) != "0x1":
+            raise CoverageError("Performance requires Ethereum history.")
+        block = self.block(end)
+        if str(block.get("hash", "")).lower() != expected_hash.lower():
+            raise CoverageError("Indexed block does not match archive history.")
+        self.anchor = (self.url, end, expected_hash.lower())
+        return block
+
+    def _shared_key(self, method, params):
+        if self.anchor is None:
+            return None
+        try:
+            if method == "eth_call":
+                block = params[1]
+                eligible = (
+                    isinstance(block, str)
+                    and block.startswith("0x")
+                    and 0 <= int(block, 16) <= self.anchor[1]
+                )
+            elif method == "eth_getBlockByNumber":
+                block = params[0]
+                eligible = (
+                    isinstance(block, str)
+                    and block.startswith("0x")
+                    and 0 <= int(block, 16) <= self.anchor[1]
+                )
+            elif method == "eth_getLogs":
+                query = params[0]
+                eligible = (
+                    0
+                    <= int(query["fromBlock"], 16)
+                    <= int(query["toBlock"], 16)
+                    <= self.anchor[1]
+                )
+            else:
+                eligible = False
+        except (KeyError, IndexError, TypeError, ValueError):
+            eligible = False
+        return (
+            (*self.anchor, json.dumps([method, params], sort_keys=True))
+            if eligible
+            else None
+        )
+
+    def _cached(self, method, params, key):
+        shared = self._shared_key(method, params)
+        if shared is None:
+            return None, None
+        raw, future, owner = SHARED.acquire(shared)
+        if raw is not None:
+            self.cache[key] = json.loads(raw)
+            self.cache_hits += 1
+            return None, None
+        if owner:
+            return (shared, future), None
+        return None, future
+
+    def _wait(self, key, future):
+        try:
+            raw = future.result(timeout=max(0, self.deadline - time.monotonic()))
+            self.cache[key] = json.loads(raw)
+            self.cache_hits += 1
+        except (TimeoutError, ValueError) as exc:
+            self.failed.add(key)
+            raise CoverageError("Historical RPC data is unavailable.") from exc
+
+    def _store(self, key, result, claim):
+        # Only JSON-RPC successes enter the shared cache. Readers independently
+        # retain ABI, price age, transfer and reconciliation validation.
+        if result is None:
+            raise CoverageError("Historical RPC data is unavailable.")
+        if claim is not None:
+            method, params = json.loads(key)
+            valid = False
+            if method == "eth_call":
+                valid = (
+                    isinstance(result, str)
+                    and result.startswith("0x")
+                    and len(result) > 2
+                    and (len(result) - 2) % 64 == 0
+                )
+            elif method == "eth_getBlockByNumber":
+                valid = (
+                    isinstance(result, dict)
+                    and result.get("number") == params[0]
+                    and isinstance(result.get("hash"), str)
+                    and len(result["hash"]) == 66
+                )
+            elif method == "eth_getLogs":
+                valid = isinstance(result, list) and all(
+                    isinstance(log, dict) and not log.get("removed") for log in result
+                )
+            if valid:
+                try:
+                    if method == "eth_call":
+                        bytes.fromhex(result[2:])
+                    elif method == "eth_getBlockByNumber":
+                        bytes.fromhex(result["hash"][2:])
+                        valid = (
+                            result["hash"].startswith("0x")
+                            and int(result["timestamp"], 16) >= 0
+                        )
+                    else:
+                        query = params[0]
+                        for log in result:
+                            valid &= (
+                                log["address"].lower() == query["address"].lower()
+                                and int(query["fromBlock"], 16)
+                                <= int(log["blockNumber"], 16)
+                                <= int(query["toBlock"], 16)
+                                and len(log["topics"]) == 3
+                                and log["topics"][0].lower() == TRANSFER
+                                and len(log["transactionHash"]) == 66
+                                and int(log["logIndex"], 16) >= 0
+                            )
+                            bytes.fromhex(log["data"][2:])
+                            bytes.fromhex(log["transactionHash"][2:])
+                            for topic in log["topics"]:
+                                bytes.fromhex(topic[2:])
+                except (KeyError, ValueError, TypeError, AttributeError):
+                    valid = False
+            if valid:
+                SHARED.resolve(*claim, result=result)
+            else:
+                SHARED.resolve(
+                    *claim, error=CoverageError("Historical RPC data is malformed.")
+                )
+        self.cache[key] = result
 
     def rpc(self, method, params):
         key = json.dumps([method, params], sort_keys=True)
@@ -67,12 +207,20 @@ class Archive:
             raise CoverageError("Historical RPC data is unavailable.")
         if key in self.cache:
             return self.cache[key]
+        claim, waiting = self._cached(method, params, key)
+        if waiting is not None:
+            self._wait(key, waiting)
+        if key in self.cache:
+            return self.cache[key]
         remaining = self.deadline - time.monotonic()
-        if remaining <= 0 or self.calls >= 1200:
-            raise CoverageError("Historical lookup limit reached.")
-        self.calls += 1
         try:
-            data = self._request({"jsonrpc": "2.0", "id": self.calls, "method": method, "params": params})
+            if remaining <= 0 or self.calls >= MAX_ARCHIVE_CALLS:
+                raise CoverageError("Historical lookup limit reached.")
+            self.calls += 1
+            self.methods[method] += 1
+            data = self._request(
+                {"jsonrpc": "2.0", "id": self.calls, "method": method, "params": params}
+            )
             if (
                 not isinstance(data, dict)
                 or data.get("id") != self.calls
@@ -80,28 +228,62 @@ class Archive:
                 or data.get("result") is None
             ):
                 raise CoverageError("Historical RPC data is unavailable.")
-            self.cache[key] = data["result"]
+            self._store(key, data["result"], claim)
             return data["result"]
         except (httpx.HTTPError, TimeoutError, OSError, ValueError) as exc:
+            self.failed.add(key)
+            if claim is not None:
+                SHARED.resolve(
+                    *claim, error=CoverageError("Historical RPC data is unavailable.")
+                )
             raise CoverageError("Historical RPC data is unavailable.") from exc
 
     def warm(self, calls):
         """Batch independent archive reads; shared prices are fetched only once."""
-        pending = {}
+        pending, claims, waiting = {}, {}, {}
         for method, params in calls:
             key = json.dumps([method, params], sort_keys=True)
             if key not in self.cache and key not in self.failed:
                 pending[key] = (method, params)
+        for key, (method, params) in list(pending.items()):
+            claim, future = self._cached(method, params, key)
+            if claim is not None:
+                claims[key] = claim
+            if future is not None:
+                waiting[key] = future
+            if future is not None or key in self.cache:
+                del pending[key]
         items = list(pending.items())
+        try:
+            self._warm(items, claims)
+            for key, future in waiting.items():
+                try:
+                    self._wait(key, future)
+                except CoverageError:
+                    # Match a direct batch's per-item failure semantics. An
+                    # unavailable read must not discard other covered rows.
+                    if time.monotonic() >= self.deadline:
+                        raise
+        finally:
+            # Release even unsent claims after timeouts/malformed responses.
+            for key, claim in claims.items():
+                if key not in self.cache:
+                    SHARED.resolve(
+                        *claim,
+                        error=CoverageError("Historical RPC data is unavailable."),
+                    )
+
+    def _warm(self, items, claims):
         for offset in range(0, len(items), 40):
             chunk = items[offset : offset + 40]
             remaining = self.deadline - time.monotonic()
-            if remaining <= 0 or self.calls + len(chunk) > 1200:
+            if remaining <= 0 or self.calls + len(chunk) > MAX_ARCHIVE_CALLS:
                 raise CoverageError("Historical lookup limit reached.")
             payload = []
             ids = {}
             for key, (method, params) in chunk:
                 self.calls += 1
+                self.methods[method] += 1
                 ids[self.calls] = key
                 payload.append(
                     {
@@ -115,6 +297,15 @@ class Archive:
                 results = self._request(payload)
                 if not isinstance(results, list):
                     raise CoverageError("Historical RPC batch is unavailable.")
+                response_ids = [
+                    result.get("id") for result in results if isinstance(result, dict)
+                ]
+                if (
+                    len(response_ids) != len(results)
+                    or len(set(response_ids)) != len(results)
+                    or set(response_ids) - ids.keys()
+                ):
+                    raise CoverageError("Historical RPC batch is malformed.")
                 seen = set()
                 for result in results:
                     if not isinstance(result, dict):
@@ -126,13 +317,21 @@ class Archive:
                     if result.get("error") or result.get("result") is None:
                         self.failed.add(key)
                     else:
-                        self.cache[key] = result["result"]
+                        self._store(key, result["result"], claims.get(key))
                 self.failed.update(set(ids.values()) - seen)
             except (httpx.HTTPError, TimeoutError, OSError, ValueError) as exc:
                 raise CoverageError("Historical RPC data is unavailable.") from exc
 
     def _request(self, payload):
-        reply = fetch("POST", self.url, json=payload, deadline=self.deadline, timeout=12, max_bytes=4 * 1024 * 1024)
+        self.requests += 1
+        reply = fetch(
+            "POST",
+            self.url,
+            json=payload,
+            deadline=self.deadline,
+            timeout=12,
+            max_bytes=4 * 1024 * 1024,
+        )
         if reply.status >= 400:
             raise CoverageError("Historical RPC data is unavailable.")
         return json.loads(reply.body)
@@ -214,23 +413,29 @@ class Archive:
     def transfers(self, market, owner, start, end):
         topic = "0x" + owner[2:].rjust(64, "0")
         logs = {}
+        minimum = max(start + 1, int(market["deployment_block"]))
+        # Clip the initial window; complete fixed windows still share across ranges.
+        lower = minimum
+        windows = (
+            [lower, *range((lower // 50000 + 1) * 50000, end + 1, 50000)]
+            if minimum <= end
+            else []
+        )
         queries = [
             {
                 "address": market["lender_address"],
                 "fromBlock": hex(lower),
-                "toBlock": hex(min(end, lower + 49999)),
+                "toBlock": hex(min(end, (lower // 50000 + 1) * 50000 - 1)),
                 "topics": topics,
             }
-            for lower in range(
-                max(start + 1, int(market["deployment_block"])), end + 1, 50000
-            )
+            for lower in windows
             for topics in ([TRANSFER, topic], [TRANSFER, None, topic])
         ]
         self.warm([("eth_getLogs", [query]) for query in queries])
         for query in queries:
             result = self.rpc("eth_getLogs", [query])
-            if not isinstance(result, list) or len(result) > 2500:
-                raise CoverageError("Share transfer history is too large.")
+            if not isinstance(result, list):
+                raise CoverageError("Share transfer history is invalid.")
             for log in result:
                 if (
                     not isinstance(log, dict)
@@ -239,7 +444,17 @@ class Archive:
                     != market["lender_address"].lower()
                 ):
                     raise CoverageError("Share transfer history is invalid.")
+                block = int(log["blockNumber"], 16)
+                if (
+                    not int(query["fromBlock"], 16)
+                    <= block
+                    <= int(query["toBlock"], 16)
+                ):
+                    raise CoverageError("Share transfer history is outside its query.")
+                if not start < block <= end:
+                    continue
                 logs[(log["transactionHash"].lower(), int(log["logIndex"], 16))] = log
+            # Limit the period's events; the transport also bounds response size.
             if len(logs) > 2500:
                 raise CoverageError("Share transfer history is too large.")
         return sorted(
@@ -582,8 +797,51 @@ def summary(rows):
     }
 
 
+def position_groups(events, address, start):
+    grouped = defaultdict(list)
+    for event in events:
+        if "trove_id" in event["amounts"]:
+            grouped[str(event["amounts"]["trove_id"])].append(event)
+    if len(grouped) > 500:
+        raise CoverageError("Too many positions for this lookup.")
+    selected = []
+    for group in grouped.values():
+        last = group[-1]
+        closed = last["event_name"] in ("close_trove", "close_zombie_trove") or (
+            last["event_name"] == "liquidation"
+            and last["amounts"].get("is_full_liquidation")
+        )
+        if int(last["block_number"]) <= start and closed:
+            continue
+        if address and not any(
+            str(event["actors"].get("owner", "")).lower() == address for event in group
+        ):
+            continue
+        selected.append(group)
+    return selected
+
+
 def build_performance(address, days):
     archive = Archive()
+    try:
+        return _build_performance(archive, address, days)
+    finally:
+        LOGGER.info(
+            "Flex RPC usage days=%s %s",
+            days,
+            json.dumps(
+                {
+                    "operations": archive.calls,
+                    "requests": archive.requests,
+                    "cache_hits": archive.cache_hits,
+                    "methods": archive.methods,
+                },
+                sort_keys=True,
+            ),
+        )
+
+
+def _build_performance(archive, address, days):
     if archive.rpc("eth_chainId", []) != "0x1":
         raise CoverageError("Performance requires Ethereum history.")
     with _read_cursor() as cur:
@@ -629,8 +887,7 @@ def build_performance(address, days):
         if len(events) > 10000:
             raise CoverageError("Indexed history is too large for this lookup.")
     anchor = archive.block(end)
-    if anchor["hash"].lower() != expected_hash.lower():
-        raise CoverageError("Indexed block does not match archive history.")
+    archive.bind(end, expected_hash)
     end_time = int(anchor["timestamp"], 16)
     start = archive.before(end_time - days * 86400, end, bounds)
     start_time = int(archive.block(start)["timestamp"], 16)
@@ -644,29 +901,15 @@ def build_performance(address, days):
             )
         )
 
+    contexts = []
     for market in markets:
         if int(market["deployment_block"]) > end:
             continue
         market_events = [
             e for e in events if e["market_address"] == market["market_address"]
         ]
-        relevant = [
-            e
-            for e in market_events
-            if not address or str(e["actors"].get("owner", "")).lower() == address
-        ]
-        blocks = {start, end} | {
-            int(e["block_number"]) for e in relevant if int(e["block_number"]) > start
-        }
-        feed = FEEDS.get(market["borrow_token_address"].lower())
-        for block in blocks:
-            if block < int(market["deployment_block"]):
-                continue
-            calls.append(("eth_getBlockByNumber", [hex(block), False]))
-            if feed:
-                call(feed, block, "round")
-                call(feed, block, "decimals")
-            call(market["price_oracle_address"], block, "oracle", "0" * 64)
+        groups = position_groups(market_events, address, start)
+        contexts.append((market, market_events, groups))
         for block in (start, end):
             if block < int(market["deployment_block"]):
                 continue
@@ -677,12 +920,8 @@ def build_performance(address, days):
                 address[2:].rjust(64, "0") if address else "",
             )
         if market["contract_version"] == "1.1.0":
-            ids = {
-                str(e["amounts"]["trove_id"])
-                for e in relevant
-                if "trove_id" in e["amounts"]
-            }
-            for ident in ids:
+            for group in groups:
+                ident = group[0]["amounts"]["trove_id"]
                 for block in (start, end):
                     if block >= int(market["deployment_block"]):
                         for selector in ("trove", "debt"):
@@ -693,30 +932,100 @@ def build_performance(address, days):
                                 f"{int(ident):064x}",
                             )
     archive.warm(calls)
+    calls = []
+
+    def price(market, block, collateral=False):
+        calls.append(("eth_getBlockByNumber", [hex(block), False]))
+        feed = FEEDS.get(market["borrow_token_address"].lower())
+        if feed:
+            call(feed, block, "round")
+            call(feed, block, "decimals")
+        if collateral:
+            call(market["price_oracle_address"], block, "oracle", "0" * 64)
+
+    def positive(value):
+        try:
+            return int(value) > 0
+        except (TypeError, ValueError):
+            return False
+
+    for market, market_events, groups in contexts:
+        for block in (start, end):
+            if block < int(market["deployment_block"]):
+                continue
+            try:
+                amount = archive.uint(
+                    market["lender_address"],
+                    block,
+                    "balance" if address else "total",
+                    address[2:].rjust(64, "0") if address else "",
+                )
+                if amount:
+                    price(market, block)
+                if market["contract_version"] == "1.1.0":
+                    for group in groups:
+                        ident = f"{int(group[0]['amounts']['trove_id']):064x}"
+                        state = archive.at(
+                            market["market_address"], block, "trove", ident
+                        )
+                        debt = archive.uint(
+                            market["market_address"], block, "debt", ident
+                        )
+                        if len(state) > 1 and state[1]:
+                            price(market, block, True)
+                        elif debt:
+                            price(market, block)
+            except (CoverageError, KeyError, ValueError, TypeError, IndexError):
+                # The calculation reports the original incomplete row; failed
+                # endpoint state must not trigger speculative price requests.
+                continue
+        for event in market_events:
+            if (
+                int(event["block_number"]) > start
+                and event["event_name"] in ("lender_deposit", "lender_withdrawal")
+                and (
+                    not address
+                    or str(event["actors"].get("owner", "")).lower() == address
+                )
+                and positive(event["amounts"].get("assets_raw"))
+            ):
+                price(market, int(event["block_number"]))
+        if market["contract_version"] == "1.1.0":
+            for group in groups:
+                for event in group:
+                    block, name, amounts = (
+                        int(event["block_number"]),
+                        event["event_name"],
+                        event["amounts"],
+                    )
+                    if block <= start:
+                        continue
+                    if (
+                        name
+                        in (
+                            "open_trove",
+                            "add_collateral",
+                            "remove_collateral",
+                            "close_trove",
+                            "close_zombie_trove",
+                        )
+                        and positive(amounts.get("collateral_raw"))
+                        or name == "liquidation"
+                        and amounts.get("is_full_liquidation")
+                    ):
+                        price(market, block, True)
+                    elif name in (
+                        "open_trove",
+                        "borrow",
+                        "repay",
+                        "close_trove",
+                        "close_zombie_trove",
+                    ) and positive(amounts.get("debt_raw")):
+                        price(market, block)
+    archive.warm(calls)
     borrower_rows, lender_rows = [], []
-    for market in markets:
-        if int(market["deployment_block"]) > end:
-            continue
-        market_events = [
-            e for e in events if e["market_address"] == market["market_address"]
-        ]
-        grouped = defaultdict(list)
-        for e in market_events:
-            if "trove_id" in e["amounts"]:
-                grouped[str(e["amounts"]["trove_id"])].append(e)
-        if len(grouped) > 500:
-            raise CoverageError("Too many positions for this lookup.")
-        for group in grouped.values():
-            last = group[-1]
-            closed = last["event_name"] in ("close_trove", "close_zombie_trove") or (
-                last["event_name"] == "liquidation"
-                and last["amounts"].get("is_full_liquidation")
-            )
-            if int(last["block_number"]) <= start and closed:
-                continue
-            owners = {str(e["actors"].get("owner", "")).lower() for e in group}
-            if address and address not in owners:
-                continue
+    for market, market_events, groups in contexts:
+        for group in groups:
             borrower_rows.append(
                 borrower(archive, market, group, start, end, start_time, end_time)
             )
@@ -749,6 +1058,10 @@ async def performance_response(address, days):
         cached = CACHE.get(key)
         if cached and cached[0] > time.monotonic():
             CACHE.move_to_end(key)
+            if isinstance(cached[1], HTTPException):
+                raise HTTPException(
+                    cached[1].status_code, cached[1].detail, headers=cached[1].headers
+                )
             return cached[1]
         future = PENDING.get(key)
         if future is None:
@@ -763,7 +1076,9 @@ async def performance_response(address, days):
     try:
         # Waiters use the event loop, leaving ordinary API request threads free.
         # Cancelling one viewer must not cancel a calculation shared by others.
-        return await asyncio.wait_for(asyncio.shield(asyncio.wrap_future(future)), timeout=65)
+        return await asyncio.wait_for(
+            asyncio.shield(asyncio.wrap_future(future)), timeout=65
+        )
     except TimeoutError as exc:
         raise HTTPException(503, "Performance is temporarily unavailable.") from exc
 
@@ -788,6 +1103,13 @@ def _calculate_performance(key, address, days):
         return payload
     except (CoverageError, ValueError, KeyError, TypeError, IndexError) as exc:
         error = HTTPException(502, "Performance history is temporarily unavailable.")
+        with LOCK:
+            CACHE[key] = (
+                time.monotonic() + 5,
+                HTTPException(error.status_code, error.detail, headers=error.headers),
+            )
+            while len(CACHE) > 64:
+                CACHE.popitem(last=False)
         raise error from exc
     finally:
         with LOCK:
