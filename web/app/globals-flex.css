@@ -58,14 +58,16 @@
 }
 
 .flex-market-tabs,
-.flex-range-tabs {
+.flex-range-tabs,
+.range-tabs {
   display: flex;
   overflow-x: auto;
   scrollbar-width: thin;
 }
 
 .flex-market-tab,
-.flex-range-tab {
+.flex-range-tab,
+.range-tab {
   position: relative;
   min-height: 44px;
   padding: 0 var(--space-4);
@@ -78,7 +80,8 @@
 }
 
 .flex-market-tab:first-child,
-.flex-range-tab:first-child {
+.flex-range-tab:first-child,
+.range-tab:first-child {
   padding-left: 0;
 }
 
@@ -87,12 +90,16 @@
 .flex-market-tab:focus-visible,
 .flex-range-tab:focus-visible,
 .flex-market-tab.is-active,
-.flex-range-tab.is-active {
+.flex-range-tab.is-active,
+.range-tab:hover,
+.range-tab:focus-visible,
+.range-tab.is-active {
   color: var(--text-primary);
 }
 
 .flex-market-tab.is-active::after,
-.flex-range-tab.is-active::after {
+.flex-range-tab.is-active::after,
+.range-tab.is-active::after {
   position: absolute;
   right: var(--space-4);
   bottom: 3px;
@@ -103,7 +110,8 @@
 }
 
 .flex-market-tab:first-child.is-active::after,
-.flex-range-tab:first-child.is-active::after {
+.flex-range-tab:first-child.is-active::after,
+.range-tab:first-child.is-active::after {
   left: 0;
 }
 
@@ -719,7 +727,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .flex-market-tab,
-  .flex-range-tab {
+  .flex-range-tab,
+  .range-tab {
     transition: none;
   }
 }

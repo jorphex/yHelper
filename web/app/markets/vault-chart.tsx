@@ -45,9 +45,9 @@ export function VaultChart({ points, days, asset }: { points: VaultHistoryPoint[
   const selectedIndex = selectedTime === null ? -1 : visible.findIndex(point => point.timestamp === selectedTime);
   const activeIndex = selectedIndex < 0 ? visible.length - 1 : selectedIndex;
   const active = visible[activeIndex] ?? visible.at(-1)!;
-  const left = width < 520 ? 48 : 60;
-  const right = width < 520 ? 66 : 78;
-  const chartTop = 27;
+  const left = 0;
+  const right = width < 480 ? 4 : 8;
+  const chartTop = 40;
   const plotHeight = width < 520 ? 230 : 290;
   const tvlTop = chartTop + plotHeight + 51;
   const tvlHeight = 72;
@@ -91,7 +91,7 @@ export function VaultChart({ points, days, asset }: { points: VaultHistoryPoint[
       <span className="vault-chart-date">{dateLabel(active.timestamp)} <span>UTC</span></span>
       <span><span className="vault-chart-label apy-color">7d APY</span><strong>{formatPct(active.apy_7d)}</strong></span>
       <span><span className="vault-chart-label pps-color">PPS{asset ? ` · ${asset}` : ""}</span><strong>{shareLabel(active.pps)}</strong></span>
-      <span><span className="vault-chart-label">TVL</span><strong>{formatUsd(active.tvl_usd)}</strong></span>
+      <span><span className="vault-chart-label">TVL</span><strong title={formatUsd(active.tvl_usd)}><span className="vault-tvl-full">{formatUsd(active.tvl_usd)}</span><span className="vault-tvl-compact">{formatUsdCompact(active.tvl_usd)}</span></strong></span>
     </div>
     <div ref={container} className="vault-chart-interactive" role="slider" tabIndex={0}
       aria-label="Explore vault history" aria-valuemin={0} aria-valuemax={visible.length - 1} aria-valuenow={activeIndex}
@@ -99,32 +99,34 @@ export function VaultChart({ points, days, asset }: { points: VaultHistoryPoint[
       onKeyDown={keyboard} onPointerMove={inspect} onPointerDown={inspect}>
       {width > 0 ? <svg viewBox={`0 0 ${width} ${height}`} aria-hidden="true" data-testid="vault-history-chart">
         <defs><clipPath id="vault-main-clip"><rect x={left - 1} y={chartTop - 3} width={plotWidth + 2} height={plotHeight + 6} /></clipPath></defs>
-        <text x={left} y={12} className="vault-axis-label apy-color">7d realized APY</text>
-        <text x={width - right} y={12} textAnchor="end" className="vault-axis-label pps-color">Price per share</text>
+        <text x={left} y={12} className="vault-axis-label vault-axis-heading apy-color">7d realized APY</text>
+        <text x={width - right} y={12} textAnchor="end" className="vault-axis-label vault-axis-heading pps-color">Price per share</text>
         {Array.from({ length: 5 }, (_, index) => {
           const ratio = index / 4;
           const y = chartTop + plotHeight * ratio;
-          return <g key={index}>
-            <line x1={left} x2={width - right} y1={y} y2={y} className="vault-chart-grid" />
-            <text x={left - 10} y={y + 4} textAnchor="end" className="vault-axis-tick">{hasApy ? formatPct(apyMax - (apyMax - apyMin) * ratio, 1) : "—"}</text>
-            <text x={width - right + 10} y={y + 4} className="vault-axis-tick">{hasPps ? (ppsMax - (ppsMax - ppsMin) * ratio).toFixed(ppsDigits) : "—"}</text>
-          </g>;
+          return <line key={index} x1={left} x2={width - right} y1={y} y2={y} className="vault-chart-grid" />;
         })}
         <g clipPath="url(#vault-main-clip)">
           <path d={linePath(visible, "apy_7d", x, apyY)} className="vault-line vault-line-apy" data-testid="apy-line" />
           <path d={linePath(visible, "pps", x, ppsY)} className="vault-line vault-line-pps" data-testid="pps-line" />
         </g>
         {!hasPps ? <text x={left + 10} y={chartTop + 22} className="vault-axis-label">Share price history unavailable</text> : !hasApy ? <text x={left + 10} y={chartTop + 22} className="vault-axis-label">Realized APY unavailable</text> : null}
-        <text x={left} y={tvlTop - 16} className="vault-axis-label">TVL · USD</text>
-        {hasTvl ? [0, .5, 1].map(ratio => <g key={ratio}>
-          <line x1={left} x2={width - right} y1={bottom - ratio * tvlHeight} y2={bottom - ratio * tvlHeight} className="vault-chart-grid" />
-          <text x={left - 10} y={bottom - ratio * tvlHeight + 4} textAnchor="end" className="vault-axis-tick">{formatUsdCompact(ratio * tvlMax)}</text>
-        </g>) : <text x={left + plotWidth / 2} y={tvlTop + tvlHeight / 2} textAnchor="middle" className="vault-axis-label">TVL history unavailable</text>}
+        <text x={left} y={tvlTop - 24} className="vault-axis-label vault-axis-heading">TVL · USD</text>
+        {hasTvl ? [0, .5, 1].map(ratio => <line key={ratio} x1={left} x2={width - right} y1={bottom - ratio * tvlHeight} y2={bottom - ratio * tvlHeight} className="vault-chart-grid" />) : <text x={left + plotWidth / 2} y={tvlTop + tvlHeight / 2} textAnchor="middle" className="vault-axis-label">TVL history unavailable</text>}
         {visible.map(point => point.tvl_usd !== null ? <rect key={point.timestamp} x={Math.max(left, x(point.timestamp) - barWidth / 2)} y={bottom - point.tvl_usd / tvlMax * tvlHeight}
           width={Math.min(barWidth, width - right - Math.max(left, x(point.timestamp) - barWidth / 2))} height={point.tvl_usd / tvlMax * tvlHeight} className="vault-tvl-bar" data-testid="tvl-bar" /> : null)}
         <line x1={x(active.timestamp)} x2={x(active.timestamp)} y1={chartTop} y2={bottom} className="vault-chart-cursor" />
         {active.apy_7d !== null ? <circle cx={x(active.timestamp)} cy={apyY(active.apy_7d)} r={3.5} className="vault-marker-apy" /> : null}
         {active.pps !== null ? <circle cx={x(active.timestamp)} cy={ppsY(active.pps)} r={3.5} className="vault-marker-pps" /> : null}
+        {Array.from({ length: 5 }, (_, index) => {
+          const ratio = index / 4;
+          const y = chartTop + plotHeight * ratio - 6;
+          return <g key={index}>
+            <text x={left + 4} y={y} className="vault-axis-tick">{hasApy ? formatPct(apyMax - (apyMax - apyMin) * ratio, 1) : "—"}</text>
+            <text x={width - right - 4} y={y} textAnchor="end" className="vault-axis-tick">{hasPps ? (ppsMax - (ppsMax - ppsMin) * ratio).toFixed(ppsDigits) : "—"}</text>
+          </g>;
+        })}
+        {hasTvl ? [0, .5, 1].map(ratio => <text key={ratio} x={left + 4} y={bottom - ratio * tvlHeight - 6} className="vault-axis-tick">{formatUsdCompact(ratio * tvlMax)}</text>) : null}
         {Array.from({ length: ticks }, (_, index) => {
           const ts = start + (end - start) * index / (ticks - 1);
           return <text key={index} x={x(ts)} y={bottom + 26} textAnchor={index === 0 ? "start" : index === ticks - 1 ? "end" : "middle"} className="vault-axis-tick">{dateLabel(ts)}</text>;

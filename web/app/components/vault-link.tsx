@@ -2,11 +2,11 @@ import { shortVaultLabel, yearnVaultUrl } from "../lib/format";
 import Link from "next/link";
 import { vaultDetailUrl } from "../lib/vault-navigation";
 
-function ExternalArrow() {
+export function ExternalArrow({ size = 10 }: { size?: number }) {
   return (
     <svg
-      width="10"
-      height="10"
+      width={size}
+      height={size}
       viewBox="0 0 12 12"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"

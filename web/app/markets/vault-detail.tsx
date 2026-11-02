@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ExternalArrow } from "../components/vault-link";
 import { VaultSourceNote } from "../components/source-notes";
 import { useVaultHistory } from "../hooks/use-vault-history";
 import { chainLabel, formatPct, formatUsd, formatUsdCompact, shortVaultLabel, yearnVaultUrl } from "../lib/format";
@@ -53,7 +54,7 @@ export function VaultDetail({ chainId, address }: { chainId: number; address: st
         <h1 className="page-title">{title}</h1>
         {data?.vault.name && data.vault.name !== data.vault.symbol ? <p className="vault-subtitle">{data.vault.name}</p> : null}
       </div>
-      {data ? <a className="button button-secondary vault-yearn-link" href={yearnVaultUrl(chainId, address)} target="_blank" rel="noopener noreferrer">Open in Yearn <span aria-hidden="true">↗</span></a> : null}
+      {data ? <a className="button button-secondary vault-yearn-link" href={yearnVaultUrl(chainId, address)} target="_blank" rel="noopener noreferrer">Open in Yearn <ExternalArrow size={12} /></a> : null}
     </header>
     {missing || (error && !data) ? <section className="vault-history-empty" role="status">
       <h2>{missing ? "Vault not found" : "Vault history is unavailable"}</h2>
@@ -69,15 +70,15 @@ export function VaultDetail({ chainId, address }: { chainId: number; address: st
       <section className="vault-performance" aria-labelledby="vault-performance-title">
         <div className="vault-performance-heading">
           <h2 id="vault-performance-title">Performance</h2>
-          <div className="vault-periods" role="group" aria-label="History period">
-            {([7, 30, 90] as const).map(period => <button key={period} type="button" aria-pressed={days === period} onClick={() => setDays(period)}>{period}d</button>)}
+          <div className="range-tabs vault-periods" role="group" aria-label="History period">
+            {([7, 30, 90] as const).map(period => <button key={period} type="button" className={`range-tab${days === period ? " is-active" : ""}`} aria-pressed={days === period} onClick={() => setDays(period)}>{period}d</button>)}
           </div>
         </div>
         {isLoading ? <div className="vault-chart-loading" role="status"><span className="skeleton" /><span className="skeleton" /><span className="skeleton" /><span className="sr-only">Loading vault history…</span></div> : data?.points.length ? <VaultChart points={data.points} days={days} asset={data.vault.token_symbol} /> : <div className="vault-history-empty">No daily history available yet.</div>}
       </section>
       {data ? <footer className="vault-history-note">
         <span>Daily samples · UTC{latestPps ? ` · PPS through ${utcDate(latestPps.timestamp)}` : ""}</span>
-        <a href="https://github.com/yearn/kong/blob/master/docs/outputs.md" target="_blank" rel="noopener noreferrer">Source: Kong ↗</a>
+        <a href="https://github.com/yearn/kong/blob/master/docs/outputs.md" target="_blank" rel="noopener noreferrer">Source: Kong<ExternalArrow size={12} /></a>
         {historyNotes ? <span role="status">{historyNotes} <button className="vault-text-button" disabled={isFetching || retryWait > 0} onClick={() => refetch()}>{retryLabel}</button></span> : null}
       </footer> : null}
     </>}

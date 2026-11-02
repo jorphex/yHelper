@@ -143,3 +143,53 @@ test("Zero APY has readable ticks and filtered APY uses an honest empty label", 
     await page.unrouteAll();
   }
 });
+
+test("Vault plots and labels remain readable and aligned across screen sizes", async ({ page }, testInfo) => {
+  await sources(page);
+  await page.goto(`/markets/vault/1/${address}`);
+  const chart = page.getByTestId("vault-history-chart");
+  await expect(chart).toBeVisible();
+  const evidence = [];
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect.poll(() => chart.evaluate(svg => Math.abs(svg.getBoundingClientRect().width - (svg as SVGSVGElement).viewBox.baseVal.width))).toBeLessThan(1);
+    const layout = await page.evaluate(() => {
+      const svg = document.querySelector<SVGSVGElement>('[data-testid="vault-history-chart"]')!;
+      const grid = svg.querySelector<SVGLineElement>(".vault-chart-grid")!;
+      const text = [...svg.querySelectorAll<SVGTextElement>("text")];
+      const selected = document.querySelector<HTMLButtonElement>('.vault-periods [aria-pressed="true"]')!;
+      const values = [...document.querySelectorAll<HTMLElement>(".vault-metrics dd")];
+      return {
+        chartWidth: svg.viewBox.baseVal.width,
+        plotLeft: grid.x1.baseVal.value,
+        plotWidth: grid.x2.baseVal.value - grid.x1.baseVal.value,
+        smallestLabel: Math.min(...text.map(node => parseFloat(getComputedStyle(node).fontSize))),
+        labelsInside: text.every(node => { const box = node.getBBox(); return box.x >= -1 && box.x + box.width <= svg.viewBox.baseVal.width + 1; }),
+        labelsDisjoint: text.every((node, index) => text.slice(index + 1).every(other => {
+          const a = node.getBBox(), b = other.getBBox();
+          return a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y;
+        })),
+        valueY: values.map(node => node.getBoundingClientRect().y),
+        valueColor: getComputedStyle(values[0]).color,
+        primaryColor: getComputedStyle(document.documentElement).getPropertyValue("--text-primary").trim(),
+        controlHeight: selected.getBoundingClientRect().height,
+        underline: getComputedStyle(selected, "::after").backgroundColor,
+        accent: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+        overflow: document.documentElement.scrollWidth > innerWidth,
+      };
+    });
+    expect(layout.plotLeft).toBe(0);
+    expect(layout.plotWidth / layout.chartWidth).toBeGreaterThan(.95);
+    expect(layout.smallestLabel).toBeGreaterThanOrEqual(12);
+    expect(layout.labelsInside).toBe(true);
+    expect(layout.labelsDisjoint).toBe(true);
+    expect(Math.max(...layout.valueY) - Math.min(...layout.valueY)).toBeLessThan(1);
+    expect(layout.valueColor).toBe("rgb(250, 250, 250)");
+    expect(layout.controlHeight).toBeGreaterThanOrEqual(44);
+    expect(layout.underline).toBe("rgb(6, 87, 233)");
+    expect(layout.overflow).toBe(false);
+    evidence.push({ width, ...layout });
+    await page.screenshot({ path: testInfo.outputPath(`vault-design-${width}.png`), fullPage: true });
+  }
+  await testInfo.attach("responsive-design-checks", { body: JSON.stringify(evidence), contentType: "application/json" });
+});
