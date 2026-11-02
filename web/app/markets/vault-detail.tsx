@@ -54,7 +54,7 @@ export function VaultDetail({ chainId, address }: { chainId: number; address: st
         <h1 className="page-title">{title}</h1>
         {data?.vault.name && data.vault.name !== data.vault.symbol ? <p className="vault-subtitle">{data.vault.name}</p> : null}
       </div>
-      {data ? <a className="button button-secondary vault-yearn-link" href={yearnVaultUrl(chainId, address)} target="_blank" rel="noopener noreferrer">Open in Yearn <ExternalArrow size={12} /></a> : null}
+      {data ? <a className="button button-primary vault-yearn-link" href={yearnVaultUrl(chainId, address)} target="_blank" rel="noopener noreferrer">Open in Yearn <ExternalArrow size={12} /></a> : null}
     </header>
     {missing || (error && !data) ? <section className="vault-history-empty" role="status">
       <h2>{missing ? "Vault not found" : "Vault history is unavailable"}</h2>
