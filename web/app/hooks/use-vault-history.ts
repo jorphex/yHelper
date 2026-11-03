@@ -15,6 +15,7 @@ export type VaultHistoryPoint = {
 export type VaultHistory = {
   vault: { chain_id: number; vault_address: string; symbol: string | null; name: string | null; token_symbol: string | null; est_apy: number | null };
   points: VaultHistoryPoint[];
+  pps_asset_symbol?: string | null;
   source_freshness: SourceFreshness;
   history_state: "ready" | "partial" | "delayed" | "unavailable";
   history_delayed: boolean;

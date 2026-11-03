@@ -74,7 +74,7 @@ export function VaultDetail({ chainId, address }: { chainId: number; address: st
             {([7, 30, 90] as const).map(period => <button key={period} type="button" className={`range-tab${days === period ? " is-active" : ""}`} aria-pressed={days === period} onClick={() => setDays(period)}>{period}d</button>)}
           </div>
         </div>
-        {isLoading ? <div className="vault-chart-loading" role="status"><span className="skeleton" /><span className="skeleton" /><span className="skeleton" /><span className="sr-only">Loading vault history…</span></div> : data?.points.length ? <VaultChart points={data.points} days={days} asset={data.vault.token_symbol} /> : <div className="vault-history-empty">No daily history available yet.</div>}
+        {isLoading ? <div className="vault-chart-loading" role="status"><span className="skeleton" /><span className="skeleton" /><span className="skeleton" /><span className="sr-only">Loading vault history…</span></div> : data?.points.length ? <VaultChart points={data.points} days={days} asset={data.pps_asset_symbol ?? data.vault.token_symbol} /> : <div className="vault-history-empty">No daily history available yet.</div>}
       </section>
       {data ? <footer className="vault-history-note">
         <span>Daily samples · UTC{latestPps ? ` · PPS through ${utcDate(latestPps.timestamp)}` : ""}</span>

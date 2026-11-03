@@ -3,12 +3,14 @@ from __future__ import annotations
 import psycopg
 
 from app.common import (
+    _aggregate_tvl_sql,
+    _locked_yvusd_filter_sql,
     _market_filter_sql,
     _market_group_sql,
     _rank_gate_filter_sql,
     _user_visible_filter_sql,
 )
-from app.config import APY_MAX, APY_MIN, MOMENTUM_ABS_MAX
+from app.config import APY_MAX, APY_MIN, MOMENTUM_ABS_MAX, YVUSD_ADDRESS
 
 
 def _bounded_metric_sql(expr: str, lower: float | str, upper: float | str) -> str:
@@ -53,7 +55,7 @@ def _composition_filtered_cte(*, max_vaults: int | None, filter_market: bool = F
 
 def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) -> str:
     bounded_momentum_sql = _bounded_momentum_sql("m")
-    rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
+    rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults, include_locked=True)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
     market_clause = f"AND {_market_filter_sql('d')}" if filter_market else ""
     return f"""
@@ -68,6 +70,7 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
             {_market_group_sql("d")} AS market,
             COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
             d.est_apy,
+            {_aggregate_tvl_sql("d")} AS aggregate_tvl_usd,
             {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS realized_apy_30d,
             m.points_count,
             m.last_point_time,
@@ -75,15 +78,25 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
         FROM vault_dim d
         JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
         WHERE
-            {_user_visible_filter_sql("d", include_retired=False)}
+            {_user_visible_filter_sql("d", include_retired=False, include_locked=True)}
             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             AND COALESCE(m.points_count, 0) >= %(min_points)s
             {rank_clause}
             {market_clause}
     ),
+    performance_points AS (
+        SELECT p.chain_id, p.vault_address, p.ts,
+            CASE WHEN {_locked_yvusd_filter_sql("p")}
+                 THEN p.pps_raw * parent.pps_raw ELSE p.pps_raw END AS pps_raw
+        FROM pps_timeseries p
+        JOIN eligible e ON e.chain_id=p.chain_id AND e.vault_address=p.vault_address
+        LEFT JOIN pps_timeseries parent ON {_locked_yvusd_filter_sql("p")}
+            AND parent.chain_id=1 AND parent.vault_address='{YVUSD_ADDRESS}' AND parent.ts=p.ts
+        WHERE NOT {_locked_yvusd_filter_sql("p")} OR parent.pps_raw > 0
+    ),
     latest AS (
         SELECT p.chain_id, p.vault_address, MAX(p.ts) AS latest_ts
-        FROM pps_timeseries p
+        FROM performance_points p
         JOIN eligible e
           ON e.chain_id = p.chain_id
          AND e.vault_address = p.vault_address
@@ -100,6 +113,7 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
             e.market,
             e.tvl_usd,
             e.est_apy,
+            e.aggregate_tvl_usd,
             e.realized_apy_30d,
             e.points_count,
             e.last_point_time,
@@ -117,14 +131,14 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
          AND l.vault_address = e.vault_address
         JOIN LATERAL (
             SELECT p.ts, p.pps_raw
-            FROM pps_timeseries p
+            FROM performance_points p
             WHERE p.chain_id = e.chain_id AND p.vault_address = e.vault_address AND p.ts <= l.latest_ts
             ORDER BY p.ts DESC
             LIMIT 1
         ) latest_point ON TRUE
         JOIN LATERAL (
             SELECT p.ts, p.pps_raw
-            FROM pps_timeseries p
+            FROM performance_points p
             WHERE p.chain_id = e.chain_id
               AND p.vault_address = e.vault_address
               AND p.ts >= l.latest_ts - %(window_sec)s
@@ -134,7 +148,7 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
         ) curr_point ON TRUE
         JOIN LATERAL (
             SELECT p.ts, p.pps_raw
-            FROM pps_timeseries p
+            FROM performance_points p
             WHERE p.chain_id = e.chain_id
               AND p.vault_address = e.vault_address
               AND p.ts >= curr_point.ts - %(window_sec)s
@@ -187,6 +201,8 @@ def _fetch_change_movers(
             n.symbol,
             n.token_symbol,
             n.tvl_usd,
+            n.aggregate_tvl_usd,
+            n.est_apy,
             n.realized_apy_window,
             n.realized_apy_prev_window,
             (n.realized_apy_window - n.realized_apy_prev_window) AS delta_apy,

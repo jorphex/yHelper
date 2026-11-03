@@ -15,6 +15,7 @@ from app.analytics_service import (
     _fetch_change_movers,
 )
 from app.common import (
+    _aggregate_tvl_sql,
     _kong_source_freshness,
     _locked_yvusd_filter_sql,
     _market_filter_sql,
@@ -53,11 +54,7 @@ def discover(
     token_symbol = token_symbol.strip().upper() or None if token_symbol is not None else None
     realized_apy_sql = _bounded_realized_apy_sql()
     momentum_sql = _bounded_momentum_sql()
-    # Locker PPS measures the extra yield only, not the parent vault's return.
-    # Publish the verified combined estimate without inventing realized yield.
     locked_sql = _locked_yvusd_filter_sql("d")
-    realized_apy_sql = f"CASE WHEN {locked_sql} THEN NULL ELSE ({realized_apy_sql}) END"
-    momentum_sql = f"CASE WHEN {locked_sql} THEN NULL ELSE ({momentum_sql}) END"
     order_map = {
         "tvl": "COALESCE(d.tvl_usd, 0.0)",
         "est_apy": "COALESCE(d.est_apy, -999999.0)",
@@ -84,11 +81,11 @@ def discover(
         base_filters.append(rank_filter)
         params["max_vaults"] = max_vaults
     base_where = " AND ".join(base_filters)
-    eligible_where = f"{base_where} AND COALESCE(m.points_count, 0) >= %(min_points)s"
+    eligible_where = f"{base_where} AND (COALESCE(m.points_count, 0) >= %(min_points)s OR {locked_sql})"
     selected_where = eligible_where
     # Locked shares are already assets of the parent vault. Show the option,
     # without counting those assets twice in aggregate TVL or yield weights.
-    owned_tvl = f"CASE WHEN {_locked_yvusd_filter_sql('d')} THEN 0.0 ELSE COALESCE(d.tvl_usd, 0.0) END"
+    owned_tvl = _aggregate_tvl_sql("d")
     if chain_id is not None:
         selected_where += " AND d.chain_id = %(chain_id)s"
         params["chain_id"] = chain_id
@@ -117,7 +114,7 @@ def discover(
                 f"""
                 SELECT d.chain_id, COUNT(*) AS vaults
                 FROM vault_dim d
-                JOIN vault_metrics_latest m
+                LEFT JOIN vault_metrics_latest m
                   ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {eligible_where}
                 GROUP BY d.chain_id
@@ -142,7 +139,7 @@ def discover(
                         ELSE NULL
                     END AS tvl_weighted_realized_apy_30d
                 FROM vault_dim d
-                JOIN vault_metrics_latest m
+                LEFT JOIN vault_metrics_latest m
                   ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {selected_where}
                 """,
@@ -159,11 +156,12 @@ def discover(
                     d.token_symbol,
                     {_market_group_sql("d")} AS market,
                     d.tvl_usd,
+                    {owned_tvl} AS aggregate_tvl_usd,
                     d.est_apy,
                     {realized_apy_sql} AS realized_apy_30d,
                     {momentum_sql} AS momentum_7d_30d
                 FROM vault_dim d
-                JOIN vault_metrics_latest m
+                LEFT JOIN vault_metrics_latest m
                   ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {selected_where}
                 ORDER BY {order_map[sort_by]} {"ASC" if direction == "asc" else "DESC"}, d.tvl_usd DESC
@@ -320,15 +318,15 @@ def changes(
                 SELECT
                     COUNT(*) AS vaults_eligible,
                     COUNT(*) FILTER (WHERE {comparable}) AS vaults_with_change,
-                    SUM(n.tvl_usd) FILTER (WHERE {comparable}) AS tracked_tvl_usd,
+                    SUM(n.aggregate_tvl_usd) FILTER (WHERE {comparable}) AS tracked_tvl_usd,
                     COUNT(*) FILTER (WHERE {comparable} AND n.realized_apy_window > n.realized_apy_prev_window) AS riser_vaults,
                     COUNT(*) FILTER (WHERE {comparable} AND n.realized_apy_window < n.realized_apy_prev_window) AS faller_vaults,
                     COUNT(*) FILTER (WHERE {comparable} AND n.realized_apy_window = n.realized_apy_prev_window) AS flat_vaults,
-                    SUM(n.tvl_usd) FILTER (WHERE {comparable} AND n.realized_apy_window > n.realized_apy_prev_window) AS riser_tvl_usd,
-                    SUM(n.tvl_usd) FILTER (WHERE {comparable} AND n.realized_apy_window < n.realized_apy_prev_window) AS faller_tvl_usd,
-                    CASE WHEN SUM(n.tvl_usd) FILTER (WHERE {comparable}) > 0
-                         THEN SUM(n.tvl_usd * (n.realized_apy_window - n.realized_apy_prev_window)) FILTER (WHERE {comparable})
-                              / SUM(n.tvl_usd) FILTER (WHERE {comparable})
+                    SUM(n.aggregate_tvl_usd) FILTER (WHERE {comparable} AND n.realized_apy_window > n.realized_apy_prev_window) AS riser_tvl_usd,
+                    SUM(n.aggregate_tvl_usd) FILTER (WHERE {comparable} AND n.realized_apy_window < n.realized_apy_prev_window) AS faller_tvl_usd,
+                    CASE WHEN SUM(n.aggregate_tvl_usd) FILTER (WHERE {comparable}) > 0
+                         THEN SUM(n.aggregate_tvl_usd * (n.realized_apy_window - n.realized_apy_prev_window)) FILTER (WHERE {comparable})
+                              / SUM(n.aggregate_tvl_usd) FILTER (WHERE {comparable})
                          ELSE NULL END AS tvl_weighted_delta,
                     MIN(n.age_seconds) FILTER (WHERE {comparable}) AS newest_comparison_age_seconds,
                     COUNT(*) FILTER (WHERE {comparable} AND n.age_seconds > %(stale_threshold_sec)s) AS stale_comparisons

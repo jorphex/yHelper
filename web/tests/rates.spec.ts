@@ -38,3 +38,31 @@ test("Vault discovery displays net estimates and the locked yvUSD option", async
   }
   await page.screenshot({ path: testInfo.outputPath("net-vault-estimates.png") });
 });
+
+test("Locked yvUSD is a core mover with combined realized returns and USDC share values", async ({ page }, testInfo) => {
+  const evidence = JSON.parse(fs.readFileSync(source, "utf8"));
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.route("**/api/**", route => {
+    const url = new URL(route.request().url());
+    const json = url.pathname.endsWith("/history") ? evidence.locked_history
+      : url.pathname === "/api/changes" ? evidence.changes
+      : url.pathname === "/api/composition" ? { categories: [], chains: [], tokens: [], summary: { vaults: 2, total_tvl_usd: 1500 } }
+      : evidence.core;
+    return route.fulfill({ json });
+  });
+  await page.goto("/markets?view=changes");
+  await expect(page.getByRole("row").filter({ hasText: "Locked yvUSD" })).toContainText("10.24%");
+  await page.goto("/markets?view=vaults");
+  await page.getByRole("row").filter({ hasText: "Locked yvUSD" }).getByRole("link", { name: "Locked yvUSD" }).click();
+  await expect(page.getByRole("heading", { name: "Locked yvUSD", exact: true })).toBeVisible();
+  await expect(page.locator(".vault-metrics")).toContainText("7.73%");
+  await expect(page.locator(".vault-metrics")).toContainText("10.24%");
+  await expect(page.locator(".vault-chart-caption")).toContainText("USDC per vault share");
+  await page.screenshot({ path: testInfo.outputPath("locked-yvusd-core.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".vault-chart-caption")).toContainText("USDC per vault share");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("locked-yvusd-mobile.png"), fullPage: true });
+});

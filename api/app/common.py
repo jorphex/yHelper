@@ -16,6 +16,7 @@ from app.config import (
     UNIVERSE_RAW_MAX_VAULTS,
     UNIVERSE_RAW_MIN_POINTS,
     UNIVERSE_RAW_MIN_TVL_USD,
+    LOCKED_YVUSD_ADDRESS,
     USER_VISIBLE_KIND,
     USER_VISIBLE_VERSION_PREFIX,
 )
@@ -181,7 +182,12 @@ def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None, include_locked:
 
 
 def _locked_yvusd_filter_sql(alias: str) -> str:
-    return f"({alias}.chain_id = 1 AND {alias}.vault_address = '0xaaafea48472f77563961cdb53291dedfb46f9040')"
+    return f"({alias}.chain_id = 1 AND {alias}.vault_address = '{LOCKED_YVUSD_ADDRESS}')"
+
+
+def _aggregate_tvl_sql(alias: str) -> str:
+    """Expose wrapper capital without adding its underlying assets a second time."""
+    return f"CASE WHEN {_locked_yvusd_filter_sql(alias)} THEN 0.0 ELSE COALESCE({alias}.tvl_usd, 0.0) END"
 
 
 def _user_visible_filter_sql(alias: str, *, include_retired: bool = False, include_locked: bool = False) -> str:

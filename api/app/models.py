@@ -66,6 +66,7 @@ class VaultMetricRow(ApiModel):
     chain_id: int
     symbol: str | None
     tvl_usd: float | None
+    aggregate_tvl_usd: float | None = Field(default=None, description="Non-duplicated TVL contribution; wrapper assets already counted in a parent contribute zero.")
     est_apy: float | None
     realized_apy_30d: float | None
     momentum_7d_30d: float | None
@@ -102,6 +103,7 @@ class VaultHistoryPoint(ApiModel):
 
 class VaultHistoryResponse(ApiModel):
     vault: VaultHistoryIdentity
+    pps_asset_symbol: str | None = Field(default=None, description="Asset unit for PPS and realized returns, including the underlying vault for supported wrappers.")
     points: list[VaultHistoryPoint]
     source_freshness: SourceFreshness
     history_state: Literal["ready", "partial", "delayed", "unavailable"]
@@ -191,6 +193,8 @@ class ChangeMover(ApiModel):
     symbol: str | None
     token_symbol: str
     tvl_usd: float
+    aggregate_tvl_usd: float | None = None
+    est_apy: float | None = Field(default=None, description="Kong's combined forward estimate, distinct from the realized comparison window.")
     realized_apy_window: float
     realized_apy_prev_window: float
     delta_apy: float

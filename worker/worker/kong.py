@@ -24,6 +24,7 @@ from .config import (
     KONG_REST_VAULTS_URL,
     KONG_SLEEP_BETWEEN_REQ_MS,
     KONG_TIMEOUT_SEC,
+    LOCKED_YVUSD_ADDRESS,
     PPS_RETENTION_DAYS,
     PRODUCT_ACTIVITY_RETENTION_DAYS,
     STYFI_EPOCH_LENGTH_SEC,
@@ -31,6 +32,7 @@ from .config import (
     STYFI_RETENTION_DAYS,
     STYFI_SNAPSHOT_RETENTION_DAYS,
     UPSERT_SQL,
+    YVUSD_ADDRESS,
 )
 from .db_state import _assert_snapshot_size_guard, _complete_run, _insert_run
 from .eth import _first_present, _normalize_vault, _parse_chain_id
@@ -301,7 +303,7 @@ def _apy_for_window(points: list[tuple[int, float]], days: int) -> float | None:
 
 
 def _compute_metrics(chain_id: int, vault_address: str, points: list[tuple[int, float]]) -> dict | None:
-    if not points:
+    if not points and (chain_id != 1 or vault_address != LOCKED_YVUSD_ADDRESS):
         return None
     apy_7d = _apy_for_window(points, 7)
     apy_30d = _apy_for_window(points, 30)
@@ -314,7 +316,7 @@ def _compute_metrics(chain_id: int, vault_address: str, points: list[tuple[int, 
         "chain_id": chain_id,
         "as_of": datetime.now(UTC),
         "points_count": len(points),
-        "last_point_time": datetime.fromtimestamp(points[-1][0], tz=UTC),
+        "last_point_time": datetime.fromtimestamp(points[-1][0], tz=UTC) if points else None,
         "apy_7d": apy_7d,
         "apy_30d": apy_30d,
         "apy_90d": apy_90d,
@@ -484,13 +486,18 @@ def _run_kong_ingestion(conn: psycopg.Connection) -> tuple[int, int, int]:
             _complete_run(conn, run_id, "success", 0, json.dumps({"note": "no eligible vaults"}))
             return run_id, 0, 0
         metric_payload: list[dict] = []
+        locked_points = None
         for chain_id, vault_address in targets:
             try:
                 points, changed = _refresh_pps(conn, chain_id, vault_address)
                 if not points:
                     continue
                 pps_rows_stored += changed
-                computed = _compute_metrics(chain_id, vault_address, points)
+                if chain_id == 1 and vault_address == LOCKED_YVUSD_ADDRESS:
+                    locked_points = points
+                    computed = None
+                else:
+                    computed = _compute_metrics(chain_id, vault_address, points)
                 if computed:
                     metric_payload.append(computed)
             except Exception as exc:
@@ -499,6 +506,17 @@ def _run_kong_ingestion(conn: psycopg.Connection) -> tuple[int, int, int]:
                     errors.append(f"{chain_id}:{vault_address}:{exc}")
             if KONG_SLEEP_BETWEEN_REQ_MS > 0:
                 time.sleep(KONG_SLEEP_BETWEEN_REQ_MS / 1000)
+        if locked_points is not None:
+            # Keep raw locker PPS intact; its realized return also earns parent PPS.
+            # Run after all refreshes so target ordering cannot select stale parents.
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT ts, pps_raw FROM pps_timeseries WHERE chain_id=1 AND vault_address=%s ORDER BY ts DESC LIMIT %s",
+                    (YVUSD_ADDRESS, KONG_PPS_LIMIT),
+                )
+                parent = {int(ts): float(value) for ts, value in cur.fetchall() if value > 0}
+            combined = [(ts, value * parent[ts]) for ts, value in locked_points if ts in parent and value > 0]
+            metric_payload.append(_compute_metrics(1, LOCKED_YVUSD_ADDRESS, combined))
         metrics_rows = _upsert_metrics(conn, metric_payload)
         summary = {"targets": len(targets), "points": pps_rows_stored, "metrics": metrics_rows, "errors": errors}
         _complete_run(conn, run_id, "success", pps_rows_stored, json.dumps(summary))

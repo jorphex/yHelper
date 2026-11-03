@@ -4,6 +4,9 @@ Run with uv, api/requirements.txt, worker/requirements.txt and --with httpx.
 Failure modes: gross/net precedence, valid zero/negative estimates, wrong-kind
 locker visibility, double-counted TVL, base-only APR mislabeled as total,
 missing/stale price, unfinalized rewards, missing boost reads and empty proposals.
+Locked yvUSD must remain a core product with a combined estimate and realized
+return, never compare locker-only PPS, and never duplicate parent TVL. Missing
+parent history must leave the estimate visible and realized returns unavailable.
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "reports/rate-fixes"
 OUT.mkdir(parents=True, exist_ok=True)
 NOW = int(time.time())
+TODAY = NOW // 86400 * 86400
 WAD, YEAR, EPOCH = 10**18, 365 * 86400, 14 * 86400
 BASE = 160 * 100 * EPOCH * WAD // YEAR
 STAKING = "0x95547ede56cf74b73dd78a37f547127dffda6113"
@@ -69,7 +73,7 @@ VAULTS = [
         "isHidden": False,
         "isRetired": False,
         "tvl": tvl,
-        "asset": {"address": USDC, "symbol": "USDC", "decimals": 6},
+        "asset": {"address": UNLOCKED if address == LOCKED else USDC, "symbol": "yvUSD" if address == LOCKED else "USDC", "decimals": 6},
         "performance": performance,
     }
     for address, symbol, kind, tvl, performance in [
@@ -139,6 +143,32 @@ class Upstream(BaseHTTPRequestHandler):
 
     def do_POST(self):
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        if "query" in request:
+            variables = request["variables"]
+
+            def points(address, humanized=False):
+                if address == UNLOCKED and MODE == "no_parent":
+                    return []
+                return [
+                    {
+                        "time": TODAY - (119 - day) * 86400,
+                        "value": (1 if humanized else 10**6) * (
+                            1.02 ** (min(day, 112) / 365) * 1.04 ** (max(0, day - 112) / 365)
+                            if address == LOCKED else 1.06 ** (day / 365)
+                        ),
+                    }
+                    for day in range(120)
+                    if TODAY - (119 - day) * 86400 >= (variables.get("timestamp") or variables.get("start") or 0)
+                ]
+
+            address = variables["address"]
+            if "label" in variables:
+                return self.send({"data": {"timeseries": points(address)}})
+            return self.send({"data": {
+                "pps": points(address, True),
+                "tvl": [{"time": p["time"], "value": 400} for p in points(address, True)],
+                "parentPps": points(UNLOCKED, True) if variables.get("includeParent") else None,
+            }})
         method, params = request["method"], request["params"]
         if method == "eth_chainId":
             result = "0x1"
@@ -211,10 +241,13 @@ def main():
         ETH_RPC_URL=upstream,
         STYFI_SITE_GLOBAL_DATA_URL=upstream + "/global-data",
         KONG_REST_VAULTS_URL=upstream + "/vaults",
+        KONG_GQL_URL=upstream,
+        KONG_MIN_TVL_USD="0",
+        KONG_MAX_VAULTS="10",
     )
     sys.path.insert(0, str(ROOT / "worker"))
     from worker.config import DDL, UPSERT_SQL
-    from worker.kong import _fetch_kong_snapshot, _normalize_kong_snapshot
+    from worker.kong import _fetch_kong_snapshot, _normalize_kong_snapshot, _run_kong_ingestion
     from worker.styfi import _fetch_styfi_site_reward_state
 
     proc = None
@@ -315,10 +348,8 @@ def main():
                     connection.cursor() as cursor,
                 ):
                     cursor.executemany(UPSERT_SQL, rows)
-                    cursor.executemany(
-                        "INSERT INTO vault_metrics_latest(chain_id,vault_address,as_of,points_count,apy_30d,apy_7d) VALUES (1,%s,NOW(),120,0.02,0.03)",
-                        [(r["vault_address"],) for r in rows],
-                    )
+                    MODE = "valid"
+                    _run_kong_ingestion(connection)
                 response = client.get(
                     "/api/discover",
                     params={"universe": "raw", "min_tvl_usd": 0, "min_points": 0},
@@ -327,14 +358,44 @@ def main():
                 discover = response.json()
                 assert len(discover["rows"]) == 3
                 locked = next(r for r in discover["rows"] if r["symbol"] == "Locked yvUSD")
-                assert locked["realized_apy_30d"] is None, "Locker-only PPS must not be shown as combined realized APY"
-                assert locked["momentum_7d_30d"] is None
+                expected_30d = 1.06 * 1.02 ** (23 / 30) * 1.04 ** (7 / 30) - 1
+                assert abs(locked["realized_apy_30d"] - expected_30d) < 1e-8
+                assert locked["est_apy"] == 0.0773
+                assert locked["aggregate_tvl_usd"] == 0
                 assert discover["summary"]["total_tvl_usd"] == 1500, (
                     "A wrapper must not count its underlying TVL twice"
                 )
+                core = client.get("/api/discover", params={"universe": "core", "min_tvl_usd": 0}).json()
+                assert any(r["vault_address"] == LOCKED for r in core["rows"])
+                changes = client.get("/api/changes", params={"min_tvl_usd": 0}).json()
+                assert changes["summary"]["vaults_with_change"] == 3
+                assert changes["summary"]["tracked_tvl_usd"] == 1500
+                mover = next(r for r in changes["movers"]["risers"] if r["vault_address"] == LOCKED)
+                assert abs(mover["realized_apy_window"] - 0.1024) < 1e-8
+                assert abs(mover["realized_apy_prev_window"] - 0.0812) < 1e-8
+                assert mover["est_apy"] == 0.0773 and mover["aggregate_tvl_usd"] == 0
+                with psycopg.connect(scoped, autocommit=True) as connection:
+                    connection.execute("DELETE FROM pps_timeseries WHERE vault_address=%s", (UNLOCKED,))
+                    MODE = "no_parent"
+                    _run_kong_ingestion(connection)
+                missing = client.get("/api/discover", params={"min_tvl_usd": 0}).json()
+                missing_locked = next(r for r in missing["rows"] if r["vault_address"] == LOCKED)
+                assert missing_locked["est_apy"] == 0.0773 and missing_locked["realized_apy_30d"] is None
+                history_url = f"/api/vaults/1/{LOCKED}/history"
+                missing_history = client.get(history_url).json()
+                assert all(p["apy_7d"] is None and p["pps"] is None for p in missing_history["points"])
+                with psycopg.connect(scoped, autocommit=True) as connection:
+                    MODE = "valid"
+                    _run_kong_ingestion(connection)
+                time.sleep(16)  # Expire the real API's partial-history cooldown.
+                history = client.get(history_url).json()
+                assert history["pps_asset_symbol"] == "USDC"
+                assert history["vault"]["token_symbol"] == "yvUSD"
+                assert abs(history["points"][-1]["apy_7d"] - 0.1024) < 1e-8
+                assert history["points"][-1]["pps"] > 1.02 ** (112 / 365) * 1.04 ** (7 / 365)
                 (OUT / "api-results.json").write_text(
                     json.dumps(
-                        {"passed": True, "staking": results, "discover": discover},
+                        {"passed": True, "staking": results, "discover": discover, "core": core, "changes": changes, "missing_parent": missing_history, "locked_history": history},
                         indent=2,
                     )
                     + "\n"

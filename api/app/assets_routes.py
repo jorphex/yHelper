@@ -7,6 +7,8 @@ from psycopg.rows import dict_row
 
 from app.analytics_service import _bounded_momentum_sql, _bounded_realized_apy_sql
 from app.common import (
+    _aggregate_tvl_sql,
+    _locked_yvusd_filter_sql,
     _rank_gate_filter_sql,
     _resolve_universe_gate,
     _user_visible_filter_sql,
@@ -32,7 +34,7 @@ def _asset_vaults_response(
     min_tvl_usd = float(universe_gate["min_tvl_usd"])
     min_points = int(universe_gate["min_points"])
     max_vaults = universe_gate["max_vaults"]
-    rank_filter = _rank_gate_filter_sql("d", max_vaults=max_vaults)
+    rank_filter = _rank_gate_filter_sql("d", max_vaults=max_vaults, include_locked=True)
     rank_clause = f"AND {rank_filter}" if rank_filter else ""
     params: dict[str, object] = {
         "token_symbol": token_symbol.strip(),
@@ -50,16 +52,17 @@ def _asset_vaults_response(
                 d.chain_id,
                 d.symbol,
                 d.tvl_usd,
+                {_aggregate_tvl_sql("d")} AS aggregate_tvl_usd,
                 d.est_apy,
                 {realized_apy_sql} AS realized_apy_30d,
                 {_bounded_momentum_sql()} AS momentum_7d_30d
             FROM vault_dim d
-            JOIN vault_metrics_latest m
+            LEFT JOIN vault_metrics_latest m
               ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
-            WHERE {_user_visible_filter_sql("d", include_retired=False)}
+            WHERE {_user_visible_filter_sql("d", include_retired=False, include_locked=True)}
               AND LOWER(COALESCE(d.token_symbol, '')) = LOWER(%(token_symbol)s)
               AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
-              AND COALESCE(m.points_count, 0) >= %(min_points)s
+              AND (COALESCE(m.points_count, 0) >= %(min_points)s OR {_locked_yvusd_filter_sql("d")})
               {rank_clause}
         )
     """
@@ -71,15 +74,15 @@ def _asset_vaults_response(
                 SELECT
                     COUNT(*) AS vaults,
                     COUNT(DISTINCT chain_id) AS chains,
-                    COALESCE(SUM(COALESCE(tvl_usd, 0.0)), 0.0) AS total_tvl_usd,
+                    COALESCE(SUM(aggregate_tvl_usd), 0.0) AS total_tvl_usd,
                     MAX(realized_apy_30d) AS best_realized_apy_30d,
                     MIN(realized_apy_30d) AS worst_realized_apy_30d,
                     MAX(realized_apy_30d) - MIN(realized_apy_30d) AS realized_spread_30d,
                     CASE
-                        WHEN SUM(COALESCE(tvl_usd, 0.0)) FILTER (WHERE realized_apy_30d IS NOT NULL) > 0
-                        THEN SUM(COALESCE(tvl_usd, 0.0) * realized_apy_30d)
+                        WHEN SUM(aggregate_tvl_usd) FILTER (WHERE realized_apy_30d IS NOT NULL) > 0
+                        THEN SUM(aggregate_tvl_usd * realized_apy_30d)
                              FILTER (WHERE realized_apy_30d IS NOT NULL)
-                             / SUM(COALESCE(tvl_usd, 0.0)) FILTER (WHERE realized_apy_30d IS NOT NULL)
+                             / SUM(aggregate_tvl_usd) FILTER (WHERE realized_apy_30d IS NOT NULL)
                         ELSE NULL
                     END AS weighted_realized_apy_30d
                 FROM filtered
@@ -90,7 +93,7 @@ def _asset_vaults_response(
             cur.execute(
                 filtered_cte
                 + """
-                SELECT vault_address, chain_id, symbol, tvl_usd, est_apy,
+                SELECT vault_address, chain_id, symbol, tvl_usd, aggregate_tvl_usd, est_apy,
                        realized_apy_30d, momentum_7d_30d
                 FROM filtered
                 ORDER BY realized_apy_30d DESC NULLS LAST, tvl_usd DESC

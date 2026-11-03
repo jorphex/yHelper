@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Path, Response
 from psycopg.rows import dict_row
 
 from app.common import _kong_source_freshness
-from app.config import APY_MAX, APY_MIN, CHAIN_LABELS, KONG_GQL_URL
+from app.config import APY_MAX, APY_MIN, CHAIN_LABELS, KONG_GQL_URL, LOCKED_YVUSD_ADDRESS, YVUSD_ADDRESS
 from app.db import connect
 from app.models import VaultHistoryResponse
 from app.transport import fetch
@@ -24,11 +24,14 @@ router = APIRouter()
 LOGGER = logging.getLogger(__name__)
 DAY = 86400
 QUERY = """
-query VaultHistory($chain: Int, $address: String, $start: BigInt) {
+query VaultHistory($chain: Int, $address: String, $start: BigInt, $parent: String, $includeParent: Boolean!) {
   pps: timeseries(label: "pps", component: "humanized", chainId: $chain,
     address: $address, timestamp: $start, period: "1 day", limit: 100) { time value }
   tvl: timeseries(label: "tvl-c", component: "tvl", chainId: $chain,
     address: $address, timestamp: $start, period: "1 day", limit: 100) { time value }
+  parentPps: timeseries(label: "pps", component: "humanized", chainId: $chain,
+    address: $parent, timestamp: $start, period: "1 day", limit: 100)
+    @include(if: $includeParent) { time value }
 }
 """
 EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="vault-history")
@@ -64,6 +67,8 @@ def _build(chain_id: int, address: str, previous: dict | None = None) -> dict:
     deadline = time.monotonic() + 18
     today = int(datetime.now(UTC).timestamp()) // DAY * DAY
     start = today - 98 * DAY
+    locked = chain_id == 1 and address == LOCKED_YVUSD_ADDRESS
+    parent_stored, parent_decimals = [], None
     with connect(row_factory=dict_row) as conn, conn.cursor() as cur:
         cur.execute(
             """SELECT chain_id, vault_address, symbol, name, token_symbol, token_decimals, est_apy
@@ -82,8 +87,17 @@ def _build(chain_id: int, address: str, previous: dict | None = None) -> dict:
             (chain_id, address, start),
         )
         stored = cur.fetchall()
+        pps_asset_symbol = vault["token_symbol"]
+        if locked:
+            cur.execute("SELECT token_symbol, token_decimals FROM vault_dim WHERE chain_id=1 AND vault_address=%s", (YVUSD_ADDRESS,))
+            parent = cur.fetchone()
+            pps_asset_symbol = parent["token_symbol"] if parent else None
+            parent_decimals = parent["token_decimals"] if parent else None
+            cur.execute("SELECT ts, pps_raw FROM pps_timeseries WHERE chain_id=1 AND vault_address=%s AND ts >= %s ORDER BY ts DESC LIMIT 100", (YVUSD_ADDRESS, start))
+            parent_stored = cur.fetchall()
     decimals = vault.pop("token_decimals")
     pps, tvl = {}, {}
+    parent_pps = {}
     pps_source = "unavailable"
     tvl_source = "unavailable"
     try:
@@ -95,7 +109,7 @@ def _build(chain_id: int, address: str, previous: dict | None = None) -> dict:
             max_bytes=1024 * 1024,
             json={
                 "query": QUERY,
-                "variables": {"chain": chain_id, "address": address, "start": start},
+                "variables": {"chain": chain_id, "address": address, "start": start, "parent": YVUSD_ADDRESS if locked else None, "includeParent": locked},
             },
         )
         if reply.status != 200:
@@ -106,6 +120,11 @@ def _build(chain_id: int, address: str, previous: dict | None = None) -> dict:
         data = payload.get("data")
         if not isinstance(data, dict):
             raise TypeError("Vault history upstream returned no data")
+        if locked:
+            try:
+                parent_pps = _series(data.get("parentPps"), start, today, positive=True)
+            except (ValueError, TypeError):
+                LOGGER.warning("Invalid parent vault history series")
         for label, positive in (("pps", True), ("tvl", False)):
             try:
                 values = _series(data.get(label), start, today, positive=positive)
@@ -133,6 +152,18 @@ def _build(chain_id: int, address: str, previous: dict | None = None) -> dict:
             positive=True,
         )
         if pps:
+            pps_source = "stored"
+    if locked:
+        parent_source = "kong" if parent_pps else "stored"
+        if not parent_pps and isinstance(parent_decimals, int) and 0 <= parent_decimals <= 36:
+            parent_pps = _series(
+                [{"time": row["ts"], "value": float(row["pps_raw"]) / 10**parent_decimals} for row in parent_stored],
+                start, today, positive=True,
+            )
+        pps = {ts: value * parent_pps[ts] for ts, value in pps.items() if ts in parent_pps and pps_asset_symbol}
+        if not pps:
+            pps_source = "unavailable"
+        elif parent_source != "kong" or pps_source != "kong":
             pps_source = "stored"
     prior = {
         point["timestamp"]: point
@@ -178,6 +209,7 @@ def _build(chain_id: int, address: str, previous: dict | None = None) -> dict:
         state = "delayed"
     return {
         "vault": vault,
+        "pps_asset_symbol": pps_asset_symbol,
         "points": points,
         "source_freshness": freshness,
         "history_state": state,
