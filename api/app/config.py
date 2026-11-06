@@ -124,6 +124,8 @@ def _ensure_schema_columns() -> None:
 
     with connect() as conn:
         with conn.cursor() as cur:
+            cur.execute("ALTER TABLE IF EXISTS styfi_epoch_stats ADD COLUMN IF NOT EXISTS reward_vote_boost_raw NUMERIC(78, 0)")
+            cur.execute("ALTER TABLE IF EXISTS styfi_epoch_stats ADD COLUMN IF NOT EXISTS is_finalized BOOLEAN")
             cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS token_decimals INTEGER")
             cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS origin TEXT")
             cur.execute("ALTER TABLE vault_dim ADD COLUMN IF NOT EXISTS inclusion JSONB NOT NULL DEFAULT '{}'::jsonb")

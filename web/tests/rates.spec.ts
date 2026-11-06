@@ -29,6 +29,29 @@ for (const mode of ["valid", "stale_price"] as const) {
   });
 }
 
+for (const pending of [false, true]) {
+  test(`Staking allocations include Vote Boost and disjoint base shares; pending=${pending}`, async ({ page }, testInfo) => {
+    const evidence = JSON.parse(fs.readFileSync(source, "utf8"));
+    const data = pending ? evidence.pending_allocations : evidence.epoch_allocations;
+    await page.route("**/api/styfi?**", route => route.fulfill({ json: data }));
+    await page.goto("/styfi");
+    const table = page.getByRole("table", { name: "Epoch allocations" });
+    await expect(table.getByRole("columnheader", { name: "Vote Boost" })).toBeVisible();
+    await expect(table.getByRole("columnheader", { name: "stYFIx", exact: true })).toHaveCount(0);
+    const row = table.getByRole("row").filter({ has: page.locator('td[data-label="Epoch"]').filter({ hasText: /^17$/ }) });
+    await expect(row).toContainText(pending ? "Pending" : "Finalized");
+    if (pending) await expect(row.locator('td[data-label="Vote Boost"]')).toHaveText("Pending");
+    else {
+      await expect(page.getByText("Base reward split · settled epoch 17", { exact: true })).toBeVisible();
+      await expect(page.locator(".bar-list li").filter({ hasText: "Direct stYFI" })).toContainText("70%");
+      await expect(page.locator(".bar-list li").filter({ hasText: "stYFIx" })).toContainText("30%");
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`epoch-allocation-${pending ? "pending" : "settled"}.png`), fullPage: true });
+  });
+}
+
 test("Vault discovery displays net estimates and the locked yvUSD option", async ({ page }, testInfo) => {
   const evidence = JSON.parse(fs.readFileSync(source, "utf8"));
   await page.route("**/api/discover?**", route => route.fulfill({ json: evidence.discover }));

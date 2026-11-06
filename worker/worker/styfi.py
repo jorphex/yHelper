@@ -199,6 +199,7 @@ def _fetch_styfi_snapshot_data(
         rpc_cache_hit()
         rpc_cache_hit()
     current_epoch = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch()")
+    next_unfinalized_epoch = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "last_epoch()")
     genesis = _safe_int(state.get("genesis"))
     if genesis is None or genesis <= 0:
         genesis = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "genesis()")
@@ -249,18 +250,22 @@ def _fetch_styfi_snapshot_data(
         ):
             continue
         reward_total = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch_rewards(uint256)", ("uint256", epoch))
+        finalized = epoch < next_unfinalized_epoch
         epochs.append(
             {
                 "chain_id": STYFI_CHAIN_ID,
                 "epoch": epoch,
                 "epoch_start": _styfi_epoch_start(genesis, epoch),
                 "reward_total_raw": reward_total,
-                "reward_styfi_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["styfi_reward_distributor"]),
-                "reward_styfix_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["styfix_reward_distributor"]),
-                "reward_veyfi_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["veyfi_reward_distributor"]),
+                "is_finalized": finalized,
+                "reward_styfi_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["styfi_reward_distributor"]) if finalized else 0,
+                # Compatibility column; stYFIx is nested in staking, not a main recipient.
+                "reward_styfix_raw": 0,
+                "reward_veyfi_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["veyfi_reward_distributor"]) if finalized else 0,
                 "reward_liquid_lockers_raw": _styfi_component_reward(
                     epoch, STYFI_CONTRACTS["liquid_locker_reward_distributor"]
-                ),
+                ) if finalized else 0,
+                "reward_vote_boost_raw": _styfi_component_reward(epoch, STYFI_CONTRACTS["vote_boost_reward_distributor"]) if finalized else 0,
             }
         )
 
@@ -344,7 +349,9 @@ def _upsert_styfi_epoch_stats(conn: psycopg.Connection, rows: list[dict[str, obj
                 reward_styfi_raw,
                 reward_styfix_raw,
                 reward_veyfi_raw,
-                reward_liquid_lockers_raw
+                reward_liquid_lockers_raw,
+                reward_vote_boost_raw,
+                is_finalized
             ) VALUES (
                 %(chain_id)s,
                 %(epoch)s,
@@ -353,7 +360,9 @@ def _upsert_styfi_epoch_stats(conn: psycopg.Connection, rows: list[dict[str, obj
                 %(reward_styfi_raw)s,
                 %(reward_styfix_raw)s,
                 %(reward_veyfi_raw)s,
-                %(reward_liquid_lockers_raw)s
+                %(reward_liquid_lockers_raw)s,
+                %(reward_vote_boost_raw)s,
+                %(is_finalized)s
             )
             ON CONFLICT (chain_id, epoch) DO UPDATE SET
                 epoch_start = EXCLUDED.epoch_start,
@@ -362,6 +371,8 @@ def _upsert_styfi_epoch_stats(conn: psycopg.Connection, rows: list[dict[str, obj
                 reward_styfix_raw = EXCLUDED.reward_styfix_raw,
                 reward_veyfi_raw = EXCLUDED.reward_veyfi_raw,
                 reward_liquid_lockers_raw = EXCLUDED.reward_liquid_lockers_raw,
+                reward_vote_boost_raw = EXCLUDED.reward_vote_boost_raw,
+                is_finalized = EXCLUDED.is_finalized,
                 fetched_at = NOW()
             """,
             rows,
@@ -408,7 +419,7 @@ def _run_styfi_snapshot(conn: psycopg.Connection) -> tuple[int, int, int]:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT epoch, fetched_at FROM styfi_epoch_stats WHERE chain_id = %s",
+                "SELECT epoch, fetched_at FROM styfi_epoch_stats WHERE chain_id = %s AND is_finalized IS TRUE AND reward_vote_boost_raw IS NOT NULL",
                 (STYFI_CHAIN_ID,),
             )
             cached_epochs = {int(epoch): fetched for epoch, fetched in cur.fetchall()}

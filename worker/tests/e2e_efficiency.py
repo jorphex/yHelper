@@ -76,6 +76,7 @@ SIGNATURES = {
         "latestRoundData()",
         "token()",
         "epoch()",
+        "last_epoch()",
         "genesis()",
         "totalSupply()",
         "epoch_rewards(uint256)",
@@ -298,6 +299,7 @@ class Upstream(BaseHTTPRequestHandler):
                 "decimals()": [8 if call["to"].lower() == FEED else 6],
                 "token()": [int(USDC, 16)],
                 "epoch()": [EPOCH],
+                "last_epoch()": [EPOCH],
                 "min_debt()": [RISK],
                 "genesis()": [MIDNIGHT - 19 * 14 * 86400],
                 "one_pct()": [10000],
@@ -614,7 +616,7 @@ def main():
             styfi._run_styfi_snapshot(conn)
             assert (
                 COUNTS["epoch_rewards(uint256)"] == 2
-                and COUNTS["rewards(address,uint256)"] == 8
+                and COUNTS["rewards(address,uint256)"] == 4
             )
             assert COUNTS["token()"] == COUNTS["genesis()"] == COUNTS["decimals()"] == COUNTS["symbol()"] == 0, "Warm metadata must be reused"
             conn.execute("UPDATE styfi_sync_state SET payload=jsonb_set(payload,'{metadata_updated_at}','0')")
@@ -644,7 +646,7 @@ def main():
                 == EPOCH
             )
             evidence["styfi"] = (
-                "warm history reads fall from 60 to 10 reward calls; daily correction and epoch rollover verified"
+                "warm refresh reads two pots and four finalized allocations; daily correction and epoch rollover verified"
             )
 
             accounting._run_protocol_tvl_ingestion(conn)

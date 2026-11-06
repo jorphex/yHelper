@@ -27,7 +27,8 @@ type StYfiEpochPoint = {
   epoch_start?: string | null;
   reward_total?: number | null;
   reward_styfi?: number | null;
-  reward_styfix?: number | null;
+  reward_vote_boost?: number | null;
+  is_finalized?: boolean | null;
   reward_veyfi?: number | null;
   reward_liquid_lockers?: number | null;
 };
@@ -65,6 +66,7 @@ type StYfiResponse = {
   };
   current_reward_state?: StakingSourceState & StakingAprState & {
     epoch?: number | null;
+    apr_reward_epoch?: number | null;
     styfi_current_apr?: number | null;
     styfix_current_apr?: number | null;
     styfi_current_reward?: number | null;
@@ -214,20 +216,26 @@ function StYfiPageContent() {
     { id: "migrated-yfi", label: "Migrated veYFI", points: snapshotSeries.map((r) => r.migrated_yfi), note: "Balance recorded by stYFI" },
   ], [snapshotSeries]);
 
-  const rewardBars = useMemo(() => [
+  const rewardBars = useMemo(() => {
+    const total = data?.current_reward_state?.styfi_current_reward;
+    const delegated = data?.current_reward_state?.styfix_current_reward;
+    const valid = total != null && delegated != null && Number.isFinite(total) && Number.isFinite(delegated) && total >= delegated && delegated >= 0;
+    const direct = valid ? total - delegated : null;
+    return [
     { 
       id: "styfi", 
-      label: "stYFI", 
-      value: data?.current_reward_state?.styfi_current_reward ?? null,
-      note: percentShare(data?.current_reward_state?.styfi_current_reward ?? null, (data?.current_reward_state?.styfi_current_reward ?? 0) + (data?.current_reward_state?.styfix_current_reward ?? 0)),
+      label: "Direct stYFI",
+      value: direct,
+      note: percentShare(direct, total),
     },
     { 
       id: "styfix", 
       label: "stYFIx", 
-      value: data?.current_reward_state?.styfix_current_reward ?? null,
-      note: percentShare(data?.current_reward_state?.styfix_current_reward ?? null, (data?.current_reward_state?.styfi_current_reward ?? 0) + (data?.current_reward_state?.styfix_current_reward ?? 0)),
+      value: valid ? delegated : null,
+      note: percentShare(valid ? delegated : null, total),
     },
-  ], [data?.current_reward_state]);
+  ];
+  }, [data?.current_reward_state]);
 
   // Error state fallback - after all hooks
   if (error && !data) {
@@ -296,7 +304,7 @@ function StYfiPageContent() {
       <section className="section section-lg">
         <p className="section-note">APR uses settled rewards; the range reflects voting participation. stYFIx includes Vote Boost. Rewards in {rewardSymbol} shares.</p>
         <BarList
-          title={`Base reward split (Epoch ${data?.current_reward_state?.epoch ?? "-"})`}
+          title={`Base reward split${data?.current_reward_state?.apr_reward_epoch != null ? ` · settled epoch ${data.current_reward_state.apr_reward_epoch}` : ""}`}
           items={rewardBars}
           valueFormatter={(value) => formatToken(value, rewardSymbol, 2)}
           emptyText="Reward split is not available yet."
@@ -414,7 +422,7 @@ function StYfiPageContent() {
         <div className="card-header">
           <div>
             <p className="card-description">
-              Protocol allocations, not individual claims. Epochs start at 00:00 UTC.
+              Staking includes stYFIx. Allocations finalize after each epoch.
             </p>
           </div>
         </div>
@@ -426,9 +434,9 @@ function StYfiPageContent() {
                 <th>Status</th>
                 <th>Start</th>
                 <th className="numeric">Reward pot</th>
-                <th className="numeric">stYFI</th>
-                <th className="numeric">stYFIx</th>
-                <th className="numeric">veYFI</th>
+                <th className="numeric">Staking</th>
+                <th className="numeric">Vote Boost</th>
+                <th className="numeric">Migrated veYFI</th>
                 <th className="numeric">Liquid lockers</th>
               </tr>
             </thead>
@@ -438,20 +446,21 @@ function StYfiPageContent() {
               ) : (
                 [...epochSeries].reverse().slice(0, 10).map((row) => {
                   const isCurrent = row.epoch === currentEpoch;
+                  const allocation = (value: number | null | undefined) => row.is_finalized === true ? formatToken(value, rewardSymbol, 2) : row.is_finalized === false ? "Pending" : "Unavailable";
                   return (
                     <tr key={row.epoch ?? row.epoch_start ?? "epoch"}>
                       <td data-label="Epoch">{row.epoch ?? "n/a"}</td>
                       <td data-label="Status">
                         <span className={isCurrent ? "badge badge-primary" : "badge"}>
-                          {isCurrent ? "Ongoing" : "Completed"}
+                          {isCurrent ? "Ongoing" : row.is_finalized === true ? "Finalized" : row.is_finalized === false ? "Pending" : "Unavailable"}
                         </span>
                       </td>
                       <td data-label="Start">{formatUtcDate(row.epoch_start ?? null)}</td>
                       <td data-label="Reward pot" className="data-value numeric">{formatToken(row.reward_total, rewardSymbol, 2)}</td>
-                      <td data-label="stYFI" className="data-value numeric">{formatToken(row.reward_styfi, rewardSymbol, 2)}</td>
-                      <td data-label="stYFIx" className="data-value numeric">{formatToken(row.reward_styfix, rewardSymbol, 2)}</td>
-                      <td data-label="veYFI" className="data-value numeric">{formatToken(row.reward_veyfi, rewardSymbol, 2)}</td>
-                      <td data-label="Liquid lockers" className="data-value numeric">{formatToken(row.reward_liquid_lockers, rewardSymbol, 2)}</td>
+                      <td data-label="Staking" className="data-value numeric">{allocation(row.reward_styfi)}</td>
+                      <td data-label="Vote Boost" className="data-value numeric">{allocation(row.reward_vote_boost)}</td>
+                      <td data-label="Migrated veYFI" className="data-value numeric">{allocation(row.reward_veyfi)}</td>
+                      <td data-label="Liquid lockers" className="data-value numeric">{allocation(row.reward_liquid_lockers)}</td>
                     </tr>
                   );
                 })

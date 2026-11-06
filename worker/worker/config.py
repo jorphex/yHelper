@@ -244,6 +244,7 @@ STYFI_CONTRACTS = {
     "reward_claimer": "0xa82454009e01ae697012a73cb232d85e61b05e50",
     "veyfi_reward_distributor": "0x2548bf65916fdabb5a5673fc4225011ff29ee884",
     "liquid_locker_reward_distributor": "0x7efc3953bed2fc20b9f825ebffab1cc8b072a000",
+    "vote_boost_reward_distributor": "0xa139250bcb3880a97c75fd4287d5bf2a6caf98a3",
 }
 
 EVENT_TOPIC_DEPOSIT = f"0x{keccak(text='Deposit(address,address,uint256,uint256)').hex()}"
@@ -473,6 +474,8 @@ CREATE TABLE IF NOT EXISTS styfi_epoch_stats (
 );
 CREATE INDEX IF NOT EXISTS idx_styfi_epoch_stats_chain_start
     ON styfi_epoch_stats(chain_id, epoch_start DESC);
+ALTER TABLE styfi_epoch_stats ADD COLUMN IF NOT EXISTS reward_vote_boost_raw NUMERIC(78, 0);
+ALTER TABLE styfi_epoch_stats ADD COLUMN IF NOT EXISTS is_finalized BOOLEAN;
 
 CREATE TABLE IF NOT EXISTS styfi_sync_state (
     stream_name TEXT PRIMARY KEY,

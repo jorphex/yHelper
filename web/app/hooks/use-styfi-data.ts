@@ -22,7 +22,8 @@ type StYfiEpochPoint = {
   epoch_start?: string | null;
   reward_total?: number | null;
   reward_styfi?: number | null;
-  reward_styfix?: number | null;
+  reward_vote_boost?: number | null;
+  is_finalized?: boolean | null;
   reward_veyfi?: number | null;
   reward_liquid_lockers?: number | null;
 };
@@ -72,6 +73,7 @@ type StYfiResponse = {
     decimals?: number | null;
   };
   current_reward_state?: StakingSourceState & StakingAprState & {
+    apr_reward_epoch?: number | null;
     source?: string | null;
     epoch?: number | null;
     timestamp?: number | null;

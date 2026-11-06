@@ -7,6 +7,8 @@ missing/stale price, unfinalized rewards, missing boost reads and empty proposal
 Locked yvUSD must remain a core product with a combined estimate and realized
 return, never compare locker-only PPS, and never duplicate parent TVL. Missing
 parent history must leave the estimate visible and realized returns unavailable.
+Epoch allocations must include Vote Boost, preserve unknown migrated history,
+retry unsynced epochs, and never report stYFIx as an independent main recipient.
 """
 
 from __future__ import annotations
@@ -58,8 +60,8 @@ SOURCES = {
         },
         "rewards": {"pps": str(WAD)},
     },
-    "styfi": {"current": {"aprBps": "800"}, "projected": {"aprBps": "1100"}},
-    "styfix": {"current": {"aprBps": "800"}, "projected": {"aprBps": "1100"}},
+    "styfi": {"current": {"aprBps": "800", "rewards": str(BASE)}, "projected": {"aprBps": "1100"}},
+    "styfix": {"current": {"aprBps": "800", "rewards": str(BASE * 3 // 10)}, "projected": {"aprBps": "1100"}},
 }
 VAULTS = [
     {
@@ -107,6 +109,7 @@ SIGNATURES = {
         "last_epoch()",
         "token()",
         "decimals()",
+        "symbol()",
         "asset()",
         "convertToAssets(uint256)",
         "total_weight_cursor()",
@@ -118,6 +121,9 @@ SIGNATURES = {
         "weight(uint256,address)",
         "balanceOf(address)",
         "totalSupply()",
+        "totalAssets()",
+        "genesis()",
+        "epoch_rewards(uint256)",
         "num_votes(uint256,address)",
     ]
 }
@@ -175,9 +181,12 @@ class Upstream(BaseHTTPRequestHandler):
         elif method == "eth_getBlockByNumber":
             result = {"number": "0x64", "timestamp": hex(NOW), "hash": "0x" + "a" * 64}
         else:
-            assert method == "eth_call" and params[1] == "0x64"
+            assert method == "eth_call" and params[1] in ("0x64", "latest")
             call = params[0]
             signature = SIGNATURES[call["data"][2:10]]
+            if signature == "symbol()":
+                result = "0x" + f"{32:064x}{8:064x}" + b"yvUSDC-1".hex().ljust(64, "0")
+                return self.send({"jsonrpc": "2.0", "id": request["id"], "result": result})
             arg = call["data"][10:]
             boost = BOOST[2:] in arg.lower()
             values = {
@@ -199,6 +208,9 @@ class Upstream(BaseHTTPRequestHandler):
                 "weight(uint256,address)": [60 * WAD],
                 "balanceOf(address)": [10 * WAD],
                 "totalSupply()": [10 * WAD],
+                "totalAssets()": [10 * WAD],
+                "genesis()": [TODAY - 18 * EPOCH],
+                "epoch_rewards(uint256)": [BASE * 9 // 2],
             }[signature]
             if MODE == "missing_boost" and boost:
                 return self.send(
@@ -248,7 +260,7 @@ def main():
     sys.path.insert(0, str(ROOT / "worker"))
     from worker.config import DDL, UPSERT_SQL
     from worker.kong import _fetch_kong_snapshot, _normalize_kong_snapshot, _run_kong_ingestion
-    from worker.styfi import _fetch_styfi_site_reward_state
+    from worker.styfi import _fetch_styfi_site_reward_state, _run_styfi_snapshot
 
     proc = None
     try:
@@ -256,6 +268,10 @@ def main():
             connection.execute(f"CREATE SCHEMA {schema}")
         with psycopg.connect(scoped, autocommit=True) as connection:
             connection.execute(DDL)
+            connection.execute(
+                "INSERT INTO styfi_epoch_stats (chain_id,epoch,epoch_start,reward_total_raw,reward_styfi_raw,reward_styfix_raw,reward_veyfi_raw,reward_liquid_lockers_raw) VALUES (1,7,NOW(),%s,%s,0,%s,%s)",
+                (BASE * 9 // 2, BASE, BASE, BASE),
+            )
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))
             port = sock.getsockname()[1]
@@ -331,6 +347,29 @@ def main():
                             result["styfi_estimated_max_apr"] is None
                             and result["styfix_current_apr"] is None
                         ), mode
+                legacy = client.get("/api/styfi").json()
+                old_epoch = next(e for e in legacy["series"]["epochs"] if e["epoch"] == 7)
+                assert old_epoch["is_finalized"] is None and old_epoch["reward_vote_boost"] is None
+                assert old_epoch["reward_styfi"] is None, "Unverified migrated rows must not look complete"
+                MODE = "unfinalized"
+                with psycopg.connect(scoped) as connection:
+                    _run_styfi_snapshot(connection)
+                pending_epochs = client.get("/api/styfi").json()
+                pending = next(e for e in pending_epochs["series"]["epochs"] if e["epoch"] == 17)
+                assert pending["is_finalized"] is False and pending["reward_vote_boost"] is None
+                assert pending["reward_styfi"] is None and pending["reward_total"] > 0
+                assert pending_epochs["component_split_latest_completed"]["epoch"] == 16
+                MODE = "valid"
+                with psycopg.connect(scoped) as connection:
+                    _run_styfi_snapshot(connection)
+                allocations = client.get("/api/styfi").json()
+                completed = next(e for e in allocations["series"]["epochs"] if e["epoch"] == 17)
+                assert completed["is_finalized"] is True and completed["reward_styfix"] is None
+                assert abs(completed["reward_vote_boost"] - BASE * 3 / 2 / WAD) < 1e-8
+                assert abs(sum(completed[k] for k in ("reward_styfi", "reward_veyfi", "reward_liquid_lockers", "reward_vote_boost")) - completed["reward_total"]) < 1e-8
+                assert allocations["component_split_latest_completed"]["epoch"] == 17
+                assert [e["component"] for e in allocations["component_split_latest_completed"]["rows"]] == ["Staking (includes stYFIx)", "Migrated veYFI", "Liquid lockers", "Vote Boost"]
+                assert next(e for e in allocations["series"]["epochs"] if e["epoch"] == 7)["reward_vote_boost"] is not None, "Incomplete cached history must refresh without waiting a day"
                 rows = _normalize_kong_snapshot(_fetch_kong_snapshot()[0])
                 for row, expected in zip(rows, [0.0602, 0.0773, 0.0625], strict=True):
                     assert row["est_apy"] == expected
@@ -395,7 +434,7 @@ def main():
                 assert history["points"][-1]["pps"] > 1.02 ** (112 / 365) * 1.04 ** (7 / 365)
                 (OUT / "api-results.json").write_text(
                     json.dumps(
-                        {"passed": True, "staking": results, "discover": discover, "core": core, "changes": changes, "missing_parent": missing_history, "locked_history": history},
+                        {"passed": True, "staking": results, "discover": discover, "core": core, "changes": changes, "missing_parent": missing_history, "locked_history": history, "epoch_allocations": allocations, "pending_allocations": pending_epochs, "legacy_allocations": legacy},
                         indent=2,
                     )
                     + "\n"

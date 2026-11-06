@@ -572,7 +572,9 @@ class StyfiEpoch(ApiModel):
     epoch_start: str | None
     reward_total: float | None
     reward_styfi: float | None
-    reward_styfix: float | None
+    reward_styfix: float | None = Field(default=None, deprecated=True, description="Not a main distributor component; included in reward_styfi.")
+    reward_vote_boost: float | None = None
+    is_finalized: bool | None = Field(default=None, description="Contract-confirmed finalization; null means historical allocation data has not been verified yet.")
     reward_veyfi: float | None
     reward_liquid_lockers: float | None
 

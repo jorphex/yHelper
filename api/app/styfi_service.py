@@ -360,9 +360,10 @@ def _styfi_epoch_series(cur: psycopg.Cursor, *, epoch_limit: int, reward_scale: 
         SELECT
             epoch,
             epoch_start,
+            is_finalized,
             (reward_total_raw::numeric / %(scale)s)::double precision AS reward_total,
             (reward_styfi_raw::numeric / %(scale)s)::double precision AS reward_styfi,
-            (reward_styfix_raw::numeric / %(scale)s)::double precision AS reward_styfix,
+            (reward_vote_boost_raw::numeric / %(scale)s)::double precision AS reward_vote_boost,
             (reward_veyfi_raw::numeric / %(scale)s)::double precision AS reward_veyfi,
             (reward_liquid_lockers_raw::numeric / %(scale)s)::double precision AS reward_liquid_lockers
         FROM styfi_epoch_stats
@@ -378,10 +379,12 @@ def _styfi_epoch_series(cur: psycopg.Cursor, *, epoch_limit: int, reward_scale: 
             "epoch": int(row.get("epoch") or 0),
             "epoch_start": row["epoch_start"].isoformat() if row.get("epoch_start") else None,
             "reward_total": _to_float_or_none(row.get("reward_total")),
-            "reward_styfi": _to_float_or_none(row.get("reward_styfi")),
-            "reward_styfix": _to_float_or_none(row.get("reward_styfix")),
-            "reward_veyfi": _to_float_or_none(row.get("reward_veyfi")),
-            "reward_liquid_lockers": _to_float_or_none(row.get("reward_liquid_lockers")),
+            "is_finalized": row.get("is_finalized") if row.get("reward_vote_boost") is not None else None,
+            "reward_styfi": _to_float_or_none(row.get("reward_styfi")) if row.get("is_finalized") is True and row.get("reward_vote_boost") is not None else None,
+            "reward_styfix": None,
+            "reward_veyfi": _to_float_or_none(row.get("reward_veyfi")) if row.get("is_finalized") is True and row.get("reward_vote_boost") is not None else None,
+            "reward_liquid_lockers": _to_float_or_none(row.get("reward_liquid_lockers")) if row.get("is_finalized") is True and row.get("reward_vote_boost") is not None else None,
+            "reward_vote_boost": _to_float_or_none(row.get("reward_vote_boost")) if row.get("is_finalized") is True else None,
         }
         for row in rows
     ]
@@ -395,12 +398,13 @@ def _styfi_latest_component_split(cur: psycopg.Cursor, *, current_epoch: int | N
         SELECT
             epoch,
             (reward_styfi_raw::numeric / %(scale)s)::double precision AS reward_styfi,
-            (reward_styfix_raw::numeric / %(scale)s)::double precision AS reward_styfix,
+            (reward_vote_boost_raw::numeric / %(scale)s)::double precision AS reward_vote_boost,
             (reward_veyfi_raw::numeric / %(scale)s)::double precision AS reward_veyfi,
             (reward_liquid_lockers_raw::numeric / %(scale)s)::double precision AS reward_liquid_lockers
         FROM styfi_epoch_stats
         WHERE chain_id = %(chain_id)s
           AND epoch < %(current_epoch)s
+          AND is_finalized IS TRUE AND reward_vote_boost_raw IS NOT NULL
         ORDER BY epoch DESC
         LIMIT 1
         """,
@@ -412,10 +416,10 @@ def _styfi_latest_component_split(cur: psycopg.Cursor, *, current_epoch: int | N
     return {
         "epoch": int(row.get("epoch") or 0),
         "rows": [
-            {"component": "stYFI", "reward": _to_float_or_none(row.get("reward_styfi"))},
-            {"component": "stYFIx", "reward": _to_float_or_none(row.get("reward_styfix"))},
+            {"component": "Staking (includes stYFIx)", "reward": _to_float_or_none(row.get("reward_styfi"))},
             {"component": "Migrated veYFI", "reward": _to_float_or_none(row.get("reward_veyfi"))},
             {"component": "Liquid lockers", "reward": _to_float_or_none(row.get("reward_liquid_lockers"))},
+            {"component": "Vote Boost", "reward": _to_float_or_none(row.get("reward_vote_boost"))},
         ],
     }
 
