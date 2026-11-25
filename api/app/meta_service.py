@@ -245,7 +245,7 @@ def _freshness_snapshot(
             }
         result["ingestion_jobs"] = jobs
 
-        cur.execute("SELECT to_regclass('public.alert_state') AS table_name")
+        cur.execute("SELECT to_regclass('alert_state') AS table_name")
         alert_table = (cur.fetchone() or {}).get("table_name")
         if alert_table:
             cur.execute(

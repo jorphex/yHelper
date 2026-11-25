@@ -21,9 +21,6 @@ from app.config import (
     USER_VISIBLE_VERSION_PREFIX,
 )
 
-MARKET_VALUES = ("all", "stablecoins", "eth", "bitcoin", "other")
-
-
 def _public_error(value: object) -> str | None:
     """Keep raw upstream exceptions in server diagnostics, not public responses."""
     return "Upstream request failed." if value else None
@@ -134,37 +131,18 @@ def _resolve_universe_gate(
     min_tvl_usd: float | None,
     min_points: int | None,
     max_vaults: int | None,
-) -> dict[str, float | int | str | None]:
-    defaults = {
-        "core": {
-            "min_tvl_usd": UNIVERSE_CORE_MIN_TVL_USD,
-            "min_points": UNIVERSE_CORE_MIN_POINTS,
-            "max_vaults": UNIVERSE_CORE_MAX_VAULTS,
-        },
-        "extended": {
-            "min_tvl_usd": UNIVERSE_EXTENDED_MIN_TVL_USD,
-            "min_points": UNIVERSE_EXTENDED_MIN_POINTS,
-            "max_vaults": UNIVERSE_EXTENDED_MAX_VAULTS,
-        },
-        "raw": {
-            "min_tvl_usd": UNIVERSE_RAW_MIN_TVL_USD,
-            "min_points": UNIVERSE_RAW_MIN_POINTS,
-            "max_vaults": UNIVERSE_RAW_MAX_VAULTS,
-        },
-    }
-    fallback = defaults[universe]
-    resolved_min_tvl_usd = float(fallback["min_tvl_usd"] if min_tvl_usd is None else min_tvl_usd)
-    resolved_min_points = int(fallback["min_points"] if min_points is None else min_points)
-    resolved_max_vaults = int(fallback["max_vaults"] if max_vaults is None else max_vaults)
-    if resolved_max_vaults <= 0:
-        resolved_max_vaults = None
-    return {
-        "universe": universe,
-        "min_tvl_usd": resolved_min_tvl_usd,
-        "min_points": resolved_min_points,
-        "max_vaults": resolved_max_vaults,
-        "defaults": fallback,
-    }
+) -> tuple[float, int, int | None]:
+    default_tvl, default_points, default_max = {
+        "core": (UNIVERSE_CORE_MIN_TVL_USD, UNIVERSE_CORE_MIN_POINTS, UNIVERSE_CORE_MAX_VAULTS),
+        "extended": (UNIVERSE_EXTENDED_MIN_TVL_USD, UNIVERSE_EXTENDED_MIN_POINTS, UNIVERSE_EXTENDED_MAX_VAULTS),
+        "raw": (UNIVERSE_RAW_MIN_TVL_USD, UNIVERSE_RAW_MIN_POINTS, UNIVERSE_RAW_MAX_VAULTS),
+    }[universe]
+    maximum = default_max if max_vaults is None else max_vaults
+    return (
+        default_tvl if min_tvl_usd is None else min_tvl_usd,
+        default_points if min_points is None else min_points,
+        maximum if maximum > 0 else None,
+    )
 
 
 def _rank_gate_filter_sql(alias: str, *, max_vaults: int | None, include_locked: bool = False) -> str:

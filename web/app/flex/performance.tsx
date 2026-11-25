@@ -4,14 +4,14 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { TableWrap } from "../components/table-wrap";
-import { useFlexPerformance } from "../hooks/use-flex-data";
+import { FLEX_PERIODS, useFlexPerformance, type FlexPeriod } from "../hooks/use-flex-data";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
 const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const value = (amount: number | null) => amount === null ? "Unavailable" : usd.format(amount);
 const pnl = (amount: number | null) => amount === null ? "Unavailable" : `${amount > 0 ? "+" : ""}${usd.format(amount)}`;
 
-export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (days: 7 | 30 | 90) => void }) {
+export function FlexPerformance({ days, onDays }: { days: FlexPeriod; onDays: (days: FlexPeriod) => void }) {
   const searchParams = useSearchParams();
   const [draft, setDraft] = useState("");
   const [address, setAddress] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export function FlexPerformance({ days, onDays }: { days: 7 | 30 | 90; onDays: (
         <p className="card-description">{address && !editing ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Active Flex markets"}{query.isPlaceholderData ? " · Updating…" : ""}</p>
       </div>
       <div className="flex-range-tabs" role="group" aria-label="Performance period">
-        {([7, 30, 90] as const).map(period => <button type="button" key={period} className={`flex-range-tab ${days === period ? "is-active" : ""}`} aria-pressed={days === period} aria-label={`${period}-day performance`} onClick={() => onDays(period)}>{period}D</button>)}
+        {FLEX_PERIODS.map(period => <button type="button" key={period} className={`flex-range-tab ${days === period ? "is-active" : ""}`} aria-pressed={days === period} aria-label={`${period}-day performance`} onClick={() => onDays(period)}>{period}D</button>)}
       </div>
     </div>
     <form className="flex-performance-form" onSubmit={submit}>

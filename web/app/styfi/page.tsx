@@ -1,6 +1,6 @@
 "use client";
 
-import { StakingSourceNote, type StakingSourceState } from "../components/source-notes";
+import { StakingSourceNote } from "../components/source-notes";
 
 import { Suspense, useMemo } from "react";
 import { explorerAddressUrl, explorerTxUrl, formatPct, formatUtcDateTime } from "../lib/format";
@@ -9,87 +9,7 @@ import { TableWrap } from "../components/table-wrap";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { DataLoadError } from "../components/error-state";
 import { useStYfiData } from "../hooks/use-styfi-data";
-import { stakingAprRange, type StakingAprState } from "../lib/staking-apr";
-
-type StYfiSnapshotPoint = {
-  observed_at?: string | null;
-  reward_epoch?: number | null;
-  styfi_staked?: number | null;
-  styfix_staked?: number | null;
-  liquid_lockers_staked?: number | null;
-  migrated_yfi?: number | null;
-  combined_staked?: number | null;
-  staked_share_supply?: number | null;
-};
-
-type StYfiEpochPoint = {
-  epoch?: number | null;
-  epoch_start?: string | null;
-  reward_total?: number | null;
-  reward_styfi?: number | null;
-  reward_vote_boost?: number | null;
-  is_finalized?: boolean | null;
-  reward_veyfi?: number | null;
-  reward_liquid_lockers?: number | null;
-};
-
-type StYfiRecentActivityPoint = {
-  chain_id?: number | null;
-  block_time?: string | null;
-  tx_hash?: string | null;
-  user_account?: string | null;
-  product_type?: string | null;
-  product_label?: string | null;
-  event_kind?: string | null;
-  action_label?: string | null;
-  product_contract?: string | null;
-  amount_raw?: string | null;
-  amount_decimals?: number | null;
-  amount_symbol?: string | null;
-};
-
-type StYfiResponse = {
-  summary?: {
-    reward_epoch?: number | null;
-    yfi_total_supply?: number | null;
-    styfi_staked?: number | null;
-    styfix_staked?: number | null;
-    liquid_lockers_staked?: number | null;
-    migrated_yfi?: number | null;
-    combined_staked?: number | null;
-    staked_share_supply?: number | null;
-    net_flow_24h?: number | null;
-    net_flow_7d?: number | null;
-    snapshots_count?: number | null;
-    first_snapshot_at?: string | null;
-    latest_snapshot_at?: string | null;
-  };
-  current_reward_state?: StakingSourceState & StakingAprState & {
-    epoch?: number | null;
-    apr_reward_epoch?: number | null;
-    styfi_current_apr?: number | null;
-    styfix_current_apr?: number | null;
-    styfi_current_reward?: number | null;
-    styfix_current_reward?: number | null;
-    liquid_lockers_staked?: number | null;
-    liquid_lockers_participating?: number | null;
-    migrated_yfi?: number | null;
-  } | null;
-  series?: {
-    snapshots?: StYfiSnapshotPoint[];
-    epochs?: StYfiEpochPoint[];
-  };
-  recent_activity?: StYfiRecentActivityPoint[];
-  freshness?: {
-    latest_snapshot_age_seconds?: number | null;
-    latest_snapshot_at?: string | null;
-    snapshots_count?: number | null;
-  };
-  data_policy?: {
-    retention_days?: number | null;
-    snapshot_retention_days?: number | null;
-  };
-};
+import { stakingAprRange } from "../lib/staking-apr";
 
 function formatTokenCompact(value: number | null | undefined, symbol: string, digits = 1): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "n/a";
@@ -163,10 +83,11 @@ function StYfiPageContent() {
 
   const rewardSymbol = data?.reward_token?.symbol?.trim() || "yvUSDC-1";
   const summary = data?.summary ?? null;
-  const epochSeries = useMemo<StYfiEpochPoint[]>(() => data?.series?.epochs ?? [], [data?.series?.epochs]);
-  const snapshotSeries = useMemo<StYfiSnapshotPoint[]>(() => data?.series?.snapshots ?? [], [data?.series?.snapshots]);
-  const recentActivity = useMemo<StYfiRecentActivityPoint[]>(() => data?.recent_activity ?? [], [data?.recent_activity]);
+  const epochSeries = data?.series?.epochs ?? [];
+  const snapshotSeries = useMemo(() => data?.series?.snapshots ?? [], [data?.series?.snapshots]);
+  const recentActivity = data?.recent_activity ?? [];
   const currentEpoch = summary?.reward_epoch ?? null;
+  const currentEpochStart = epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start;
   const historySpan = formatRollingSpan(summary?.first_snapshot_at ?? null, summary?.latest_snapshot_at ?? null);
   const hasNetFlow24h = summary?.net_flow_24h !== null && summary?.net_flow_24h !== undefined && Number.isFinite(summary.net_flow_24h);
   const hasNetFlow7d = summary?.net_flow_7d !== null && summary?.net_flow_7d !== undefined && Number.isFinite(summary.net_flow_7d);
@@ -292,7 +213,7 @@ function StYfiPageContent() {
         )}
       </section>
 
-      <p className="explanation">Reward period · {currentEpoch != null ? `Epoch ${currentEpoch} · ` : ""}{epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ? `Started ${formatUtcDate(epochSeries.find((row) => row.epoch === currentEpoch)?.epoch_start ?? null)} at 00:00 UTC. ` : ""}</p>
+      <p className="explanation">Reward period · {currentEpoch != null ? `Epoch ${currentEpoch} · ` : ""}{currentEpochStart ? `Started ${formatUtcDate(currentEpochStart)} at 00:00 UTC. ` : ""}</p>
       <p className="explanation">{data?.freshness?.latest_snapshot_at ? `Participation updated ${formatUtcDateTime(data.freshness.latest_snapshot_at)}.` : "Participation update time unavailable."}{(data?.freshness?.latest_snapshot_age_seconds ?? 0) > 3600 ? " Updates are delayed." : ""}</p>
       <section className="detail-section">
         <h2 className="detail-title">Participation</h2>

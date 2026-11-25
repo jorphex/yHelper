@@ -37,22 +37,33 @@ fs.mkdirSync(output, { recursive: true });
           }
           return get.call(this, type, ...args);
         };
-        const sample = () => {
+        const snapshot = () => {
           if (!document.body || !document.querySelector('.launch-flash, #boot')) return;
           const flash = document.querySelector('.launch-flash');
           const boot = document.getElementById('boot');
           const css = node => node && getComputedStyle(node);
-          window.recordHandoff({ time: performance.timeOrigin + performance.now(), doc: location.pathname.endsWith('replay.html') ? 'replay' : 'landing',
+          return { time: performance.timeOrigin + performance.now(), doc: location.pathname.endsWith('replay.html') ? 'replay' : 'landing',
             launching: document.body.classList.contains('launching'), curtain: flash ? Number(css(flash).opacity) : null,
             opaque: flash ? /rgb\(10, 10, 10\)$/.test(css(flash).background) || css(flash).backgroundColor === 'rgb(10, 10, 10)' : false,
             bodyOpacity: Number(css(document.body).opacity), done: boot?.classList.contains('done'), bootOpacity: boot ? Number(css(boot).opacity) : null,
             stage: !!document.querySelector('#boot-stage.is-3d'), bootFrames, bodyY: window.__bootStage?.debug().y, gpuCover: window.__gpuCover,
             bootBackground: boot && css(boot).backgroundColor, circularCover: flash && css(flash).backgroundImage.includes('radial-gradient'),
             fallbackMark: !!document.querySelector('.boot-fallback'), legacySpinner: !!document.querySelector('.boot-orbit'),
-            active: !!document.querySelector('.card.active') }).catch(() => {});
+            active: !!document.querySelector('.card.active') };
         };
-        setInterval(sample, 20);
-        addEventListener('pagehide', sample);
+        const report = sample => { if (sample) window.recordHandoff(sample).catch(() => {}); };
+        const departureKey = 'wrapped-test-departure';
+        const departure = sessionStorage.getItem(departureKey);
+        if (departure) {
+          sessionStorage.removeItem(departureKey);
+          report(JSON.parse(departure));
+        }
+        setInterval(() => report(snapshot()), 20);
+        addEventListener('pagehide', () => {
+          const sample = snapshot();
+          // The outgoing document can close before the asynchronous binding delivers.
+          if (sample?.doc === 'landing') sessionStorage.setItem(departureKey, JSON.stringify(sample));
+        });
       }, variant === 'no-webgl');
       const delay = variant === 'cached' ? 0 : 4200;
       await context.route('**/api/recap?*', async route => {

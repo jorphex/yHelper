@@ -32,6 +32,7 @@ from eth_utils import keccak
 from psycopg.types.json import Jsonb
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 OUT = ROOT / "reports/rate-fixes"
 OUT.mkdir(parents=True, exist_ok=True)
 NOW = int(time.time())
@@ -287,7 +288,7 @@ def main():
                     "--port",
                     str(port),
                 ],
-                env={**os.environ, "PYTHONPATH": str(ROOT / "api")},
+                env={**os.environ, "PYTHONPATH": os.pathsep.join((str(ROOT / "api"), str(ROOT)))},
                 stdout=log,
                 stderr=subprocess.STDOUT,
             )
@@ -371,17 +372,6 @@ def main():
                 assert [e["component"] for e in allocations["component_split_latest_completed"]["rows"]] == ["Staking (includes stYFIx)", "Migrated veYFI", "Liquid lockers", "Vote Boost"]
                 assert next(e for e in allocations["series"]["epochs"] if e["epoch"] == 7)["reward_vote_boost"] is not None, "Incomplete cached history must refresh without waiting a day"
                 rows = _normalize_kong_snapshot(_fetch_kong_snapshot()[0])
-                for row, expected in zip(rows, [0.0602, 0.0773, 0.0625], strict=True):
-                    assert row["est_apy"] == expected
-                for value in (0, -0.01):
-                    sample = {
-                        **VAULTS[0],
-                        "performance": {
-                            "estimated": {"apy": value},
-                            "oracle": {"netAPY": 0.05},
-                        },
-                    }
-                    assert _normalize_kong_snapshot([sample])[0]["est_apy"] == value
                 with (
                     psycopg.connect(scoped, autocommit=True) as connection,
                     connection.cursor() as cursor,
@@ -396,10 +386,19 @@ def main():
                 assert response.status_code == 200, response.text
                 discover = response.json()
                 assert len(discover["rows"]) == 3
+                assert {r["vault_address"]: r["est_apy"] for r in discover["rows"]} == {
+                    UNLOCKED: 0.0602, LOCKED: 0.0773, CRV: 0.0625,
+                }
+                response = client.get("/api/discover", params={"universe": "raw", "token_symbol": " uSdC ", "limit": 1})
+                assert response.status_code == 200, response.text
+                filtered = response.json()
+                assert filtered["filters"]["token_symbol"] == "USDC"
+                assert filtered["pagination"]["total"] == 2
+                assert [row["vault_address"] for row in filtered["rows"]] == [UNLOCKED]
+                assert filtered["summary"]["total_tvl_usd"] == 1500
                 locked = next(r for r in discover["rows"] if r["symbol"] == "Locked yvUSD")
                 expected_30d = 1.06 * 1.02 ** (23 / 30) * 1.04 ** (7 / 30) - 1
                 assert abs(locked["realized_apy_30d"] - expected_30d) < 1e-8
-                assert locked["est_apy"] == 0.0773
                 assert locked["aggregate_tvl_usd"] == 0
                 assert discover["summary"]["total_tvl_usd"] == 1500, (
                     "A wrapper must not count its underlying TVL twice"

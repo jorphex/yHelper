@@ -23,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 OUT = ROOT / "reports/rpc-optimization"
 COUNTS = Counter()
 BLOCK_HASH = "0x" + "a" * 64

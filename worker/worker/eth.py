@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import math
+import re
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import lru_cache
 from urllib.parse import urlparse
 
-import psycopg
-import requests
 from eth_utils import keccak
 from psycopg.types.json import Json
 
@@ -17,12 +16,9 @@ from .config import (
     CHAIN_WSS_URLS,
     ETH_CALL_TIMEOUT_SEC,
     ETH_RPC_URL,
-    ETH_TX_BATCH_SIZE,
     EXPLORER_BASE_URLS,
-    KONG_GQL_URL,
 )
-from .db import connect
-from .http import is_transient, request, rpc_cache_hit
+from .http import request, rpc_cache_hit
 
 _FINALIZED = ContextVar("finalized_blocks", default=None)
 
@@ -37,28 +33,13 @@ def finalized_scope():
 
 
 def _to_float(value: object) -> float | None:
-    if value is None:
-        return None
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        numeric = float(value)
-        return numeric if math.isfinite(numeric) else None
     if isinstance(value, str):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        if cleaned.lower() in {"n/a", "na", "none", "null", "nan", "-", "--"}:
-            return None
-        cleaned = cleaned.replace(",", "")
-        try:
-            numeric = float(cleaned)
-        except ValueError:
-            return None
-        return numeric if math.isfinite(numeric) else None
+        value = value.replace(",", "")
     try:
         numeric = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return numeric if math.isfinite(numeric) else None
 
@@ -82,31 +63,15 @@ def _has_raw_numeric_value(value: object) -> bool:
 
 
 def _parse_chain_id(value: object) -> int | None:
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        value = cleaned
-    try:
-        chain_id = int(value)
-    except (TypeError, ValueError):
-        return None
-    return chain_id if chain_id > 0 else None
+    return _to_int_or_none(value) or None
 
 
 def _to_int_or_none(value: object) -> int | None:
-    if value is None or isinstance(value, bool):
+    if isinstance(value, bool) or (isinstance(value, float) and not value.is_integer()):
         return None
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        value = cleaned
     try:
         parsed = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return parsed if parsed >= 0 else None
 
@@ -225,6 +190,14 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
         est_apy = _to_float(raw_apr)
         if est_apy is None and _has_raw_numeric_value(raw_apr):
             numeric_parse_failures.append("est_apy")
+    decimal_candidates = (
+        asset_obj.get("decimals"),
+        asset_obj.get("tokenDecimals"),
+        meta_token_obj.get("decimals"),
+        token_obj.get("decimals"),
+        vault.get("decimals"),
+    )
+    token_decimals = next((value for value in map(_to_int_or_none, decimal_candidates) if value is not None), None)
     row = {
         "vault_address": vault_address,
         "chain_id": chain_id,
@@ -239,12 +212,7 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
         ),
         "token_symbol": _first_present(asset_obj, ("symbol", "tokenSymbol")) or _first_present(token_obj, ("symbol",)),
         "token_name": _first_present(asset_obj, ("name", "tokenName")) or _first_present(token_obj, ("name",)),
-        "token_decimals": _to_int_or_none(
-            _first_present(asset_obj, ("decimals", "tokenDecimals"))
-            or _first_present(meta_token_obj, ("decimals",))
-            or _first_present(token_obj, ("decimals",))
-            or _first_present(vault, ("decimals",))
-        ),
+        "token_decimals": token_decimals,
         "tvl_usd": tvl_usd,
         "est_apy": est_apy,
         "origin": str(vault.get("origin") or "").strip() or None,
@@ -259,31 +227,15 @@ def _normalize_vault(vault: dict, *, vault_address: str, chain_id: int) -> tuple
     return row, numeric_parse_failures
 
 
-def _connect() -> psycopg.Connection:
-    return connect()
-
-
-def _post_kong_gql_json(query: str, variables: dict[str, object] | None = None) -> dict[str, object]:
-    response = request(
-        "POST", KONG_GQL_URL,
-        json={"query": query, "variables": variables or {}},
-        timeout=30,
-        headers={"Content-Type": "application/json"},
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if not isinstance(payload, dict):
-        raise ValueError("Kong GraphQL response is not an object")
-    if payload.get("errors"):
-        raise ValueError(f"Kong GraphQL returned errors: {payload['errors']}")
-    return payload
-
-
 def _rpc_url_for_chain(chain_id: int) -> str | None:
-    url = CHAIN_RPC_URLS.get(chain_id)
-    if url and url.strip():
-        return url.strip()
-    return None
+    return (CHAIN_RPC_URLS.get(chain_id) or "").strip() or None
+
+
+def _required_rpc_url(chain_id: int) -> str:
+    url = _rpc_url_for_chain(chain_id)
+    if url is None:
+        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    return url
 
 
 def _derive_wss_url(rpc_url: str | None) -> str | None:
@@ -360,15 +312,15 @@ def _eth_selector(signature: str) -> str:
 
 
 def _eth_encode_address(value: str) -> str:
-    normalized = value.lower().replace("0x", "")
-    if len(normalized) != 40:
-        raise ValueError(f"Invalid address length: {value}")
+    normalized = value.lower().removeprefix("0x")
+    if not re.fullmatch(r"[0-9a-f]{40}", normalized):
+        raise ValueError("Invalid Ethereum address")
     return normalized.rjust(64, "0")
 
 
 def _eth_encode_uint256(value: int) -> str:
-    if value < 0:
-        raise ValueError(f"uint256 cannot be negative: {value}")
+    if not 0 <= value < 2**256:
+        raise ValueError("Value is outside the uint256 range")
     return f"{value:064x}"
 
 
@@ -378,9 +330,20 @@ def _eth_decode_address(result: str) -> str:
     return f"0x{result[-40:]}".lower()
 
 
-def _eth_call(address: str, signature: str, encoded_args: str = "", block_tag: str = "latest") -> str:
-    data = f"0x{_eth_selector(signature)}{encoded_args}"
-    result = _eth_rpc("eth_call", [{"to": address, "data": data}, block_tag])
+def _eth_call(
+    address: str,
+    signature: str,
+    *args: str | int,
+    block_number: int | None = None,
+    rpc_url: str | None = None,
+) -> str:
+    encoded = "".join(
+        _eth_encode_address(value) if isinstance(value, str) else _eth_encode_uint256(value)
+        for value in args
+    )
+    data = f"0x{_eth_selector(signature)}{encoded}"
+    block_tag = hex(block_number) if block_number is not None else "latest"
+    result = _eth_rpc_to_url(rpc_url or ETH_RPC_URL, "eth_call", [{"to": address, "data": data}, block_tag])
     if not isinstance(result, str) or not result.startswith("0x"):
         raise ValueError(f"Unexpected eth_call result for {signature}: {result!r}")
     return result
@@ -407,85 +370,39 @@ def _eth_decode_string(result: str) -> str:
     return bytes.fromhex(payload[start:end]).decode("utf-8")
 
 
-def _eth_call_uint(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> int:
-    encoded = ""
-    for arg_type, value in args:
-        if arg_type == "address":
-            encoded += _eth_encode_address(str(value))
-        elif arg_type == "uint256":
-            encoded += _eth_encode_uint256(int(value))
-        else:
-            raise ValueError(f"Unsupported abi arg type: {arg_type}")
-    return _eth_decode_uint256(_eth_call(address, signature, encoded))
+def _eth_call_uint(address: str, signature: str, *args: str | int) -> int:
+    return _eth_decode_uint256(_eth_call(address, signature, *args))
 
 
 def _eth_call_uint_for_chain(
     chain_id: int,
     address: str,
     signature: str,
-    *args: tuple[str, str] | tuple[str, int],
+    *args: str | int,
     block_number: int | None = None,
 ) -> int:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
-    encoded = ""
-    for arg_type, value in args:
-        if arg_type == "address":
-            encoded += _eth_encode_address(str(value))
-        elif arg_type == "uint256":
-            encoded += _eth_encode_uint256(int(value))
-        else:
-            raise ValueError(f"Unsupported abi arg type: {arg_type}")
-    data = f"0x{_eth_selector(signature)}{encoded}"
-    block_tag = hex(block_number) if block_number is not None else "latest"
-    result = _eth_rpc_to_url(rpc_url, "eth_call", [{"to": address, "data": data}, block_tag])
-    if not isinstance(result, str) or not result.startswith("0x"):
-        raise ValueError(f"Unexpected eth_call result for {signature} on chain {chain_id}: {result!r}")
-    return _eth_decode_uint256(result)
+    return _eth_decode_uint256(
+        _eth_call(address, signature, *args, block_number=block_number, rpc_url=_required_rpc_url(chain_id))
+    )
 
 
-def _eth_call_address(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> str:
-    encoded = ""
-    for arg_type, value in args:
-        if arg_type == "address":
-            encoded += _eth_encode_address(str(value))
-        elif arg_type == "uint256":
-            encoded += _eth_encode_uint256(int(value))
-        else:
-            raise ValueError(f"Unsupported abi arg type: {arg_type}")
-    return _eth_decode_address(_eth_call(address, signature, encoded))
+def _eth_call_address(address: str, signature: str) -> str:
+    return _eth_decode_address(_eth_call(address, signature))
 
 
-def _eth_call_string(address: str, signature: str, *args: tuple[str, str] | tuple[str, int]) -> str:
-    encoded = ""
-    for arg_type, value in args:
-        if arg_type == "address":
-            encoded += _eth_encode_address(str(value))
-        elif arg_type == "uint256":
-            encoded += _eth_encode_uint256(int(value))
-        else:
-            raise ValueError(f"Unsupported abi arg type: {arg_type}")
-    return _eth_decode_string(_eth_call(address, signature, encoded))
-
-
-def _eth_call_string_for_chain(chain_id: int, address: str, signature: str) -> str:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
-    data = f"0x{_eth_selector(signature)}"
-    result = _eth_rpc_to_url(rpc_url, "eth_call", [{"to": address, "data": data}, "latest"])
-    if not isinstance(result, str) or not result.startswith("0x"):
-        raise ValueError(f"Unexpected eth_call result for {signature} on chain {chain_id}: {result!r}")
-    return _eth_decode_string(result)
+def _eth_call_string(address: str, signature: str, *, rpc_url: str | None = None) -> str:
+    return _eth_decode_string(_eth_call(address, signature, rpc_url=rpc_url))
 
 
 @lru_cache(maxsize=2048)
 def _strategy_display_label(chain_id: int, strategy_address: str) -> str:
     normalized = strategy_address.lower()
+    rpc_url = _rpc_url_for_chain(chain_id)
+    if rpc_url is None:
+        return _short_hex(normalized)
     for signature in ("symbol()", "name()"):
         try:
-            label = _eth_call_string_for_chain(chain_id, normalized, signature).strip()
+            label = _eth_call_string(normalized, signature, rpc_url=rpc_url).strip()
         except Exception:
             continue
         if label:
@@ -500,19 +417,14 @@ def _hex_to_int(value: str | None) -> int | None:
 
 
 def _eth_block_number_for_chain(chain_id: int) -> int:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
-    block_number = _eth_rpc_to_url(rpc_url, "eth_blockNumber", [])
+    block_number = _eth_rpc_to_url(_required_rpc_url(chain_id), "eth_blockNumber", [])
     if not isinstance(block_number, str):
         raise ValueError(f"Unexpected eth_blockNumber result for chain {chain_id}: {block_number!r}")
     return int(block_number, 16)
 
 
 def _eth_finalized_block_for_chain(chain_id: int) -> dict[str, object]:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
+    rpc_url = _required_rpc_url(chain_id)
     cache = _FINALIZED.get()
     key = (chain_id, rpc_url)
     if cache is not None and key in cache:
@@ -549,74 +461,17 @@ def _eth_finalized_block_for_chain(chain_id: int) -> dict[str, object]:
 
 
 def _eth_get_block_for_chain(chain_id: int, block_number: int) -> dict[str, object]:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
-    payload = _eth_rpc_to_url(rpc_url, "eth_getBlockByNumber", [hex(block_number), False])
+    payload = _eth_rpc_to_url(_required_rpc_url(chain_id), "eth_getBlockByNumber", [hex(block_number), False])
     if not isinstance(payload, dict):
         raise ValueError(f"Unexpected eth_getBlockByNumber result for chain {chain_id}: {payload!r}")
     return payload
 
 
-def _eth_get_transaction_for_chain(chain_id: int, tx_hash: str) -> dict[str, object]:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
-    payload = _eth_rpc_to_url(rpc_url, "eth_getTransactionByHash", [tx_hash])
-    if not isinstance(payload, dict):
-        raise ValueError(f"Unexpected eth_getTransactionByHash result for chain {chain_id}: {payload!r}")
-    return payload
-
-
 def _eth_get_transaction_receipt_for_chain(chain_id: int, tx_hash: str) -> dict[str, object]:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
-    payload = _eth_rpc_to_url(rpc_url, "eth_getTransactionReceipt", [tx_hash])
+    payload = _eth_rpc_to_url(_required_rpc_url(chain_id), "eth_getTransactionReceipt", [tx_hash])
     if not isinstance(payload, dict):
         raise ValueError(f"Unexpected eth_getTransactionReceipt result for chain {chain_id}: {payload!r}")
     return payload
-
-
-def _eth_get_transactions_for_chain(chain_id: int, tx_hashes: list[str]) -> dict[str, dict[str, object]]:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
-    if not tx_hashes:
-        return {}
-    transactions: dict[str, dict[str, object]] = {}
-    for start in range(0, len(tx_hashes), ETH_TX_BATCH_SIZE):
-        batch_tx_hashes = tx_hashes[start : start + ETH_TX_BATCH_SIZE]
-        batch_payload = [
-            {"jsonrpc": "2.0", "id": idx, "method": "eth_getTransactionByHash", "params": [tx_hash]}
-            for idx, tx_hash in enumerate(batch_tx_hashes, start=1)
-        ]
-        try:
-            payload = request(
-                "POST", rpc_url, json=batch_payload, timeout=ETH_CALL_TIMEOUT_SEC, rpc=True,
-            ).json()
-            if not isinstance(payload, list):
-                raise ValueError("Unexpected transaction batch response")
-            by_id = {idx: tx_hash for idx, tx_hash in enumerate(batch_tx_hashes, start=1)}
-            for row in payload:
-                if not isinstance(row, dict):
-                    continue
-                tx_hash = by_id.get(row.get("id"))
-                result = row.get("result")
-                if tx_hash and isinstance(result, dict):
-                    transactions[tx_hash] = result
-            if any(tx_hash not in transactions for tx_hash in batch_tx_hashes):
-                raise ValueError("Incomplete transaction batch response")
-        except (requests.RequestException, ValueError) as exc:
-            if is_transient(exc):
-                raise
-            for tx_hash in batch_tx_hashes:
-                if tx_hash in transactions:
-                    continue
-                result = _eth_get_transaction_for_chain(chain_id, tx_hash)
-                if isinstance(result, dict):
-                    transactions[tx_hash] = result
-    return transactions
 
 
 def _eth_get_logs_for_chain(
@@ -627,11 +482,8 @@ def _eth_get_logs_for_chain(
     to_block: int,
     topics: list[list[str] | str | None],
 ) -> list[dict[str, object]]:
-    rpc_url = _rpc_url_for_chain(chain_id)
-    if not rpc_url:
-        raise ValueError(f"No RPC URL configured for chain {chain_id}")
     payload = _eth_rpc_to_url(
-        rpc_url,
+        _required_rpc_url(chain_id),
         "eth_getLogs",
         [
             {

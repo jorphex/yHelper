@@ -205,29 +205,16 @@ function esc(s) {
 
 // --- Card chrome ------------------------------------------------------------
 
-// One scene per card: the glow wash, headline gradient and chart tip all take it,
-// so consecutive cards never wear the same outfit. Mapped by content, not a rainbow
-// rotation: money-earned cards read teal, identity and streak cards read gold,
-// market and movement cards read blue.
-const SCENE_BY_TITLE = {
-  "your wallet": "blue",
-  "first activity": "gold",
-  "the year outside": "blue",
-  "vaults explored": "teal",
-  "chains used": "blue",
-  "home base": "gold",
-  "the ledger": "blue",
-  "deposits made": "blue",
-  "what if?": "gold",
-  "you timed it": "gold",
-  "portfolio value": "teal",
-  "vault yield earned": "teal",
-  "longest holding streak": "gold",
-  "how you move": "blue",
-  "the shape of the year": "blue",
-  "portfolio curve": "teal",
-  "share balance": "teal",
-  "the verdict": "gold",
+const CARD_SCENES = {
+  firstActivity: "gold",
+  vaults: "teal",
+  favourite: "gold",
+  whatIf: "gold",
+  valuation: "teal",
+  growth: "teal",
+  streak: "gold",
+  verdict: "gold",
+  summary: "gold",
 };
 
 // A barely-there resting rotation, alternating by build order with a deterministic
@@ -235,14 +222,12 @@ const SCENE_BY_TITLE = {
 // boundary as custom properties; the transform stays compositor-friendly.
 let cardCounter = 0;
 
-function card(html) {
+function card(html, kind = "") {
   const el = document.createElement("section");
-  el.className = "card";
+  el.className = kind === "streak" ? "card is-streak" : "card";
   el.innerHTML = html;
-  const title = (html.match(/class="card-title">([\s\S]*?)<\/p>/) || [""])[1]
-    .replace(/<[^>]+>/g, "");
-  el.dataset.scene = SCENE_BY_TITLE[title]
-    || (title.includes("yearn wrapped") ? "gold" : "blue");
+  el.dataset.kind = kind;
+  el.dataset.scene = CARD_SCENES[kind] ?? "blue";
   const n = cardCounter++;
   el.style.setProperty("--tilt", `${((n % 2 ? 1 : -1) * (0.45 + ((n * 37) % 7) * 0.06)).toFixed(2)}deg`);
   deck.appendChild(el);
@@ -352,7 +337,7 @@ function statsOf(items) {
 
 // One fact big, two or three supporting, one editorial line. Every value is
 // escaped except `big`, which callers build themselves.
-function bigCard({ title, big, small, line, sub, stats, quip, count, extra }) {
+function bigCard({ kind, title, big, small, line, sub, stats, quip, count, extra }) {
   const countAttr = count
     ? ` data-count="${esc(Number(count.value))}" data-money="${count.money ? 1 : 0}" data-suffix="${esc(count.suffix || "")}"`
     : "";
@@ -364,7 +349,7 @@ function bigCard({ title, big, small, line, sub, stats, quip, count, extra }) {
     ${statsOf(stats)}
     ${extra || ""}
     ${quipOf(quip)}
-  `);
+  `, kind);
 }
 
 // Twelve columns of what you actually did each month: deposits bright, exits
@@ -433,83 +418,61 @@ function peakMonthIndex(points) {
   return best === null ? null : new Date(best[0] * 1000).getUTCMonth();
 }
 
-function stampFor(el, p) {
-  const c = p.cards || {};
-  const mk = c.marketContext || {};
-  const pers = mk.personal || {};
-  const val = c.valuation || {};
-  const dw = c.depositsWithdrawn || {};
-  const streak = c.longestHoldingStreak || {};
-  const vg = c.vaultGrowth || {};
-  const vd = c.verdict || {};
-  const title = (el.querySelector(".card-title")?.textContent || "").trim();
-  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
-
-  switch (title) {
-    case "first activity": {
-      const kind = c.firstActivity?.detail?.kind;
-      return kind === "transfer" ? { text: "arrived by transfer", tone: "gold" } : null;
-    }
-    case "the year outside":
+function stampFor(kind, c) {
+  switch (kind) {
+    case "firstActivity":
+      return c.firstActivity?.detail?.kind === "transfer" ? { text: "arrived by transfer", tone: "gold" } : null;
+    case "market": {
+      const mk = c.marketContext;
+      const pers = mk.personal || {};
       if ((pers.dipMonths || []).length) return { text: "bought the dip", tone: "gold" };
       // "weathered it" claims you sat through the fall holding. That needs a real
       // measured overlap; a null that defaults to zero would beat the year's drop.
       if (
-        (num(mk.changePct) ?? 0) <= -20 &&
+        mk.changePct <= -20 &&
         typeof pers.ethWhileHeldPct === "number" &&
-        pers.ethWhileHeldPct > (num(mk.changePct) ?? 0)
+        pers.ethWhileHeldPct > mk.changePct
       ) {
         return { text: "weathered it", tone: "aqua" };
       }
-      return (num(mk.maxDrawdownPct) ?? 0) <= -40 ? { text: "in for it", tone: "blue" } : null;
-    case "vaults explored": {
-      const n = Number(c.vaultsExplored?.count || 0);
+      return mk.maxDrawdownPct <= -40 ? { text: "in for it", tone: "blue" } : null;
+    }
+    case "vaults": {
+      const n = c.vaultsExplored.count;
       if (n === 1) return { text: "committed", tone: "blue" };
       return n >= 6 ? { text: "polyglot", tone: "aqua" } : null;
     }
-    case "chains used": {
-      const n = Number(c.chainsUsed?.chainIds?.length || 0);
+    case "chains": {
+      const n = c.chainsUsed?.chainIds?.length ?? 0;
       if (n >= 3) return { text: "multi chain", tone: "gold" };
       return n === 1 ? { text: "one town only", tone: "aqua" } : null;
     }
-    case "home base": {
-      const peak = num(c.favouriteVault?.peakPositionUsd);
-      const yearPeak = num(val.peakUsd);
+    case "favourite": {
+      const peak = c.favouriteVault?.peakPositionUsd;
+      const yearPeak = c.valuation?.peakUsd;
       if (peak && yearPeak && peak / yearPeak >= 0.8) return { text: "all in", tone: "gold" };
       return null;
     }
-    case "deposits made":
-    case "the ledger":
-      return Number(dw.depositsCount || 0) > 0 && Number(dw.withdrawalsCount || 0) === 0
+    case "ledger":
+      return c.depositsWithdrawn?.depositsCount > 0 && (c.depositsWithdrawn.withdrawalsCount ?? 0) === 0
         ? { text: "never pulled", tone: "aqua" } : null;
-    case "what if?":
-    case "you timed it":
-      return Number(c.whatIfHeld?.exitsTotal || 0) >= 3 ? { text: "serial exit", tone: "gold" } : null;
-    case "vault yield earned": {
-      const total = num(vg.totalGrowthUsd) ?? 0;
+    case "whatIf":
+      return c.whatIfHeld.exitsTotal >= 3 ? { text: "serial exit", tone: "gold" } : null;
+    case "growth": {
+      const total = c.vaultGrowth.totalGrowthUsd;
       if (total >= 10000) return { text: "compounding", tone: "gold" };
       return total >= 1000 ? { text: "yield max", tone: "aqua" } : null;
     }
-    case "longest holding streak": {
-      const days = Number(streak.days || 0);
-      if (Number(streak.drawdownsHeld || 0) >= 1) return { text: "sat through it", tone: "aqua" };
+    case "streak": {
+      const { days, drawdownsHeld } = c.longestHoldingStreak ?? {};
+      if (drawdownsHeld >= 1) return { text: "sat through it", tone: "aqua" };
       if (days >= 180) return { text: "half-year club", tone: "gold" };
       return days >= 30 ? { text: "diamond hands", tone: "blue" } : null;
     }
-    case "the shape of the year":
+    case "verdict":
+      return c.verdict.stamp ? { text: String(c.verdict.stamp).toLowerCase(), tone: "gold" } : null;
+    default:
       return null;
-    case "the verdict":
-      return vd.stamp ? { text: String(vd.stamp).toLowerCase(), tone: "gold" } : null;
-    case "portfolio curve":
-      return null;
-    case "share balance":
-      return null;
-    default: {
-      // Outro: the year's own verdict.
-      if (!el.classList.contains("is-outro")) return null;
-      return (num(mk.changePct) ?? 0) < 0
-        ? { text: "survivor", tone: "aqua" } : { text: "max degen", tone: "gold" };
-    }
   }
 }
 
@@ -520,7 +483,7 @@ function stampCards(list, p) {
     heading.className = "card-heading";
     title.before(heading);
     heading.append(title);
-    const stamp = stampFor(el, p);
+    const stamp = stampFor(el.dataset.kind, p.cards);
     if (!stamp) continue;
     const span = document.createElement("span");
     span.className = `stamp tone-${stamp.tone}`;
@@ -553,6 +516,7 @@ function buildCards(p) {
     const inYear = p.period.startTs <= fa.firstTs;
     const detail = fa.detail || null;
     cards.push(bigCard({
+      kind: "firstActivity",
       title: "first activity",
       big: esc(fmtDate(fa.firstTs)),
       line: inYear
@@ -600,7 +564,7 @@ function buildCards(p) {
         typeof pers.stableDepositPct === "number" && { value: `${pers.stableDepositPct}%`, label: "deposits in stables" },
       ])}
       ${quipOf(mk.quip)}
-    `);
+    `, "market");
     if (monthly.length > 1) {
       el.dataset.spark = JSON.stringify({
         points: monthly, kind: "market", asset: mk.asset || "ETH",
@@ -626,7 +590,7 @@ function buildCards(p) {
       ])}
       <ul class="card-list">${(ve.vaults || []).slice(0, 14).map((v) => `<li>${esc(v.label)}</li>`).join("")}</ul>
       ${quipOf(ve.quip)}
-    `));
+    `, "vaults"));
   }
 
   const names = c.chainsUsed?.names || [];
@@ -636,7 +600,7 @@ function buildCards(p) {
     <p class="card-line">chain${names.length === 1 ? "" : "s"} you farmed on this year.</p>
     ${names.length ? `<ul class="card-list">${names.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
     ${quipOf(c.chainsUsed?.quip)}
-  `));
+  `, "chains"));
 
   const fv = c.favouriteVault;
   if (fv?.vault && fv.isComplete) {
@@ -653,6 +617,7 @@ function buildCards(p) {
         + `${fd.symbol ? ` ${fd.symbol}` : ""}`
       : undefined;
     cards.push(bigCard({
+      kind: "favourite",
       title: "home base",
       big: esc(fv.label),
       line: fv.basis === "holdings" ? "your largest estimated vault position this year." : "your vault this year.",
@@ -664,7 +629,7 @@ function buildCards(p) {
       ],
     }));
   } else {
-    cards.push(bigCard({ title: "home base", big: c.vaultsExplored?.count ? "not ranked" : "off the grid", line: c.vaultsExplored?.count ? "some vault prices are unavailable." : "no vault this year." }));
+    cards.push(bigCard({ kind: "favourite", title: "home base", big: c.vaultsExplored?.count ? "not ranked" : "off the grid", line: c.vaultsExplored?.count ? "some vault prices are unavailable." : "no vault this year." }));
   }
 
   const dw = c.depositsWithdrawn || {};
@@ -672,6 +637,7 @@ function buildCards(p) {
   const moneyOut = dw.isComplete ? symbolAmount(dw.withdrawalsBySymbol) : null;
   if (!dw.depositsCount && !dw.withdrawalsCount) {
     cards.push(bigCard({
+      kind: "ledger",
       title: "the ledger",
       quip: dw.quip,
       big: c.vaultsExplored?.count ? "held shares" : "quiet year",
@@ -682,6 +648,7 @@ function buildCards(p) {
     const busiest = (dw.monthly || []).reduce(
       (best, m) => (!best || m.deposits > best.deposits ? m : best), null);
     cards.push(bigCard({
+      kind: "ledger",
       title: "deposits made",
       quip: dw.quip,
       big: dw.depositsCount,
@@ -713,6 +680,7 @@ function buildCards(p) {
     cards.push(bigCard({
       // "what if?" rather than "if you had held": the old title plus the old line
       // read as one sentence cut in half.
+      kind: "whatIf",
       title: positive ? "what if?" : "you timed it",
       quip: wi.quip,
       big: shown,
@@ -735,6 +703,7 @@ function buildCards(p) {
   const val = c.valuation;
   if (val?.isComplete && val.points?.length > 1) {
     cards.push(bigCard({
+      kind: "valuation",
       title: "portfolio value",
       quip: val.quip,
       big: fmtUsd(val.endUsd),
@@ -751,6 +720,7 @@ function buildCards(p) {
     }));
   } else if (val && val.reason) {
     cards.push(bigCard({
+      kind: "valuation",
       title: "portfolio value",
       big: "still counting",
       small: true,
@@ -767,6 +737,7 @@ function buildCards(p) {
       + `<b>${esc(fmtUsdShort(v.growthUsd))}${typeof v.annualizedPct === "number"
         ? ` · ${v.annualizedPct.toFixed(2)}%` : ""}</b></li>`);
     cards.push(bigCard({
+      kind: "growth",
       title: "vault yield earned",
       quip: vg.quip,
       big: fmtUsd(total),
@@ -785,6 +756,7 @@ function buildCards(p) {
   const streak = c.longestHoldingStreak;
   if (streak?.vault && streak.days > 0) {
     cards.push(bigCard({
+      kind: "streak",
       title: "longest holding streak",
       quip: streak.quip,
       big: fmtDays(streak.days),
@@ -804,6 +776,7 @@ function buildCards(p) {
     }));
   } else {
     cards.push(bigCard({
+      kind: "streak",
       title: "longest holding streak",
       big: c.behaviour?.holdings?.holds ? "under a day" : "no streak",
       line: c.behaviour?.holdings?.holds ? "every measured hold was under a day." : "no measured holding streak this year.",
@@ -899,7 +872,7 @@ function buildCards(p) {
         ? `peaked at ${esc(fmtUsd(peak[1]))} on ${esc(fmtDate(peak[0]))}. ended at ${esc(fmtUsd(pts[pts.length - 1][1]))}.`
         : `${pts.length} balance changes across the year.`}</p>
       ${isUsd ? statsOf(followUpStats(val)) : ""}
-    `);
+    `, "valuation");
     el.dataset.spark = JSON.stringify({ points: pts, kind: isUsd ? "usd" : "relative" });
     cards.push(el);
   }
@@ -910,6 +883,7 @@ function buildCards(p) {
   if (vd?.name) {
     const rt = c.behaviour?.holdings?.roundTrips;
     cards.push(bigCard({
+      kind: "verdict",
       title: "the verdict",
       big: esc(vd.name),
       line: esc(vd.line || ""),
@@ -927,6 +901,7 @@ function buildCards(p) {
   const hasStreak = streak?.vault && streak.days > 0;
   const asOf = p.period.endTs ? fmtDate(p.period.endTs) : "recently";
   const closing = bigCard({
+    kind: "summary",
     title: `${year} · yearn wrapped`,
     big: hasYield ? fmtUsd(vg.totalGrowthUsd) : hasStreak ? fmtDays(streak.days) : `${ve?.count || 0} vault${ve?.count === 1 ? "" : "s"}`,
     line: hasYield ? `${vg.estimated ? "estimated " : ""}vault yield earned.`
@@ -943,9 +918,6 @@ function buildCards(p) {
   });
   closing.classList.add("is-summary");
   cards.push(closing);
-  cards.forEach(el => {
-    if (el.querySelector(".card-title")?.textContent === "longest holding streak") el.classList.add("is-streak");
-  });
 
   stampCards(cards, p);
   return cards;

@@ -17,8 +17,9 @@ from .config import (
     _validate_data_policy_config,
     configure_logging,
 )
+from .db import connect
 from .db_state import _ensure_schema, _mark_boot_orphaned_runs, _mark_stale_running_runs
-from .eth import _connect, finalized_scope
+from .eth import finalized_scope
 from .flex import _run_flex_sync
 from .harvests import HarvestWssManager, _run_vault_harvests, _select_harvest_contracts
 from .http import rpc_metrics
@@ -32,7 +33,6 @@ from .product_activity import _backfill_styfi_activity_amounts, _run_product_act
 from .styfi import _run_styfi_snapshot
 from .ylockers import _run_ylocker_rewards
 
-HARVEST_WSS_MANAGER: HarvestWssManager | None = None
 LOGGER = logging.getLogger(__name__)
 
 
@@ -46,10 +46,10 @@ def _run_job(conn, name, function):
         return None
 
 
-def run_once() -> None:
+def run_once(harvest_manager: HarvestWssManager | None) -> None:
     LOGGER.info("Tick at %s", datetime.now(UTC).isoformat())
     LOGGER.info("Fetching Kong vault snapshot: %s", KONG_REST_VAULTS_URL)
-    with _connect() as conn, finalized_scope():
+    with connect() as conn, finalized_scope():
         abandoned = _mark_stale_running_runs(conn)
         if abandoned > 0:
             LOGGER.warning(
@@ -75,11 +75,11 @@ def run_once() -> None:
         _run_job(conn, "Product activity", _run_product_activity)
         _run_job(conn, "stYFI activity backfill", _backfill_styfi_activity_amounts)
         targets = _run_job(conn, "Harvest targets", _select_harvest_contracts)
-        if targets is not None and HARVEST_WSS_MANAGER is not None:
+        if targets is not None and harvest_manager is not None:
             _run_job(
                 conn,
                 "Harvest subscriptions",
-                lambda connection: HARVEST_WSS_MANAGER.refresh(targets),
+                lambda _: harvest_manager.refresh(targets),
             )
         _run_job(
             conn,
@@ -100,7 +100,7 @@ def run_once() -> None:
 def _maintenance(stop: threading.Event) -> None:
     while not stop.is_set():
         try:
-            with _connect() as conn:
+            with connect() as conn:
                 _run_job(
                     conn, "Notification retries", _retry_failed_discord_notifications
                 )
@@ -111,14 +111,14 @@ def _maintenance(stop: threading.Event) -> None:
 
 
 def main() -> None:
-    global HARVEST_WSS_MANAGER
     configure_logging()
     _validate_data_policy_config()
     interval = int(os.getenv("WORKER_INTERVAL_SEC", "900"))
     if interval <= 0:
         raise ValueError("WORKER_INTERVAL_SEC must be positive")
     LOGGER.info("Worker booted with interval=%ss", interval)
-    with _connect() as conn:
+    harvest_manager = HarvestWssManager() if HARVEST_WSS_ENABLED else None
+    with connect() as conn:
         _ensure_schema(conn)
         orphaned = _mark_boot_orphaned_runs(conn)
         if orphaned > 0:
@@ -126,9 +126,8 @@ def main() -> None:
                 "Marked %s orphaned running ingestion rows as abandoned on boot",
                 orphaned,
             )
-        if HARVEST_WSS_ENABLED:
-            HARVEST_WSS_MANAGER = HarvestWssManager()
-            HARVEST_WSS_MANAGER.refresh(_select_harvest_contracts(conn))
+        if harvest_manager is not None:
+            harvest_manager.refresh(_select_harvest_contracts(conn))
     stop = threading.Event()
     maintenance = threading.Thread(
         target=_maintenance, args=(stop,), name="worker-maintenance", daemon=True
@@ -138,7 +137,7 @@ def main() -> None:
         while True:
             next_tick = time.monotonic() + interval
             try:
-                run_once()
+                run_once(harvest_manager)
             except Exception:
                 LOGGER.exception("Worker cycle failed; retrying on the next tick")
             # Skip missed starts instead of overlapping or spinning after an overrun.

@@ -597,7 +597,7 @@ def main():
             **os.environ,
             "DATABASE_URL": scoped,
             "FLEX_PERFORMANCE_RPC_URL": f"http://127.0.0.1:{rpc.server_port}",
-            "PYTHONPATH": str(ROOT / "api"),
+            "PYTHONPATH": os.pathsep.join((str(ROOT / "api"), str(ROOT))),
         }
         with (OUT / "api.log").open("w") as log:
             proc = subprocess.Popen(

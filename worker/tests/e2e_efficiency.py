@@ -33,6 +33,7 @@ from psycopg.conninfo import make_conninfo
 from psycopg.types.json import Jsonb
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 OUT = ROOT / "reports/worker-efficiency-e2e"
 HOUR = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
 BASE = int(HOUR.timestamp()) - 4 * 3600
@@ -725,7 +726,7 @@ def main():
             env = dict(
                 os.environ,
                 WORKER_INTERVAL_SEC="2",
-                PYTHONPATH=str(ROOT / "worker"),
+                PYTHONPATH=os.pathsep.join((str(ROOT / "worker"), str(ROOT))),
                 DB_CLEANUP_ENABLED="0",
             )
             with (OUT / "scheduler.log").open("w") as log:

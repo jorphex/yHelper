@@ -8,7 +8,7 @@ from decimal import Decimal, localcontext
 import requests
 
 from .config import STYFI_CONTRACTS, STYFI_EPOCH_LENGTH_SEC
-from .eth import _eth_call, _eth_encode_address, _eth_encode_uint256, _eth_rpc
+from .eth import _decode_uint256_words, _eth_call, _eth_rpc
 
 VOTE_BOOST = "0xa139250bcb3880a97c75fd4287d5bf2a6caf98a3"
 USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
@@ -43,18 +43,10 @@ def fetch_styfi_apr(payload: dict) -> dict:
             return unavailable
 
         def read(address, signature, *args):
-            encoded = "".join(
-                _eth_encode_address(value)
-                if isinstance(value, str)
-                else _eth_encode_uint256(value)
-                for value in args
-            )
-            raw = _eth_call(address, signature, encoded, block_tag=tag)[2:]
-            if not raw or len(raw) % 64:
+            words = _decode_uint256_words(_eth_call(address, signature, *args, block_number=block))
+            if not words:
                 raise ValueError("Malformed staking read")
-            return [
-                int(raw[index : index + 64], 16) for index in range(0, len(raw), 64)
-            ]
+            return words
 
         distributor = STYFI_CONTRACTS["reward_distributor"]
         staking = STYFI_CONTRACTS["styfi_reward_distributor"]

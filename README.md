@@ -43,6 +43,8 @@ Docker Compose runs four services:
 
 The web service defaults to port `3010` and proxies `/api/*` and `/health` to the API when `NEXT_PUBLIC_API_BASE_URL=/api`. PostgreSQL and the API bind to loopback; the worker uses host networking for local chain endpoints.
 
+The API and worker Dockerfiles use the repository root as their build context so both can include `yhelper_shared`. Docker Compose sets these contexts.
+
 One worker owns ingestion and harvest WebSocket listeners. Normal jobs target 15-minute starts (`WORKER_INTERVAL_SEC=900`); an overrun waits one interval before retrying, without overlapping cycles. Schema setup runs at startup. Notification retries and alerts use a separate DB connection and poll independently, waiting at most a minute between passes. An in-flight identity guard prevents retries and live reports from concurrently sending the same notification. The default retry cooldown remains 120 seconds.
 
 Kong PPS refreshes an overlapping two-day tail, merges it with stored history for realized APY, and repairs full history on startup, onboarding and each UTC day. Unchanged PPS/catalog rows are not rewritten; catalog fetch freshness comes from ingestion metadata, while a row's `last_seen_at` changes when its stored catalog data changes. Flex discovery persists a replay cursor and reuses verified deployment, token and risk parameters by contract identity; endorsement, API labels and live prices still refresh. Completed hourly snapshots are reused; genuine gaps are repaired without predeployment samples.
@@ -182,7 +184,7 @@ These cover product navigation during source failures, vault search across API p
 Python tests, with service dependencies installed:
 
 ```bash
-pytest api/tests worker/tests
+PYTHONPATH=.:api:worker pytest api/tests worker/tests
 ```
 
 Smoke-test a running web deployment:

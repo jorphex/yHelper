@@ -1035,25 +1035,6 @@ td.text-center, th.text-center {
   margin-bottom: var(--space-2);
 }
 
-.error-state-description {
-  font-size: var(--text-base);
-  color: var(--text-secondary);
-  max-width: 50ch;
-  margin-bottom: var(--space-4);
-}
-
-.error-state-trace {
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  background: var(--bg-elevated);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-4);
-  max-width: 100%;
-  overflow: auto;
-}
-
 .error-state-actions {
   display: flex;
   gap: var(--space-3);

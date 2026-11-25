@@ -16,7 +16,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from .config import FLEX_BORROW_USD_FEEDS, FLEX_USDC_USD_FEED
-from .eth import _connect
+from .db import connect
 from .flex import WAD, _borrow_prices, _usd_e18
 
 
@@ -135,7 +135,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
-    with _connect() as conn:
+    with connect() as conn:
         result = repair(conn, args.output, apply=args.apply)
     print(json.dumps({"rows": result["rows"], "applied": result["applied"]}))
 

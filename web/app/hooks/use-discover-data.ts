@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
 import type { SourceFreshness } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
 import { fetchJson } from "../lib/fetch-json";
@@ -40,44 +40,36 @@ interface UseDiscoverDataParams {
   market: MarketKind;
   minTvl: number;
   minPoints: number;
-  limit: number;
   sort: string;
   dir: string;
-  chain?: string | null;
-  enabled?: boolean;
-  allRows?: boolean;
+  chain: number | null;
 }
 
-export async function fetchDiscoverData(params: UseDiscoverDataParams, signal?: AbortSignal): Promise<DiscoverResponse> {
+async function fetchDiscoverData(params: UseDiscoverDataParams, signal: AbortSignal): Promise<DiscoverResponse> {
   const searchParams = new URLSearchParams({
     universe: params.universe,
     min_tvl_usd: String(params.minTvl),
     min_points: String(params.minPoints),
-    limit: String(params.limit),
+    limit: "250",
     sort_by: params.sort,
     direction: params.dir,
     market: params.market,
   });
-  if (params.chain) searchParams.set("chain_id", params.chain);
+  if (params.chain !== null) searchParams.set("chain_id", String(params.chain));
   const data = await fetchJson<DiscoverResponse>(apiUrl("/discover", searchParams), { signal });
-  if (params.allRows) {
-    while (data.rows.length < data.pagination.total) {
-      searchParams.set("offset", String(data.rows.length));
-      const page = await fetchJson<DiscoverResponse>(apiUrl("/discover", searchParams), { signal });
-      if (!page.rows.length) break;
-      data.rows.push(...page.rows);
-    }
+  while (data.rows.length < data.pagination.total) {
+    searchParams.set("offset", String(data.rows.length));
+    const page = await fetchJson<DiscoverResponse>(apiUrl("/discover", searchParams), { signal });
+    if (!page.rows.length) break;
+    data.rows.push(...page.rows);
   }
   return data;
 }
 
-export function useDiscoverData(params: UseDiscoverDataParams) {
-  const { enabled = true, ...request } = params;
-  return useQuery({
-    queryKey: ["discover", request],
-    queryFn: ({ signal }) => fetchDiscoverData(request, signal),
-    enabled,
+export function discoverOptions(params: UseDiscoverDataParams) {
+  return queryOptions({
+    queryKey: ["discover", params],
+    queryFn: ({ signal }) => fetchDiscoverData(params, signal),
     staleTime: 30_000,
-    gcTime: 30 * 60_000,
   });
 }

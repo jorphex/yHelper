@@ -1,5 +1,11 @@
 type RequestOptions = { signal?: AbortSignal; timeoutMs?: number };
 
+export class HttpError extends Error {
+  constructor(readonly status: number) {
+    super(`Request failed (${status})`);
+  }
+}
+
 export async function fetchJson<T>(url: string, { signal, timeoutMs = 25_000 }: RequestOptions = {}): Promise<T> {
   const controller = new AbortController();
   const cancel = () => controller.abort(signal?.reason);
@@ -8,7 +14,7 @@ export async function fetchJson<T>(url: string, { signal, timeoutMs = 25_000 }: 
   const timer = setTimeout(() => controller.abort(new DOMException("Request timed out.", "TimeoutError")), timeoutMs);
   try {
     const response = await fetch(url, { cache: "no-store", signal: controller.signal });
-    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    if (!response.ok) throw new HttpError(response.status);
     return await response.json() as T;
   } finally {
     clearTimeout(timer);

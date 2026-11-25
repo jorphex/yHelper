@@ -4,22 +4,20 @@ import { RiskAssessmentLink } from "../components/risk-assessment-link";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { DataLoadError } from "../components/error-state";
 import { EmptyState } from "../components/empty-state";
 import { TableSkeleton } from "../components/skeleton";
 import { TableWrap } from "../components/table-wrap";
+import { chartKeyIndex } from "../components/visuals/utils";
 import { formatPct, formatUsd } from "../lib/format";
 import { replaceQuery } from "../lib/url";
 import {
   useFlexActivity,
-  useFlexHistory,
-  useFlexMarketDetail,
+  FLEX_PERIODS,
+  useFlexMarketData,
   useFlexMarkets,
   useFlexMarketPreload,
-  useFlexRedemptionPriority,
-  useFlexTroveHealth,
-  type FlexActivityRow,
   type FlexHistoryPoint,
   type FlexMarket,
   type FlexRedemptionPriorityResponse,
@@ -27,8 +25,15 @@ import {
 import { flexA11y, flexCopy } from "./copy";
 import { FlexPerformance } from "./performance";
 
-type SortKey = "deposits" | "debt" | "liquidity" | "utilization" | "lenderApr" | "borrowerRate";
-type HistoryDays = 7 | 30 | 90;
+const MARKET_COLUMNS = [
+  { key: "deposits_usd", label: "Deposits", format: formatUsd },
+  { key: "debt_usd", label: "Debt", format: formatUsd },
+  { key: "idle_liquidity_usd", label: "Idle liquidity", format: formatUsd },
+  { key: "utilization", label: "Utilization", mobile: "Used", format: formatPct },
+  { key: "lender_apr", label: "Expected lender APR", format: formatPct },
+  { key: "average_borrow_rate", label: "Debt-weighted rate", format: formatPct },
+] as const;
+type SortKey = typeof MARKET_COLUMNS[number]["key"];
 
 const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 const dateTime = new Intl.DateTimeFormat("en-US", {
@@ -43,38 +48,25 @@ const dateTime = new Intl.DateTimeFormat("en-US", {
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
 const percentagePoints = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
-function metric(market: FlexMarket, key: SortKey): number {
-  const values = market.metrics;
-  if (!values) return -1;
-  return {
-    deposits: values.deposits_usd,
-    debt: values.debt_usd,
-    liquidity: values.idle_liquidity_usd,
-    utilization: values.utilization,
-    lenderApr: values.lender_apr,
-    borrowerRate: values.average_borrow_rate,
-  }[key];
-}
-
 function MarketTable({ rows }: { rows: FlexMarket[] }) {
   const [sort, setSort] = useState<{ key: SortKey; direction: "ascending" | "descending" }>({
-    key: "deposits",
+    key: "deposits_usd",
     direction: "descending",
   });
   const ordered = useMemo(() => [...rows].sort((a, b) => {
-    const delta = metric(a, sort.key) - metric(b, sort.key);
+    const delta = (a.metrics?.[sort.key] ?? -1) - (b.metrics?.[sort.key] ?? -1);
     return sort.direction === "ascending" ? delta : -delta;
   }), [rows, sort]);
   const toggle = (key: SortKey) => setSort((current) => ({
     key,
     direction: current.key === key && current.direction === "descending" ? "ascending" : "descending",
   }));
-  const header = (key: SortKey, label: string, mobileLabel?: string) => (
-    <th className="numeric" aria-sort={sort.key === key ? sort.direction : "none"} data-mobile-label={mobileLabel}>
+  const header = ({ key, label, mobile = label }: { key: SortKey; label: string; mobile?: string }) => (
+    <th key={key} className="numeric" aria-sort={sort.key === key ? sort.direction : "none"} data-mobile-label={mobile}>
       <button
         type="button"
         className="th-button"
-        aria-label={flexA11y(flexCopy.accessibility.tableSort, { column: label })}
+        aria-label={`Sort by ${label}`}
         onClick={() => toggle(key)}
       >
         {label}{sort.key === key ? <span className="th-indicator" aria-hidden="true">{sort.direction === "ascending" ? "↑" : "↓"}</span> : null}
@@ -86,12 +78,7 @@ function MarketTable({ rows }: { rows: FlexMarket[] }) {
       <table className="decision-table flex-market-table" aria-labelledby="flex-markets-title">
         <thead><tr>
           <th>{flexCopy.markets.headers.market}</th>
-          {header("deposits", flexCopy.markets.headers.deposits, flexCopy.markets.mobile.deposits)}
-          {header("debt", flexCopy.markets.headers.debt, flexCopy.markets.mobile.debt)}
-          {header("liquidity", flexCopy.markets.headers.liquidity, flexCopy.markets.mobile.liquidity)}
-          {header("utilization", flexCopy.markets.headers.utilization, flexCopy.markets.mobile.utilization)}
-          {header("lenderApr", flexCopy.markets.headers.lenderApr, flexCopy.markets.mobile.lenderApr)}
-          {header("borrowerRate", flexCopy.markets.headers.borrowerRate, flexCopy.markets.mobile.borrowerRate)}
+          {MARKET_COLUMNS.map(header)}
           <th className="mobile-secondary-column">{flexCopy.markets.headers.age}</th>
         </tr></thead>
         <tbody>{ordered.map((market) => <tr key={market.addresses.market}>
@@ -99,12 +86,7 @@ function MarketTable({ rows }: { rows: FlexMarket[] }) {
             <strong>{market.label}</strong>
             <span className="flex-market-version">v{market.contract_version}</span>
           </td>
-          <td className="numeric data-value" data-label={flexCopy.markets.mobile.deposits}>{formatUsd(market.metrics?.deposits_usd)}</td>
-          <td className="numeric data-value" data-label={flexCopy.markets.mobile.debt}>{formatUsd(market.metrics?.debt_usd)}</td>
-          <td className="numeric data-value" data-label={flexCopy.markets.mobile.liquidity}>{formatUsd(market.metrics?.idle_liquidity_usd)}</td>
-          <td className="numeric data-value" data-label={flexCopy.markets.mobile.utilization}>{formatPct(market.metrics?.utilization)}</td>
-          <td className="numeric data-value" data-label={flexCopy.markets.mobile.lenderApr}>{formatPct(market.metrics?.lender_apr)}</td>
-          <td className="numeric data-value" data-label={flexCopy.markets.mobile.borrowerRate}>{formatPct(market.metrics?.average_borrow_rate)}</td>
+          {MARKET_COLUMNS.map(column => <td key={column.key} className="numeric data-value" data-label={"mobile" in column ? column.mobile : column.label}>{column.format(market.metrics?.[column.key])}</td>)}
           <td className="mobile-secondary-column" data-label={flexCopy.markets.headers.age}><time dateTime={market.deployment_time}>{date.format(new Date(market.deployment_time))}</time></td>
         </tr>)}</tbody>
       </table>
@@ -179,12 +161,10 @@ function HistoryChart({
     onInspect(chartId, Math.round(ratio * (points.length - 1)));
   };
   const moveInspection = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key) || points.length === 0) return;
+    const index = chartKeyIndex(event.key, inspectionIndex, points.length);
+    if (index === undefined) return;
     event.preventDefault();
-    const current = inspectionIndex ?? points.length - 1;
-    if (event.key === "Home") onInspect(chartId, 0);
-    else if (event.key === "End") onInspect(chartId, points.length - 1);
-    else onInspect(chartId, Math.max(0, Math.min(points.length - 1, current + (event.key === "ArrowRight" ? 1 : -1))));
+    onInspect(chartId, index);
   };
   return (
     <section className="flex-chart-panel" aria-labelledby={`${chartId}-title`}>
@@ -315,12 +295,10 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
     setInspectionIndex(closest);
   };
   const moveInspection = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key) || points.length === 0) return;
+    const index = chartKeyIndex(event.key, inspectionIndex, points.length);
+    if (index === undefined) return;
     event.preventDefault();
-    const current = inspectionIndex ?? points.length - 1;
-    if (event.key === "Home") setInspectionIndex(0);
-    else if (event.key === "End") setInspectionIndex(points.length - 1);
-    else setInspectionIndex(Math.max(0, Math.min(points.length - 1, current + (event.key === "ArrowRight" ? 1 : -1))));
+    setInspectionIndex(index);
   };
   const summary = inspected ? flexA11y(flexCopy.redemptionPriority.summary, {
     symbol: data.borrow_token.symbol,
@@ -391,7 +369,7 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
 function RedemptionPrioritySection({
   query,
 }: {
-  query: ReturnType<typeof useFlexRedemptionPriority>;
+  query: ReturnType<typeof useFlexMarketData>["redemptionPriority"];
 }) {
   const data = query.data;
   const freshness = data?.freshness;
@@ -419,7 +397,7 @@ function RedemptionPrioritySection({
 function TroveHealthSection({
   query,
 }: {
-  query: ReturnType<typeof useFlexTroveHealth>;
+  query: ReturnType<typeof useFlexMarketData>["troveHealth"];
 }) {
   const data = query.data;
   const metrics = data?.metrics;
@@ -450,29 +428,40 @@ function TroveHealthSection({
   </section>;
 }
 
-function eventLabel(event: string): string {
-  const normalized = event.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
-  return flexCopy.events[normalized as keyof typeof flexCopy.events] ?? event.replaceAll("_", " ");
-}
+type EventDetail = readonly [label: string] | readonly [label: string, amount: string, token: "borrow_token" | "collateral_token"];
+const EVENTS = new Map<string, EventDetail>([
+  ["open_trove", ["Position opened", "debt_raw", "borrow_token"]],
+  ["close_trove", ["Position closed", "debt_raw", "borrow_token"]],
+  ["close_zombie_trove", ["Dormant position closed", "debt_raw", "borrow_token"]],
+  ["borrow", ["Borrowed", "debt_raw", "borrow_token"]],
+  ["repay", ["Repaid", "debt_raw", "borrow_token"]],
+  ["liquidation", ["Liquidated", "debt_raw", "borrow_token"]],
+  ["redeem_trove", ["Position redeemed", "debt_raw", "borrow_token"]],
+  ["redemption", ["Redeemed", "debt_raw", "borrow_token"]],
+  ["lender_deposit", ["Deposited", "assets_raw", "borrow_token"]],
+  ["lender_withdrawal", ["Withdrawn", "assets_raw", "borrow_token"]],
+  ["add_collateral", ["Collateral added", "collateral_raw", "collateral_token"]],
+  ["remove_collateral", ["Collateral removed", "collateral_raw", "collateral_token"]],
+  ["auction_kick", ["Auction started", "collateral_raw", "collateral_token"]],
+  ["auction_take", ["Auction filled", "take_raw", "collateral_token"]],
+  ["bad_debt", ["Bad debt recorded", "loss_raw", "borrow_token"]],
+  ["market_deployed", ["Market deployed"]],
+  ["market_endorsed", ["Market endorsed"]],
+  ["market_unendorsed", ["Market unendorsed"]],
+  ["adjust_interest_rate", ["Interest rate adjusted"]],
+  ["adjust", ["Position adjusted"]],
+  ["close", ["Position closed", "debt_raw", "borrow_token"]],
+  ["deposit", ["Deposited", "assets_raw", "borrow_token"]],
+  ["withdrawal", ["Withdrawn", "assets_raw", "borrow_token"]],
+]);
 
-function primaryAmount(row: FlexActivityRow, market: FlexMarket | undefined): string {
-  const values = row.amounts;
-  const candidates: Array<[string, number, string]> = [
-    ["debt_raw", market?.borrow_token.decimals ?? 6, market?.borrow_token.symbol ?? ""],
-    ["assets_raw", market?.borrow_token.decimals ?? 6, market?.borrow_token.symbol ?? ""],
-    ["collateral_raw", market?.collateral_token.decimals ?? 18, market?.collateral_token.symbol ?? ""],
-    ["take_raw", market?.collateral_token.decimals ?? 18, market?.collateral_token.symbol ?? ""],
-    ["loss_raw", market?.borrow_token.decimals ?? 6, market?.borrow_token.symbol ?? ""],
-  ];
-  const entry = candidates.find(([key]) => values[key] !== undefined);
-  if (!entry) return flexCopy.values.unavailable;
-  const raw = Number(values[entry[0]]);
-  if (!Number.isFinite(raw)) return flexCopy.values.unavailable;
-  return `${compact.format(raw / 10 ** entry[1])} ${entry[2]}`.trim();
+function formatActivityAmount(raw: unknown, asset: FlexMarket["borrow_token"] | undefined): string {
+  const amount = typeof raw === "number" || (typeof raw === "string" && /^\d+$/.test(raw)) ? Number(raw) : NaN;
+  if (!asset || !Number.isInteger(amount) || amount < 0) return flexCopy.values.unavailable;
+  return `${compact.format(amount / 10 ** asset.decimals)} ${asset.symbol}`;
 }
 
 function FlexPageContent() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data, isLoading, error, refetch } = useFlexMarkets();
@@ -484,20 +473,16 @@ function FlexPageContent() {
   const selectableMarkets = selected && selected.status !== "active" ? [...active, selected] : active;
   useFlexMarketPreload(selectableMarkets);
   const marketTabsRef = useRef<HTMLDivElement>(null);
-  const rawDays = Number(searchParams.get("days") ?? 30);
-  const days: HistoryDays = rawDays === 7 || rawDays === 90 ? rawDays : 30;
-  const rawPerformanceDays = Number(searchParams.get("pnl_days") ?? 30);
-  const performanceDays: HistoryDays = rawPerformanceDays === 7 || rawPerformanceDays === 90 ? rawPerformanceDays : 30;
-  const history = useFlexHistory(selected?.addresses.market ?? null, days);
-  const detail = useFlexMarketDetail(selected?.addresses.market ?? null);
-  const redemptionPriority = useFlexRedemptionPriority(selected?.addresses.market ?? null);
-  const troveHealth = useFlexTroveHealth(selected?.addresses.market ?? null);
+  const period = (key: string) => FLEX_PERIODS.find(days => days === Number(searchParams.get(key))) ?? 30;
+  const days = period("days");
+  const performanceDays = period("pnl_days");
+  const { history, detail, redemptionPriority, troveHealth } = useFlexMarketData(selected?.addresses.market ?? null, days);
   const activity = useFlexActivity();
   const activityRows = activity.data?.pages.flatMap((page) => page.rows) ?? [];
   const marketByAddress = useMemo(() => new Map(data?.rows.map((market) => [market.addresses.market, market])), [data]);
   const updateQuery = useCallback(
-    (updates: Record<string, string | number | null>) => replaceQuery(router, pathname, searchParams, updates, { clientOnly: true }),
-    [pathname, router, searchParams],
+    (updates: Record<string, string | number | null>) => replaceQuery(pathname, searchParams, updates),
+    [pathname, searchParams],
   );
 
   useEffect(() => {
@@ -566,7 +551,7 @@ function FlexPageContent() {
         <div className="flex-history-heading-row">
           <div><h3>{flexCopy.history.title}{history.isPlaceholderData ? " · Updating…" : ""}</h3></div>
           <div className="flex-range-tabs" role="group" aria-label={flexCopy.history.rangeLabel}>
-            {([[7, flexCopy.history.ranges.seven], [30, flexCopy.history.ranges.thirty], [90, flexCopy.history.ranges.ninety]] as const).map(([value, label]) => <button key={value} type="button" className={`flex-range-tab ${days === value ? "is-active" : ""}`} aria-pressed={days === value} onClick={() => updateQuery({ days: value })}>{label}</button>)}
+            {FLEX_PERIODS.map(value => <button key={value} type="button" className={`flex-range-tab ${days === value ? "is-active" : ""}`} aria-pressed={days === value} onClick={() => updateQuery({ days: value })}>{value} days</button>)}
           </div>
         </div>
         {history.isLoading && !history.data ? <div className="flex-chart-grid-layout"><div className="skeleton flex-chart-skeleton" /><div className="skeleton flex-chart-skeleton" /></div> : history.data?.points.length ? <HistoryCharts points={history.data.points} /> : <p className="muted">{flexCopy.history.unavailable}</p>}
@@ -581,12 +566,19 @@ function FlexPageContent() {
         <div className="card-header"><div><h2 className="card-title" id="flex-activity-title">{flexCopy.activity.title}</h2></div></div>
         <TableWrap className="flex-activity-wrap"><table className="decision-table flex-activity-table" aria-labelledby="flex-activity-title">
           <thead><tr><th>{flexCopy.activity.headers.time}</th><th>{flexCopy.activity.headers.event}</th><th>{flexCopy.activity.headers.market}</th><th className="numeric">{flexCopy.activity.headers.amount}</th></tr></thead>
-          <tbody>{activity.isLoading && !activity.data ? <TableSkeleton rows={8} columns={4} /> : activityRows.map((row) => <tr key={`${row.tx_hash}:${row.log_index}`}>
-            <td data-label={flexCopy.activity.mobile.time}><Link className="report-link report-link-utility" href={`https://etherscan.io/tx/${row.tx_hash}`} target="_blank" rel="noreferrer" aria-label={flexA11y(flexCopy.accessibility.transaction, { hash: row.tx_hash })}><time dateTime={row.block_time}>{dateTime.format(new Date(row.block_time))} UTC</time></Link></td>
-            <td data-label={flexCopy.activity.mobile.event}>{eventLabel(row.event)}</td>
-            <td data-label={flexCopy.activity.mobile.market}>{row.market_label}</td>
-            <td data-label={flexCopy.activity.mobile.amount} className="numeric data-value">{primaryAmount(row, marketByAddress.get(row.market_address))}</td>
-          </tr>)}</tbody>
+          <tbody>{activity.isLoading && !activity.data ? <TableSkeleton rows={8} columns={4} /> : activityRows.map((row) => {
+            const event = EVENTS.get(row.event);
+            const market = marketByAddress.get(row.market_address);
+            const amount = event?.length === 3
+              ? formatActivityAmount(row.amounts[event[1]], market?.[event[2]])
+              : flexCopy.values.unavailable;
+            return <tr key={`${row.tx_hash}:${row.log_index}`}>
+              <td data-label={flexCopy.activity.mobile.time}><Link className="report-link report-link-utility" href={`https://etherscan.io/tx/${row.tx_hash}`} target="_blank" rel="noreferrer" aria-label={flexA11y(flexCopy.accessibility.transaction, { hash: row.tx_hash })}><time dateTime={row.block_time}>{dateTime.format(new Date(row.block_time))} UTC</time></Link></td>
+              <td data-label={flexCopy.activity.mobile.event}>{event?.[0] ?? row.event.replaceAll("_", " ")}</td>
+              <td data-label={flexCopy.activity.mobile.market}>{row.market_label}</td>
+              <td data-label={flexCopy.activity.mobile.amount} className="numeric data-value">{amount}</td>
+            </tr>;
+          })}</tbody>
         </table></TableWrap>
         {!activity.isLoading && activityRows.length === 0 ? <p className="muted">{flexCopy.activity.empty}</p> : null}
         {activity.hasNextPage ? <button type="button" className="button button-ghost section-sm" disabled={activity.isFetchingNextPage} onClick={() => activity.fetchNextPage()}>{activity.isFetchingNextPage ? flexCopy.activity.loadingMore : flexCopy.activity.loadMore}</button> : null}

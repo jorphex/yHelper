@@ -15,7 +15,7 @@ import httpx
 import requests
 
 from .config import ETH_RPC_MAX_ATTEMPTS, ETH_RPC_RETRY_SLEEP_SEC
-from .transport import fetch
+from yhelper_shared.transport import fetch
 
 _BUDGET_SEC = 65
 _MAX_DELAY_SEC = 30

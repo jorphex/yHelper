@@ -73,8 +73,8 @@ def _styfi_component_reward(epoch: int, component_address: str) -> int:
     return _eth_call_uint(
         STYFI_CONTRACTS["reward_distributor"],
         "rewards(address,uint256)",
-        ("address", component_address),
-        ("uint256", epoch),
+        component_address,
+        epoch,
     )
 
 
@@ -249,7 +249,7 @@ def _fetch_styfi_snapshot_data(
             and fetched.date() == observed_at.date()
         ):
             continue
-        reward_total = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch_rewards(uint256)", ("uint256", epoch))
+        reward_total = _eth_call_uint(STYFI_CONTRACTS["reward_distributor"], "epoch_rewards(uint256)", epoch)
         finalized = epoch < next_unfinalized_epoch
         epochs.append(
             {

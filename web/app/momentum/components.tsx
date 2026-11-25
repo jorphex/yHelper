@@ -8,7 +8,9 @@ import { VaultLink } from "../components/vault-link";
 import { chainLabel, compactChainLabel, deltaArrow, formatPct, formatPercentagePoints, formatUsd } from "../lib/format";
 import { sortIndicator, sortRows, toggleSort, type SortState } from "../lib/sort";
 import type { MarketKind, UniverseKind } from "../lib/universe";
-import type { ChangeRow, MoverSortKey, WindowKey } from "./types";
+import type { ChangeRow, WindowKey } from "../hooks/use-changes-data";
+
+type MoverSortKey = "vault" | "chain" | "tvl" | "current" | "previous" | "delta";
 
 function compactAge(seconds: number | null): string | null {
   if (seconds === null || !Number.isFinite(seconds)) return null;

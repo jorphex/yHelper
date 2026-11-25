@@ -31,6 +31,7 @@ from websockets.exceptions import ConnectionClosed
 from websockets.sync.server import serve
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 OUT = ROOT / "reports/network-resilience-fix"
 OUT.mkdir(parents=True, exist_ok=True)
 VAULT, STRATEGY = "0x" + "1" * 40, "0x" + "2" * 40
@@ -158,6 +159,7 @@ from worker.config import (  # noqa: E402
 )
 
 from worker import eth, harvests, kong  # noqa: E402
+from worker.db import connect  # noqa: E402
 
 configure_logging()
 event = {
@@ -299,7 +301,7 @@ try:
         **os.environ,
         "DATABASE_URL": make_conninfo(scoped, application_name="network-review-api"),
         "FLEX_PERFORMANCE_RPC_URL": origin + "/archive",
-        "PYTHONPATH": str(ROOT / "api"),
+        "PYTHONPATH": os.pathsep.join((str(ROOT / "api"), str(ROOT))),
     }
     with (OUT / "api.log").open("w") as log:
         api = subprocess.Popen(
@@ -344,7 +346,7 @@ try:
                 ).fetchone()[0]
             health = client.get("/health").status_code
             lock.rollback()
-        with eth._connect() as conn:
+        with connect() as conn:
             settings = {
                 name: conn.execute(f"SHOW {name}").fetchone()[0]
                 for name in ("statement_timeout", "lock_timeout")

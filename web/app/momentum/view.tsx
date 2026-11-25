@@ -2,18 +2,18 @@
 
 import { VaultSourceNote } from "../components/source-notes";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { KpiGridSkeleton, TableSkeleton } from "../components/skeleton";
 import { MarketFilter } from "../components/market-filter";
 import { MarketModeNav } from "../components/market-mode-nav";
 import { ScatterPlot, ShareMeter } from "../components/visuals";
-import { useChangesData } from "../hooks/use-changes-data";
+import { CHANGE_WINDOWS, changesOptions } from "../hooks/use-changes-data";
 import { formatPct, formatPercentagePoints, formatUsd, yearnVaultUrl } from "../lib/format";
-import { MARKET_VALUES, UNIVERSE_VALUES, universeDefaults, universeLabel } from "../lib/universe";
+import { marketScope, UNIVERSE_VALUES, universeLabel } from "../lib/universe";
 import { queryChoice, replaceQuery } from "../lib/url";
 import { MoverTable } from "./components";
-import type { ChangeRow } from "./types";
 
 function comparisonLabel(window: "24h" | "7d" | "30d"): string {
   if (window === "24h") return "24 hours vs preceding 24 hours";
@@ -29,21 +29,12 @@ function ageLabel(seconds: number | null | undefined): string | null {
   return `${Math.max(1, Math.round(seconds / 86_400))}d ago`;
 }
 
-function MomentumPageContent() {
-  const router = useRouter();
+export function ChangesView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [compact, setCompact] = useState(false);
-  const query = useMemo(() => {
-    const universe = queryChoice(searchParams, "universe", UNIVERSE_VALUES, "core");
-    return {
-      universe,
-      market: queryChoice(searchParams, "market", MARKET_VALUES, "all"),
-      window: queryChoice(searchParams, "window", ["24h", "7d", "30d"] as const, "7d"),
-      ...universeDefaults(universe),
-    };
-  }, [searchParams]);
-  const updateQuery = (updates: Record<string, string | number | null | undefined>) => replaceQuery(router, pathname, searchParams, updates, { clientOnly: pathname === "/markets" });
+  const query = { ...marketScope(searchParams), window: queryChoice(searchParams, "window", CHANGE_WINDOWS, "7d") };
+  const updateQuery = (updates: Record<string, string | null>) => replaceQuery(pathname, searchParams, updates);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");
@@ -53,14 +44,7 @@ function MomentumPageContent() {
     return () => media.removeEventListener("change", update);
   }, []);
 
-  const { data, isLoading, error, refetch } = useChangesData({
-    universe: query.universe,
-    market: query.market,
-    minTvl: query.minTvl,
-    minPoints: query.minPoints,
-    window: query.window,
-    staleThreshold: "auto",
-  });
+  const { data, isLoading, error, refetch } = useQuery(changesOptions(query));
   if (error && !data) {
     return <div className="error-state"><h2>Markets are temporarily unavailable</h2><button className="button button-primary section-sm" onClick={() => refetch()}>Retry</button></div>;
   }
@@ -82,7 +66,7 @@ function MomentumPageContent() {
     { id: "flat-tvl", label: "Unchanged TVL", value: neutralTvl, note: "No measured window change", tone: "muted" as const },
   ];
 
-  const moverRows = [...(data?.movers?.risers ?? []), ...(data?.movers?.fallers ?? [])].filter((row, index, rows) => rows.findIndex((candidate) => candidate.chain_id === row.chain_id && candidate.vault_address === row.vault_address) === index);
+  const moverRows = [...(data?.movers?.risers ?? []), ...(data?.movers?.fallers ?? [])];
   const newestMetricAge = ageLabel(data?.freshness?.newest_comparison_age_seconds);
   const currentComparisons = data?.freshness?.current_comparisons;
   const trackedComparisons = data?.freshness?.tracked_comparisons;
@@ -109,8 +93,8 @@ function MomentumPageContent() {
 
       <section className="section section-lg">
         {isLoading ? <table className="decision-table" aria-label="Loading yield changes"><tbody><TableSkeleton rows={8} columns={6} /></tbody></table> : <>
-          <MoverTable title="Yield increased" direction="strengthening" rows={(data?.movers?.risers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
-          <MoverTable title="Yield decreased" direction="weakening" rows={(data?.movers?.fallers ?? []) as ChangeRow[]} universe={query.universe} market={query.market} window={query.window} compact={compact} />
+          <MoverTable title="Yield increased" direction="strengthening" rows={data?.movers?.risers ?? []} universe={query.universe} market={query.market} window={query.window} compact={compact} />
+          <MoverTable title="Yield decreased" direction="weakening" rows={data?.movers?.fallers ?? []} universe={query.universe} market={query.market} window={query.window} compact={compact} />
         </>}
       </section>
       <section className="detail-section"><h2 className="detail-title">Across vaults</h2><div className="detail-body">
@@ -132,8 +116,4 @@ function MomentumPageContent() {
 
     </div>
   );
-}
-
-export default function MomentumPage() {
-  return <Suspense fallback={<div className="page-loading">Loading yield changes…</div>}><MomentumPageContent /></Suspense>;
 }

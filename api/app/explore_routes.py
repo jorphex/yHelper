@@ -8,8 +8,8 @@ from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
 from app.analytics_service import (
-    _bounded_momentum_sql,
-    _bounded_realized_apy_sql,
+    BOUNDED_MOMENTUM_SQL,
+    BOUNDED_REALIZED_APY_SQL,
     _changes_base_cte,
     _composition_filtered_cte,
     _fetch_change_movers,
@@ -29,6 +29,7 @@ from app.db import connect
 from app.models import ChangesResponse, CompositionResponse, DiscoverResponse
 
 router = APIRouter()
+WINDOW_SECONDS = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}
 
 
 @router.get("/api/discover", response_model=DiscoverResponse)
@@ -45,22 +46,20 @@ def discover(
     sort_by: Literal["tvl", "est_apy", "apy_30d", "momentum"] = "tvl",
     direction: Literal["asc", "desc"] = "desc",
 ) -> dict[str, object]:
-    universe_gate = _resolve_universe_gate(
+    min_tvl_usd, min_points, max_vaults = _resolve_universe_gate(
         universe, min_tvl_usd=min_tvl_usd, min_points=min_points, max_vaults=max_vaults
     )
-    min_tvl_usd = float(universe_gate["min_tvl_usd"])
-    min_points = int(universe_gate["min_points"])
-    max_vaults = universe_gate["max_vaults"]
-    token_symbol = token_symbol.strip().upper() or None if token_symbol is not None else None
-    realized_apy_sql = _bounded_realized_apy_sql()
-    momentum_sql = _bounded_momentum_sql()
+    token_symbol = (token_symbol or "").strip().upper() or None
+    realized_apy_sql = BOUNDED_REALIZED_APY_SQL
+    momentum_sql = BOUNDED_MOMENTUM_SQL
     locked_sql = _locked_yvusd_filter_sql("d")
-    order_map = {
+    sort_sql = {
         "tvl": "COALESCE(d.tvl_usd, 0.0)",
-        "est_apy": "COALESCE(d.est_apy, -999999.0)",
-        "apy_30d": f"COALESCE({realized_apy_sql}, -999999.0)",
-        "momentum": f"COALESCE({momentum_sql}, -999999.0)",
-    }
+        "est_apy": "d.est_apy",
+        "apy_30d": realized_apy_sql,
+        "momentum": momentum_sql,
+    }[sort_by]
+    order_sql = "ASC NULLS FIRST" if direction == "asc" else "DESC NULLS LAST"
     base_filters = [
         _user_visible_filter_sql("d", include_retired=False, include_locked=True),
         "COALESCE(d.tvl_usd, 0) >= %(min_tvl_usd)s",
@@ -164,7 +163,7 @@ def discover(
                 LEFT JOIN vault_metrics_latest m
                   ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
                 WHERE {selected_where}
-                ORDER BY {order_map[sort_by]} {"ASC" if direction == "asc" else "DESC"}, d.tvl_usd DESC
+                ORDER BY {sort_sql} {order_sql}, d.tvl_usd DESC, d.chain_id, d.vault_address
                 LIMIT %(limit)s OFFSET %(offset)s
                 """,
                 params,
@@ -210,12 +209,9 @@ def composition(
     max_vaults: int | None = Query(default=None, ge=0),
     top_n: int = Query(default=12, ge=3, le=50),
 ) -> dict[str, object]:
-    universe_gate = _resolve_universe_gate(
+    min_tvl_usd, min_points, max_vaults = _resolve_universe_gate(
         universe, min_tvl_usd=min_tvl_usd, min_points=min_points, max_vaults=max_vaults
     )
-    min_tvl_usd = float(universe_gate["min_tvl_usd"])
-    min_points = int(universe_gate["min_points"])
-    max_vaults = universe_gate["max_vaults"]
     params: dict[str, object] = {
         "min_tvl_usd": min_tvl_usd,
         "min_points": min_points,
@@ -224,13 +220,13 @@ def composition(
     }
     if max_vaults is not None:
         params["max_vaults"] = max_vaults
-    filtered_cte = _composition_filtered_cte(max_vaults=max_vaults, filter_market=True)
+    filtered_cte = _composition_filtered_cte(max_vaults=max_vaults)
 
-    def breakdown(cur: psycopg.Cursor, key_sql: str, key_alias: str) -> list[dict]:
+    def breakdown(cur: psycopg.Cursor, key_sql: str, key_alias: str | None = None) -> list[dict]:
         cur.execute(
             filtered_cte
             + f"""
-            SELECT {key_sql} AS {key_alias}, COUNT(*) AS vaults, SUM(tvl_usd) AS tvl_usd
+            SELECT {key_sql} AS {key_alias or key_sql}, COUNT(*) AS vaults, SUM(tvl_usd) AS tvl_usd
             FROM filtered
             GROUP BY {key_sql}
             ORDER BY tvl_usd DESC
@@ -247,9 +243,9 @@ def composition(
                 params,
             )
             summary = cur.fetchone() or {"vaults": 0, "total_tvl_usd": 0.0}
-            chains = breakdown(cur, "chain_id", "chain_id")
+            chains = breakdown(cur, "chain_id")
             categories = breakdown(cur, "market", "category")
-            tokens = breakdown(cur, "token_symbol", "token_symbol")
+            tokens = breakdown(cur, "token_symbol")
             source_freshness = _kong_source_freshness(cur)
     total_tvl = float(summary.get("total_tvl_usd") or 0.0)
     for rows in (chains, categories, tokens):
@@ -282,19 +278,11 @@ def changes(
     min_points: int | None = Query(default=None, ge=0),
     max_vaults: int | None = Query(default=None, ge=0),
 ) -> dict[str, object]:
-    universe_gate = _resolve_universe_gate(
+    min_tvl_usd, min_points, max_vaults = _resolve_universe_gate(
         universe, min_tvl_usd=min_tvl_usd, min_points=min_points, max_vaults=max_vaults
     )
-    min_tvl_usd = float(universe_gate["min_tvl_usd"])
-    min_points = int(universe_gate["min_points"])
-    max_vaults = universe_gate["max_vaults"]
-    window_seconds = {"24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400}[window]
-    threshold_seconds = {
-        "auto": 2 * window_seconds,
-        "24h": 86400,
-        "7d": 7 * 86400,
-        "30d": 30 * 86400,
-    }[stale_threshold]
+    window_seconds = WINDOW_SECONDS[window]
+    threshold_seconds = 2 * window_seconds if stale_threshold == "auto" else WINDOW_SECONDS[stale_threshold]
     params: dict[str, object] = {
         "window_sec": window_seconds,
         "stale_threshold_sec": threshold_seconds,

@@ -42,8 +42,6 @@ const toast = document.getElementById("toast");
 const entry = document.getElementById("entry");
 
 let connectedAddress = null;
-// The chosen ENS name stays separate from the connected account.
-let resolvedEns = null;
 
 function shortAddress(addr) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -71,16 +69,11 @@ function flagInvalid() {
 // Cover the moving scene completely before navigating. The next document paints
 // this same opaque curtain before releasing it over a ready loader or recap.
 let launched = false;
-function goReplay(addr) {
+function goReplay(addr, name) {
   if (launched) return;
   launched = true;
-  let url = `replay.html?address=${encodeURIComponent(addr)}`;
-  // The name travels with the address. The landing already paid for the lookup, and
-  // the deck, its outro and the share image would otherwise fall back to six
-  // characters and an ellipsis.
-  if (resolvedEns?.name && resolvedEns.addr?.toLowerCase() === String(addr).toLowerCase()) {
-    url += `&name=${encodeURIComponent(resolvedEns.name)}`;
-  }
+  const query = new URLSearchParams({ address: addr });
+  if (name) query.set("name", name);
   if (hero.launch) hero.launch();
   try { sessionStorage.setItem("wrapped-launch", "1"); } catch (err) {}
   const flash = document.getElementById("launch-flash");
@@ -89,7 +82,7 @@ function goReplay(addr) {
     if (navigating) return;
     navigating = true;
     clearTimeout(fallback);
-    location.href = url;
+    location.href = `replay.html?${query}`;
   };
   flash.addEventListener("transitionend", event => {
     if (event.target === flash && event.propertyName === "opacity") {
@@ -125,7 +118,6 @@ function setStatus(html) {
 const WC_PROJECT_ID = "2eaa1bd097db18926eb024849fe35341";
 let wcProviderPromise = null;
 async function walletConnectProvider() {
-  if (!WC_PROJECT_ID) throw new Error("walletconnect not configured");
   if (!wcProviderPromise) {
     wcProviderPromise = import("./vendor/walletconnect.js")
       .then(({ EthereumProvider }) => EthereumProvider.init({
@@ -153,7 +145,7 @@ async function walletConnectProvider() {
 
 // Prepare the modal after first paint; a click shares the same initialization.
 function warmWallet() {
-  if (window.ethereum || !WC_PROJECT_ID) return;
+  if (window.ethereum) return;
   // Fetch as soon as the first scene is committed; prepare the modal after paint.
   // This overlaps its download with animation without competing for scene bytes.
   const preload = document.createElement("link");
@@ -174,36 +166,33 @@ connectBtn.addEventListener("click", async () => {
   }
   connectLabel.textContent = "Connecting…";
   try {
-    let accounts = null;
-    if (window.ethereum) {
-      accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    let provider = window.ethereum;
+    let accounts;
+    if (provider) {
+      accounts = await provider.request({ method: "eth_requestAccounts" });
     } else {
       // No injected wallet: WalletConnect's QR flow covers the rest of the
       // mobile wallets, and the address is all the deck ever needs. The modal
       // only opens once the provider is initialized, so say so instead of
       // leaving the tap silent.
       setStatus('<span class="dim">connecting · the wallet modal opens next</span>');
-      const provider = await walletConnectProvider();
+      provider = await walletConnectProvider();
       await provider.enable();
       accounts = provider.accounts;
     }
-    if (!accounts || !accounts.length) throw new Error("no accounts");
-    if (!ADDR_RE.test(accounts[0])) throw new Error("invalid wallet account");
+    if (!ADDR_RE.test(accounts?.[0])) throw new Error("invalid wallet account");
     connectedAddress = accounts[0];
-    bindWallet(window.ethereum || await walletConnectProvider());
+    bindWallet(provider);
     connectLabel.textContent = shortAddress(connectedAddress);
     validate();
-    if (!input.value.trim()) setReady(connectedAddress, '<span class="ok">●</span> wallet connected · press enter to replay');
-    if (!input.value.trim()) replayBtn.focus({ preventScroll: true });
+    if (!input.value.trim()) {
+      setStatus('<span class="ok">●</span> wallet connected · press enter to replay');
+      replayBtn.focus({ preventScroll: true });
+    }
     showToast("Wallet connected.");
-  } catch (err) {
+  } catch {
     connectLabel.textContent = "Connect wallet";
     setStatus('<span class="err">connection cancelled</span>');
-    if (!window.ethereum && !WC_PROJECT_ID) {
-      showToast("No injected wallet found. Paste an address instead.");
-      setStatus('<span class="err">no injected wallet, paste an address</span>');
-      input.focus();
-    }
   }
 });
 
@@ -277,17 +266,16 @@ async function handleSubmit(event) {
   }
 
   if (ENS_RE.test(value)) {
-    // Typing an ENS name already resolved it, so this is the fast path.
-    if (resolvedEns && resolvedEns.name === value && cachedEns(value)) {
-      goReplay(resolvedEns.addr);
+    const cached = cachedEns(value);
+    if (cached) {
+      goReplay(cached, value);
       return;
     }
     replayLabel.textContent = "Resolving…";
     try {
       const addr = await resolveEns(value);
       if (input.value.trim() !== value) return;
-      resolvedEns = { name: value, addr };
-      goReplay(addr);
+      goReplay(addr, value);
     } catch (err) {
       if (input.value.trim() !== value) return;
       setStatus(`<span class="err">couldn't resolve ${value} on mainnet</span>`);
@@ -328,8 +316,10 @@ function validate() {
   }
 
   if (ENS_RE.test(value)) {
-    if (resolvedEns && resolvedEns.name === value && cachedEns(value)) {
-      setReady(resolvedEns.addr, `<span class="ok">●</span> ${value} → ${shortAddress(resolvedEns.addr)} · replay ready`);
+    const cached = cachedEns(value);
+    const ready = addr => setReady(addr, `<span class="ok">●</span> ${value} → ${shortAddress(addr)} · replay ready`);
+    if (cached) {
+      ready(cached);
       return;
     }
     setReady(null, `<span class="dim">resolving ${value} on mainnet…</span>`);
@@ -337,8 +327,7 @@ function validate() {
       try {
         const addr = await resolveEns(value);
         if (seq !== resolveSeq || input.value.trim() !== value) return;
-        resolvedEns = { name: value, addr };
-        setReady(addr, `<span class="ok">●</span> ${value} → ${shortAddress(addr)} · replay ready`);
+        ready(addr);
       } catch (err) {
         if (seq !== resolveSeq || input.value.trim() !== value) return;
         setReady(null, `<span class="err">couldn't resolve ${value} on mainnet</span>`);

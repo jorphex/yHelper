@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { VaultHistoryPoint } from "../hooks/use-vault-history";
+import { chartKeyIndex } from "../components/visuals/utils";
 import { formatPct, formatUsd, formatUsdCompact } from "../lib/format";
 
 const DAY = 86400;
@@ -76,14 +77,10 @@ export function VaultChart({ points, days, asset }: { points: VaultHistoryPoint[
     setSelectedTime(nearest.timestamp);
   };
   const keyboard = (event: KeyboardEvent<HTMLDivElement>) => {
-    let index = activeIndex;
-    if (event.key === "ArrowLeft") index--;
-    else if (event.key === "ArrowRight") index++;
-    else if (event.key === "Home") index = 0;
-    else if (event.key === "End") index = visible.length - 1;
-    else return;
+    const index = chartKeyIndex(event.key, activeIndex, visible.length);
+    if (index === undefined) return;
     event.preventDefault();
-    setSelectedTime(visible[Math.max(0, Math.min(visible.length - 1, index))].timestamp);
+    setSelectedTime(visible[index].timestamp);
   };
 
   return <figure className="vault-chart">

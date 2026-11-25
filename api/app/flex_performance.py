@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import threading
 import time
 from collections import OrderedDict, defaultdict
@@ -19,10 +20,10 @@ from decimal import Decimal, localcontext
 
 import httpx
 from fastapi import HTTPException
+from yhelper_shared.transport import fetch
 
 from app.archive_cache import HistoricalCache
 from app.flex_service import _read_cursor
-from app.transport import fetch
 
 WAD = 10**18
 YEAR = 365 * 86400
@@ -50,10 +51,51 @@ ARCHIVE_TIMEOUT_SEC = 60
 MAX_ARCHIVE_CALLS = 1600
 SHARED = HistoricalCache()
 LOGGER = logging.getLogger("uvicorn.error.flex_rpc")
+HISTORICAL_BLOCK_PARAM = {"eth_call": 1, "eth_getBlockByNumber": 0}
+HEX_DATA = re.compile(r"0x[0-9a-fA-F]+")
 
 
 class CoverageError(ValueError):
     """History cannot support an honest numeric result."""
+
+
+def _shareable_result(method, params, result):
+    # The build still validates values for its own calculations. Only well-formed
+    # historical responses may be shared by another build.
+    try:
+        if method == "eth_call":
+            return (
+                isinstance(result, str)
+                and len(result) > 2
+                and (len(result) - 2) % 64 == 0
+                and HEX_DATA.fullmatch(result) is not None
+            )
+        if method == "eth_getBlockByNumber":
+            return (
+                result["number"] == params[0]
+                and len(result["hash"]) == 66
+                and HEX_DATA.fullmatch(result["hash"]) is not None
+                and int(result["timestamp"], 16) >= 0
+            )
+        query = params[0]
+        start, end = int(query["fromBlock"], 16), int(query["toBlock"], 16)
+        address = query["address"].lower()
+        return isinstance(result, list) and all(
+            not log.get("removed")
+            and log["address"].lower() == address
+            and start <= int(log["blockNumber"], 16) <= end
+            and len(log["topics"]) == 3
+            and log["topics"][0].lower() == TRANSFER
+            and int(log["logIndex"], 16) >= 0
+            and all(
+                len(word) == 66 and HEX_DATA.fullmatch(word) is not None
+                for word in (log["data"], log["transactionHash"], *log["topics"])
+            )
+            for log in result
+        )
+    except (AttributeError, IndexError, KeyError, TypeError, ValueError):
+        return False
+
 
 
 class Archive:
@@ -80,44 +122,23 @@ class Archive:
         self.anchor = (self.url, end, expected_hash.lower())
         return block
 
-    def _shared_key(self, method, params):
+    def _shared_key(self, method, params, key):
         if self.anchor is None:
             return None
         try:
-            if method == "eth_call":
-                block = params[1]
-                eligible = (
-                    isinstance(block, str)
-                    and block.startswith("0x")
-                    and 0 <= int(block, 16) <= self.anchor[1]
-                )
-            elif method == "eth_getBlockByNumber":
-                block = params[0]
-                eligible = (
-                    isinstance(block, str)
-                    and block.startswith("0x")
-                    and 0 <= int(block, 16) <= self.anchor[1]
-                )
-            elif method == "eth_getLogs":
+            if method == "eth_getLogs":
                 query = params[0]
-                eligible = (
-                    0
-                    <= int(query["fromBlock"], 16)
-                    <= int(query["toBlock"], 16)
-                    <= self.anchor[1]
-                )
+                start, end = query["fromBlock"], query["toBlock"]
             else:
-                eligible = False
-        except (KeyError, IndexError, TypeError, ValueError):
-            eligible = False
-        return (
-            (*self.anchor, json.dumps([method, params], sort_keys=True))
-            if eligible
-            else None
-        )
+                start = end = params[HISTORICAL_BLOCK_PARAM[method]]
+            if start.startswith("0x") and end.startswith("0x") and 0 <= int(start, 16) <= int(end, 16) <= self.anchor[1]:
+                return (*self.anchor, key)
+        except (AttributeError, IndexError, KeyError, TypeError, ValueError):
+            pass
+        return None
 
     def _cached(self, method, params, key):
-        shared = self._shared_key(method, params)
+        shared = self._shared_key(method, params, key)
         if shared is None:
             return None, None
         raw, future, owner = SHARED.acquire(shared)
@@ -138,67 +159,12 @@ class Archive:
             self.failed.add(key)
             raise CoverageError("Historical RPC data is unavailable.") from exc
 
-    def _store(self, key, result, claim):
-        # Only JSON-RPC successes enter the shared cache. Readers independently
-        # retain ABI, price age, transfer and reconciliation validation.
-        if result is None:
-            raise CoverageError("Historical RPC data is unavailable.")
+    def _store(self, key, method, params, result, claim):
         if claim is not None:
-            method, params = json.loads(key)
-            valid = False
-            if method == "eth_call":
-                valid = (
-                    isinstance(result, str)
-                    and result.startswith("0x")
-                    and len(result) > 2
-                    and (len(result) - 2) % 64 == 0
-                )
-            elif method == "eth_getBlockByNumber":
-                valid = (
-                    isinstance(result, dict)
-                    and result.get("number") == params[0]
-                    and isinstance(result.get("hash"), str)
-                    and len(result["hash"]) == 66
-                )
-            elif method == "eth_getLogs":
-                valid = isinstance(result, list) and all(
-                    isinstance(log, dict) and not log.get("removed") for log in result
-                )
-            if valid:
-                try:
-                    if method == "eth_call":
-                        bytes.fromhex(result[2:])
-                    elif method == "eth_getBlockByNumber":
-                        bytes.fromhex(result["hash"][2:])
-                        valid = (
-                            result["hash"].startswith("0x")
-                            and int(result["timestamp"], 16) >= 0
-                        )
-                    else:
-                        query = params[0]
-                        for log in result:
-                            valid &= (
-                                log["address"].lower() == query["address"].lower()
-                                and int(query["fromBlock"], 16)
-                                <= int(log["blockNumber"], 16)
-                                <= int(query["toBlock"], 16)
-                                and len(log["topics"]) == 3
-                                and log["topics"][0].lower() == TRANSFER
-                                and len(log["transactionHash"]) == 66
-                                and int(log["logIndex"], 16) >= 0
-                            )
-                            bytes.fromhex(log["data"][2:])
-                            bytes.fromhex(log["transactionHash"][2:])
-                            for topic in log["topics"]:
-                                bytes.fromhex(topic[2:])
-                except (KeyError, ValueError, TypeError, AttributeError):
-                    valid = False
-            if valid:
+            if _shareable_result(method, params, result):
                 SHARED.resolve(*claim, result=result)
             else:
-                SHARED.resolve(
-                    *claim, error=CoverageError("Historical RPC data is malformed.")
-                )
+                SHARED.resolve(*claim, error=CoverageError("Historical RPC data is malformed."))
         self.cache[key] = result
 
     def rpc(self, method, params):
@@ -223,12 +189,13 @@ class Archive:
             )
             if (
                 not isinstance(data, dict)
-                or data.get("id") != self.calls
+                or type(data.get("id")) is not int
+                or data["id"] != self.calls
                 or data.get("error")
                 or data.get("result") is None
             ):
                 raise CoverageError("Historical RPC data is unavailable.")
-            self._store(key, data["result"], claim)
+            self._store(key, method, params, data["result"], claim)
             return data["result"]
         except (httpx.HTTPError, TimeoutError, OSError, ValueError) as exc:
             self.failed.add(key)
@@ -284,7 +251,7 @@ class Archive:
             for key, (method, params) in chunk:
                 self.calls += 1
                 self.methods[method] += 1
-                ids[self.calls] = key
+                ids[self.calls] = (key, method, params)
                 payload.append(
                     {
                         "jsonrpc": "2.0",
@@ -297,28 +264,18 @@ class Archive:
                 results = self._request(payload)
                 if not isinstance(results, list):
                     raise CoverageError("Historical RPC batch is unavailable.")
-                response_ids = [
-                    result.get("id") for result in results if isinstance(result, dict)
-                ]
-                if (
-                    len(response_ids) != len(results)
-                    or len(set(response_ids)) != len(results)
-                    or set(response_ids) - ids.keys()
-                ):
-                    raise CoverageError("Historical RPC batch is malformed.")
-                seen = set()
+                by_id = {}
                 for result in results:
-                    if not isinstance(result, dict):
+                    request_id = result.get("id") if isinstance(result, dict) else None
+                    if type(request_id) is not int or request_id not in ids or request_id in by_id:
                         raise CoverageError("Historical RPC batch is malformed.")
-                    key = ids.get(result.get("id"))
-                    if key is None or key in seen:
-                        raise CoverageError("Historical RPC batch is malformed.")
-                    seen.add(key)
+                    by_id[request_id] = result
+                for request_id, (key, method, params) in ids.items():
+                    result = by_id.get(request_id, {})
                     if result.get("error") or result.get("result") is None:
                         self.failed.add(key)
                     else:
-                        self._store(key, result["result"], claims.get(key))
-                self.failed.update(set(ids.values()) - seen)
+                        self._store(key, method, params, result["result"], claims.get(key))
             except (httpx.HTTPError, TimeoutError, OSError, ValueError) as exc:
                 raise CoverageError("Historical RPC data is unavailable.") from exc
 
@@ -886,8 +843,7 @@ def _build_performance(archive, address, days):
         events = cur.fetchall()
         if len(events) > 10000:
             raise CoverageError("Indexed history is too large for this lookup.")
-    anchor = archive.block(end)
-    archive.bind(end, expected_hash)
+    anchor = archive.bind(end, expected_hash)
     end_time = int(anchor["timestamp"], 16)
     start = archive.before(end_time - days * 86400, end, bounds)
     start_time = int(archive.block(start)["timestamp"], 16)

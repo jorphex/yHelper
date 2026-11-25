@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useCompositionData } from "../hooks/use-composition-data";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { compositionOptions } from "../hooks/use-composition-data";
 import {
   MARKET_VALUES,
   marketLabel,
@@ -20,23 +21,14 @@ export function MarketFilter({
   minTvl: number;
   onChange: (market: MarketKind) => void;
 }) {
-  const { data } = useCompositionData({ universe, market: "all", minTvl });
-  const counts = useMemo(() => {
-    const next = new Map<MarketKind, number>();
-    if (!data) return next;
-    for (const row of data.categories) {
-      const key = row.category as MarketKind;
-      if (!MARKET_VALUES.includes(key) || key === "all") continue;
-      next.set(key, row.vaults);
-    }
-    next.set("all", data.summary.vaults);
-    return next;
-  }, [data]);
-  const hasCounts = Boolean(data) && counts.has("all");
+  const { data } = useQuery(compositionOptions({ universe, market: "all", minTvl }));
+  const counts = new Map(data?.categories.map(row => [row.category, row.vaults]));
+  counts.set("all", data?.summary.vaults ?? 0);
+  const marketCount = counts.get(market) ?? 0;
 
   useEffect(() => {
-    if (hasCounts && market !== "all" && (counts.get(market) ?? 0) === 0) onChange("all");
-  }, [counts, hasCounts, market, onChange]);
+    if (data && market !== "all" && !marketCount) onChange("all");
+  }, [data, market, marketCount, onChange]);
 
   return (
     <label>
@@ -45,8 +37,8 @@ export function MarketFilter({
         {MARKET_VALUES.map((value) => {
           const count = counts.get(value) ?? 0;
           return (
-            <option key={value} value={value} disabled={hasCounts && count === 0}>
-              {marketLabel(value)}{hasCounts ? ` · ${count}` : ""}
+            <option key={value} value={value} disabled={Boolean(data && count === 0)}>
+              {marketLabel(value)}{data ? ` · ${count}` : ""}
             </option>
           );
         })}

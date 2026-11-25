@@ -1,8 +1,7 @@
 """Additional real-service scenarios, invoked by e2e_resilience.py.
 
-Failure cases: relative Telegram routes leak tokens through logs or persistence;
-concurrent heartbeats trigger HTTP catchup; stale heartbeats stop triggering it;
-SQL errors leave jobs running, hide the original error or prevent a later sync.
+Checks cover Telegram token redaction, heartbeat writes during HTTP reconciliation,
+catchup after a stale heartbeat, and SQL failure recovery.
 Uses fake credentials, loopback HTTP/WebSockets and a disposable PostgreSQL schema.
 """
 
@@ -30,6 +29,7 @@ from websockets.exceptions import ConnectionClosed
 from websockets.sync.server import serve
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 VAULT = "0x" + "1" * 40
 TOKEN = "123456789:resilience-only-fake-telegram-secret"
 
@@ -76,7 +76,7 @@ def main():
                         time.sleep(0.01)
                 result = "0x65"
             elif method == "eth_getBlockByNumber":
-                result = {"number": "0x1", "timestamp": hex(int(time.time()))}
+                result = {"number": "0x1", "timestamp": hex(int(time.time())), "hash": "0x" + "b" * 64}
             elif method == "eth_getCode":
                 result = "0x"
             elif method == "eth_getLogs":
@@ -90,9 +90,9 @@ def main():
         connection.send(
             json.dumps({"jsonrpc": "2.0", "id": request["id"], "result": "local"})
         )
-        if ping_requested.wait(5):
-            connection.ping(b"concurrent-heartbeat")
         try:
+            if ping_requested.wait(5):
+                connection.ping(b"concurrent-heartbeat")
             connection.recv(timeout=5)
         except (ConnectionClosed, TimeoutError):
             pass
@@ -197,7 +197,7 @@ def main():
         with psycopg.connect(scoped) as conn:
             conn.execute(
                 "UPDATE vault_harvest_sync_state SET cursor=100,payload=payload || jsonb_build_object('last_http_reconcile_at', %s::text)",
-                (datetime.now(UTC).isoformat(),),
+                ((datetime.now(UTC) - timedelta(days=1)).isoformat(),),
             )
             conn.commit()
             _run_vault_harvests(conn)
@@ -206,16 +206,14 @@ def main():
             ).fetchone()
         evidence["heartbeat"] = {
             "ping_persisted_during_rpc": heartbeat_seen.is_set(),
-            "live_scan_skipped": cursor == 100
-            and payload.get("status") == "wss_live"
-            and payload.get("wss_connected") is True,
+            "scheduled_reconcile_preserved": cursor == 101 and payload.get("wss_connected") is True,
         }
         listener.stop()
         listener.join(timeout=3)
         assert not listener.is_alive(), "Listener did not stop"
         with psycopg.connect(scoped) as conn:
             conn.execute(
-                "UPDATE vault_harvest_sync_state SET payload=payload || %s",
+                "UPDATE vault_harvest_sync_state SET cursor=100,payload=payload || %s",
                 (
                     Jsonb(
                         {

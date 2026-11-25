@@ -28,6 +28,7 @@ import psycopg
 from psycopg.conninfo import make_conninfo
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 OUT = ROOT / "reports/vault-detail"
 DAY = 86400
 TODAY = int(datetime.now(UTC).timestamp()) // DAY * DAY
@@ -101,7 +102,7 @@ def main():
         os.environ,
         DATABASE_URL=scoped,
         KONG_GQL_URL=f"http://127.0.0.1:{server.server_port}",
-        PYTHONPATH=str(ROOT / "api"),
+        PYTHONPATH=os.pathsep.join((str(ROOT / "api"), str(ROOT))),
     )
     process = None
     checks = {}
@@ -152,7 +153,9 @@ def main():
                         time.sleep(0.05)
                 else:
                     raise AssertionError("API did not start")
-                url = lambda address: f"/api/vaults/1/{address}/history"
+                def url(address):
+                    return f"/api/vaults/1/{address}/history"
+
                 response = client.get(url(ADDRESSES[0]))
                 assert response.status_code == 200, response.text
                 payload = response.json()

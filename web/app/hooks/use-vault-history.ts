@@ -26,9 +26,10 @@ export type VaultHistory = {
 };
 
 export function useVaultHistory(chainId: number, address: string) {
+  const normalized = address.toLowerCase();
   return useQuery({
-    queryKey: ["vault-history", chainId, address.toLowerCase()],
-    queryFn: ({ signal }) => fetchJson<VaultHistory>(apiUrl(`/vaults/${chainId}/${address.toLowerCase()}/history`), { signal }),
+    queryKey: ["vault-history", chainId, normalized],
+    queryFn: ({ signal }) => fetchJson<VaultHistory>(apiUrl(`/vaults/${chainId}/${normalized}/history`), { signal }),
     enabled: Number.isInteger(chainId) && chainId > 0 && /^0x[0-9a-fA-F]{40}$/.test(address),
     staleTime: query => query.state.data?.history_state === "ready" ? 5 * 60_000 : 15_000,
     gcTime: 30 * 60_000,

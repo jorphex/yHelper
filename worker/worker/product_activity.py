@@ -84,32 +84,20 @@ def _product_activity_amount_payload(
     data: object,
     reward_token_meta: dict[str, object],
 ) -> dict[str, object | None]:
-    words = _decode_uint256_words(data)
-    if event_kind in {"deposit", "withdraw"} and product_type in {"styfi", "styfix"}:
-        amount_raw = words[0] if words else None
-        return {
-            "amount_raw": amount_raw,
-            "amount_decimals": STYFI_ASSET_DECIMALS,
-            "amount_symbol": STYFI_ASSET_SYMBOL,
-        }
-    if event_kind == "unstake" and product_type in {"styfi", "styfix"}:
-        amount_raw = words[0] if words else None
-        return {
-            "amount_raw": amount_raw,
-            "amount_decimals": STYFI_ASSET_DECIMALS,
-            "amount_symbol": STYFI_PRODUCT_SYMBOLS.get(product_type),
-        }
-    if event_kind == "claim" and product_type in {"styfi", "styfix"}:
-        amount_raw = words[0] if words else None
-        return {
-            "amount_raw": amount_raw,
-            "amount_decimals": _to_int_or_none(reward_token_meta.get("decimals")),
-            "amount_symbol": reward_token_meta.get("symbol"),
-        }
+    words, decimals, symbol = [], None, None
+    if product_type in STYFI_PRODUCT_SYMBOLS:
+        if event_kind == "claim":
+            decimals, symbol = reward_token_meta["decimals"], reward_token_meta["symbol"]
+        elif event_kind == "unstake":
+            decimals, symbol = STYFI_ASSET_DECIMALS, STYFI_PRODUCT_SYMBOLS[product_type]
+        elif event_kind in {"deposit", "withdraw"}:
+            decimals, symbol = STYFI_ASSET_DECIMALS, STYFI_ASSET_SYMBOL
+        if decimals is not None:
+            words = _decode_uint256_words(data)
     return {
-        "amount_raw": None,
-        "amount_decimals": None,
-        "amount_symbol": None,
+        "amount_raw": words[0] if words else None,
+        "amount_decimals": decimals,
+        "amount_symbol": symbol,
     }
 
 
@@ -147,23 +135,14 @@ def _product_activity_accounts(
     event_kind: str,
     topics: list[object],
 ) -> tuple[str | None, str | None, str | None]:
-    if event_kind == "deposit":
-        sender = _topic_address(topics, 1)
-        owner = _topic_address(topics, 2)
-        return sender, owner, "event_owner"
-    if event_kind == "withdraw":
-        sender = _topic_address(topics, 1)
-        owner = _topic_address(topics, 3)
-        return sender, owner, "event_owner"
-    if event_kind == "unstake" and product_type in {"styfi", "styfix"}:
+    if event_kind in {"deposit", "withdraw"}:
+        owner_topic = 2 if event_kind == "deposit" else 3
+        return _topic_address(topics, 1), _topic_address(topics, owner_topic), "event_owner"
+    if event_kind == "unstake" and product_type in STYFI_PRODUCT_SYMBOLS:
         from_account = _topic_address(topics, 1)
         to_account = _topic_address(topics, 2)
         if from_account and to_account == "0x0000000000000000000000000000000000000000":
             return from_account, from_account, "event_burn_from"
-    if event_kind == "claim" and product_type in {"styfi", "styfix"}:
-        account = _topic_address(topics, 1)
-        if account and account not in STYFI_CLAIM_IGNORED_ACCOUNTS:
-            return account, account, "event_claim_account"
     return None, None, None
 
 
@@ -406,34 +385,17 @@ def _run_product_activity(conn: psycopg.Connection) -> tuple[int, int]:
                 vault_addresses = sorted(address for address, product_type in contracts.items() if product_type == "vault")
                 styfi_addresses = sorted(address for address in contracts if address in STYFI_EVENT_CONTRACTS)
                 styfi_claim_addresses = sorted(STYFI_CLAIM_SOURCES) if chain_id == STYFI_CHAIN_ID else []
+                query_groups = (
+                    (vault_addresses, [[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW]]),
+                    (styfi_addresses, [[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW, EVENT_TOPIC_TRANSFER]]),
+                    (styfi_claim_addresses, [[EVENT_TOPIC_CLAIM]]),
+                )
                 max_block_span = _product_activity_block_span_for_chain(chain_id)
                 block_span = max_block_span
                 current_block = start_block
                 while current_block <= latest_block:
                     end_block = min(latest_block, current_block + block_span - 1)
                     try:
-                        query_groups: list[tuple[list[str], list[list[str]]]] = []
-                        if vault_addresses:
-                            query_groups.append(
-                                (
-                                    vault_addresses,
-                                    [[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW]],
-                                )
-                            )
-                        if styfi_addresses:
-                            query_groups.append(
-                                (
-                                    styfi_addresses,
-                                    [[EVENT_TOPIC_DEPOSIT, EVENT_TOPIC_WITHDRAW, EVENT_TOPIC_TRANSFER]],
-                                )
-                            )
-                        if styfi_claim_addresses:
-                            query_groups.append(
-                                (
-                                    styfi_claim_addresses,
-                                    [[EVENT_TOPIC_CLAIM]],
-                                )
-                            )
                         for addresses, topics_filter in query_groups:
                             for address_chunk in _chunked(addresses, 100):
                                 logs = _eth_get_logs_for_chain(
@@ -450,9 +412,7 @@ def _run_product_activity(conn: psycopg.Connection) -> tuple[int, int]:
                                         continue
                                     topic0 = str(topics[0]).lower()
                                     event_kind = PRODUCT_ACTIVITY_TOPICS.get(topic0)
-                                    if not event_kind:
-                                        continue
-                                    if event_kind == "claim":
+                                    if event_kind is None or event_kind == "claim":
                                         continue
                                     product_contract = str(log.get("address", "")).lower()
                                     product_type = contracts.get(product_contract)

@@ -29,6 +29,7 @@ import requests
 from psycopg.conninfo import make_conninfo
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 OUT = ROOT / "reports/http-deadline-fix"
 BUDGET = 0.25
 

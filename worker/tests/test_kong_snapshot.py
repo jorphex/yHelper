@@ -33,6 +33,12 @@ class KongSnapshotValidationTests(unittest.TestCase):
         self.assertIs(row["is_hidden"], False)
         self.assertIs(row["is_retired"], False)
 
+    def test_asset_decimals_preserve_zero_and_fall_back_for_empty_values(self) -> None:
+        for value, expected in ((0, 0), ("", 6)):
+            with self.subTest(value=value):
+                row = _normalize_kong_snapshot([_vault(asset={"decimals": value}, token={"decimals": 6})])[0]
+                self.assertEqual(row["token_decimals"], expected)
+
     def test_ybold_family_uses_maximum_net_oracle_or_weekly_apy(self) -> None:
         row = _normalize_kong_snapshot(
             [
@@ -53,19 +59,15 @@ class KongSnapshotValidationTests(unittest.TestCase):
         )[0]
         self.assertEqual(row["est_apy"], 0.04)
 
-    def test_non_ybold_vault_uses_net_oracle_apy(self) -> None:
-        row = _normalize_kong_snapshot(
-            [
-                _vault(
-                    symbol="yvUSDC",
-                    performance={
-                        "oracle": {"apy": 0.05, "netAPY": 0.04},
-                        "historical": {"weeklyNet": 0.17},
-                    },
-                )
-            ]
-        )[0]
-        self.assertEqual(row["est_apy"], 0.04)
+    def test_standard_vault_estimate_takes_precedence_over_net_oracle_apy(self) -> None:
+        for estimate, expected in ((None, 0.04), (0, 0), (-0.01, -0.01)):
+            with self.subTest(estimate=estimate):
+                record = _vault(symbol="yvUSDC", performance={
+                    "estimated": {"apy": estimate},
+                    "oracle": {"apy": 0.05, "netAPY": 0.04},
+                    "historical": {"weeklyNet": 0.17},
+                })
+                self.assertEqual(_normalize_kong_snapshot([record])[0]["est_apy"], expected)
 
     def test_ybold_family_rejects_malformed_present_component(self) -> None:
         record = _vault(

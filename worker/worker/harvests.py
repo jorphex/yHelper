@@ -26,10 +26,10 @@ from .config import (
     HARVEST_WSS_SUBSCRIPTION_CHUNK,
     JOB_VAULT_HARVESTS,
 )
+from .db import connect
 from .db_state import _complete_run, _insert_run
 from .eth import (
     _chunked,
-    _connect,
     _decode_uint256_words,
     _eth_block_number_for_chain,
     _eth_get_block_for_chain,
@@ -344,7 +344,7 @@ class HarvestWssListener(threading.Thread):
                     continue
                 logging.warning("Harvest WSS listener reconnect: chain=%s error=%s", self.chain_id, exc)
                 try:
-                    with _connect() as conn:
+                    with connect() as conn:
                         _upsert_harvest_sync_state(
                             conn,
                             chain_id=self.chain_id,
@@ -364,7 +364,7 @@ class HarvestWssListener(threading.Thread):
     def _run_session(self, *, wss_url: str, contracts: dict[str, str]) -> None:
         ws = websocket.create_connection(wss_url, timeout=HARVEST_WSS_CONNECT_TIMEOUT_SEC)
         try:
-            with _connect() as conn:
+            with connect() as conn:
                 subscription_id = 1
                 for address_chunk in _chunked(sorted(contracts), HARVEST_WSS_SUBSCRIPTION_CHUNK):
                     ws.send(

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
+from app.common import _seconds_since
 from app.config import (
     STYFI_CHAIN_ID,
     STYFI_EPOCH_LOOKBACK,
@@ -32,12 +33,13 @@ from app.styfi_service import (
 router = APIRouter()
 
 
-def _reports_response(
-    days: int,
-    chain_id: int | None,
-    vault_address: str | None,
-    limit: int,
-    meaningful_only: bool,
+@router.get("/api/reports", response_model=ReportsResponse)
+def reports(
+    days: int = Query(default=30, ge=7, le=365),
+    chain_id: int | None = Query(default=None, ge=1),
+    vault_address: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    meaningful_only: bool = Query(default=False),
 ) -> dict[str, object]:
     normalized_vault = vault_address.lower() if vault_address else None
     with connect(row_factory=dict_row) as conn:
@@ -56,27 +58,12 @@ def _reports_response(
                 limit=limit,
                 meaningful_only=meaningful_only,
             )
-    chain_facets = [
-        {"chain_id": row["chain_id"], "chain_label": row.get("chain_label")}
-        for row in available_chains
-    ]
     return {
         "event": {"name": "StrategyReported", "level": "vault"},
         "trailing_24h": trailing_24h,
-        "available_chains": chain_facets,
+        "available_chains": available_chains,
         "recent": recent,
     }
-
-
-@router.get("/api/reports", response_model=ReportsResponse)
-def reports(
-    days: int = Query(default=30, ge=7, le=365),
-    chain_id: int | None = Query(default=None, ge=1),
-    vault_address: str | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
-    meaningful_only: bool = Query(default=False),
-) -> dict[str, object]:
-    return _reports_response(days, chain_id, vault_address, limit, meaningful_only)
 
 
 @router.get(
@@ -93,33 +80,25 @@ def styfi(
     epoch_limit: int = Query(default=STYFI_EPOCH_LOOKBACK, ge=3, le=max(STYFI_EPOCH_LOOKBACK, 24)),
     include_history: bool = Query(default=True),
 ) -> dict[str, object]:
-    with connect(row_factory=dict_row) as conn:
-        with conn.cursor() as cur:
-            reward_token = _styfi_reward_token(cur)
+    with connect(row_factory=dict_row) as conn, conn.cursor() as cur:
+        reward_token = _styfi_reward_token(cur)
+        current_reward_state = _styfi_current_reward_state(cur)
+        summary = _styfi_summary_snapshot(cur)
+        last_run = _styfi_last_run(cur)
+        if include_history:
             reward_scale = float(10 ** int(reward_token.get("decimals") or 0))
-            current_reward_state = _styfi_current_reward_state(cur)
-            summary = _styfi_summary_snapshot(cur)
-            series = _styfi_snapshot_series(cur, days=days) if include_history else []
-            epochs = _styfi_epoch_series(cur, epoch_limit=epoch_limit, reward_scale=reward_scale) if include_history else []
-            component_split = (
-                _styfi_latest_component_split(
-                    cur,
-                    current_epoch=summary.get("reward_epoch"),
-                    reward_scale=reward_scale,
-                )
-                if include_history
-                else {"epoch": None, "rows": []}
+            series = _styfi_snapshot_series(cur, days=days)
+            epochs = _styfi_epoch_series(cur, epoch_limit=epoch_limit, reward_scale=reward_scale)
+            component_split = _styfi_latest_component_split(
+                cur, current_epoch=summary.get("reward_epoch"), reward_scale=reward_scale
             )
-            last_run = _styfi_last_run(cur)
-            recent_activity = _styfi_recent_activity(cur) if include_history else []
+            recent_activity = _styfi_recent_activity(cur)
+        else:
+            series, epochs, recent_activity = [], [], []
+            component_split = {"epoch": None, "rows": []}
 
     latest_snapshot_at = summary.get("latest_snapshot_at")
     latest_snapshot_dt = datetime.fromisoformat(latest_snapshot_at) if isinstance(latest_snapshot_at, str) else None
-    latest_snapshot_age_seconds = None
-    if latest_snapshot_dt is not None:
-        if latest_snapshot_dt.tzinfo is None:
-            latest_snapshot_dt = latest_snapshot_dt.replace(tzinfo=UTC)
-        latest_snapshot_age_seconds = max(0, int((datetime.now(UTC) - latest_snapshot_dt).total_seconds()))
     return {
         "filters": {
             "days": days,
@@ -138,7 +117,7 @@ def styfi(
         "recent_activity": recent_activity,
         "freshness": {
             "latest_snapshot_at": latest_snapshot_at,
-            "latest_snapshot_age_seconds": latest_snapshot_age_seconds,
+            "latest_snapshot_age_seconds": _seconds_since(latest_snapshot_dt, datetime.now(UTC)),
             "snapshots_count": summary.get("snapshots_count"),
             "first_snapshot_at": summary.get("first_snapshot_at"),
         },

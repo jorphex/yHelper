@@ -65,6 +65,9 @@ def error(status: int, detail: str, ttl: float = 0) -> Result:
     return Result(json.dumps({"detail": detail}).encode(), status, ttl)
 
 
+BUSY = error(503, "Recap service is busy. Please try again shortly.")
+
+
 class BuildClient:
     """Let the synchronous builder share async I/O with a cancellable wall deadline."""
 
@@ -127,10 +130,9 @@ class RecapService:
             _, (_, removed) = self.cache.popitem(last=False)
             self.cache_bytes -= len(removed.body)
 
-    def build(self, address: str, year: int, client: BuildClient) -> Result:
+    def build(self, address: str, year: int, client: BuildClient, prune_disk: bool) -> Result:
         try:
-            if time.monotonic() - self.last_disk_prune > 300:
-                self.last_disk_prune = time.monotonic()
+            if prune_disk:
                 recap.prune_cache()
             payload = recap.build_payload(address, year, client)
             recap.check_deadline(client)
@@ -166,11 +168,15 @@ class RecapService:
                 )
                 acquired = True
             except TimeoutError:
-                return error(503, "Recap service is busy. Please try again shortly.")
+                return BUSY
             client = BuildClient(
                 self.http, asyncio.get_running_loop(), self.settings.build_timeout
             )
-            result = await asyncio.to_thread(self.build, *key, client)
+            now = time.monotonic()
+            prune_disk = now - self.last_disk_prune > 300
+            if prune_disk:
+                self.last_disk_prune = now
+            result = await asyncio.to_thread(self.build, *key, client, prune_disk)
             self.remember(key, result)
             LOGGER.info(
                 "recap build wallet=%s…%s year=%s status=%s seconds=%.2f",
@@ -194,9 +200,7 @@ class RecapService:
         if key in self.inflight:
             return await asyncio.shield(self.inflight[key]), "COALESCED"
         if len(self.inflight) >= self.settings.max_pending:
-            return error(
-                503, "Recap service is busy. Please try again shortly."
-            ), "BUSY"
+            return BUSY, "BUSY"
         task = asyncio.create_task(self.generate(key))
         self.inflight[key] = task
         return await asyncio.shield(task), "MISS"
@@ -213,16 +217,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app):
-        yield
-        await service.close()
+        try:
+            yield
+        finally:
+            await service.close()
 
     app = FastAPI(
         title="Yearn Wrapped",
         lifespan=lifespan,
         root_path=os.getenv("YEARN_WRAPPED_ROOT_PATH", ""),
     )
-    app.state.recap_service = service
-
     @app.get("/health")
     async def health():
         return {"status": "ok"}

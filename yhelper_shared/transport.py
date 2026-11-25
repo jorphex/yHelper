@@ -1,7 +1,4 @@
-"""Cancellable HTTP I/O for synchronous callers, with per-thread keepalive pools.
-
-Packaged identically in API and worker because their images build independently.
-"""
+"""Cancellable HTTP I/O for synchronous callers, with per-thread keepalive pools."""
 
 from __future__ import annotations
 

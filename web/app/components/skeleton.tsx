@@ -1,48 +1,10 @@
-"use client";
-
 import type { CSSProperties } from "react";
 
-/**
- * Skeleton loading component with shimmer animation
- * Editorial design system styling
- */
-
-interface SkeletonProps {
-  className?: string;
-  style?: CSSProperties;
-  variant?: "default" | "card" | "text" | "circle" | "table-row";
-  width?: string | number;
-  height?: string | number;
+function Skeleton({ width, height, style }: { width: string; height: number; style: CSSProperties }) {
+  return <div className="skeleton" style={{ ...style, width, height }} aria-hidden="true" />;
 }
 
-export function Skeleton({
-  className = "",
-  style = {},
-  variant = "default",
-  width,
-  height,
-}: SkeletonProps) {
-  const baseStyles: CSSProperties = {
-    borderRadius: variant === "circle" ? "50%" : variant === "card" ? "12px" : "4px",
-    ...style,
-  };
-
-  if (width) baseStyles.width = typeof width === "number" ? `${width}px` : width;
-  if (height) baseStyles.height = typeof height === "number" ? `${height}px` : height;
-
-  return (
-    <div
-      className={`skeleton ${className}`}
-      style={baseStyles}
-      aria-hidden="true"
-    />
-  );
-}
-
-/**
- * KPI Card Skeleton
- */
-export function KpiCardSkeleton() {
+function KpiCardSkeleton() {
   return (
     <div
       style={{
@@ -72,14 +34,7 @@ export function KpiCardSkeleton() {
   );
 }
 
-/**
- * KPI Grid Skeleton
- */
-interface KpiGridSkeletonProps {
-  count?: number;
-}
-
-export function KpiGridSkeleton({ count = 4 }: KpiGridSkeletonProps) {
+export function KpiGridSkeleton({ count }: { count: number }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
@@ -89,15 +44,7 @@ export function KpiGridSkeleton({ count = 4 }: KpiGridSkeletonProps) {
   );
 }
 
-/**
- * Table Skeleton
- */
-interface TableSkeletonProps {
-  rows?: number;
-  columns?: number;
-}
-
-export function TableSkeleton({ rows = 5, columns = 6 }: TableSkeletonProps) {
+export function TableSkeleton({ rows, columns }: { rows: number; columns: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, rowIdx) => (

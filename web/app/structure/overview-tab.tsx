@@ -5,7 +5,7 @@ import { TableWrap } from "../components/table-wrap";
 import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { marketLabel, type MarketKind } from "../lib/universe";
 import { TvlTreemap } from "./components";
-import type { BreakdownRow } from "./types";
+import type { BreakdownRow } from "../hooks/use-composition-data";
 
 function vaultCountLabel(count: number): string {
   return `${count} ${count === 1 ? "vault" : "vaults"}`;

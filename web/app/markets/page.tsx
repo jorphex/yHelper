@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { MarketsTabPreloader } from "./tab-preloader";
 import { MarketsViews } from "./views";
 
 export default function MarketsPage({
@@ -19,5 +20,8 @@ export default function MarketsPage({
     params.set("view", "vaults");
     redirect(`/markets?${params.toString()}`);
   }
-  return <Suspense fallback={<div className="page-loading">Loading vaults…</div>}><MarketsViews /></Suspense>;
+  return <Suspense fallback={<div className="page-loading">Loading vaults…</div>}>
+    <MarketsTabPreloader />
+    <MarketsViews />
+  </Suspense>;
 }

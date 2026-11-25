@@ -1,10 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import ExplorePage from "../explore/page";
-import MomentumPage from "../momentum/page";
+import { VaultResearchView } from "../explore/research-view";
+import { ChangesView } from "../momentum/view";
 
 export function MarketsViews() {
   const searchParams = useSearchParams();
-  return searchParams.get("view") === "changes" ? <MomentumPage /> : <ExplorePage />;
+  return searchParams.get("view") === "changes" ? <ChangesView /> : <VaultResearchView />;
 }

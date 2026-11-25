@@ -21,6 +21,17 @@ export function normalize(value: number, min: number, max: number): number {
   return (value - min) / (max - min);
 }
 
+export function chartKeyIndex(key: string, current: number | null, count: number): number | undefined {
+  if (count === 0) return;
+  const last = count - 1;
+  switch (key) {
+    case "Home": return 0;
+    case "End": return last;
+    case "ArrowLeft":
+    case "ArrowRight": return Math.max(0, Math.min(last, (current ?? last) + (key === "ArrowLeft" ? -1 : 1)));
+  }
+}
+
 export function pickTrendStroke(id: string, index: number): string {
   if (TREND_STROKE_CUSTOM[id]) return TREND_STROKE_CUSTOM[id];
 

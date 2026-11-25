@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Query
 from psycopg.rows import dict_row
 
-from app.analytics_service import _bounded_momentum_sql, _bounded_realized_apy_sql
+from app.analytics_service import BOUNDED_MOMENTUM_SQL, BOUNDED_REALIZED_APY_SQL
 from app.common import (
     _aggregate_tvl_sql,
     _locked_yvusd_filter_sql,
@@ -20,20 +20,27 @@ from app.models import AssetVaultsResponse
 router = APIRouter()
 
 
-def _asset_vaults_response(
+@router.get(
+    "/api/assets/{token_symbol:path}/vaults",
+    response_model=AssetVaultsResponse,
+    deprecated=True,
+    summary="List exact-symbol vaults (deprecated)",
+    description=(
+        "Compatibility endpoint for existing ySupport clients. New consumers should use "
+        "GET /api/discover?token_symbol={symbol}, which is the canonical vault discovery contract."
+    ),
+)
+def asset_vaults(
     token_symbol: str,
-    universe: Literal["core", "extended", "raw"],
-    min_tvl_usd: float | None,
-    min_points: int | None,
-    max_vaults: int | None,
-    limit: int,
+    universe: Literal["core", "extended", "raw"] = "core",
+    min_tvl_usd: float | None = Query(default=None, ge=0.0),
+    min_points: int | None = Query(default=None, ge=0),
+    max_vaults: int | None = Query(default=None, ge=0),
+    limit: int = Query(default=150, ge=1, le=500),
 ) -> dict[str, object]:
-    universe_gate = _resolve_universe_gate(
+    min_tvl_usd, min_points, max_vaults = _resolve_universe_gate(
         universe, min_tvl_usd=min_tvl_usd, min_points=min_points, max_vaults=max_vaults
     )
-    min_tvl_usd = float(universe_gate["min_tvl_usd"])
-    min_points = int(universe_gate["min_points"])
-    max_vaults = universe_gate["max_vaults"]
     rank_filter = _rank_gate_filter_sql("d", max_vaults=max_vaults, include_locked=True)
     rank_clause = f"AND {rank_filter}" if rank_filter else ""
     params: dict[str, object] = {
@@ -44,7 +51,6 @@ def _asset_vaults_response(
     }
     if max_vaults is not None:
         params["max_vaults"] = max_vaults
-    realized_apy_sql = _bounded_realized_apy_sql()
     filtered_cte = f"""
         WITH filtered AS (
             SELECT
@@ -54,8 +60,8 @@ def _asset_vaults_response(
                 d.tvl_usd,
                 {_aggregate_tvl_sql("d")} AS aggregate_tvl_usd,
                 d.est_apy,
-                {realized_apy_sql} AS realized_apy_30d,
-                {_bounded_momentum_sql()} AS momentum_7d_30d
+                {BOUNDED_REALIZED_APY_SQL} AS realized_apy_30d,
+                {BOUNDED_MOMENTUM_SQL} AS momentum_7d_30d
             FROM vault_dim d
             LEFT JOIN vault_metrics_latest m
               ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
@@ -115,24 +121,3 @@ def _asset_vaults_response(
         "summary": summary,
         "rows": rows,
     }
-
-
-@router.get(
-    "/api/assets/{token_symbol:path}/vaults",
-    response_model=AssetVaultsResponse,
-    deprecated=True,
-    summary="List exact-symbol vaults (deprecated)",
-    description=(
-        "Compatibility endpoint for existing ySupport clients. New consumers should use "
-        "GET /api/discover?token_symbol={symbol}, which is the canonical vault discovery contract."
-    ),
-)
-def asset_vaults(
-    token_symbol: str,
-    universe: Literal["core", "extended", "raw"] = "core",
-    min_tvl_usd: float | None = Query(default=None, ge=0.0),
-    min_points: int | None = Query(default=None, ge=0),
-    max_vaults: int | None = Query(default=None, ge=0),
-    limit: int = Query(default=150, ge=1, le=500),
-) -> dict[str, object]:
-    return _asset_vaults_response(token_symbol, universe, min_tvl_usd, min_points, max_vaults, limit)

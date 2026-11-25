@@ -1,21 +1,4 @@
-import type { CSSProperties } from "react";
-
 export const SHELL_THEME = {
-  bg: "#030816",
-  bg2: "#051025",
-  card: "#10254d",
-  surface1: "#10254d",
-  surface2: "#0d1d3d",
-  surface3: "#09142b",
-  panelTop: "#14315f",
-  panelBottom: "#0c1b39",
-  panelTopStrong: "#17396e",
-  panelBottomStrong: "#102142",
-  headerBg: "rgba(8, 18, 41, 0.86)",
-  shellOverlayTop: "rgba(3, 8, 21, 0.18)",
-  shellOverlayBottom: "rgba(4, 10, 25, 0.28)",
-  shellShadeTop: "rgba(4, 9, 24, 0.22)",
-  shellShadeBottom: "rgba(5, 11, 28, 0.42)",
   previewBg: "#030816",
   previewGlowPrimary: "rgba(84, 125, 255, 0.18)",
   previewGlowSecondary: "rgba(58, 166, 184, 0.16)",
@@ -28,21 +11,3 @@ export const SHELL_THEME = {
   previewCardTop: "rgba(22, 52, 99, 0.88)",
   previewCardBottom: "rgba(11, 26, 50, 0.94)",
 } as const;
-
-export const SHELL_THEME_STYLE = {
-  "--bg": SHELL_THEME.bg,
-  "--bg-2": SHELL_THEME.bg2,
-  "--card": SHELL_THEME.card,
-  "--surface-1": SHELL_THEME.surface1,
-  "--surface-2": SHELL_THEME.surface2,
-  "--surface-3": SHELL_THEME.surface3,
-  "--panel-top": SHELL_THEME.panelTop,
-  "--panel-bottom": SHELL_THEME.panelBottom,
-  "--panel-top-strong": SHELL_THEME.panelTopStrong,
-  "--panel-bottom-strong": SHELL_THEME.panelBottomStrong,
-  "--header-bg": SHELL_THEME.headerBg,
-  "--shell-overlay-top": SHELL_THEME.shellOverlayTop,
-  "--shell-overlay-bottom": SHELL_THEME.shellOverlayBottom,
-  "--shell-shade-top": SHELL_THEME.shellShadeTop,
-  "--shell-shade-bottom": SHELL_THEME.shellShadeBottom,
-} as CSSProperties;

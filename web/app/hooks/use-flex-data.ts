@@ -1,6 +1,6 @@
 "use client";
 
-import { useInfiniteQuery, useQuery, useQueryClient, type QueryFunctionContext } from "@tanstack/react-query";
+import { queryOptions, useInfiniteQuery, useQuery, useQueryClient, type QueryFunctionContext } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { apiUrl } from "../lib/api";
 import { fetchJson } from "../lib/fetch-json";
@@ -229,18 +229,18 @@ export type FlexPerformanceResponse = {
 };
 
 export const FLEX_PERIODS = [7, 30, 90] as const;
+export type FlexPeriod = typeof FLEX_PERIODS[number];
 
-function performanceOptions(address: string | null, days: 7 | 30 | 90) {
+function performanceOptions(address: string | null, days: FlexPeriod) {
   return {
     queryKey: ["flex-performance", address, days],
     queryFn: ({ signal }: QueryFunctionContext) => fetchJson<FlexPerformanceResponse>(apiUrl("/flex/performance", { address, days }), { signal, timeoutMs: 75_000 }),
     staleTime: 5 * 60_000,
     retry: false,
-    refetchOnWindowFocus: false,
   };
 }
 
-export function useFlexPerformance(address: string | null, days: 7 | 30 | 90, enabled: boolean) {
+export function useFlexPerformance(address: string | null, days: FlexPeriod, enabled: boolean) {
   const client = useQueryClient();
   const query = useQuery({
     ...performanceOptions(address, days), enabled,
@@ -264,31 +264,56 @@ export function useFlexPerformance(address: string | null, days: 7 | 30 | 90, en
   return query;
 }
 
+function marketOptions<T>(address: string | null, path = "", query?: { days: FlexPeriod; interval: "day" }) {
+  return queryOptions({
+    queryKey: ["flex-market", address, path, query],
+    queryFn: ({ signal }) => fetchJson<T>(apiUrl(`/flex/markets/${address}${path}`, query), { signal }),
+    enabled: Boolean(address),
+  });
+}
+
+function marketResources(address: string | null) {
+  return {
+    detail: marketOptions<FlexMarketDetailResponse>(address),
+    redemption: marketOptions<FlexRedemptionPriorityResponse>(address, "/redemption-priority"),
+    health: marketOptions<FlexTroveHealthResponse>(address, "/trove-health"),
+  };
+}
+
+function marketHistoryOptions(address: string | null, days: FlexPeriod) {
+  return marketOptions<FlexHistoryResponse>(address, "/history", { days, interval: "day" });
+}
+
+export function useFlexMarketData(address: string | null, days: FlexPeriod) {
+  const { detail, redemption, health } = marketResources(address);
+  return {
+    history: useQuery({
+      ...marketHistoryOptions(address, days),
+      placeholderData: (previous, query) => query?.queryKey[1] === address ? previous : undefined,
+    }),
+    detail: useQuery(detail),
+    redemptionPriority: useQuery({ ...redemption, refetchInterval: 5 * 60_000 }),
+    troveHealth: useQuery({ ...health, refetchInterval: 5 * 60_000 }),
+  };
+}
+
 export function useFlexMarketPreload(markets: FlexMarket[]) {
   const client = useQueryClient();
   const addresses = markets.map(market => market.addresses.market).join(",");
   useEffect(() => {
     if (!addresses) return;
-    for (const address of addresses.split(",")) {
-      for (const days of FLEX_PERIODS) void client.prefetchQuery({
-        queryKey: ["flex-history", address, days],
-        queryFn: ({ signal }) => fetchJson<FlexHistoryResponse>(apiUrl(`/flex/markets/${address}/history`, { days, interval: "day" }), { signal }),
-        staleTime: 60_000,
-      });
-      for (const [key, path] of [
-        ["flex-market-detail", ""],
-        ["flex-redemption-priority", "/redemption-priority"],
-        ["flex-trove-health", "/trove-health"],
-      ]) void client.prefetchQuery({
-        queryKey: [key, address],
-        queryFn: ({ signal }) => fetchJson(apiUrl(`/flex/markets/${address}${path}`), { signal }),
-        staleTime: 60_000,
-      });
+    const targets = addresses.split(",");
+    for (const address of targets) {
+      for (const days of FLEX_PERIODS) {
+        void client.prefetchQuery(marketHistoryOptions(address, days));
+      }
+      const { detail, redemption, health } = marketResources(address);
+      void client.prefetchQuery(detail);
+      void client.prefetchQuery(redemption);
+      void client.prefetchQuery(health);
     }
     return () => {
-      const targets = new Set(addresses.split(","));
-      const keys = new Set(["flex-history", "flex-market-detail", "flex-redemption-priority", "flex-trove-health"]);
-      void client.cancelQueries({ predicate: query => !query.isActive() && typeof query.queryKey[0] === "string" && keys.has(query.queryKey[0]) && typeof query.queryKey[1] === "string" && targets.has(query.queryKey[1]) });
+      for (const address of targets) void client.cancelQueries({ queryKey: ["flex-market", address], type: "inactive" });
     };
   }, [client, addresses]);
 }
@@ -297,48 +322,6 @@ export function useFlexMarkets() {
   return useQuery({
     queryKey: ["flex-markets", "all"],
     queryFn: ({ signal }) => fetchJson<FlexMarketsResponse>(apiUrl("/flex/markets", { status: "all" }), { signal }),
-    staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
-  });
-}
-
-export function useFlexHistory(marketAddress: string | null, days: 7 | 30 | 90) {
-  return useQuery({
-    queryKey: ["flex-history", marketAddress, days],
-    queryFn: ({ signal }) => fetchJson<FlexHistoryResponse>(apiUrl(`/flex/markets/${marketAddress}/history`, {
-      days,
-      interval: "day",
-    }), { signal }),
-    enabled: Boolean(marketAddress),
-    staleTime: 60_000,
-    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === marketAddress ? previous : undefined,
-  });
-}
-
-export function useFlexMarketDetail(marketAddress: string | null) {
-  return useQuery({
-    queryKey: ["flex-market-detail", marketAddress],
-    queryFn: ({ signal }) => fetchJson<FlexMarketDetailResponse>(apiUrl(`/flex/markets/${marketAddress}`), { signal }),
-    enabled: Boolean(marketAddress),
-    staleTime: 60_000,
-  });
-}
-
-export function useFlexRedemptionPriority(marketAddress: string | null) {
-  return useQuery({
-    queryKey: ["flex-redemption-priority", marketAddress],
-    queryFn: ({ signal }) => fetchJson<FlexRedemptionPriorityResponse>(apiUrl(`/flex/markets/${marketAddress}/redemption-priority`), { signal }),
-    enabled: Boolean(marketAddress),
-    staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
-  });
-}
-
-export function useFlexTroveHealth(marketAddress: string | null) {
-  return useQuery({
-    queryKey: ["flex-trove-health", marketAddress],
-    queryFn: ({ signal }) => fetchJson<FlexTroveHealthResponse>(apiUrl(`/flex/markets/${marketAddress}/trove-health`), { signal }),
-    enabled: Boolean(marketAddress),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
   });

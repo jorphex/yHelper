@@ -28,7 +28,8 @@ services:
 
   yhelper-api:
     build:
-      context: ./api
+      context: .
+      dockerfile: api/Dockerfile
     container_name: yhelper-api
     logging: *default-logging
     restart: unless-stopped
@@ -71,7 +72,8 @@ services:
 
   yhelper-worker:
     build:
-      context: ./worker
+      context: .
+      dockerfile: worker/Dockerfile
     container_name: yhelper-worker
     logging: *default-logging
     restart: unless-stopped

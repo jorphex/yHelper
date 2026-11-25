@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ExternalArrow } from "../components/vault-link";
 import { VaultSourceNote } from "../components/source-notes";
 import { useVaultHistory } from "../hooks/use-vault-history";
+import { HttpError } from "../lib/fetch-json";
 import { chainLabel, formatPct, formatUsd, formatUsdCompact, shortVaultLabel, yearnVaultUrl } from "../lib/format";
 import { vaultReturnUrl } from "../lib/vault-navigation";
 import { VaultChart } from "./vault-chart";
@@ -16,7 +17,7 @@ export function VaultDetail({ chainId, address }: { chainId: number; address: st
   const search = useSearchParams();
   const back = vaultReturnUrl(search.get("from"));
   const [days, setDays] = useState<7 | 30 | 90>(30);
-  const { data, dataUpdatedAt, isLoading, isFetching, error, refetch } = useVaultHistory(chainId, address);
+  const { data, dataUpdatedAt, isEnabled, isLoading, isFetching, error, refetch } = useVaultHistory(chainId, address);
   const [retryWait, setRetryWait] = useState(0);
   useEffect(() => {
     const until = dataUpdatedAt + (data?.retry_after_seconds ?? 0) * 1000;
@@ -30,11 +31,10 @@ export function VaultDetail({ chainId, address }: { chainId: number; address: st
     }, 1000);
     return () => clearInterval(timer);
   }, [dataUpdatedAt, data?.retry_after_seconds]);
-  const valid = Number.isInteger(chainId) && chainId > 0 && /^0x[0-9a-fA-F]{40}$/.test(address);
   const latestPps = data?.points.filter(point => point.pps !== null).at(-1);
   const latestTvl = data?.points.filter(point => point.tvl_usd !== null).at(-1);
   const backLabel = new URL(back, "https://yhelper.invalid").searchParams.get("view") === "changes" ? "Yield changes" : "Vaults";
-  const missing = !valid || (error instanceof Error && error.message.includes("404"));
+  const missing = !isEnabled || (error instanceof HttpError && error.status === 404);
   const title = data ? shortVaultLabel(data.vault.symbol, address) : isLoading ? "Vault performance" : shortVaultLabel(null, address);
   const historyNotes = [
     data?.history_delayed || data?.history_state === "delayed" ? "History is delayed." : null,

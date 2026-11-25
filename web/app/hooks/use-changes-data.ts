@@ -1,13 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
 import type { SourceFreshness } from "../components/source-notes";
 import { apiUrl } from "../lib/api";
 import { fetchJson } from "../lib/fetch-json";
 import { MarketKind, UniverseKind } from "../lib/universe";
 
-type WindowKey = "24h" | "7d" | "30d";
-type StaleThresholdKey = "auto" | "24h" | "7d" | "30d";
+export const CHANGE_WINDOWS = ["24h", "7d", "30d"] as const;
+export type WindowKey = typeof CHANGE_WINDOWS[number];
 
 type Summary = {
   vaults_eligible: number;
@@ -21,7 +21,7 @@ type Summary = {
   faller_tvl_usd?: number | null;
 };
 
-type ChangeRow = {
+export type ChangeRow = {
   vault_address: string;
   chain_id: number;
   symbol: string | null;
@@ -53,28 +53,20 @@ interface UseChangesDataParams {
   minTvl: number;
   minPoints: number;
   window: WindowKey;
-  staleThreshold: StaleThresholdKey;
 }
 
-export async function fetchChangesData(params: UseChangesDataParams, signal?: AbortSignal): Promise<ChangesResponse> {
-  const searchParams = new URLSearchParams({
-    window: params.window,
-    stale_threshold: params.staleThreshold,
-    universe: params.universe,
-    min_tvl_usd: String(params.minTvl),
-    min_points: String(params.minPoints),
-    limit: "60",
-    market: params.market,
-  });
-
-  return fetchJson<ChangesResponse>(apiUrl("/changes", searchParams), { signal });
-}
-
-export function useChangesData(params: UseChangesDataParams) {
-  return useQuery({
+export function changesOptions(params: UseChangesDataParams) {
+  return queryOptions({
     queryKey: ["changes", params],
-    queryFn: ({ signal }) => fetchChangesData(params, signal),
+    queryFn: ({ signal }) => fetchJson<ChangesResponse>(apiUrl("/changes", {
+      window: params.window,
+      stale_threshold: "auto",
+      universe: params.universe,
+      min_tvl_usd: params.minTvl,
+      min_points: params.minPoints,
+      limit: 60,
+      market: params.market,
+    }), { signal }),
     staleTime: 30_000,
-    gcTime: 30 * 60_000,
   });
 }

@@ -24,9 +24,9 @@ from .config import (
     FLEX_SNAPSHOT_INTERVAL_SEC,
     JOB_FLEX_SYNC,
 )
+from .db import connect
 from .db_state import _complete_run, _ensure_schema, _insert_run
 from .eth import (
-    _connect,
     _eth_call_address,
     _eth_call_string,
     _eth_call_uint,
@@ -216,10 +216,6 @@ def _contract_creation_block(address: str, latest_block: int) -> int:
     return candidate
 
 
-def _read_address(address: str, signature: str) -> str:
-    return _eth_call_address(address, signature).lower()
-
-
 def _safe_string(address: str, signature: str) -> str | None:
     try:
         return _eth_call_string(address, signature).strip()
@@ -312,8 +308,8 @@ def _discover_markets(
             sorted_troves, dutch_desk, auction, lender = [
                 _word_address(word) for word in data_words[:4]
             ]
-            collateral = _read_address(market, "collateral_token()")
-            borrow = _read_address(market, "borrow_token()")
+            collateral = _eth_call_address(market, "collateral_token()")
+            borrow = _eth_call_address(market, "borrow_token()")
             collateral_decimals = int(_eth_call_uint(collateral, "decimals()"))
             borrow_decimals = int(_eth_call_uint(borrow, "decimals()"))
             collateral_symbol = _safe_string(collateral, "symbol()") or collateral[:10]
@@ -1156,7 +1152,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--max-snapshot-hours", type=int, default=0)
     args = parser.parse_args()
-    with _connect() as conn:
+    with connect() as conn:
         _ensure_schema(conn)
         result = _run_flex_sync(conn, max_snapshot_hours=args.max_snapshot_hours)
     print(json.dumps(result, sort_keys=True))

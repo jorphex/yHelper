@@ -32,6 +32,7 @@ from psycopg.types.json import Jsonb
 from websockets.sync.server import serve
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 OUT = ROOT / "reports/worker-resilience-fix"
 VAULT, STRATEGY = "0x" + "1" * 40, "0x" + "2" * 40
 TX = "0x" + "3" * 64
@@ -132,7 +133,7 @@ def main():
     }
     env.update(
         DATABASE_URL=scoped,
-        PYTHONPATH=str(ROOT / "worker"),
+        PYTHONPATH=os.pathsep.join((str(ROOT / "worker"), str(ROOT))),
         WORKER_INTERVAL_SEC="1",
         ETH_RPC_URL=f"{origin}/v2/{SECRET}",
         KONG_REST_VAULTS_URL=origin + "/vaults",
@@ -321,7 +322,8 @@ def main():
                 (json.dumps({"error": legacy}),),
             )
             conn.execute(
-                "UPDATE alert_state SET last_notify_result=%s",
+                """INSERT INTO alert_state(alert_key,job_name,status,threshold_seconds,last_notify_result)
+                   VALUES ('legacy-fixture','kong_vault_snapshot','firing',3600,%s)""",
                 (
                     Jsonb(
                         {
@@ -391,7 +393,7 @@ def main():
                     "--port",
                     str(port),
                 ],
-                env={**env, "PYTHONPATH": str(ROOT / "api")},
+                env={**env, "PYTHONPATH": os.pathsep.join((str(ROOT / "api"), str(ROOT)))},
                 stdout=log,
                 stderr=subprocess.STDOUT,
             )
@@ -435,12 +437,7 @@ def main():
                             == "Upstream request failed."
                         )
                     else:
-                        assert body["alerts"]
-                        assert all(
-                            a["last_notify_result"]["errors"]
-                            == ["Upstream request failed."]
-                            for a in body["alerts"].values()
-                        )
+                        assert body["alerts"]["legacy-fixture"]["last_notify_result"]["errors"] == ["Upstream request failed."]
         evidence["public_api"] = {
             "legacy_staking_error_protected": True,
             "legacy_alert_errors_protected": True,

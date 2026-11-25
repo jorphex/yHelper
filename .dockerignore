@@ -1,0 +1,8 @@
+**
+!api/Dockerfile
+!api/requirements.txt
+!api/app/*.py
+!worker/Dockerfile
+!worker/requirements.txt
+!worker/worker/*.py
+!yhelper_shared/*.py

@@ -17,44 +17,33 @@ def _bounded_metric_sql(expr: str, lower: float | str, upper: float | str) -> st
     return f"CASE WHEN {expr} IS NULL THEN NULL ELSE LEAST(GREATEST({expr}, {lower}), {upper}) END"
 
 
-def _bounded_realized_apy_sql() -> str:
-    return _bounded_metric_sql("m.apy_30d", APY_MIN, APY_MAX)
+BOUNDED_REALIZED_APY_SQL = _bounded_metric_sql("m.apy_30d", APY_MIN, APY_MAX)
+BOUNDED_MOMENTUM_SQL = _bounded_metric_sql("m.momentum_7d_30d", -abs(MOMENTUM_ABS_MAX), abs(MOMENTUM_ABS_MAX))
 
 
-def _bounded_momentum_sql(alias: str = "m") -> str:
-    lower = -abs(MOMENTUM_ABS_MAX)
-    upper = abs(MOMENTUM_ABS_MAX)
-    return _bounded_metric_sql(f"{alias}.momentum_7d_30d", lower, upper)
-
-
-def _composition_filtered_cte(*, max_vaults: int | None, filter_market: bool = False) -> str:
+def _composition_filtered_cte(*, max_vaults: int | None) -> str:
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
-    market_clause = f"AND {_market_filter_sql('d')}" if filter_market else ""
     return f"""
     WITH filtered AS (
         SELECT
-            d.vault_address,
             d.chain_id,
-            COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
             {_market_group_sql("d")} AS market,
             COALESCE(NULLIF(d.token_symbol, ''), 'unknown') AS token_symbol,
-            COALESCE(NULLIF(d.symbol, ''), d.vault_address) AS symbol,
             COALESCE(d.tvl_usd, 0.0) AS tvl_usd
         FROM vault_dim d
         JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
         WHERE
-            {_user_visible_filter_sql("d", include_retired=False)}
+            {_user_visible_filter_sql("d")}
             AND COALESCE(d.tvl_usd, 0.0) >= %(min_tvl_usd)s
             AND COALESCE(m.points_count, 0) >= %(min_points)s
+            AND {_market_filter_sql('d')}
             {rank_clause}
-            {market_clause}
     )
     """
 
 
 def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) -> str:
-    bounded_momentum_sql = _bounded_momentum_sql("m")
     rank_filter_sql = _rank_gate_filter_sql("d", max_vaults=max_vaults, include_locked=True)
     rank_clause = f"AND {rank_filter_sql}" if rank_filter_sql else ""
     market_clause = f"AND {_market_filter_sql('d')}" if filter_market else ""
@@ -63,18 +52,11 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
         SELECT
             d.vault_address,
             d.chain_id,
-            d.name,
             d.symbol,
             COALESCE(NULLIF(d.token_symbol, ''), 'unknown') AS token_symbol,
-            COALESCE(NULLIF(d.category, ''), 'unknown') AS category,
-            {_market_group_sql("d")} AS market,
             COALESCE(d.tvl_usd, 0.0) AS tvl_usd,
             d.est_apy,
-            {_aggregate_tvl_sql("d")} AS aggregate_tvl_usd,
-            {_bounded_metric_sql("m.apy_30d", "%(apy_min)s", "%(apy_max)s")} AS realized_apy_30d,
-            m.points_count,
-            m.last_point_time,
-            {bounded_momentum_sql} AS momentum_7d_30d
+            {_aggregate_tvl_sql("d")} AS aggregate_tvl_usd
         FROM vault_dim d
         JOIN vault_metrics_latest m ON m.chain_id = d.chain_id AND m.vault_address = d.vault_address
         WHERE
@@ -97,29 +79,12 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
     latest AS (
         SELECT p.chain_id, p.vault_address, MAX(p.ts) AS latest_ts
         FROM performance_points p
-        JOIN eligible e
-          ON e.chain_id = p.chain_id
-         AND e.vault_address = p.vault_address
         GROUP BY p.chain_id, p.vault_address
     ),
     anchors AS (
         SELECT
-            e.vault_address,
-            e.chain_id,
-            e.name,
-            e.symbol,
-            e.token_symbol,
-            e.category,
-            e.market,
-            e.tvl_usd,
-            e.est_apy,
-            e.aggregate_tvl_usd,
-            e.realized_apy_30d,
-            e.points_count,
-            e.last_point_time,
-            e.momentum_7d_30d,
+            e.*,
             l.latest_ts,
-            latest_point.ts AS latest_point_ts,
             latest_point.pps_raw AS latest_pps,
             curr_point.ts AS curr_ts,
             curr_point.pps_raw AS curr_pps,
@@ -129,13 +94,10 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
         JOIN latest l
           ON l.chain_id = e.chain_id
          AND l.vault_address = e.vault_address
-        JOIN LATERAL (
-            SELECT p.ts, p.pps_raw
-            FROM performance_points p
-            WHERE p.chain_id = e.chain_id AND p.vault_address = e.vault_address AND p.ts <= l.latest_ts
-            ORDER BY p.ts DESC
-            LIMIT 1
-        ) latest_point ON TRUE
+        JOIN performance_points latest_point
+          ON latest_point.chain_id = l.chain_id
+         AND latest_point.vault_address = l.vault_address
+         AND latest_point.ts = l.latest_ts
         JOIN LATERAL (
             SELECT p.ts, p.pps_raw
             FROM performance_points p
@@ -163,18 +125,16 @@ def _changes_base_cte(*, max_vaults: int | None, filter_market: bool = False) ->
             CASE
                 WHEN a.latest_pps > 0
                     AND a.curr_pps > 0
-                    AND a.latest_point_ts > a.curr_ts
-                THEN POWER(a.latest_pps / a.curr_pps, 31536000.0 / NULLIF((a.latest_point_ts - a.curr_ts), 0)) - 1
+                THEN POWER(a.latest_pps / a.curr_pps, 31536000.0 / (a.latest_ts - a.curr_ts)) - 1
                 ELSE NULL
             END AS apy_window_raw,
             CASE
                 WHEN a.curr_pps > 0
                     AND a.prev_pps > 0
-                    AND a.curr_ts > a.prev_ts
-                THEN POWER(a.curr_pps / a.prev_pps, 31536000.0 / NULLIF((a.curr_ts - a.prev_ts), 0)) - 1
+                THEN POWER(a.curr_pps / a.prev_pps, 31536000.0 / (a.curr_ts - a.prev_ts)) - 1
                 ELSE NULL
             END AS apy_prev_window_raw,
-            (%(now_epoch)s - a.latest_point_ts) AS age_seconds
+            (%(now_epoch)s - a.latest_ts) AS age_seconds
         FROM anchors a
     ),
     normalized AS (
@@ -211,24 +171,15 @@ def _fetch_change_movers(
         WHERE n.apy_window_raw IS NOT NULL
           AND n.apy_prev_window_raw IS NOT NULL
           AND ({sign_filter})
-        ORDER BY {order_expr}, n.tvl_usd DESC
+        ORDER BY {order_expr}, n.tvl_usd DESC, n.chain_id, n.vault_address
         LIMIT %(limit)s
         """
     )
-    cur.execute(
-        movers_sql.format(
-            order_expr="delta_apy DESC",
-            sign_filter="(n.realized_apy_window - n.realized_apy_prev_window) > 0",
-        ),
-        movers_params,
-    )
-    risers = cur.fetchall()
-    cur.execute(
-        movers_sql.format(
-            order_expr="delta_apy ASC",
-            sign_filter="(n.realized_apy_window - n.realized_apy_prev_window) < 0",
-        ),
-        movers_params,
-    )
-    fallers = cur.fetchall()
-    return {"risers": risers, "fallers": fallers}
+    movers = {}
+    for side, sign, direction in (("risers", ">", "DESC"), ("fallers", "<", "ASC")):
+        cur.execute(
+            movers_sql.format(order_expr=f"delta_apy {direction}", sign_filter=f"(n.realized_apy_window - n.realized_apy_prev_window) {sign} 0"),
+            movers_params,
+        )
+        movers[side] = cur.fetchall()
+    return movers

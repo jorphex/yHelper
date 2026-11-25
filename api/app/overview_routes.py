@@ -28,7 +28,8 @@ def overview_pulse() -> dict[str, object]:
     return _overview_pulse_response()
 
 
-def _operational_status() -> dict[str, object]:
+@router.get("/api/meta/status", response_model=OperationalStatusResponse)
+def operational_status() -> dict[str, object]:
     with connect(row_factory=dict_row) as conn:
         freshness = _freshness_snapshot(
             conn,
@@ -54,8 +55,3 @@ def _operational_status() -> dict[str, object]:
         "freshness": freshness,
         "coverage": coverage,
     }
-
-
-@router.get("/api/meta/status", response_model=OperationalStatusResponse)
-def operational_status() -> dict[str, object]:
-    return _operational_status()

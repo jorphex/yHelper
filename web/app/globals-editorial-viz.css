@@ -60,57 +60,6 @@
   color: var(--text-tertiary);
 }
 
-/* --------------------------------------------------------------------------
-   32. Visualization Skeleton States
-   -------------------------------------------------------------------------- */
-.viz-skeleton {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.viz-skeleton-header {
-  height: 12px;
-  width: 35%;
-  background: linear-gradient(90deg, var(--bg-elevated) 0%, rgba(255,255,255,0.03) 50%, var(--bg-elevated) 100%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--radius-sm);
-}
-
-.viz-skeleton-body {
-  flex: 1;
-  background: linear-gradient(90deg, var(--bg-elevated) 0%, rgba(255,255,255,0.03) 50%, var(--bg-elevated) 100%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--radius-md);
-}
-
-.viz-skeleton-bars {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.viz-skeleton-bar {
-  height: 6px;
-  background: linear-gradient(90deg, var(--bg-elevated) 0%, rgba(255,255,255,0.03) 50%, var(--bg-elevated) 100%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--radius-full);
-}
-
-.viz-skeleton-bar:nth-child(1) { width: 78%; }
-.viz-skeleton-bar:nth-child(2) { width: 62%; }
-.viz-skeleton-bar:nth-child(3) { width: 91%; }
-.viz-skeleton-bar:nth-child(4) { width: 55%; }
-.viz-skeleton-bar:nth-child(5) { width: 84%; }
-
 /* Bar List */
 .bar-panel {
   background: var(--bg-card);
@@ -535,10 +484,7 @@
     transition-duration: 0.01ms !important;
   }
 
-  .skeleton,
-  .viz-skeleton-header,
-  .viz-skeleton-body,
-  .viz-skeleton-bar {
+  .skeleton {
     animation: none !important;
     background-position: 0 0 !important;
   }

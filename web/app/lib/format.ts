@@ -102,16 +102,6 @@ export function formatUsdCompact(value: number | null | undefined): string {
   }).format(value);
 }
 
-export function formatHours(seconds: number | null | undefined, digits = 1, isLoading = false): string {
-  if (isLoading) {
-    return "Loading…";
-  }
-  if (seconds === null || seconds === undefined) {
-    return "n/a";
-  }
-  return `${(seconds / 3600).toFixed(digits)}h`;
-}
-
 const UTC_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "short",
@@ -169,17 +159,4 @@ export function explorerTxUrl(chainId: number, txHash: string): string | null {
   const base = CHAIN_EXPLORER_BASES[chainId];
   if (!base) return null;
   return `${base}/tx/${encodeURIComponent(txHash)}`;
-}
-
-export function compactCategoryLabel(value: string | null | undefined, compact = false): string {
-  if (!value || value.trim().length === 0) return "unknown";
-  const label = value.trim();
-  if (!compact) return label;
-  const key = label.toLowerCase();
-  if (key === "stablecoin") return "Stable";
-  if (key === "volatile") return "Vol.";
-  if (key === "liquid staking") return "LST";
-  if (key === "restaking") return "Restk.";
-  if (label.length <= 7) return label;
-  return `${label.slice(0, 6)}…`;
 }

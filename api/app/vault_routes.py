@@ -18,7 +18,7 @@ from app.common import _kong_source_freshness
 from app.config import APY_MAX, APY_MIN, CHAIN_LABELS, KONG_GQL_URL, LOCKED_YVUSD_ADDRESS, YVUSD_ADDRESS
 from app.db import connect
 from app.models import VaultHistoryResponse
-from app.transport import fetch
+from yhelper_shared.transport import fetch
 
 router = APIRouter()
 LOGGER = logging.getLogger(__name__)

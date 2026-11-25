@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { chainLabel, formatPct, formatUsd } from "../lib/format";
 import { useInViewOnce } from "../components/visuals";
-import type { BreakdownRow } from "./types";
+import type { BreakdownRow } from "../hooks/use-composition-data";
 
 type DisplayRow = BreakdownRow & { isRemainder?: boolean };
 

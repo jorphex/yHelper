@@ -473,8 +473,7 @@ table tbody a {
 
 /* Loading and empty states retain resolved-content geometry. */
 .skeleton-card,
-.kpi-grid > div:not([class]),
-.viz-skeleton {
+.kpi-grid > div:not([class]) {
   background: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -482,21 +481,14 @@ table tbody a {
 }
 
 .kpi-grid > div:not([class]) { padding: var(--space-5) !important; }
-.viz-skeleton { padding: var(--space-5) 0 !important; }
 
 .skeleton,
-.viz-skeleton-header,
-.viz-skeleton-body,
-.viz-skeleton-bar,
 .skeleton-text,
 .skeleton-table-row {
   border-radius: 0 !important;
 }
 
-.skeleton,
-.viz-skeleton-header,
-.viz-skeleton-body,
-.viz-skeleton-bar {
+.skeleton {
   background-image: linear-gradient(90deg, rgba(255,255,255,.018), rgba(255,255,255,.055), rgba(255,255,255,.018)) !important;
 }
 

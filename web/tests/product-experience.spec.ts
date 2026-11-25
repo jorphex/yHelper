@@ -63,6 +63,21 @@ test("Reports find a named vault and show exact accounting without rounding", as
   await expect(evidence.getByRole("link", { name: `View transaction ${transaction}` })).toHaveAttribute("href", `https://etherscan.io/tx/${transaction}`);
 });
 
+test("Invalid chain filters keep vault research and reports usable", async ({ page }) => {
+  await page.route("**/api/**", route => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.has("chain_id")) return route.fulfill({ status: 422 });
+    if (url.pathname === "/api/discover") return route.fulfill({ json: catalog });
+    if (url.pathname === "/api/reports") return route.fulfill({ json: { available_chains: [], recent: [] } });
+    return route.fulfill({ status: 503 });
+  });
+
+  await page.goto("/markets?chain=1invalid");
+  await expect(page.getByRole("link", { name: "View Needle performance" })).toBeVisible();
+  await page.goto("/reports?chain_id=1invalid");
+  await expect(page.getByRole("combobox", { name: "Find a vault by name or address" })).toBeVisible();
+});
+
 for (const width of [1440, 720, 390]) {
   test(`Product pages reflow with visible evidence at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
@@ -117,6 +132,40 @@ test("Research discloses upstream cache age and links only matched vault assessm
   await expect(page.getByText(/Vault data delayed/)).toBeVisible();
   await expect(page.getByRole("link", { name: /Risk assessment/ })).toHaveCount(1);
   await expect(page.getByRole("link", { name: /Risk assessment for yvUSDC-1/ })).toHaveAttribute("href", /yearn-yvusdc/);
+});
+
+test("Flex renders known activity amounts alongside unknown events and missing amounts", async ({ page }) => {
+  const market = {
+    addresses: { market: address },
+    label: "Fixture",
+    status: "active",
+    contract_version: "1.1.0",
+    deployment_time: "2026-01-01T00:00:00Z",
+    borrow_token: { symbol: "USDC", decimals: 6 },
+    collateral_token: { symbol: "WETH", decimals: 18 },
+    metrics: null,
+  };
+  const rows = [
+    { event: "liquidation", amounts: { debt_raw: "12000000", collateral_raw: "2000000000000000000" } },
+    { event: "auction_take", amounts: { take_raw: "500000000000000000" } },
+    { event: "constructor", amounts: { debt_raw: "12000000" } },
+    { event: "borrow", amounts: { debt_raw: "" } },
+  ].map((row, log_index) => ({
+    ...row, log_index, tx_hash: transaction, market_address: address,
+    market_label: market.label, block_time: "2026-09-05T05:00:00Z",
+  }));
+  await page.route("**/api/**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/flex/markets") return route.fulfill({ json: { freshness: { data_state: "ready" }, rows: [market] } });
+    if (path === "/api/flex/activity") return route.fulfill({ json: { rows, pagination: { next_cursor: null } } });
+    return route.fulfill({ status: 503 });
+  });
+
+  await page.goto("/flex");
+  const activity = page.getByRole("table", { name: "Protocol activity" });
+  for (const [label, amount] of [["Liquidated", "12 USDC"], ["Auction filled", "0.5 WETH"], ["constructor", "Not available"], ["Borrowed", "Not available"]]) {
+    await expect(activity.getByRole("row").filter({ hasText: label }).getByRole("cell").last()).toHaveText(amount);
+  }
 });
 
 
