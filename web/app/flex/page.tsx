@@ -74,7 +74,7 @@ function MarketTable({ rows, marketHref }: { rows: FlexMarket[]; marketHref: (ad
     direction: current.key === key && current.direction === "descending" ? "ascending" : "descending",
   }));
   const header = ({ key, label }: typeof MARKET_COLUMNS[number]) => (
-    <th key={key} className="numeric" aria-sort={sort.key === key ? sort.direction : "none"} data-column={key}>
+    <th key={key} className="numeric" aria-sort={sort.key === key ? sort.direction : "none"}>
       <button
         type="button"
         className="th-button"

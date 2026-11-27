@@ -39,10 +39,6 @@
   min-width: 150px;
 }
 
-.flex-market-table [data-column="lender_apr"] {
-  border-inline-start: 1px solid var(--border-subtle);
-}
-
 .flex-market-meta,
 .flex-market-unit {
   display: block;
