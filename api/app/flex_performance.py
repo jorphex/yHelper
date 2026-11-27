@@ -42,6 +42,7 @@ SELECTORS = {
     "total": "0x01e1d114",
     "trove": "0x87553b7e",
     "debt": "0x0ff8afc1",
+    "curve_get_dy": "0x5e0d443f",
 }
 CACHE: OrderedDict[tuple, tuple[float, dict | HTTPException]] = OrderedDict()
 PENDING = {}
@@ -53,6 +54,7 @@ SHARED = HistoricalCache()
 LOGGER = logging.getLogger("uvicorn.error.flex_rpc")
 HISTORICAL_BLOCK_PARAM = {"eth_call": 1, "eth_getBlockByNumber": 0}
 HEX_DATA = re.compile(r"0x[0-9a-fA-F]+")
+TROVE_STATUS = {1: "open", 2: "dormant", 4: "closed", 8: "liquidated"}
 
 
 class CoverageError(ValueError):
@@ -461,11 +463,12 @@ def debt_at(book, stamp, precision):
     )
 
 
-def borrower(archive, market, events, start, end, start_time, end_time):
+def borrower(archive, market, events, start, end, start_time, end_time, *, include_trove=False):
     ident = events[0]["amounts"]["trove_id"]
     row = blank(market, "trove", ident)
     book = {"debt": 0, "collateral": 0, "rate": 0, "last": 0}
     funding = Decimal(0)
+    debt_changes = upfront_fees = 0
     opening = None
     seen = False
     terminal = False
@@ -495,9 +498,10 @@ def borrower(archive, market, events, start, end, start_time, end_time):
                 if seen:
                     raise CoverageError("Opening history is inconsistent.")
                 seen = True
+                fee = int(a["upfront_fee_raw"])
                 book.update(
                     collateral=int(a["collateral_raw"]),
-                    debt=int(a["debt_raw"]) + int(a["upfront_fee_raw"]),
+                    debt=int(a["debt_raw"]) + fee,
                     rate=int(a["annual_interest_rate_raw"]),
                     last=stamp,
                 )
@@ -505,6 +509,9 @@ def borrower(archive, market, events, start, end, start_time, end_time):
                     funding += archive.value(
                         market, block, book["collateral"], True
                     ) - archive.value(market, block, int(a["debt_raw"]))
+                    if include_trove:
+                        debt_changes += book["debt"]
+                        upfront_fees += fee
                 continue
             if not seen:
                 raise CoverageError("Opening history is missing.")
@@ -590,6 +597,9 @@ def borrower(archive, market, events, start, end, start_time, end_time):
                 raise CoverageError("Unsupported trove event.")
             if book["debt"] < 0 or book["collateral"] < 0:
                 raise CoverageError("Position history cannot be reconciled.")
+            if include_trove and in_period:
+                debt_changes += debt_at(book, stamp, precision) - owed
+                upfront_fees += int(a.get("upfront_fee_raw", 0))
         if pending_bad_debt:
             raise CoverageError("Bad debt does not match a full liquidation.")
         opening = opening if opening is not None else dict(book)
@@ -598,7 +608,7 @@ def borrower(archive, market, events, start, end, start_time, end_time):
 
         def equity(state, block, stamp):
             if block < int(market["deployment_block"]):
-                return Decimal(0)
+                return Decimal(0), []
             actual = archive.at(
                 market["market_address"], block, "trove", f"{int(ident):064x}"
             )
@@ -611,16 +621,27 @@ def borrower(archive, market, events, start, end, start_time, end_time):
                 or debt != debt_at(state, stamp, precision)
             ):
                 raise CoverageError("Position history does not match the chain.")
-            return archive.value(market, block, actual[1], True) - archive.value(
-                market, block, debt
-            )
+            value = archive.value(market, block, actual[1], True) - archive.value(market, block, debt)
+            return value, actual
 
-        return finish(
-            row,
-            equity(opening, start, start_time),
-            equity(book, end, end_time),
-            funding,
-        )
+        start_value, _ = equity(opening, start, start_time)
+        end_value, end_trove = equity(book, end, end_time)
+        if include_trove and len(end_trove) == 8:
+            status = TROVE_STATUS.get(end_trove[7])
+            last = events[-1]
+            final = "liquidated" if last["event_name"] == "liquidation" else "closed"
+            if status in ((final,) if terminal else ("open", "dormant")):
+                # Subtract event-time debt changes from the change in accrued debt.
+                interest = debt_at(book, end_time, precision) - debt_at(opening, start_time, precision) - debt_changes
+                row["trove"] = {
+                    "status": status,
+                    "opened_at": events[0]["block_time"].isoformat(),
+                    "exited_at": last["block_time"].isoformat() if terminal else None,
+                    "borrow_token_symbol": market["borrow_token_symbol"],
+                    "upfront_fees": upfront_fees / precision,
+                    "interest": interest / precision,
+                }
+        return finish(row, start_value, end_value, funding)
     except (CoverageError, KeyError, ValueError, TypeError, IndexError) as exc:
         row["issue"] = (
             str(exc)
@@ -983,7 +1004,7 @@ def _build_performance(archive, address, days):
     for market, market_events, groups in contexts:
         for group in groups:
             borrower_rows.append(
-                borrower(archive, market, group, start, end, start_time, end_time)
+                borrower(archive, market, group, start, end, start_time, end_time, include_trove=address is not None)
             )
         lender_rows.append(lender(archive, market, market_events, address, start, end))
     return {

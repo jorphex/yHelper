@@ -428,7 +428,9 @@ class RPC(BaseHTTPRequestHandler):
                                     ),
                                     16,
                                 ),
-                                1,
+                                (8 if trove in (9, 16, 17, 18, 19, 21) else 4)
+                                if block >= 1550 and (trove in (3, 9) or trove >= 12)
+                                else (1 if block >= 1100 else 0),
                             )
                         )
                     )
@@ -508,17 +510,18 @@ def main():
             conn.execute(f"CREATE SCHEMA {schema}")
         with psycopg.connect(scoped, autocommit=True) as conn:
             conn.execute(
-                "CREATE TABLE flex_market_dim (chain_id int, market_address text, raw_metadata jsonb, market_status text, contract_version text, deployment_block bigint, deployment_time timestamptz, lender_address text, collateral_token_address text, collateral_token_symbol text, collateral_token_decimals int, borrow_token_address text, borrow_token_symbol text, borrow_token_decimals int, price_oracle_address text)"
+                "CREATE TABLE flex_market_dim (chain_id int, market_address text, raw_metadata jsonb, market_status text, contract_version text, deployment_block bigint, deployment_time timestamptz, lender_address text, collateral_token_address text, collateral_token_symbol text, collateral_token_decimals int, borrow_token_address text, borrow_token_symbol text, borrow_token_decimals int, price_oracle_address text, one_pct_raw numeric)"
             )
             conn.execute(
-                "CREATE TABLE flex_market_snapshots (chain_id int, market_address text, block_number bigint, block_hash text, block_time timestamptz)"
+                "CREATE TABLE flex_market_snapshots (chain_id int, market_address text, block_number bigint, block_hash text, block_time timestamptz, sampled_hour timestamptz)"
             )
             conn.execute(
-                "CREATE TABLE flex_events (chain_id int, market_address text, block_number bigint, block_time timestamptz, tx_hash text, log_index int, event_name text, actors jsonb, amounts jsonb)"
+                "CREATE TABLE flex_events (chain_id int, market_address text, block_number bigint, block_time timestamptz, tx_hash text, log_index int, event_name text, actors jsonb, amounts jsonb, contract_version text DEFAULT '1.1.0')"
             )
             conn.execute(
                 "CREATE TABLE flex_sync_state (stream_name text, chain_id int, cursor bigint)"
             )
+            conn.execute("CREATE TABLE flex_reconciliations (id bigint, checked_at timestamptz, verdict text)")
             conn.execute("INSERT INTO flex_sync_state VALUES ('events',1,2000)")
             conn.execute(
                 "INSERT INTO flex_market_dim VALUES (1,%s,%s,%s,%s,900,%s,%s,%s,%s,6,%s,%s,6,%s)",
@@ -678,6 +681,24 @@ def main():
                     )
                 assert pnl("interest", "borrowers") < 19, "Accrued interest reduces P&L"
                 assert pnl("liquidated", "borrowers") is not None
+                simple = results["simple"]["borrowers"]["rows"][0]["trove"]
+                closed = results["closed"]["borrowers"]["rows"][0]["trove"]
+                assert simple["status"] == "open" and simple["exited_at"] is None
+                assert simple["upfront_fees"] == 1 and simple["interest"] == 0
+                assert closed["status"] == "closed" and closed["exited_at"] > closed["opened_at"]
+                assert results["liquidated"]["borrowers"]["rows"][0]["trove"]["status"] == "liquidated"
+                assert results["bad_debt"]["borrowers"]["rows"][0]["trove"]["interest"] == 0
+                interest = results["interest"]["borrowers"]["rows"][0]["trove"]["interest"]
+                assert interest == 0.451232, "Interest included within the reporting window"
+                timelines = {}
+                for name, ident, expected in (("simple", "1", ["open_trove"]), ("closed", "3", ["close_trove", "open_trove"])):
+                    period = results[name]["period"]
+                    params = {"market_address": MARKET, "trove_id": ident, "after_block": period["start_block"], "through_block": period["end_block"]}
+                    timelines[ident] = client.get("/api/flex/activity", params=params).raise_for_status().json()
+                    assert [row["event"] for row in timelines[ident]["rows"]] == expected
+                page = client.get("/api/flex/activity", params={**params, "after_block": 1100, "through_block": 1550, "limit": 1}).raise_for_status().json()
+                assert [row["event"] for row in page["rows"]] == ["close_trove"]
+                assert page["pagination"]["next_cursor"] is None
                 assert pnl("missing", "borrowers") is None, (
                     "Missing opening history must not invent P&L"
                 )
@@ -712,6 +733,7 @@ def main():
                 assert overview.json()["borrowers"]["pnl_usd"] is None, (
                     "Incomplete position must invalidate the combined total"
                 )
+                assert all(row["trove"] is None for row in overview.json()["borrowers"]["rows"])
                 BAD_PRICE = True
                 # A changed historical answer needs a changed chain anchor;
                 # otherwise correctly cached finalized reads remain valid.
@@ -749,6 +771,7 @@ def main():
                             "passed": True,
                             "cases": results,
                             "overview": overview.json(),
+                            "timelines": timelines,
                             "rpc_calls": CALLS,
                         },
                         indent=2,

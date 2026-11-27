@@ -54,6 +54,8 @@ export type FlexMarket = {
     auction: string;
   };
   metrics: FlexMarketMetrics | null;
+  collateral_yield?: { apr: number; asset_symbol: string; observed_at: string } | null;
+  has_market_peg?: boolean;
   latest_block_number: number | null;
   latest_block_time: string | null;
 };
@@ -86,6 +88,15 @@ export type FlexHistoryPoint = {
   utilization: number;
   lender_apr: number;
   average_borrow_rate: number;
+  collateral_price_in_borrow_token: number;
+};
+
+export type FlexMarketPeg = {
+  asset_symbol: string;
+  usdc_per_token: number;
+  pool_address: string;
+  block_number: number;
+  block_time: string;
 };
 
 export type FlexMarketDetailResponse = {
@@ -191,6 +202,7 @@ export type FlexActivityRow = {
   event: string;
   actors: Record<string, string | number | boolean>;
   amounts: Record<string, string | number | boolean>;
+  redemption?: { troves: number | null; highest_annual_rate: number | null } | null;
 };
 
 type FlexActivityResponse = {
@@ -210,6 +222,14 @@ export type FlexPerformanceRow = {
   pnl_usd: number | null;
   is_complete: boolean;
   issue: string | null;
+  trove?: {
+    status: "open" | "dormant" | "closed" | "liquidated";
+    opened_at: string;
+    exited_at: string | null;
+    borrow_token_symbol: string;
+    upfront_fees: number;
+    interest: number;
+  } | null;
 };
 
 type FlexPerformanceSide = {
@@ -275,6 +295,7 @@ function marketOptions<T>(address: string | null, path = "", query?: { days: Fle
 function marketResources(address: string | null) {
   return {
     detail: marketOptions<FlexMarketDetailResponse>(address),
+    peg: { ...marketOptions<FlexMarketPeg | null>(address, "/peg"), retry: false },
     redemption: marketOptions<FlexRedemptionPriorityResponse>(address, "/redemption-priority"),
     health: marketOptions<FlexTroveHealthResponse>(address, "/trove-health"),
   };
@@ -284,14 +305,16 @@ function marketHistoryOptions(address: string | null, days: FlexPeriod) {
   return marketOptions<FlexHistoryResponse>(address, "/history", { days, interval: "day" });
 }
 
-export function useFlexMarketData(address: string | null, days: FlexPeriod) {
-  const { detail, redemption, health } = marketResources(address);
+export function useFlexMarketData(market: FlexMarket | null, days: FlexPeriod) {
+  const address = market?.addresses.market ?? null;
+  const { detail, peg, redemption, health } = marketResources(address);
   return {
     history: useQuery({
       ...marketHistoryOptions(address, days),
       placeholderData: (previous, query) => query?.queryKey[1] === address ? previous : undefined,
     }),
     detail: useQuery(detail),
+    peg: useQuery({ ...peg, enabled: Boolean(market?.has_market_peg) }),
     redemptionPriority: useQuery({ ...redemption, refetchInterval: 5 * 60_000 }),
     troveHealth: useQuery({ ...health, refetchInterval: 5 * 60_000 }),
   };
@@ -300,22 +323,25 @@ export function useFlexMarketData(address: string | null, days: FlexPeriod) {
 export function useFlexMarketPreload(markets: FlexMarket[]) {
   const client = useQueryClient();
   const addresses = markets.map(market => market.addresses.market).join(",");
+  const pegAddresses = markets.filter(market => market.has_market_peg).map(market => market.addresses.market).join(",");
   useEffect(() => {
     if (!addresses) return;
     const targets = addresses.split(",");
+    const pegTargets = new Set(pegAddresses.split(","));
     for (const address of targets) {
       for (const days of FLEX_PERIODS) {
         void client.prefetchQuery(marketHistoryOptions(address, days));
       }
-      const { detail, redemption, health } = marketResources(address);
+      const { detail, peg, redemption, health } = marketResources(address);
       void client.prefetchQuery(detail);
       void client.prefetchQuery(redemption);
       void client.prefetchQuery(health);
+      if (pegTargets.has(address)) void client.prefetchQuery(peg);
     }
     return () => {
       for (const address of targets) void client.cancelQueries({ queryKey: ["flex-market", address], type: "inactive" });
     };
-  }, [client, addresses]);
+  }, [client, addresses, pegAddresses]);
 }
 
 export function useFlexMarkets() {
@@ -327,12 +353,20 @@ export function useFlexMarkets() {
   });
 }
 
-export function useFlexActivity() {
+export function useFlexActivity(filters: {
+  market_address?: string;
+  event?: string;
+  trove_id?: string;
+  after_block?: number;
+  through_block?: number;
+}) {
   return useInfiniteQuery({
-    queryKey: ["flex-activity"],
+    queryKey: ["flex-activity", filters],
     queryFn: ({ pageParam, signal }) => fetchJson<FlexActivityResponse>(apiUrl("/flex/activity", {
       limit: 12,
       cursor: pageParam || undefined,
+      ...filters,
+      group_redemptions: filters.event === "redemption" || undefined,
     }), { signal }),
     initialPageParam: "",
     getNextPageParam: (lastPage) => lastPage.pagination.next_cursor ?? undefined,

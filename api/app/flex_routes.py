@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.flex_performance import performance_response
+from app.flex_prices import flex_market_peg_response
 from app.flex_service import (
     flex_activity_response,
     flex_market_detail_response,
@@ -20,6 +21,7 @@ from app.models import (
     FlexActivityResponse,
     FlexMarketDetailResponse,
     FlexMarketHistoryResponse,
+    FlexMarketPeg,
     FlexMarketsResponse,
     FlexPerformanceResponse,
     FlexProtocolResponse,
@@ -103,6 +105,15 @@ def flex_market_detail(market_address: str) -> dict[str, object]:
 
 
 @router.get(
+    "/api/flex/markets/{market_address}/peg",
+    response_model=FlexMarketPeg | None,
+    summary="Get a verified Curve pool quote for a Flex collateral's underlying asset",
+)
+def flex_market_peg(market_address: str) -> dict[str, object] | None:
+    return flex_market_peg_response(_address(market_address))
+
+
+@router.get(
     "/api/flex/markets/{market_address}/redemption-priority",
     response_model=FlexRedemptionPriorityResponse,
     summary="Get current Flex redemption priority",
@@ -166,7 +177,9 @@ def flex_market_history(
     summary="List Flex activity",
     description=(
         "Returns recent Ethereum Flex events. Filter by market address or event name. Results are ordered "
-        "newest first and paginated with a block-number and log-index cursor; limit is 1 to 200."
+        "newest first and paginated with a block-number and log-index cursor; limit is 1 to 200. "
+        "A trove ID and exclusive start and inclusive end blocks can scope a position timeline. "
+        "Grouped redemptions use one row per market and transaction."
     ),
 )
 def flex_activity(
@@ -174,10 +187,20 @@ def flex_activity(
     event: str | None = Query(default=None, min_length=1, max_length=64),
     limit: int = Query(default=50, ge=1, le=200),
     cursor: str | None = Query(default=None, pattern=r"^\d+:\d+$"),
+    trove_id: str | None = Query(default=None, pattern=r"^(0|[1-9][0-9]{0,77})$"),
+    after_block: int | None = Query(default=None, ge=0),
+    through_block: int | None = Query(default=None, ge=0),
+    group_redemptions: bool = False,
 ) -> dict[str, object]:
+    if group_redemptions and (event != "redemption" or trove_id is not None):
+        raise HTTPException(422, "Grouping requires aggregate redemption events")
     return flex_activity_response(
         market_address=_address(market_address) if market_address else None,
         event=event,
         limit=limit,
         cursor=cursor,
+        trove_id=trove_id,
+        after_block=after_block,
+        through_block=through_block,
+        group_redemptions=group_redemptions,
     )

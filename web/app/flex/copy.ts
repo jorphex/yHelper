@@ -21,7 +21,6 @@ export const flexCopy = {
     noActive: "No active markets.",
     headers: {
       market: "Market",
-      age: "Age",
     },
   },
   status: {
@@ -125,12 +124,6 @@ export const flexCopy = {
     headers: {
       time: "Time",
       event: "Event",
-      market: "Market",
-      amount: "Amount",
-    },
-    mobile: {
-      time: "When",
-      event: "Activity",
       market: "Market",
       amount: "Amount",
     },

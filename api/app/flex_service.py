@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from math import isfinite
 from typing import Literal
 
 import psycopg
@@ -16,6 +17,12 @@ WAD = Decimal(10**18)
 FLEX_CHAIN_ID = 1
 FLEX_STALE_AFTER_SECONDS = 2 * 60 * 60
 RATE_SCALE_FALLBACK = Decimal(10**6)
+USDC = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+# Verified two-coin pools, with the underlying token's index in each pool.
+CURVE_PEG_POOLS = {
+    ("0x23346b04a7f55b8760e5860aa5a77383d63491cd", USDC): ("BOLD", "0xefc6516323fbd28e80b85a497b65a86243a54b3e", 0),
+    ("0xbf319ddc2edc1eb6fdf9910e39b37be221c8805f", USDC): ("crvUSD", "0x4dece678ceceb27446b35c672dc7d61f30bad69e", 1),
+}
 
 
 @contextmanager
@@ -142,7 +149,11 @@ MARKET_SELECT = """
         s.avg_borrow_rate_raw,
         s.collateral_price_in_borrow_wad,
         s.borrow_usd_price_raw,
-        s.borrow_usd_price_decimals
+        s.borrow_usd_price_decimals,
+        v.token_symbol AS yield_asset,
+        latest_pps.ts AS yield_ts,
+        latest_pps.pps_raw AS current_pps,
+        initial_pps.pps_raw AS initial_pps
     FROM flex_market_dim d
     LEFT JOIN LATERAL (
         SELECT *
@@ -152,6 +163,16 @@ MARKET_SELECT = """
         ORDER BY snapshot.sampled_hour DESC
         LIMIT 1
     ) s ON TRUE
+    LEFT JOIN vault_dim v ON v.chain_id = d.chain_id AND v.origin = 'yearn'
+        AND v.vault_address = d.collateral_token_address
+    LEFT JOIN LATERAL (
+        SELECT ts, pps_raw FROM pps_timeseries
+        WHERE chain_id = v.chain_id AND vault_address = v.vault_address
+          AND ts <= extract(epoch FROM now())::bigint
+        ORDER BY ts DESC LIMIT 1
+    ) latest_pps ON TRUE
+    LEFT JOIN pps_timeseries initial_pps ON initial_pps.chain_id = v.chain_id
+        AND initial_pps.vault_address = v.vault_address AND initial_pps.ts = latest_pps.ts - 604800
 """
 
 
@@ -160,6 +181,16 @@ def _market_response(row: dict[str, object]) -> dict[str, object]:
     borrow_decimals = int(row["borrow_token_decimals"])
     has_metrics = row.get("latest_block_number") is not None
     metrics = None
+    collateral_yield = None
+    current, initial = row.get("current_pps"), row.get("initial_pps")
+    if row.get("yield_asset") and all(point is not None and isfinite(point) and point > 0 for point in (current, initial)):
+        apr = (current / initial - 1) * 365 / 7
+        if isfinite(apr):
+            collateral_yield = {
+                "apr": apr,
+                "asset_symbol": row["yield_asset"],
+                "observed_at": _iso(datetime.fromtimestamp(row["yield_ts"], UTC)),
+            }
     if has_metrics:
         metrics = {
             "collateral_raw": str(row["collateral_raw"]),
@@ -208,6 +239,8 @@ def _market_response(row: dict[str, object]) -> dict[str, object]:
             "auction": str(row["auction_address"]),
         },
         "metrics": metrics,
+        "collateral_yield": collateral_yield,
+        "has_market_peg": (row["collateral_token_address"], row["borrow_token_address"]) in CURVE_PEG_POOLS,
         "latest_block_number": int(row["latest_block_number"]) if row.get("latest_block_number") else None,
         "latest_block_time": _iso(row.get("latest_block_time")),
     }
@@ -629,7 +662,7 @@ def flex_market_history_response(
                         date_trunc('{bucket}', sampled_hour) AS sampled_at,
                         block_number, block_time, collateral_usd_e18, debt_usd_e18,
                         deposits_usd_e18, idle_liquidity_usd_e18, utilization_wad,
-                        lender_apr_wad, avg_borrow_rate_raw,
+                        lender_apr_wad, avg_borrow_rate_raw, collateral_price_in_borrow_wad,
                         ROW_NUMBER() OVER (
                             PARTITION BY date_trunc('{bucket}', sampled_hour)
                             ORDER BY sampled_hour DESC
@@ -660,6 +693,7 @@ def flex_market_history_response(
             "utilization": float(_decimal(row["utilization_wad"]) / WAD),
             "lender_apr": float(_decimal(row["lender_apr_wad"]) / WAD),
             "average_borrow_rate": float(_decimal(row["avg_borrow_rate_raw"]) / rate_scale),
+            "collateral_price_in_borrow_token": float(_decimal(row["collateral_price_in_borrow_wad"]) / WAD),
         }
         for row in rows
     ]
@@ -697,12 +731,67 @@ def _cursor(value: str | None) -> tuple[int, int] | None:
     return parsed if parsed[0] >= 0 and parsed[1] >= 0 else None
 
 
+def _attach_redemption_groups(cur: psycopg.Cursor, rows: list[dict[str, object]]) -> None:
+    cur.execute(
+        """
+        WITH logs AS (
+            SELECT market_address, tx_hash, block_number, log_index, event_name,
+                   (amounts->>'debt_raw')::numeric AS debt,
+                   (amounts->>'collateral_raw')::numeric AS collateral,
+                   amounts->>'trove_id' AS trove_id
+            FROM flex_events
+            WHERE chain_id = 1 AND tx_hash = ANY(%s) AND event_name IN ('redemption', 'redeem_trove')
+        )
+        SELECT e.market_address, e.tx_hash,
+               SUM(debt) FILTER (WHERE e.event_name = 'redemption') AS debt,
+               SUM(collateral) FILTER (WHERE e.event_name = 'redemption') AS collateral,
+               bool_and(debt IS NOT NULL AND collateral IS NOT NULL)
+                   FILTER (WHERE e.event_name = 'redemption') AS complete_total,
+               SUM(debt) FILTER (WHERE e.event_name = 'redeem_trove') AS trove_debt,
+               SUM(collateral) FILTER (WHERE e.event_name = 'redeem_trove') AS trove_collateral,
+               COUNT(DISTINCT trove_id) FILTER (WHERE e.event_name = 'redeem_trove') AS troves,
+               bool_and(trove_id IS NOT NULL AND debt IS NOT NULL AND collateral IS NOT NULL)
+                   FILTER (WHERE e.event_name = 'redeem_trove') AS complete_troves,
+               bool_and(rate IS NOT NULL) FILTER (WHERE e.event_name = 'redeem_trove') AS complete_rates,
+               MAX(rate) AS highest_rate
+        FROM logs e
+        LEFT JOIN LATERAL (
+            SELECT (amounts->>'annual_interest_rate_raw')::numeric AS rate
+            FROM flex_events r
+            WHERE r.chain_id = 1 AND r.market_address = e.market_address
+              AND r.event_name IN ('open_trove', 'adjust_interest_rate')
+              AND r.amounts->>'trove_id' = e.trove_id
+              AND (r.block_number, r.log_index) < (e.block_number, e.log_index)
+            ORDER BY r.block_number DESC, r.log_index DESC LIMIT 1
+        ) r ON e.event_name = 'redeem_trove'
+        GROUP BY e.market_address, e.tx_hash
+        """,
+        (list({row["tx_hash"] for row in rows}),),
+    )
+    groups = {(group["market_address"], group["tx_hash"]): group for group in cur.fetchall()}
+    for row in rows:
+        group = groups[row["market_address"], row["tx_hash"]]
+        matched = (group["complete_total"] and group["complete_troves"]
+                   and group["debt"] == group["trove_debt"] and group["collateral"] == group["trove_collateral"])
+        scale = _decimal(row["one_pct_raw"]) * 100
+        row["amounts"] = {f"{key}_raw": str(group[key]) for key in ("debt", "collateral")} if group["complete_total"] else {}
+        row["actors"] = {}
+        row["redemption"] = {
+            "troves": group["troves"] if matched else None,
+            "highest_annual_rate": float(group["highest_rate"] / scale) if matched and group["complete_rates"] and scale > 0 else None,
+        }
+
+
 def flex_activity_response(
     *,
     market_address: str | None,
     event: str | None,
     limit: int,
     cursor: str | None,
+    group_redemptions: bool = False,
+    trove_id: str | None = None,
+    after_block: int | None = None,
+    through_block: int | None = None,
 ) -> dict[str, object]:
     now = datetime.now(UTC)
     conditions = ["e.chain_id = 1"]
@@ -713,26 +802,45 @@ def flex_activity_response(
     if event:
         conditions.append("e.event_name = %(event)s")
         params["event"] = event
+    if trove_id is not None:
+        conditions.append("e.amounts->>'trove_id' = %(trove_id)s")
+        params["trove_id"] = trove_id
+    if after_block is not None:
+        conditions.append("e.block_number > %(after_block)s")
+        params["after_block"] = after_block
+    if through_block is not None:
+        conditions.append("e.block_number <= %(through_block)s")
+        params["through_block"] = through_block
+    if group_redemptions:
+        conditions.append("""
+            NOT EXISTS (SELECT 1 FROM flex_events later WHERE later.chain_id = e.chain_id
+                AND later.tx_hash = e.tx_hash AND later.market_address = e.market_address
+                AND later.event_name = 'redemption' AND later.log_index > e.log_index)
+        """)
     parsed_cursor = _cursor(cursor)
     if parsed_cursor:
         conditions.append("(e.block_number, e.log_index) < (%(before_block)s, %(before_log)s)")
         params["before_block"], params["before_log"] = parsed_cursor
     with _read_cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    e.*, COALESCE(d.raw_metadata->>'label', d.collateral_token_symbol || '/' || d.borrow_token_symbol)
-                        AS market_label
-                FROM flex_events e
-                JOIN flex_market_dim d USING (chain_id, market_address)
-                WHERE
-                """
-                + " AND ".join(conditions)
-                + " ORDER BY e.block_number DESC, e.log_index DESC LIMIT %(limit)s",
-                params,
-            )
-            rows = list(cur.fetchall())
-            freshness = _freshness(cur, now)
+        if group_redemptions:
+            cur.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        cur.execute(
+            """
+            SELECT
+                e.*, d.one_pct_raw, COALESCE(d.raw_metadata->>'label', d.collateral_token_symbol || '/' || d.borrow_token_symbol)
+                    AS market_label
+            FROM flex_events e
+            JOIN flex_market_dim d USING (chain_id, market_address)
+            WHERE
+            """
+            + " AND ".join(conditions)
+            + " ORDER BY e.block_number DESC, e.log_index DESC LIMIT %(limit)s",
+            params,
+        )
+        rows = list(cur.fetchall())
+        if group_redemptions and rows:
+            _attach_redemption_groups(cur, rows[:limit])
+        freshness = _freshness(cur, now)
     has_more = len(rows) > limit
     visible = rows[:limit]
     next_cursor = None
@@ -740,7 +848,8 @@ def flex_activity_response(
         next_cursor = f"{visible[-1]['block_number']}:{visible[-1]['log_index']}"
     return {
         "scope": _scope(),
-        "filters": {"market_address": market_address, "event": event},
+        "filters": {"market_address": market_address, "event": event, "trove_id": trove_id,
+                    "after_block": after_block, "through_block": through_block},
         "freshness": freshness,
         "pagination": {"limit": limit, "next_cursor": next_cursor},
         "rows": [
@@ -756,6 +865,7 @@ def flex_activity_response(
                 "event": str(row["event_name"]),
                 "actors": row["actors"] if isinstance(row["actors"], dict) else {},
                 "amounts": row["amounts"] if isinstance(row["amounts"], dict) else {},
+                "redemption": row.get("redemption"),
             }
             for row in visible
         ],

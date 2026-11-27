@@ -696,6 +696,12 @@ class FlexMarketMetrics(ApiModel):
     average_borrow_rate: float
 
 
+class FlexCollateralYield(ApiModel):
+    apr: float
+    asset_symbol: str
+    observed_at: str
+
+
 class FlexMarketRow(ApiModel):
     chain_id: Literal[1]
     label: str
@@ -708,6 +714,8 @@ class FlexMarketRow(ApiModel):
     borrow_token: FlexToken
     addresses: FlexMarketAddresses
     metrics: FlexMarketMetrics | None
+    collateral_yield: FlexCollateralYield | None = None
+    has_market_peg: bool = False
     latest_block_number: int | None
     latest_block_time: str | None
 
@@ -773,6 +781,14 @@ class FlexMarketDetailResponse(ApiModel):
     market: FlexMarketRow
     risk: FlexRiskParameters
     oracle: FlexOracle
+
+
+class FlexMarketPeg(ApiModel):
+    asset_symbol: str
+    usdc_per_token: float
+    pool_address: str
+    block_number: int
+    block_time: str
 
 
 class FlexRedemptionPriorityScope(ApiModel):
@@ -870,6 +886,7 @@ class FlexHistoryPoint(ApiModel):
     utilization: float
     lender_apr: float
     average_borrow_rate: float
+    collateral_price_in_borrow_token: float
 
 
 class FlexMarketHistoryResponse(ApiModel):
@@ -884,11 +901,19 @@ class FlexMarketHistoryResponse(ApiModel):
 class FlexActivityFilters(ApiModel):
     market_address: str | None
     event: str | None
+    trove_id: str | None = None
+    after_block: int | None = None
+    through_block: int | None = None
 
 
 class FlexCursorPagination(ApiModel):
     limit: int
     next_cursor: str | None
+
+
+class FlexRedemptionGroup(ApiModel):
+    troves: int | None
+    highest_annual_rate: float | None
 
 
 class FlexActivityRow(ApiModel):
@@ -903,6 +928,7 @@ class FlexActivityRow(ApiModel):
     event: str
     actors: dict[str, str | int | bool]
     amounts: dict[str, str | int | bool]
+    redemption: FlexRedemptionGroup | None = None
 
 
 class FlexActivityResponse(ApiModel):
@@ -911,6 +937,15 @@ class FlexActivityResponse(ApiModel):
     freshness: FlexFreshness
     pagination: FlexCursorPagination
     rows: list[FlexActivityRow]
+
+
+class FlexTrovePosition(ApiModel):
+    status: Literal["open", "dormant", "closed", "liquidated"]
+    opened_at: str
+    exited_at: str | None
+    borrow_token_symbol: str
+    upfront_fees: float
+    interest: float
 
 
 class FlexPerformanceRow(ApiModel):
@@ -924,6 +959,7 @@ class FlexPerformanceRow(ApiModel):
     pnl_usd: float | None
     is_complete: bool
     issue: str | None
+    trove: FlexTrovePosition | None = None
 
 
 class FlexPerformanceSide(ApiModel):

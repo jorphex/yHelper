@@ -181,8 +181,15 @@ test("WETH capacity follows its asset and lender rates are labelled as expected"
   await expect(capacity).not.toContainText("USDC");
   await expect(page.getByRole("columnheader", { name: "Expected lender APR" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Risk assessment/ })).toHaveCount(0);
-  await capacity.getByRole("group", { name: /Estimated borrowing capacity/ }).focus();
-  await page.keyboard.press("ArrowLeft");
-  await expect(capacity.locator(".flex-chart-tooltip")).toContainText("Idle WETH");
+  await page.setViewportSize({ width: 720, height: 900 });
+  const chart = capacity.getByRole("group", { name: /Estimated borrowing capacity/ });
+  await chart.focus();
+  await chart.press("Home");
+  const tooltip = chart.locator(".flex-chart-tooltip");
+  await expect(tooltip).toContainText("Idle WETH");
+  const bounds = (await chart.boundingBox())!;
+  const popup = (await tooltip.boundingBox())!;
+  expect(popup.x).toBeGreaterThanOrEqual(bounds.x - 1);
+  expect(popup.x + popup.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
   await expect(capacity.locator(".sr-only")).toContainText("idle WETH");
 });
