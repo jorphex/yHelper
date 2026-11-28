@@ -121,24 +121,24 @@ export function FlexPerformance({ days, onDays, marketHref }: {
   }
   return <section className="section section-lg flex-performance" aria-labelledby="flex-performance-title">
     <div className="flex-section-heading">
-      <div><h2 className="card-title" id="flex-performance-title">Performance</h2>
+      <div><h2 className="card-title" id="flex-performance-title" tabIndex={-1}>Performance</h2>
         <p className="card-description">{address && !editing ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Active Flex markets"}{query.isPlaceholderData ? " · Updating…" : ""}</p>
       </div>
-      <div className="flex-range-tabs" role="group" aria-label="Performance period">
-        {FLEX_PERIODS.map(period => <button type="button" key={period} className={`flex-range-tab ${days === period ? "is-active" : ""}`} aria-pressed={days === period} aria-label={`${period}-day performance`} onClick={() => onDays(period)}>{period}D</button>)}
-      </div>
+      {address || editing ? <button type="button" className="button button-ghost" onClick={overview}>Overview</button> : null}
     </div>
     <form className="flex-performance-form" onSubmit={submit}>
-      <label className="flex-performance-address">Address
+      <label className="flex-performance-address">Wallet address
         <input type="text" value={draft} placeholder="0x… (optional)" autoComplete="off" spellCheck={false} aria-invalid={!!error} aria-describedby={error ? "flex-performance-error" : undefined} onChange={event => { setDraft(event.target.value); setEditing(true); setError(""); }} />
       </label>
       <button type="submit" className="button button-secondary">View P&amp;L</button>
-      {address || editing ? <button type="button" className="button button-ghost" onClick={overview}>Overview</button> : null}
     </form>
     {error ? <p className="flex-performance-error" id="flex-performance-error" role="alert">{error}</p> : null}
     <div className="flex-performance-toolbar">
       <div className="flex-range-tabs" role="group" aria-label="Performance side">
         {([['borrowers', 'Borrowing'], ['lenders', 'Lending']] as const).map(([key, label]) => <button type="button" key={key} className={`flex-range-tab ${side === key ? "is-active" : ""}`} aria-pressed={side === key} onClick={() => { setSide(key); setMarket(""); }}>{label}</button>)}
+      </div>
+      <div className="flex-range-tabs" role="group" aria-label="Performance period">
+        {FLEX_PERIODS.map(period => <button type="button" key={period} className={`flex-range-tab ${days === period ? "is-active" : ""}`} aria-pressed={days === period} aria-label={`${period}-day performance`} onClick={() => onDays(period)}>{period}d</button>)}
       </div>
       {markets.length > 1 ? <label className="flex-filter">Market<select aria-label="Performance market" value={selectedMarket} onChange={event => setMarket(event.target.value)}><option value="">All markets</option>{markets.map(([address, label]) => <option key={address} value={address}>{label}</option>)}</select></label> : null}
     </div>

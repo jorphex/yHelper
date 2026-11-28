@@ -174,22 +174,48 @@ test("WETH capacity follows its asset and lender rates are labelled as expected"
   const markets = await response.json();
   const market = markets.rows.find((row: { borrow_token: { symbol: string } }) => row.borrow_token.symbol === "WETH");
   expect(market).toBeTruthy();
+  await page.route(`**/api/flex/markets/${market.addresses.market}/redemption-priority`, async route => {
+    const capacity = await (await route.fetch()).json();
+    const points = capacity.points.slice(-2).map((point: object, index: number) => ({
+      ...point,
+      annual_interest_rate: index === 0 ? 0.02 : 0.021,
+    }));
+    await route.fulfill({ json: { ...capacity, points } });
+  });
+  await page.route(`**/api/flex/markets/${market.addresses.market}/history?days=30&interval=day`, async route => {
+    const response = await route.fetch();
+    const history = await response.json();
+    await route.fulfill({ json: { ...history, points: history.points.map((point: object) => ({
+      ...point, lender_apr: 0, average_borrow_rate: 0,
+    })) } });
+  });
   await page.goto(`/flex?market=${market.addresses.market}`);
   const capacity = page.locator(".flex-redemption-section");
   await expect(capacity.getByText(/Estimated capacity = idle WETH/)).toBeVisible();
   await expect(capacity.locator(".flex-redemption-legend")).toContainText("Idle WETH");
+  await expect(capacity.getByText(/Select a rate breakpoint/)).toBeVisible();
   await expect(capacity).not.toContainText("USDC");
   await expect(page.getByRole("columnheader", { name: "Expected lender APR" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Risk assessment/ })).toHaveCount(0);
-  await page.setViewportSize({ width: 720, height: 900 });
+  await page.setViewportSize({ width: 560, height: 900 });
   const chart = capacity.getByRole("group", { name: /Estimated borrowing capacity/ });
+  const rateTicks = chart.locator("svg > text:not(.flex-chart-axis-inset)");
+  await expect(rateTicks.last()).toHaveText("2.1%");
+  await page.evaluate(() => document.fonts.ready);
+  await expect.poll(() => rateTicks.evaluateAll(labels =>
+    labels.length > 1 && labels.slice(1).every((label, index) =>
+      labels[index].getBoundingClientRect().right <= label.getBoundingClientRect().left,
+    ),
+  )).toBe(true);
   await chart.focus();
   await chart.press("Home");
   const tooltip = chart.locator(".flex-chart-tooltip");
   await expect(tooltip).toContainText("Idle WETH");
+  await expect(tooltip).toContainText("Rate breakpoint");
   const bounds = (await chart.boundingBox())!;
   const popup = (await tooltip.boundingBox())!;
   expect(popup.x).toBeGreaterThanOrEqual(bounds.x - 1);
   expect(popup.x + popup.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
   await expect(capacity.locator(".sr-only")).toContainText("idle WETH");
+  await expect(page.getByRole("region", { name: "Rates", exact: true }).locator(".flex-chart-axis-inset")).toHaveText(["0%"]);
 });

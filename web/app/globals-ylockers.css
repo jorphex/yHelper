@@ -1,18 +1,18 @@
 /* Reports is a ledger: data leads, links reveal themselves on intent. */
-.reports-table .report-link,
-.reports-table .report-link:visited {
+:is(.reports-table, .flex-activity-table) .report-link,
+:is(.reports-table, .flex-activity-table) .report-link:visited {
   text-decoration: none !important;
   transition: color var(--duration-fast) var(--ease-out) !important;
 }
-.reports-table .report-link-utility,
-.reports-table .report-link-utility:visited {
+:is(.reports-table, .flex-activity-table) .report-link-utility,
+:is(.reports-table, .flex-activity-table) .report-link-utility:visited {
   color: var(--text-tertiary) !important;
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.reports-table .report-link-utility:hover,
-.reports-table .report-link-utility:focus-visible { color: var(--text-primary) !important; }
+:is(.reports-table, .flex-activity-table) .report-link-utility:hover,
+:is(.reports-table, .flex-activity-table) .report-link-utility:focus-visible { color: var(--text-primary) !important; }
 .reports-table .report-link-vault,
 .reports-table .report-link-vault:visited {
   color: var(--text-primary) !important;

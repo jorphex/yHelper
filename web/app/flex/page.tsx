@@ -21,21 +21,26 @@ import {
   type FlexHistoryPoint,
   type FlexMarket,
   type FlexMarketDetailResponse,
-  type FlexMarketPeg,
   type FlexRedemptionPriorityResponse,
 } from "../hooks/use-flex-data";
 import { flexA11y, flexCopy } from "./copy";
 import { BorrowScenario } from "./borrow-scenario";
 import { FlexPerformance } from "./performance";
 
+const SECTION_LINKS = [
+  ["flex-markets-title", "Markets"],
+  ["flex-performance-title", "Wallet P&L"],
+  ["flex-activity-title", "Activity"],
+] as const;
+
 const MARKET_COLUMNS = [
   { key: "deposits_usd", label: "Deposits", format: formatUsd },
   { key: "debt_usd", label: "Debt", format: formatUsd },
-  { key: "idle_liquidity_usd", label: "Idle liquidity", format: formatUsd },
+  { key: "idle_liquidity_usd", label: "Idle liquidity", card: "Idle liquidity", format: formatUsd },
   { key: "utilization", label: "Utilization", format: formatPct },
-  { key: "lender_apr", label: "Expected lender APR", format: formatPct },
+  { key: "lender_apr", label: "Expected lender APR", card: "Lend APR", format: formatPct },
   { key: "collateral_apr", label: "7d collateral APR", format: formatPct },
-  { key: "average_borrow_rate", label: "Debt-weighted rate", format: formatPct },
+  { key: "average_borrow_rate", label: "Borrow rate", card: "Borrow rate", format: formatPct },
 ] as const;
 type SortKey = typeof MARKET_COLUMNS[number]["key"];
 
@@ -56,6 +61,7 @@ const dateTime = new Intl.DateTimeFormat("en-US", {
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
 const tokenAmount = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 7 });
 const percentagePoints = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+const axisPercent = new Intl.NumberFormat("en-US", { style: "percent", maximumSignificantDigits: 3 });
 
 function MarketTable({ rows, marketHref }: { rows: FlexMarket[]; marketHref: (address: string) => string }) {
   const [sort, setSort] = useState<{ key: SortKey; direction: "ascending" | "descending" }>({
@@ -73,6 +79,7 @@ function MarketTable({ rows, marketHref }: { rows: FlexMarket[]; marketHref: (ad
     key,
     direction: current.key === key && current.direction === "descending" ? "ascending" : "descending",
   }));
+  const cardSort = MARKET_COLUMNS.find(column => column.key === sort.key && !("card" in column));
   const header = ({ key, label }: typeof MARKET_COLUMNS[number]) => (
     <th key={key} className="numeric" aria-sort={sort.key === key ? sort.direction : "none"}>
       <button
@@ -92,9 +99,9 @@ function MarketTable({ rows, marketHref }: { rows: FlexMarket[]; marketHref: (ad
           const [key, direction] = event.target.value.split(":") as [SortKey, typeof sort.direction];
           setSort({ key, direction });
         }}>
-          {MARKET_COLUMNS.flatMap(({ key, label }) => [
-            <option key={`${key}:descending`} value={`${key}:descending`}>{label} · high to low</option>,
-            <option key={`${key}:ascending`} value={`${key}:ascending`}>{label} · low to high</option>,
+          {MARKET_COLUMNS.flatMap(column => [
+            <option key={`${column.key}:descending`} value={`${column.key}:descending`}>{"card" in column ? column.card : column.label} · high to low</option>,
+            <option key={`${column.key}:ascending`} value={`${column.key}:ascending`}>{"card" in column ? column.card : column.label} · low to high</option>,
           ])}
         </select>
       </label>
@@ -107,8 +114,10 @@ function MarketTable({ rows, marketHref }: { rows: FlexMarket[]; marketHref: (ad
           <td>
             <Link className="report-link" href={marketHref(market.addresses.market)}><strong>{market.label}</strong></Link>
             <small className="flex-market-meta">v{market.contract_version} · <time dateTime={market.deployment_time} title="Deployment date">{date.format(new Date(market.deployment_time))}</time></small>
+            {cardSort ? <small className="flex-card-sort-value">{cardSort.label} {cardSort.format(marketValue(market, cardSort.key))}</small> : null}
           </td>
-          {MARKET_COLUMNS.map(column => <td key={column.key} className="numeric data-value" data-column={column.key} data-label={column.label}>
+          {MARKET_COLUMNS.map(column => <td key={column.key} className="numeric data-value" data-column={column.key}
+            data-label={"card" in column ? column.card : column.label} data-card={"card" in column || undefined}>
             <span>{column.format(marketValue(market, column.key))}
               {column.key === "idle_liquidity_usd" && market.metrics ? <small className="flex-market-unit">{tokenAmount.format(market.metrics.idle_liquidity)} {market.borrow_token.symbol}</small> : null}
             </span>
@@ -119,16 +128,26 @@ function MarketTable({ rows, marketHref }: { rows: FlexMarket[]; marketHref: (ad
   );
 }
 
-function MarketPricing({ detail, quote, quoteFailed }: {
+function MarketPricing({ detail, peg }: {
   detail: FlexMarketDetailResponse;
-  quote: FlexMarketPeg | null | undefined;
-  quoteFailed: boolean;
+  peg: ReturnType<typeof useFlexMarketData>["peg"];
 }) {
   const { market, oracle, risk } = detail;
   const apr = market.collateral_yield;
+  const quote = peg.data;
+  const quoteReadout = useRef<HTMLElement>(null);
+  const quoteBusy = peg.fetchStatus !== "idle";
+  const showQuoteRetry = peg.isError || (peg.isPending && peg.errorUpdateCount > 0);
   const oracleTime = market.latest_block_time;
   const formatTime = (value: string) => `${dateTime.format(new Date(value))} UTC`;
   const formatPrice = (value: number | null) => value === null ? flexCopy.values.unavailable : tokenAmount.format(value);
+
+  async function retryQuote(event: React.MouseEvent<HTMLButtonElement>) {
+    if (quoteBusy) return;
+    const button = event.currentTarget;
+    const result = await peg.refetch({ cancelRefetch: false });
+    if (result.isSuccess && document.activeElement === button) quoteReadout.current?.focus({ preventScroll: true });
+  }
 
   return <section className="flex-market-pricing" aria-labelledby="flex-pricing-title">
     <h3 id="flex-pricing-title">Collateral and pricing</h3>
@@ -148,19 +167,24 @@ function MarketPricing({ detail, quote, quoteFailed }: {
           <span>{market.borrow_token.symbol} per {market.collateral_token.symbol}</span>
         </dd>
         <dd className="flex-pricing-source">
-          <Link className="report-link" href={`https://etherscan.io/address/${oracle.address}`} target="_blank" rel="noreferrer">Oracle contract</Link>
+          <Link className="evidence-link-primary" href={`https://etherscan.io/address/${oracle.address}`} target="_blank" rel="noreferrer">Oracle contract</Link>
           {oracleTime ? <> · <time dateTime={oracleTime}>{formatTime(oracleTime)}</time></> : null}
         </dd>
       </div>
       {market.has_market_peg ? <div>
         <dt>Curve sell quote</dt>
-        <dd className="flex-pricing-value">{quote ? formatPrice(quote.usdc_per_token) : flexCopy.values.unavailable}
-          {quote ? <span>USDC per {quote.asset_symbol}</span> : null}
+        <dd ref={quoteReadout} tabIndex={-1} className={quote ? "flex-pricing-value" : "flex-pricing-status"} aria-live="polite">
+          {quote ? <>{formatPrice(quote.usdc_per_token)}<span>USDC per {quote.asset_symbol}</span></>
+            : quoteBusy ? "Loading quote…" : peg.isError ? "Quote temporarily unavailable." : "No indexed quote yet."}
         </dd>
-        <dd className="flex-pricing-source">{quote ? <>
-          <Link className="report-link" href={`https://www.curve.finance/dex/ethereum/pools/${quote.pool_address}/swap`} target="_blank" rel="noreferrer">Curve pool</Link>
+        {quote ? <dd className="flex-pricing-source">
+          <Link className="evidence-link-primary" href={`https://www.curve.finance/dex/ethereum/pools/${quote.pool_address}/swap`} target="_blank" rel="noreferrer">Curve pool</Link>
           {` · Block ${quote.block_number.toLocaleString("en-US")} · `}<time dateTime={quote.block_time}>{formatTime(quote.block_time)}</time>
-        </> : quoteFailed ? "Quote temporarily unavailable." : null}</dd>
+        </dd> : null}
+        {showQuoteRetry ? <dd className="flex-pricing-source">
+          {quote ? <div role="status">{quoteBusy ? "Refreshing quote…" : "Refresh failed. Showing the last quote."}</div> : null}
+          <button type="button" className="button-reset flex-quote-retry" aria-disabled={quoteBusy} onClick={retryQuote}>Retry quote</button>
+        </dd> : null}
       </div> : null}
     </dl>
     {apr && risk.minimum_annual_interest_rate !== null && risk.maximum_annual_interest_rate !== null && risk.maximum_ltv ?
@@ -209,33 +233,29 @@ function HistoryChart({
   const bottom = width < 480 ? 32 : 40;
   const values = points.flatMap((point) => series.map((item) => Number(point[item.key]) || 0));
   const minValue = priceSymbol ? Math.min(...values) : 0;
-  const maxValue = priceSymbol ? Math.max(...values) : Math.max(series.length === 1 ? 1 : 0.0001, ...values);
+  const maxValue = priceSymbol ? Math.max(...values) : Math.max(series.length === 1 ? 1 : 0, ...values);
   const formatValue = (value: number) => priceSymbol ? `${tokenAmount.format(value)} ${priceSymbol}` : formatPct(value);
+  const seriesValue = (point: FlexHistoryPoint, item: ChartSeries) => formatValue(Number(point[item.key]) || 0);
+  const pointSummary = (point: FlexHistoryPoint) => series.map(item => `${item.label} ${seriesValue(point, item)}`).join(". ");
   const x = (index: number) => left + (index / Math.max(1, points.length - 1)) * (width - left - right);
   const y = (value: number) => top + (maxValue === minValue ? 0.5 : (maxValue - value) / (maxValue - minValue)) * (height - top - bottom);
+  const yTicks = maxValue === minValue ? [minValue] : [maxValue, (minValue + maxValue) / 2, minValue];
   const path = (item: ChartSeries) => points.map((point, index) => {
     const command = index === 0 ? "M" : "L";
     return `${command}${x(index).toFixed(2)},${y(Number(point[item.key]) || 0).toFixed(2)}`;
   }).join(" ");
   const first = points[0];
   const latest = points.at(-1);
-  const summary = latest
-    ? series.map((item) => `${item.label} ${formatValue(Number(latest[item.key]) || 0)}`).join(". ")
-    : description;
+  const summary = latest ? pointSummary(latest) : description;
   const inspected = inspectionIndex === null ? null : points[inspectionIndex];
   const inspectedX = inspectionIndex === null ? null : x(inspectionIndex);
   const inspectionAt = priceSymbol ? inspected?.block_time : inspected?.sampled_at;
   const inspectionTime = inspectionAt ? `${dateTime.format(new Date(inspectionAt))} UTC` : "";
-  const inspectionSummary = inspected ? priceSymbol ? `${inspectionTime}. ${formatValue(inspected.collateral_price_in_borrow_token)}` : flexA11y(flexCopy.history.inspection.summary, {
-    timestamp: inspectionTime,
-    utilization: formatPct(inspected.utilization),
-    lenderApr: formatPct(inspected.lender_apr),
-    borrowerRate: formatPct(inspected.average_borrow_rate),
-  }) : "";
+  const inspectionSummary = inspected ? `${inspectionTime}. ${pointSummary(inspected)}` : "";
   useEffect(() => {
     const element = chartRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(320, Math.round(entry.contentRect.width))));
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(1, Math.round(entry.contentRect.width))));
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -255,8 +275,8 @@ function HistoryChart({
   return (
     <section className="flex-chart-panel" aria-labelledby={`${chartId}-title`}>
       <div className="flex-chart-heading">
-        <div><h4 id={`${String(series[0].key)}-title`}>{title}</h4><p>{description}</p></div>
-        {latest ? <div className="flex-chart-latest" aria-label={summary}>{series.map((item) => <span key={String(item.key)}><i style={{ borderTopColor: item.color, borderTopStyle: item.dashed ? "dashed" : "solid" }} />{item.label} <strong>{formatValue(Number(latest[item.key]) || 0)}</strong></span>)}</div> : null}
+        <div><h4 id={`${chartId}-title`}>{title}</h4><p>{description}</p></div>
+        {latest ? <div className="flex-chart-latest">{series.map((item) => <span key={String(item.key)}><i style={{ borderTopColor: item.color, borderTopStyle: item.dashed ? "dashed" : "solid" }} />{item.label} <strong>{seriesValue(latest, item)}</strong></span>)}</div> : null}
       </div>
       <div
         ref={chartRef}
@@ -272,26 +292,20 @@ function HistoryChart({
         onPointerLeave={(event) => { if (event.pointerType === "mouse") onInspectEnd(chartId); }}
       >
         <svg className="flex-line-chart" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
-          {[0, 0.5, 1].map((ratio) => <g key={ratio}>
-            <line x1={left} x2={width - right} y1={top + ratio * (height - top - bottom)} y2={top + ratio * (height - top - bottom)} className="flex-chart-grid" />
-            <text x="4" y={top + ratio * (height - top - bottom) - 4} textAnchor="start" className="flex-chart-axis flex-chart-axis-inset">{priceSymbol ? formatValue(maxValue - (maxValue - minValue) * ratio) : formatPct(maxValue * (1 - ratio), 0)}</text>
-          </g>)}
+          {yTicks.map(value => <line key={value} x1={left} x2={width - right} y1={y(value)} y2={y(value)} className="flex-chart-grid" />)}
           {series.map((item) => <path key={String(item.key)} d={path(item)} fill="none" stroke={item.color} strokeDasharray={item.dashed ? "5 4" : undefined} className="flex-chart-line" />)}
           {series.map((item) => latest ? <circle key={String(item.key)} cx={x(points.length - 1)} cy={y(Number(latest[item.key]) || 0)} r="4" fill={item.color} /> : null)}
           {inspected && inspectedX !== null ? <g className="flex-chart-inspection">
             <line x1={inspectedX} x2={inspectedX} y1={top} y2={height - bottom} />
             {series.map((item) => <circle key={String(item.key)} cx={inspectedX} cy={y(Number(inspected[item.key]) || 0)} r="5" fill={item.color} />)}
           </g> : null}
+          {yTicks.map(value => <text key={value} x="4" y={y(value) - 4} className="flex-chart-axis flex-chart-axis-inset">{priceSymbol ? formatValue(value) : axisPercent.format(value)}</text>)}
           {first ? <text x={left} y={height - 12} className="flex-chart-axis">{date.format(new Date(first.sampled_at))}</text> : null}
           {latest ? <text x={width - right} y={height - 12} textAnchor="end" className="flex-chart-axis">{date.format(new Date(latest.sampled_at))}</text> : null}
         </svg>
         {inspected && activeInspector === chartId && inspectedX !== null ? <div className="flex-chart-tooltip" style={{ left: tooltipLeft(inspectedX, width) }}>
           <time dateTime={inspectionAt}>{inspectionTime}</time>
-          {priceSymbol ? <span>Price<strong>{formatValue(inspected.collateral_price_in_borrow_token)}</strong></span> : <>
-            <span>{flexCopy.history.utilization.title}<strong>{formatPct(inspected.utilization)}</strong></span>
-            <span>{flexCopy.history.rates.lenderApr}<strong>{formatPct(inspected.lender_apr)}</strong></span>
-            <span>{flexCopy.history.rates.borrowerRate}<strong>{formatPct(inspected.average_borrow_rate)}</strong></span>
-          </>}
+          {series.map(item => <span key={item.key}>{priceSymbol ? "Price" : item.label}<strong>{seriesValue(inspected, item)}</strong></span>)}
         </div> : null}
         <span className="sr-only" aria-live="polite">{activeInspector === chartId ? inspectionSummary : ""}</span>
       </div>
@@ -312,14 +326,14 @@ function HistoryCharts({ points, market }: { points: FlexHistoryPoint[]; market:
       title={flexCopy.history.utilization.title}
       description={flexCopy.history.utilization.description}
       points={points}
-      series={[{ key: "utilization", label: flexCopy.history.utilization.title, color: "#3b82f6" }]}
+      series={[{ key: "utilization", label: flexCopy.history.utilization.title, color: "var(--viz-line-1)" }]}
       {...inspector}
     />
     <HistoryChart
       title={flexCopy.history.rates.title}
       description={flexCopy.history.rates.description}
       points={points}
-      series={[{ key: "lender_apr", label: flexCopy.history.rates.lenderApr, color: "#3b82f6" }, { key: "average_borrow_rate", label: flexCopy.history.rates.borrowerRate, color: "#2dd4bf", dashed: true }]}
+      series={[{ key: "lender_apr", label: flexCopy.history.rates.lenderApr, color: "var(--viz-line-1)" }, { key: "average_borrow_rate", label: flexCopy.history.rates.borrowerRate, color: "var(--viz-line-2)", dashed: true }]}
       {...inspector}
     />
     {points.every(point => typeof point.collateral_price_in_borrow_token === "number") ? <HistoryChart
@@ -327,7 +341,7 @@ function HistoryCharts({ points, market }: { points: FlexHistoryPoint[]; market:
       description={`Flex valuation per ${market.collateral_token.symbol}.`}
       points={points}
       priceSymbol={market.borrow_token.symbol}
-      series={[{ key: "collateral_price_in_borrow_token", label: "Oracle", color: "#3b82f6" }]}
+      series={[{ key: "collateral_price_in_borrow_token", label: "Oracle", color: "var(--viz-line-1)" }]}
       {...inspector}
     /> : null}
   </div>;
@@ -366,16 +380,12 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
   const inspectedCapacity = inspected ? borrowingCapacity(inspected.redeemable_before) : 0;
   const inspectedShare = inspected && totalDebt > 0 ? inspected.redeemable_before / totalDebt : 0;
   const idlePatternId = `flex-idle-${data.market_address.slice(2, 10)}`;
-  const tickStep = 10 ** Math.floor(Math.log10(xMax));
-  const xTicks = width < 480
-    ? [0, xMax / 2, xMax]
-    : [...Array.from({ length: 5 }, (_, index) => index * tickStep).filter((tick) => tick < xMax), xMax];
-  const yTicks = width < 480 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+  const ticks = width < 480 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
 
   useEffect(() => {
     const element = chartRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(320, Math.round(entry.contentRect.width))));
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(1, Math.round(entry.contentRect.width))));
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -417,12 +427,14 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
     <span><i className="flex-redemption-idle-swatch" aria-hidden="true" />{flexA11y(flexCopy.redemptionPriority.legend.idle, { symbol: data.borrow_token.symbol })}<strong>{compact.format(idleLiquidity)} {data.borrow_token.symbol}</strong></span>
     <span><i className="flex-redemption-redeemable-swatch" aria-hidden="true" />{flexCopy.redemptionPriority.legend.redeemable}</span>
   </div>
+  <p className="flex-chart-hint" id="flex-capacity-hint">{flexCopy.redemptionPriority.chart.interaction}</p>
   <div
     ref={chartRef}
     className="flex-chart-interactive flex-redemption-chart"
     tabIndex={0}
     role="group"
-    aria-label={`${flexCopy.redemptionPriority.chart.ariaLabel}. ${flexCopy.redemptionPriority.axes.annualRate}. ${flexA11y(flexCopy.redemptionPriority.axes.capacity, { symbol: data.borrow_token.symbol })}. ${flexCopy.redemptionPriority.chart.interaction}`}
+    aria-label={`${flexCopy.redemptionPriority.chart.ariaLabel}. ${flexCopy.redemptionPriority.axes.annualRate}. ${flexA11y(flexCopy.redemptionPriority.axes.capacity, { symbol: data.borrow_token.symbol })}.`}
+    aria-describedby="flex-capacity-hint"
     onFocus={() => setInspectionIndex((current) => current ?? points.length - 1)}
     onBlur={() => setInspectionIndex(null)}
     onKeyDown={moveInspection}
@@ -436,10 +448,7 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
           <path d="M0 6L6 0" className="flex-redemption-idle-pattern" />
         </pattern>
       </defs>
-      {yTicks.map((ratio) => <g key={ratio}>
-        <line x1={left} x2={width - right} y1={y(yMax * ratio)} y2={y(yMax * ratio)} className="flex-chart-grid" />
-        <text x="4" y={y(yMax * ratio) - 4} textAnchor="start" className="flex-chart-axis flex-chart-axis-inset">{compact.format(yMax * ratio)}</text>
-      </g>)}
+      {ticks.map(ratio => <line key={ratio} x1={left} x2={width - right} y1={y(yMax * ratio)} y2={y(yMax * ratio)} className="flex-chart-grid" />)}
       <rect x={left} y={y(idleLiquidity)} width={plotWidth} height={Math.max(0, y(0) - y(idleLiquidity))} fill={`url(#${idlePatternId})`} className="flex-redemption-idle-area" />
       <line x1={left} x2={width - right} y1={y(idleLiquidity)} y2={y(idleLiquidity)} className="flex-redemption-idle-line" />
       <path d={areaPath} className="flex-redemption-area" />
@@ -449,7 +458,8 @@ function RedemptionPriorityChart({ data }: { data: FlexRedemptionPriorityRespons
         <line x1={x(inspected.annual_interest_rate)} x2={x(inspected.annual_interest_rate)} y1={top} y2={height - bottom} />
         <circle cx={x(inspected.annual_interest_rate)} cy={y(inspectedCapacity)} r={width < 480 ? "4" : "5"} className="flex-redemption-active-point" />
       </g> : null}
-      {xTicks.map((tick, index) => <text key={`${tick}:${index}`} x={x(tick)} y={height - 10} textAnchor={index === 0 ? "start" : index === xTicks.length - 1 ? "end" : "middle"} className="flex-chart-axis">{formatPct(tick, tick === 0 ? 0 : width < 480 || tick === xMax ? 1 : 0)}</text>)}
+      {ticks.map(ratio => <text key={ratio} x="4" y={y(yMax * ratio) - 4} className="flex-chart-axis flex-chart-axis-inset">{compact.format(yMax * ratio)}</text>)}
+      {ticks.map(ratio => <text key={ratio} x={x(xMax * ratio)} y={height - 10} textAnchor={ratio === 0 ? "start" : ratio === 1 ? "end" : "middle"} className="flex-chart-axis">{axisPercent.format(xMax * ratio)}</text>)}
     </svg>
     {inspected && width >= 480 ? <dl className="flex-chart-tooltip flex-redemption-detail-list" style={{ left: tooltipLeft(x(inspected.annual_interest_rate), width) }}>
       {inspectionDetails.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
@@ -563,6 +573,7 @@ function FlexPageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data, isLoading, error, refetch } = useFlexMarkets();
+  const showPage = !error || Boolean(data);
   const active = useMemo(() => data?.rows.filter((row) => row.status === "active") ?? [], [data]);
   const requestedMarket = searchParams.get("market")?.toLowerCase() ?? null;
   const selected = requestedMarket
@@ -570,7 +581,6 @@ function FlexPageContent() {
     : [...active].sort((a, b) => (b.metrics?.deposits_usd ?? 0) - (a.metrics?.deposits_usd ?? 0))[0] ?? null;
   const selectableMarkets = selected && selected.status !== "active" ? [...active, selected] : active;
   useFlexMarketPreload(selectableMarkets);
-  const marketTabsRef = useRef<HTMLDivElement>(null);
   const period = (key: string) => FLEX_PERIODS.find(days => days === Number(searchParams.get(key))) ?? 30;
   const days = period("days");
   const performanceDays = period("pnl_days");
@@ -587,10 +597,10 @@ function FlexPageContent() {
     next.set("market", address);
     return `${pathname}?${next}#flex-detail-title`;
   }
-  const updateQuery = useCallback(
-    (updates: Record<string, string | number | null>) => replaceQuery(pathname, searchParams, updates),
-    [pathname, searchParams],
-  );
+  const updateQuery = useCallback((updates: Record<string, string | number | null>) => {
+    const hash = window.location.hash;
+    replaceQuery(pathname, searchParams, updates, undefined, hash === "#flex-detail-title" ? "" : hash);
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     if (!selected || requestedMarket) return;
@@ -605,49 +615,92 @@ function FlexPageContent() {
   }, [selectedAddress]);
 
   useEffect(() => {
-    const strip = marketTabsRef.current;
-    if (!strip) return;
-    const revealSelected = () => {
-      const button = strip.querySelector<HTMLElement>('[aria-pressed="true"]');
-      if (!button) return;
-      const viewport = strip.getBoundingClientRect();
-      const bounds = button.getBoundingClientRect();
-      if (bounds.left < viewport.left) strip.scrollLeft += bounds.left - viewport.left;
-      else if (bounds.right > viewport.right) strip.scrollLeft += bounds.right - viewport.right;
-    };
-    revealSelected();
-    const observer = new ResizeObserver(revealSelected);
-    observer.observe(strip);
-    return () => observer.disconnect();
-  }, [selected?.addresses.market]);
+    if (!showPage) return;
+    const navigation = document.querySelector<HTMLElement>(".flex-section-links");
+    const page = navigation?.closest(".flex-page");
+    if (!navigation || !page) return;
 
-  if (error && !data) return <DataLoadError onRetry={() => refetch()} />;
+    const events = new AbortController();
+    const options = { passive: true, signal: events.signal };
+    let tracked: { hash: string; observer: ResizeObserver } | undefined;
+    const stop = () => {
+      tracked?.observer.disconnect();
+      tracked = undefined;
+    };
+    const follow = (hash: string) => {
+      stop();
+      const id = hash.slice(1);
+      if (!SECTION_LINKS.some(([section]) => section === id)) return;
+      const title = document.getElementById(id);
+      if (!title) return;
+
+      const align = () => {
+        if (window.location.hash === hash) title.scrollIntoView();
+      };
+      const observer = new ResizeObserver(align);
+      tracked = { hash, observer };
+      title.focus({ preventScroll: true });
+      align();
+      observer.observe(page);
+    };
+    for (const event of ["pointerdown", "keydown", "wheel"]) {
+      window.addEventListener(event, stop, options);
+    }
+    window.addEventListener("hashchange", () => {
+      if (window.location.hash !== tracked?.hash) stop();
+    }, options);
+    navigation.addEventListener("click", event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (event.target instanceof HTMLAnchorElement) follow(event.target.hash);
+    }, options);
+    follow(window.location.hash);
+    return () => {
+      stop();
+      events.abort();
+    };
+  }, [showPage]);
+
+  if (!showPage) return <DataLoadError onRetry={() => refetch()} />;
 
   return (
     <div className="flex-page">
       <section className="page-header page-header-no-border">
-        <h1 className="page-title">{flexCopy.hero.title}<br /><em className="page-title-accent">{flexCopy.hero.accent}</em></h1>
+        <h1 className="page-title">{flexCopy.hero.title}</h1>
         <p className="page-description">{flexCopy.hero.blurb}</p>
-        <div className="tab-bar-plain">
-          <a href="https://flexmeow.com" target="_blank" rel="noopener noreferrer" className="button button-primary">{flexCopy.hero.officialLink}</a>
+        <div className="flex-page-actions">
+          <nav className="flex-section-links" aria-label="Flex sections">
+            {SECTION_LINKS.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
+          </nav>
+          <a href="https://flexmeow.com" target="_blank" rel="noopener noreferrer">{flexCopy.hero.officialLink} <span aria-hidden="true">↗</span></a>
         </div>
       </section>
 
       <section className="section section-lg flex-markets-section" aria-labelledby="flex-markets-title">
         <div className="flex-section-heading">
-          <div><h2 className="card-title" id="flex-markets-title">{flexCopy.markets.title}</h2><p className="card-description">{flexCopy.markets.description}</p></div>
+          <div><h2 className="card-title" id="flex-markets-title" tabIndex={-1}>{flexCopy.markets.title}</h2><p className="card-description">{flexCopy.markets.description}</p></div>
           {data?.freshness.indexed_through ? <p className="flex-market-freshness">{data.freshness.data_state === "ready" ? "Updated" : "Updates delayed. Last indexed"} <time dateTime={data.freshness.indexed_through}>{dateTime.format(new Date(data.freshness.indexed_through))} UTC</time></p> : null}
         </div>
         {isLoading && !data ? <TableWrap><table className="decision-table" aria-labelledby="flex-markets-title"><tbody><TableSkeleton rows={2} columns={MARKET_COLUMNS.length + 1} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} marketHref={marketHref} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
-        <p className="section-note flex-market-note">Expected lender APR assumes all debt pays interest. Debt-weighted rate reflects existing loans.</p>
+        <p className="section-note flex-market-note">Expected lender APR assumes all debt pays interest. Borrow rate is weighted by outstanding debt.</p>
       </section>
 
-      {selected ? <section className="section section-lg flex-detail-section" aria-labelledby="flex-detail-title">
-        <h2 className="card-title" id="flex-detail-title" tabIndex={-1}>{flexCopy.detail.title}</h2>
-        <div ref={marketTabsRef} className="flex-market-tabs flex-market-selector" role="group" aria-label={flexCopy.detail.selectLabel}>
-          {selectableMarkets.map((market) => <button key={market.addresses.market} type="button" aria-pressed={market.addresses.market === selected.addresses.market} className={`flex-market-tab ${market.addresses.market === selected.addresses.market ? "is-active" : ""}`} onClick={() => updateQuery({ market: market.addresses.market })}>{market.label}{market.status !== "active" ? " (historical)" : ""}</button>)}
+      {selected ? <section className="section section-lg flex-detail-section" aria-label={flexCopy.detail.title}>
+        <div className="flex-section-heading flex-detail-heading">
+          <div>
+            <h2 className="card-title" id="flex-detail-title" tabIndex={-1}>{selected.label}</h2>
+            <p className="card-description">v{selected.contract_version} · <time dateTime={selected.deployment_time} title="Deployment date">{date.format(new Date(selected.deployment_time))}</time></p>
+          </div>
+          {selectableMarkets.length > 1 ? <label className="flex-filter flex-market-picker">Market
+            <select aria-label={flexCopy.detail.selectLabel} value={selected.addresses.market} onChange={event => updateQuery({ market: event.target.value })}>
+              {selectableMarkets.map(market => <option key={market.addresses.market} value={market.addresses.market}>{market.label}{market.status !== "active" ? " (historical)" : ""}</option>)}
+            </select>
+          </label> : null}
         </div>
         {selected.status !== "active" ? <p className="section-note">Historical market · {flexCopy.status[selected.status]} · <Link className="report-link" href={`https://etherscan.io/address/${selected.addresses.market}`} target="_blank" rel="noreferrer">{selected.addresses.market.slice(0, 6)}…{selected.addresses.market.slice(-4)}</Link></p> : null}
+        <dl className="flex-stat-grid flex-market-card-details">
+          {MARKET_COLUMNS.filter(column => !("card" in column) && column.key !== "collateral_apr").map(column =>
+            <div key={column.key}><dt>{column.label}</dt><dd>{column.format(marketValue(selected, column.key))}</dd></div>)}
+        </dl>
         {risk ? <section className="flex-risk-section" aria-labelledby="flex-risk-title">
           <div className="flex-section-heading"><h3 id="flex-risk-title">{flexCopy.detail.risk.title}</h3><RiskAssessmentLink chainId={1} address={selected.addresses.lender} label={selected.label} /></div>
           <dl className="flex-stat-grid">
@@ -659,7 +712,7 @@ function FlexPageContent() {
           </dl>
           <p className="section-note">LTV = debt ÷ collateral value. Safe LTV is a protocol threshold.</p>
         </section> : null}
-        {detail.data ? <MarketPricing detail={detail.data} quote={peg.data} quoteFailed={peg.isError} /> : null}
+        {detail.data ? <MarketPricing detail={detail.data} peg={peg} /> : null}
         <TroveHealthSection query={troveHealth} />
         <RedemptionPrioritySection query={redemptionPriority} />
         <div className="flex-history-heading-row">
@@ -680,7 +733,7 @@ function FlexPageContent() {
 
       <section className="section section-lg flex-activity-section" aria-labelledby="flex-activity-title">
         <div className="flex-section-heading">
-          <h2 className="card-title" id="flex-activity-title">{flexCopy.activity.title}</h2>
+          <h2 className="card-title" id="flex-activity-title" tabIndex={-1}>{flexCopy.activity.title}</h2>
           <div className="flex-activity-filters">
             <label className="flex-filter">Market<select aria-label="Activity market" value={activityMarket} onChange={event => setActivityMarket(event.target.value)}>
               <option value="">All markets</option>
@@ -693,7 +746,7 @@ function FlexPageContent() {
           </div>
         </div>
         <TableWrap className="flex-activity-wrap"><table className="decision-table flex-activity-table" aria-labelledby="flex-activity-title">
-          <thead><tr><th>{flexCopy.activity.headers.time}</th><th>{flexCopy.activity.headers.event}</th>{!activityMarket ? <th>{flexCopy.activity.headers.market}</th> : null}<th className="numeric">{flexCopy.activity.headers.amount}</th></tr></thead>
+          <thead><tr><th>{flexCopy.activity.headers.event}</th>{!activityMarket ? <th>{flexCopy.activity.headers.market}</th> : null}<th className="flex-activity-time">{flexCopy.activity.headers.time}</th><th className="numeric">{flexCopy.activity.headers.amount}</th></tr></thead>
           <tbody>{activity.isLoading && !activity.data ? <TableSkeleton rows={8} columns={activityMarket ? 3 : 4} /> : activityRows.map((row) => {
             const event = EVENTS.get(row.event);
             const market = marketByAddress.get(row.market_address);
@@ -701,7 +754,6 @@ function FlexPageContent() {
               ? formatActivityAmount(row.amounts[event[1]], market?.[event[2]])
               : flexCopy.values.unavailable;
             return <tr key={`${row.tx_hash}:${row.log_index}`}>
-              <td className="flex-activity-time"><Link className="report-link report-link-utility" href={`https://etherscan.io/tx/${row.tx_hash}`} target="_blank" rel="noreferrer" aria-label={flexA11y(flexCopy.accessibility.transaction, { hash: row.tx_hash })}><time dateTime={row.block_time}>{dateTime.format(new Date(row.block_time))} UTC</time></Link></td>
               <td className="flex-activity-event">{event?.[0] ?? row.event.replaceAll("_", " ")}
                 {row.redemption ? <small className="flex-market-unit">
                   {row.redemption.troves === null ? "Trove count unavailable" : `${row.redemption.troves} ${row.redemption.troves === 1 ? "trove" : "troves"}`}
@@ -709,6 +761,7 @@ function FlexPageContent() {
                 </small> : null}
               </td>
               {!activityMarket ? <td className="flex-activity-market">{row.market_label}</td> : null}
+              <td className="flex-activity-time"><Link className="report-link report-link-utility" href={`https://etherscan.io/tx/${row.tx_hash}`} target="_blank" rel="noreferrer" aria-label={flexA11y(flexCopy.accessibility.transaction, { hash: row.tx_hash })}><time dateTime={row.block_time}>{dateTime.format(new Date(row.block_time))} UTC</time></Link></td>
               <td className="flex-activity-amount numeric data-value">{amount}</td>
             </tr>;
           })}</tbody>

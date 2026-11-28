@@ -11,9 +11,8 @@ export const flexCopy = {
   },
   hero: {
     title: "Flex Markets",
-    accent: "Ethereum lending",
-    blurb: "Lending rates and borrowing capacity.",
-    officialLink: "Open Flex",
+    blurb: "Ethereum lending rates and capacity.",
+    officialLink: "Flex app",
   },
   markets: {
     title: "Markets",
@@ -57,14 +56,13 @@ export const flexCopy = {
       borrowerRate: "Borrower rate",
     },
     inspection: {
-      summary: "{timestamp}. Utilization {utilization}. Expected lender APR {lenderApr}. Borrower rate {borrowerRate}.",
       keyboardHint: "Use left and right arrow keys to inspect points.",
     },
     unavailable: "History is not available for this period.",
   },
   redemptionPriority: {
     title: "Estimated borrowing capacity by rate",
-    description: "Estimated capacity = idle {symbol} + lower-rate debt that could be redeemed. Capacity may remain when idle {symbol} is zero. Redemptions can affect existing borrowers.",
+    description: "Estimated capacity = idle {symbol} + lower-rate debt that could be redeemed from existing borrowers.",
     freshness: {
       ready: "Current",
       delayed: "Delayed",
@@ -89,10 +87,10 @@ export const flexCopy = {
     },
     chart: {
       ariaLabel: "Estimated borrowing capacity by annual rate",
-      interaction: "Use touch, pointer, or arrow keys to inspect rates.",
+      interaction: "Select a rate breakpoint or use the arrow keys to inspect capacity.",
     },
     tooltip: {
-      annualRate: "Annual rate",
+      annualRate: "Rate breakpoint",
       idle: "Idle {symbol}",
       redeemed: "Lower-rate debt potentially redeemed",
       total: "Estimated borrowing capacity",

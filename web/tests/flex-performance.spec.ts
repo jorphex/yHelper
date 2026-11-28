@@ -35,7 +35,7 @@ test("Flex P&L covers overview, address lookup, side selection and mobile reflow
   await expect(panel.getByTestId("performance-total")).toContainText("$1,000");
   await panel.getByLabel("Performance market", { exact: true }).selectOption("");
   await expect(panel.getByText("Incomplete coverage", { exact: true })).toBeVisible();
-  await panel.getByLabel("Address", { exact: true }).fill(owner);
+  await panel.getByLabel("Wallet address", { exact: true }).fill(owner);
   await panel.getByRole("button", { name: "View P&L", exact: true }).click();
   await expect(panel.getByTestId("performance-total")).toContainText("$19");
   await expect(panel.getByRole("table")).toContainText("Fixture/USDC");
@@ -52,17 +52,17 @@ test("Flex P&L covers overview, address lookup, side selection and mobile reflow
   await expect(panel.getByText("No lender positions in this period.")).toBeVisible();
   await expect(panel.getByText(/auction funding differences excluded/)).toHaveCount(0);
   await panel.getByRole("button", { name: "Borrowing", exact: true }).click();
-  await panel.getByLabel("Address", { exact: true }).fill("bad");
+  await panel.getByLabel("Wallet address", { exact: true }).fill("bad");
   await panel.getByRole("button", { name: "View P&L", exact: true }).click();
   await expect(panel.getByRole("alert")).toContainText("valid Ethereum address");
   expect(requests.every(raw => !raw.includes("address=bad"))).toBe(true);
-  await panel.getByLabel("Address", { exact: true }).fill(exitedOwner);
+  await panel.getByLabel("Wallet address", { exact: true }).fill(exitedOwner);
   await panel.getByRole("button", { name: "View P&L", exact: true }).click();
   await expect(panel.getByText("Realized on exited positions", { exact: true }).locator("..")).toContainText("+$10.00");
   await panel.getByText("Trove 3 · closed", { exact: true }).click();
   await expect(panel.getByText("Exited", { exact: true })).toBeVisible();
   await expect(panel.getByRole("link", { name: "close trove", exact: true })).toBeVisible();
-  await panel.getByLabel("Address", { exact: true }).fill("0x0000000000000000000000000000000000000069");
+  await panel.getByLabel("Wallet address", { exact: true }).fill("0x0000000000000000000000000000000000000069");
   await panel.getByRole("button", { name: "View P&L", exact: true }).click();
   await panel.getByRole("button", { name: "Lending", exact: true }).click();
   await expect(panel.getByTestId("performance-total")).toContainText("$20");
@@ -86,9 +86,11 @@ test("Flex sections own their market and period controls independently", async (
   const markets = page.getByRole("region", { name: "Markets", exact: true });
   const performance = page.getByRole("region", { name: "Performance", exact: true });
   const detail = page.getByRole("region", { name: "Market detail", exact: true });
+  const marketPicker = detail.getByRole("combobox", { name: "Choose a market", exact: true });
   const performancePeriod = performance.getByRole("group", { name: "Performance period", exact: true });
   const historyPeriod = detail.getByRole("group", { name: "History range", exact: true });
-  await expect(page.locator(".flex-page h2")).toHaveText(["Markets", "Market detail", "Performance", "Protocol activity"]);
+  await marketPicker.waitFor();
+  await expect(page.locator(".flex-page h2")).toHaveText(["Markets", await marketPicker.locator("option:checked").innerText(), "Performance", "Protocol activity"]);
   await expect(markets).toContainText("Expected lender APR assumes all debt pays interest.");
   await expect(detail.getByRole("heading", { name: "Market history", level: 3, exact: true })).toBeVisible();
   await expect(detail.getByRole("heading", { name: "Utilization", level: 4, exact: true })).toBeVisible();
@@ -111,8 +113,7 @@ test("Flex sections own their market and period controls independently", async (
   expect(detailLink.searchParams.get("days")).toBe("30");
   expect(detailLink.searchParams.get("pnl_days")).toBe("90");
   expect(detailLink.hash).toBe("#flex-detail-title");
-  const marketTabs = detail.getByRole("group", { name: "Choose a market", exact: true });
-  await marketTabs.getByRole("button").last().click();
+  await marketPicker.selectOption({ index: (await marketPicker.locator("option").count()) - 1 });
   await expect.poll(() => new URL(page.url()).searchParams.get("market")).not.toBe(selectedMarket);
   await expect(performance.getByTestId("performance-total")).toContainText("$1,000");
   expect(performanceRequests).toHaveLength(requestCount);
@@ -124,14 +125,10 @@ test("Flex sections own their market and period controls independently", async (
   await page.setViewportSize({ width: 390, height: 844 });
   await detail.evaluate(element => window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - 220));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  const heading = await detail.getByRole("heading", { name: "Market detail", level: 2, exact: true }).boundingBox();
-  const tabs = await marketTabs.boundingBox();
-  expect(heading!.y + heading!.height).toBeLessThan(tabs!.y);
-  await expect.poll(async () => {
-    const active = await marketTabs.locator('[aria-pressed="true"]').boundingBox();
-    const strip = await marketTabs.boundingBox();
-    return !!active && !!strip && active.x >= strip.x - 1 && active.x + active.width <= strip.x + strip.width + 1;
-  }).toBe(true);
+  const heading = await detail.getByRole("heading", { level: 2 }).boundingBox();
+  const picker = (await marketPicker.boundingBox())!;
+  expect(heading!.y + heading!.height).toBeLessThan(picker.y);
+  expect(picker.x + picker.width).toBeLessThanOrEqual(390);
   await page.screenshot({ path: testInfo.outputPath("section-ownership-mobile.png") });
   await testInfo.attach("section-ownership-mobile", { path: testInfo.outputPath("section-ownership-mobile.png"), contentType: "image/png" });
 });
@@ -197,15 +194,16 @@ test("Flex historical links and unknown market URLs preserve contract identity",
   const panel = page.getByRole("region", { name: "Performance", exact: true });
   await panel.getByRole("link", { name: historical.label, exact: true }).click();
   const detail = page.getByRole("region", { name: "Market detail", exact: true });
-  await expect(detail.locator('.flex-market-selector [aria-pressed="true"]')).toHaveText(`${historical.label} (historical)`);
+  const chosen = detail.getByRole("combobox", { name: "Choose a market" }).locator("option:checked");
+  await expect(chosen).toHaveText(`${historical.label} (historical)`);
   await expect(detail).toContainText("Historical market");
   await expect.poll(() => new URL(page.url()).searchParams.get("market")).toBe(address);
   await page.reload();
-  await expect(detail.locator('.flex-market-selector [aria-pressed="true"]')).toHaveText(`${historical.label} (historical)`);
+  await expect(chosen).toHaveText(`${historical.label} (historical)`);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(async () => {
-    const chosen = await detail.locator('.flex-market-selector [aria-pressed="true"]').boundingBox();
-    return !!chosen && chosen.x >= 0 && chosen.x + chosen.width <= 390;
+    const picker = await detail.getByRole("combobox", { name: "Choose a market" }).boundingBox();
+    return !!picker && picker.x >= 0 && picker.x + picker.width <= 390;
   }).toBe(true);
   await detail.screenshot({ path: testInfo.outputPath("historical-market-mobile.png") });
   const unknown = "0x" + "f".repeat(40);
@@ -249,9 +247,10 @@ test("Flex preloads market and period data and switches without route waits or l
   });
   await page.goto("/flex");
   const detail = page.getByRole("region", { name: "Market detail", exact: true });
-  const tabs = detail.getByRole("group", { name: "Choose a market", exact: true });
-  await expect(tabs.getByRole("button").first()).toBeVisible();
-  const count = await tabs.getByRole("button").count();
+  const picker = detail.getByRole("combobox", { name: "Choose a market", exact: true });
+  await expect(picker).toBeVisible();
+  const options = await picker.locator("option").evaluateAll(els => els.map(el => (el as HTMLOptionElement).value));
+  const count = options.length;
   await expect.poll(() => [...completed].filter(key => key.includes("/history?")).length).toBe(count * 3);
   await expect.poll(() => [...completed].filter(key => key.includes("/performance?")).length).toBe(3);
   await expect.poll(() => [...completed].filter(key => /\/markets\/0x[^/?]+$/.test(key)).length).toBe(count);
@@ -280,9 +279,9 @@ test("Flex preloads market and period data and switches without route waits or l
     await performance.getByRole("button", { name: `${days}-day performance`, exact: true }).click();
     await expect(performance.getByTestId("performance-total")).toHaveText(`+$${days}.00`, { timeout: 350 });
   }
-  for (const tab of await tabs.getByRole("button").all()) {
-    await tab.click();
-    await expect(tab).toHaveAttribute("aria-pressed", "true", { timeout: 350 });
+  for (const address of options) {
+    await picker.selectOption(address);
+    await expect(picker).toHaveValue(address, { timeout: 350 });
     await expect(detail.getByRole("heading", { name: "Market terms", exact: true })).toBeVisible();
   }
   expect(calls).toHaveLength(beforeCalls);

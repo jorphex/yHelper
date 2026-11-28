@@ -36,6 +36,7 @@ export function replaceQuery(
   params: ReadonlyURLSearchParams,
   updates: Record<string, string | number | null | undefined>,
   router?: ReturnType<typeof useRouter>,
+  hash = "",
 ): void {
   const next = new URLSearchParams(params.toString());
   for (const [key, value] of Object.entries(updates)) {
@@ -46,7 +47,7 @@ export function replaceQuery(
     next.set(key, String(value));
   }
   const query = next.toString();
-  const href = query ? `${pathname}?${query}` : pathname;
+  const href = `${pathname}${query ? `?${query}` : ""}${hash}`;
   if (router) router.replace(href, { scroll: false });
   else window.history.replaceState(null, "", href);
 }
