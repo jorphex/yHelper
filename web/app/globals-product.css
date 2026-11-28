@@ -22,7 +22,9 @@
 .home-research { display: flex; justify-content: space-between; align-items: center; gap: 24px; border-top: 1px solid var(--border-subtle); padding: 28px 0; margin-top: 24px; }
 .home-research h2 { font-size: 20px; margin: 0 0 8px; }
 .home-research .button { flex-shrink: 0; }
-.detail-section { border-top: 1px solid #333; margin: 32px 0; }
+.detail-section,
+.ruled-section { border-top: 1px solid #333; margin: 32px 0; }
+.ruled-section { padding-block-start: var(--space-4); }
 .detail-section > .detail-title { margin: 0 0 16px; padding: 16px 0 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
 .detail-section > .detail-body { padding: 8px 0 24px; }
 .detail-section p { max-width: 800px; color: var(--text-secondary); line-height: 1.6; font-size: 14px; }

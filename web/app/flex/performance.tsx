@@ -119,7 +119,7 @@ export function FlexPerformance({ days, onDays, marketHref }: {
     setError("");
     setMarket("");
   }
-  return <section className="section section-lg flex-performance" aria-labelledby="flex-performance-title">
+  return <section className="ruled-section flex-performance" aria-labelledby="flex-performance-title">
     <div className="flex-section-heading">
       <div><h2 className="card-title" id="flex-performance-title" tabIndex={-1}>Performance</h2>
         <p className="card-description">{address && !editing ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Active Flex markets"}{query.isPlaceholderData ? " · Updating…" : ""}</p>

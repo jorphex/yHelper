@@ -10,13 +10,14 @@ export const flexCopy = {
     activeDeposits: "Active market deposits",
   },
   hero: {
-    title: "Flex Markets",
-    blurb: "Ethereum lending rates and capacity.",
-    officialLink: "Flex app",
+    title: "Flex",
+    accent: "Lending markets",
+    blurb: "Rates and capacity on Ethereum.",
+    officialLink: "Open Flex",
   },
   markets: {
     title: "Markets",
-    description: "Active, endorsed lending markets.",
+    description: "Active, endorsed markets.",
     noActive: "No active markets.",
     headers: {
       market: "Market",
@@ -69,10 +70,7 @@ export const flexCopy = {
       sourceBlock: "Ethereum block {block}",
       sourceTime: "As of {time}",
     },
-    empty: {
-      title: "No active trove rates",
-      description: "No active borrowing positions.",
-    },
+    empty: "No active borrowing positions.",
     unavailable: {
       title: "Borrowing capacity unavailable.",
       retry: "Try again",
@@ -108,7 +106,7 @@ export const flexCopy = {
       medianLtv: "Median LTV",
       minimumBuffer: "Smallest max-LTV buffer",
       debtNearMax: "Debt share near max LTV",
-      largestDebtShare: "Largest single-trove debt share",
+      largestDebtShare: "Largest trove debt share",
     },
     loading: "Loading trove metrics…",
     empty: "No active troves in this market.",

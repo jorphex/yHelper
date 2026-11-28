@@ -44,11 +44,6 @@ test("Flex market links reveal the selected detail and retain periods", async ({
   await sort.selectOption("debt_usd:ascending");
   await expect(market.locator(".flex-card-sort-value")).toHaveText(/^Debt \$/);
   await expect(market.locator('[data-label="Idle liquidity"]')).toHaveText(/\$[\d,.]+\s*[\d,.]+ USDC/);
-  const sections = page.getByRole("navigation", { name: "Flex sections" });
-  for (const [link, heading] of [["Wallet P&L", "Performance"], ["Activity", "Protocol activity"], ["Markets", "Markets"]]) {
-    await sections.getByRole("link", { name: link, exact: true }).click();
-    await expect(page.getByRole("heading", { name: heading, exact: true })).toBeInViewport();
-  }
   await open.click();
   await expect(page).toHaveURL(/market=0x[0-9a-f]{40}#flex-detail-title$/);
   expect(new URL(page.url()).searchParams.get("days")).toBe("7");
@@ -61,7 +56,7 @@ test("Flex market links reveal the selected detail and retain periods", async ({
   await expect(heading).toBeInViewport();
 });
 
-test("Flex keeps the early keyboard jump to Performance in view", async ({ page }) => {
+test("Flex keeps the Activity deep link in view as market detail loads", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let releaseMarkets!: () => void;
   const marketsReady = new Promise<void>(resolve => { releaseMarkets = resolve; });
@@ -69,11 +64,8 @@ test("Flex keeps the early keyboard jump to Performance in view", async ({ page 
     await marketsReady;
     await route.continue();
   });
-  await page.goto("/flex");
-  const jump = page.getByRole("navigation", { name: "Flex sections" }).getByRole("link", { name: "Wallet P&L" });
-  const heading = page.getByRole("heading", { name: "Performance", exact: true });
-  await jump.focus();
-  await page.keyboard.press("Enter");
+  await page.goto("/flex#flex-activity-title");
+  const heading = page.getByRole("heading", { name: "Protocol activity", exact: true });
   await expect(heading).toBeFocused().finally(releaseMarkets);
   await expect(page.getByRole("heading", { name: "Rates", exact: true })).toBeVisible();
   await expect(heading).toBeInViewport();

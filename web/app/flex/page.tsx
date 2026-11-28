@@ -6,7 +6,6 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { DataLoadError } from "../components/error-state";
-import { EmptyState } from "../components/empty-state";
 import { TableSkeleton } from "../components/skeleton";
 import { TableWrap } from "../components/table-wrap";
 import { chartKeyIndex } from "../components/visuals/utils";
@@ -27,11 +26,7 @@ import { flexA11y, flexCopy } from "./copy";
 import { BorrowScenario } from "./borrow-scenario";
 import { FlexPerformance } from "./performance";
 
-const SECTION_LINKS = [
-  ["flex-markets-title", "Markets"],
-  ["flex-performance-title", "Wallet P&L"],
-  ["flex-activity-title", "Activity"],
-] as const;
+const SECTION_IDS = ["flex-markets-title", "flex-performance-title", "flex-activity-title"];
 
 const MARKET_COLUMNS = [
   { key: "deposits_usd", label: "Deposits", format: formatUsd },
@@ -495,7 +490,7 @@ function RedemptionPrioritySection({
     </div>
     {query.isLoading && !data ? <div className="skeleton flex-redemption-skeleton" /> : null}
     {query.error || data?.freshness.data_state === "unavailable" ? <div className="flex-redemption-error"><p>{flexCopy.redemptionPriority.unavailable.title}</p><button type="button" className="button button-secondary" onClick={() => query.refetch()}>{flexCopy.redemptionPriority.unavailable.retry}</button></div> : null}
-    {data && data.freshness.data_state !== "unavailable" && data.points.length === 0 ? <EmptyState title={flexCopy.redemptionPriority.empty.title} description={flexCopy.redemptionPriority.empty.description} icon="chart" /> : null}
+    {data && data.freshness.data_state !== "unavailable" && data.points.length === 0 ? <p className="muted">{flexCopy.redemptionPriority.empty}</p> : null}
     {data && data.freshness.data_state !== "unavailable" && data.points.length > 0 ? <RedemptionPriorityChart data={data} /> : null}
   </section>;
 }
@@ -570,6 +565,7 @@ function formatActivityAmount(raw: unknown, asset: FlexMarket["borrow_token"] | 
 }
 
 function FlexPageContent() {
+  const pageRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data, isLoading, error, refetch } = useFlexMarkets();
@@ -615,63 +611,39 @@ function FlexPageContent() {
   }, [selectedAddress]);
 
   useEffect(() => {
-    if (!showPage) return;
-    const navigation = document.querySelector<HTMLElement>(".flex-section-links");
-    const page = navigation?.closest(".flex-page");
-    if (!navigation || !page) return;
+    const page = pageRef.current;
+    const { hash } = window.location;
+    const id = hash.slice(1);
+    if (!page || !SECTION_IDS.includes(id)) return;
+    const title = document.getElementById(id);
+    if (!title) return;
 
     const events = new AbortController();
-    const options = { passive: true, signal: events.signal };
-    let tracked: { hash: string; observer: ResizeObserver } | undefined;
+    const observer = new ResizeObserver(() => {
+      if (window.location.hash === hash) title.scrollIntoView();
+    });
     const stop = () => {
-      tracked?.observer.disconnect();
-      tracked = undefined;
-    };
-    const follow = (hash: string) => {
-      stop();
-      const id = hash.slice(1);
-      if (!SECTION_LINKS.some(([section]) => section === id)) return;
-      const title = document.getElementById(id);
-      if (!title) return;
-
-      const align = () => {
-        if (window.location.hash === hash) title.scrollIntoView();
-      };
-      const observer = new ResizeObserver(align);
-      tracked = { hash, observer };
-      title.focus({ preventScroll: true });
-      align();
-      observer.observe(page);
-    };
-    for (const event of ["pointerdown", "keydown", "wheel"]) {
-      window.addEventListener(event, stop, options);
-    }
-    window.addEventListener("hashchange", () => {
-      if (window.location.hash !== tracked?.hash) stop();
-    }, options);
-    navigation.addEventListener("click", event => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      if (event.target instanceof HTMLAnchorElement) follow(event.target.hash);
-    }, options);
-    follow(window.location.hash);
-    return () => {
-      stop();
+      observer.disconnect();
       events.abort();
     };
+    for (const event of ["pointerdown", "keydown", "wheel", "hashchange"]) {
+      window.addEventListener(event, stop, { passive: true, signal: events.signal });
+    }
+    title.focus({ preventScroll: true });
+    title.scrollIntoView();
+    observer.observe(page);
+    return stop;
   }, [showPage]);
 
   if (!showPage) return <DataLoadError onRetry={() => refetch()} />;
 
   return (
-    <div className="flex-page">
+    <div className="flex-page" ref={pageRef}>
       <section className="page-header page-header-no-border">
-        <h1 className="page-title">{flexCopy.hero.title}</h1>
+        <h1 className="page-title">{flexCopy.hero.title}<br /><em className="page-title-accent">{flexCopy.hero.accent}</em></h1>
         <p className="page-description">{flexCopy.hero.blurb}</p>
-        <div className="flex-page-actions">
-          <nav className="flex-section-links" aria-label="Flex sections">
-            {SECTION_LINKS.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
-          </nav>
-          <a href="https://flexmeow.com" target="_blank" rel="noopener noreferrer">{flexCopy.hero.officialLink} <span aria-hidden="true">↗</span></a>
+        <div className="tab-bar-plain">
+          <a href="https://flexmeow.com" target="_blank" rel="noopener noreferrer" className="button button-primary">{flexCopy.hero.officialLink}</a>
         </div>
       </section>
 
@@ -680,11 +652,11 @@ function FlexPageContent() {
           <div><h2 className="card-title" id="flex-markets-title" tabIndex={-1}>{flexCopy.markets.title}</h2><p className="card-description">{flexCopy.markets.description}</p></div>
           {data?.freshness.indexed_through ? <p className="flex-market-freshness">{data.freshness.data_state === "ready" ? "Updated" : "Updates delayed. Last indexed"} <time dateTime={data.freshness.indexed_through}>{dateTime.format(new Date(data.freshness.indexed_through))} UTC</time></p> : null}
         </div>
-        {isLoading && !data ? <TableWrap><table className="decision-table" aria-labelledby="flex-markets-title"><tbody><TableSkeleton rows={2} columns={MARKET_COLUMNS.length + 1} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} marketHref={marketHref} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
+        {isLoading && !data ? <TableWrap className="flex-market-table-wrap"><table className="decision-table" aria-labelledby="flex-markets-title"><tbody><TableSkeleton rows={2} columns={MARKET_COLUMNS.length + 1} /></tbody></table></TableWrap> : active.length ? <MarketTable rows={active} marketHref={marketHref} /> : <p className="muted">{flexCopy.markets.noActive}</p>}
         <p className="section-note flex-market-note">Expected lender APR assumes all debt pays interest. Borrow rate is weighted by outstanding debt.</p>
       </section>
 
-      {selected ? <section className="section section-lg flex-detail-section" aria-label={flexCopy.detail.title}>
+      {selected ? <section className="ruled-section flex-detail-section" aria-label={flexCopy.detail.title}>
         <div className="flex-section-heading flex-detail-heading">
           <div>
             <h2 className="card-title" id="flex-detail-title" tabIndex={-1}>{selected.label}</h2>
@@ -723,7 +695,7 @@ function FlexPageContent() {
         </div>
         {history.isLoading && !history.data ? <div className="flex-chart-grid-layout"><div className="skeleton flex-chart-skeleton" /><div className="skeleton flex-chart-skeleton" /></div> : history.data?.points.length ? <HistoryCharts points={history.data.points} market={selected} /> : <p className="muted">{flexCopy.history.unavailable}</p>}
       </section> : null}
-      {requestedMarket && data && !selected ? <section className="section section-lg" aria-labelledby="flex-detail-title">
+      {requestedMarket && data && !selected ? <section className="ruled-section" aria-labelledby="flex-detail-title">
         <h2 className="card-title" id="flex-detail-title">{flexCopy.detail.title}</h2>
         <p className="muted">Market not found.</p>
         <Link className="report-link" href="/flex">View active markets</Link>
@@ -731,7 +703,7 @@ function FlexPageContent() {
 
       <FlexPerformance days={performanceDays} onDays={(value) => updateQuery({ pnl_days: value })} marketHref={marketHref} />
 
-      <section className="section section-lg flex-activity-section" aria-labelledby="flex-activity-title">
+      <section className="ruled-section flex-activity-section" aria-labelledby="flex-activity-title">
         <div className="flex-section-heading">
           <h2 className="card-title" id="flex-activity-title" tabIndex={-1}>{flexCopy.activity.title}</h2>
           <div className="flex-activity-filters">
@@ -767,7 +739,7 @@ function FlexPageContent() {
           })}</tbody>
         </table></TableWrap>
         {activity.isError ? <DataLoadError onRetry={() => activity.refetch()} /> : !activity.isLoading && activityRows.length === 0 ? <p className="muted">{flexCopy.activity.empty}</p> : null}
-        {activity.hasNextPage ? <button type="button" className="button button-ghost section-sm" disabled={activity.isFetchingNextPage} onClick={() => activity.fetchNextPage()}>{activity.isFetchingNextPage ? flexCopy.activity.loadingMore : flexCopy.activity.loadMore}</button> : null}
+        {activity.hasNextPage ? <button type="button" className="button button-ghost flex-activity-more" disabled={activity.isFetchingNextPage} onClick={() => activity.fetchNextPage()}>{activity.isFetchingNextPage ? flexCopy.activity.loadingMore : flexCopy.activity.loadMore}</button> : null}
       </section>
     </div>
   );
